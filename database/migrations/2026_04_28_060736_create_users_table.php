@@ -13,13 +13,21 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
+            $table->string('username')->unique();
+            $table->string('email');
             $table->string('password');
+            $table->float('highest_wpm')->default(0);
+            $table->integer('elo_rating')->default(0);
+            $table->integer('xp')->default(0);
+            $table->integer('coins')->default(0);
             $table->rememberToken();
             $table->timestamps();
+
+            $table->foreignId('role_id')->constrained('roles')->onDelete('cascade');
+            $table->foreignId('clan_id')->constrained('clans')->onDelete('cascade');
         });
+
+        
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
             $table->string('email')->primary();
