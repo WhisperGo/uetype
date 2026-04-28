@@ -18,9 +18,15 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'name',
+        'role_id',
+        'username',
         'email',
         'password',
+        'highest_wpm',
+        'elo_ranting',
+        'xp',
+        'coins',
+        'clan_id',
     ];
 
     /**
@@ -44,5 +50,25 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    public function clan()
+    {
+        return $this->belongsTo(Clan::class);
+    }
+
+    public function matchParticipants()
+    {
+        return $this->hasMany(MatchParticipant::class);
+    }
+
+    public function userItems()
+    {
+        return $this->hasMany(UserItem::class);
     }
 }
