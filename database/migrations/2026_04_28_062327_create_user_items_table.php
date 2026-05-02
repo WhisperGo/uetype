@@ -13,12 +13,10 @@ return new class extends Migration
     {
         Schema::create('user_items', function (Blueprint $table) {
             $table->id();
-            $table->boolean('is_equipped')->default(false);
-            $table->timestamp('purchased_at')->useCurrent();
-
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('item_id')->constrained('items')->onDelete('cascade');
-            $table->timestamps();
+            $table->boolean('is_equipped')->default(false);
+            $table->timestamp('purchased_at')->useCurrent();
         });
     }
 

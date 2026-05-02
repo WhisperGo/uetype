@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('items', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->enum('type', ['avatar', 'background']);
+            $table->string('name', 255);
+            $table->enum('type', ['theme', 'keyboard_sound', 'badge', 'border']);
             $table->integer('price');
             $table->timestamps();
         });

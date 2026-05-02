@@ -13,13 +13,12 @@ return new class extends Migration
     {
         Schema::create('matches', function (Blueprint $table) {
             $table->id();
-            $table->enum('match_type', ['solo', 'duo']);
-            $table->enum('status', ['pending', 'ongoing', 'completed']);
+            $table->foreignId('text_id')->constrained('texts')->onDelete('cascade');
+            $table->enum('match_type', ['solo_practice', 'ranked_duel', 'ranked_multiplayer']);
+            $table->enum('status', ['waiting', 'ongoing', 'completed', 'cancelled'])->default('waiting');
             $table->timestamp('started_at')->nullable();
             $table->timestamp('ended_at')->nullable();
             $table->timestamps();
-
-            $table->foreignId('text_id')->constrained('texts')->onDelete('cascade');
         });
     }
 

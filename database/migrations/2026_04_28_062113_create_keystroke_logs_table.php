@@ -13,12 +13,11 @@ return new class extends Migration
     {
         Schema::create('keystroke_logs', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('match_participant_id')->constrained('match_participants')->onDelete('cascade');
             $table->json('raw_keystrokes');
             $table->json('heatmap_data');
             $table->boolean('is_bot_flag')->default(false);
-            $table->timestamps();
-
-            $table->foreignId('match_participant_id')->constrained('match_participants')->onDelete('cascade');
+            $table->timestamp('created_at')->useCurrent();
         });
     }
 

@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('clans', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->text('tag');
+            $table->string('name', 100);
+            $table->string('tag');
             $table->string('leader_id');
             $table->integer('total_elo')->default(0);
             $table->timestamps();

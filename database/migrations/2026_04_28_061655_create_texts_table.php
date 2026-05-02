@@ -15,11 +15,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('language_id')->constrained('languages')->onDelete('cascade');
             $table->text('content');
-            $table->enum('mode', ['typing', 'reading']);
+            $table->enum('mode', ['wordlist', 'quote', 'code']);
             $table->enum('difficulty', ['easy', 'medium', 'hard']);
             $table->string('source_name');
             $table->timestamps();
-
         });
     }
 
