@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MatchParticipant extends Model
 {
@@ -16,17 +18,17 @@ class MatchParticipant extends Model
         'connection_status',
     ];
 
-    public function match()
+    public function match(): BelongsTo
     {
         return $this->belongsTo(Matches::class, 'match_id');
     }
 
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function keystrokeLogs()
+    public function keystrokeLogs(): HasMany
     {
         return $this->hasMany(KeystrokeLog::class);
     }

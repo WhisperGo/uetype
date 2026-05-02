@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Clan extends Model
 {
@@ -11,10 +12,9 @@ class Clan extends Model
         'name',
         'tag',
         'leader_id',
-        'total_elo',
     ];
 
-    public function users()
+    public function users(): HasMany
     {
         return $this->hasMany(User::class);
     }

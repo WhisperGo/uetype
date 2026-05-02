@@ -13,7 +13,7 @@ class Item extends Model
         'price',
     ];
 
-    public function userItems()
+    public function userItems(): HasMany
     {
         return $this->hasMany(UserItem::class);
     }

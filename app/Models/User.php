@@ -4,8 +4,10 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class User extends Authenticatable
 {
@@ -22,10 +24,6 @@ class User extends Authenticatable
         'username',
         'email',
         'password',
-        'highest_wpm',
-        'elo_ranting',
-        'xp',
-        'coins',
         'clan_id',
     ];
 
@@ -52,22 +50,22 @@ class User extends Authenticatable
         ];
     }
 
-    public function role()
+    public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
     }
 
-    public function clan()
+    public function clan(): BelongsTo
     {
         return $this->belongsTo(Clan::class);
     }
 
-    public function matchParticipants()
+    public function matchParticipants(): HasMany
     {
         return $this->hasMany(MatchParticipant::class);
     }
 
-    public function userItems()
+    public function userItems(): HasMany
     {
         return $this->hasMany(UserItem::class);
     }

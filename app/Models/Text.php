@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Text extends Model
 {
@@ -11,15 +13,14 @@ class Text extends Model
         'content',
         'mode',
         'difficulty',
-        'source_name',
     ];
 
-    public function language()
+    public function language(): BelongsTo
     {
         return $this->belongsTo(Language::class);
     }
 
-    public function matches()
+    public function matches(): HasMany
     {
         return $this->hasMany(Matches::class);
     }
