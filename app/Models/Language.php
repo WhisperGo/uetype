@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Language extends Model
 {
+    
+    public $timestamps = false;
+
     protected $fillable = [
         'code',
         'name',

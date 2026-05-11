@@ -16,12 +16,13 @@ return new class extends Migration
             $table->foreignId('role_id')->constrained('roles')->onDelete('cascade');
             $table->string('username')->unique();
             $table->string('email');
+            $table->timestamp('email_verified_at')->nullable(); 
             $table->string('password');
             $table->float('highest_wpm', 6, 2)->default(0.00);
             $table->integer('elo_rating')->default(0);
             $table->integer('xp')->default(0);
             $table->integer('coins')->default(0);
-            $table->foreignId('clan_id')->constrained('clans')->onDelete('cascade');
+            $table->foreignId('clan_id')->nullable()->constrained('clans')->onDelete('cascade');
             $table->rememberToken();
             $table->timestamps();
 
