@@ -11,10 +11,11 @@ class KeystrokeLog extends Model
         'match_participant_id',
         'heatmap_data',
         'is_bot_flag',
+        'raw_keystroke',
     ];
 
     protected $casts = [
-        'raw_keystroke' => 'array',
+        'raw_keystrokes' => 'array',
         'heatmap_data' => 'array',
     ];
 

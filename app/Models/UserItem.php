@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\Item;
 
 class UserItem extends Model
 {
@@ -18,8 +21,10 @@ class UserItem extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function item(): BelongsTo
+    public function item(): BelongsToMany
     {
-        return $this->belongsTo(Item::class);
+        return $this->belongsToMany(Item::class, 'user_items')
+                ->withPivot('is_equipped')
+                ->withTimestamps();
     }
 }

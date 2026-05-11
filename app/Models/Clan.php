@@ -14,6 +14,11 @@ class Clan extends Model
         'leader_id',
     ];
 
+    public function leader()
+    {
+        return $this->belongsTo(User::class, 'leader_id');
+    }
+
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
