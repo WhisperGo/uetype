@@ -9,7 +9,8 @@
 
     <div
         class="relative text-3xl font-mono leading-relaxed tracking-tight select-none outline-none overflow-hidden h-40">
-        <div class="flex flex-wrap content-start gap-x-4"> @php
+        <div class="flex flex-wrap content-start gap-x-4"> 
+            @php
             // Kita pecah teks menjadi kumpulan kata untuk rendering yang lebih baik
             $words = explode(' ', $textToType);
             $charPointer = 0;
