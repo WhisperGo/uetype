@@ -1,7 +1,7 @@
 <div class="min-h-screen bg-[#323437] text-[#646669] font-mono selection:bg-yellow-500 selection:text-black outline-none"
-    wire:key="typing-container-{{ $mainMode }}-{{ $subMode }}-{{ $textToType }}" x-data="{
-        currentMain: @entangle('mainMode').live,
-        currentSub: @entangle('subMode').live,
+    wire:key="typing-test-app" x-data="{
+        currentMain: @entangle('mainMode'),
+        currentSub: @entangle('subMode'),
         ...typingGame(@js($textToType))
     }"
     @mode-changed.window="resetWithNewText($event.detail)" {{-- PERBAIKAN KRUSIAL: Gunakan $event, bukan e --}}
@@ -73,8 +73,7 @@
             </div>
         </div>
 
-        <div class="relative min-h-[150px] text-3xl leading-relaxed tracking-tight select-none outline-none"
-            wire:ignore.self>
+        <div class="relative min-h-[150px] text-3xl leading-relaxed tracking-tight select-none outline-none">
             <div class="flex flex-wrap content-start gap-x-[0.5em]">
                 @php
                     $words = explode(' ', $textToType);
@@ -142,6 +141,10 @@
             isStarted: false,
             isFinished: false,
             timerInterval: null,
+
+            init() {
+                this.timer = (this.currentMain === 'time') ? parseInt(this.currentSub) : 0;
+            },
 
             resetWithNewText(detail) {
                 clearInterval(this.timerInterval);

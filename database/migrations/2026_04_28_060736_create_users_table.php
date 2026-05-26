@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('email');
             $table->timestamp('email_verified_at')->nullable(); 
             $table->string('password');
-            $table->float('highest_wpm', 6, 2)->default(0.00);
+            $table->decimal('highest_wpm', 6, 2)->default(0.00);
             $table->integer('elo_rating')->default(0);
             $table->integer('xp')->default(0);
             $table->integer('coins')->default(0);
@@ -27,8 +27,6 @@ return new class extends Migration
             $table->timestamps();
 
         });
-
-        
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
             $table->string('email')->primary();
@@ -44,6 +42,14 @@ return new class extends Migration
             $table->longText('payload');
             $table->integer('last_activity')->index();
         });
+
+        Schema::create('user_items', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('item_id')->constrained('items')->onDelete('cascade');
+            $table->boolean('is_equipped')->default(false);
+            $table->timestamp('purchased_at')->useCurrent();
+        });
     }
 
     /**
@@ -54,5 +60,6 @@ return new class extends Migration
         Schema::dropIfExists('users');
         Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
+        Schema::dropIfExists('user_items');
     }
 };

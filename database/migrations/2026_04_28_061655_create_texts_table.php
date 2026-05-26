@@ -17,7 +17,7 @@ return new class extends Migration
             $table->text('content');
             $table->enum('mode', ['wordlist', 'quote', 'code']);
             $table->enum('difficulty', ['easy', 'medium', 'hard']);
-            $table->string('source_name');
+            $table->string('author');
             $table->timestamps();
         });
     }

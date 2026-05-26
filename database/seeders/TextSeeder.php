@@ -43,7 +43,7 @@ class TextSeeder extends Seeder
                 'content' => implode(' ', $chunk), // Gabungkan array jadi string
                 'mode' => 'wordlist',
                 'difficulty' => 'easy', // Default
-                'source_name' => 'Monkeytype',
+                'author' => 'Monkeytype',
             ]);
         }
 
