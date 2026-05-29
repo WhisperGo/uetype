@@ -89,8 +89,7 @@
 
                     <!-- SINGLE SMOOTH CURSOR -->
                     <div x-show="!isFinished"
-                        class="absolute w-[2.5px] bg-yellow-500 transition-all duration-100 ease-out z-20 rounded"
-                        style="height: 1.2em; top: 0; left: 0;"
+                        class="absolute top-0 left-0 w-[2.5px] h-[1.5em] bg-yellow-500 transition-all duration-100 ease-out z-20 rounded"
                         :style="`transform: translate(${cursorLeft}px, ${cursorTop}px);`"
                         :class="isTyping ? '' : 'animate-[pulse_0.8s_infinite]'">
                     </div>
@@ -103,16 +102,11 @@
                     @foreach ($words as $word)
                         <div class="flex" wire:key="word-{{ $loop->index }}-{{ $textToType }}">
                             @foreach (str_split($word) as $char)
-                                <span id="char-{{ $charPointer }}"
-                                    class="char-element relative transition-colors duration-100 inline-block"
+                                <span id="char-{{ $charPointer }}" class="char-element relative transition-colors duration-100 inline-block"
                                     :class="{
-                                        'text-[#d1d0c5]': {{ $charPointer }} < currentIndex && inputResults[
-                                            {{ $charPointer }}] === true,
-                                        'text-[#ca4754] border-b-2 border-[#ca4754]': {{ $charPointer }} <
-                                            currentIndex &&
-                                            inputResults[{{ $charPointer }}] === false,
-                                        'text-[#646669]': {{ $charPointer }} > currentIndex,
-                                        'text-[#d1d0c5]': {{ $charPointer }} === currentIndex
+                                        'text-[#d1d0c5]': {{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === true,
+                                        'text-[#ca4754] border-b-2 border-[#ca4754]': {{ $charPointer }} < currentIndex && (inputResults[{{ $charPointer }}] === false || inputResults[{{ $charPointer }}] === 'skipped'),
+                                        'text-[#646669]': {{ $charPointer }} >= currentIndex
                                     }">
                                     {{ $char }}
                                 </span>
@@ -179,13 +173,23 @@
                 cursorTop: 0,
                 isTyping: false,
                 typingTimeout: null,
+                totalKeystrokes: 0,
+                correctKeystrokes: 0,
+                wpmHistory: [],
+                rawHistory: [],
+                missedChars: {},
 
                 init() {
                     this.timer = (this.currentMain === 'time') ? parseInt(this.currentSub) : 0;
-
+                    
                     this.wordBounds = [];
                     this.extraChars = {};
                     this.currentWordIndex = 0;
+                    this.totalKeystrokes = 0;
+                    this.correctKeystrokes = 0;
+                    this.wpmHistory = [];
+                    this.rawHistory = [];
+                    this.missedChars = {};
                     let start = 0;
                     let wordIdx = 0;
                     for (let i = 0; i < this.targetArray.length; i++) {
@@ -214,7 +218,7 @@
                     const bounds = this.wordBounds[wordIndex];
                     if (!bounds) return false;
                     for (let i = bounds.start; i <= bounds.end; i++) {
-                        if (this.inputResults[i] === false || this.inputResults[i] === undefined) {
+                        if (this.inputResults[i] === false || this.inputResults[i] === 'skipped' || this.inputResults[i] === undefined) {
                             return true;
                         }
                     }
@@ -304,6 +308,13 @@
                                 this.timer = timeElapsed;
                             }
                             this.calculateStats();
+                            
+                            if (timeElapsed > 0 && !this.isFinished) {
+                                this.wpmHistory.push(this.wpm);
+                                const timeElapsedMins = (Date.now() - this.startTime) / 60000;
+                                const raw = Math.round((this.totalKeystrokes / 5) / timeElapsedMins) || 0;
+                                this.rawHistory.push(raw);
+                            }
                         }, 1000);
                     }
 
@@ -326,8 +337,20 @@
                                     let prevWordIdx = this.currentWordIndex - 1;
                                     if (this.wordHasError(prevWordIdx)) {
                                         this.currentWordIndex--;
-                                        this.currentIndex = this.wordBounds[this.currentWordIndex].space;
-                                        this.inputResults[this.currentIndex] = null;
+                                        
+                                        let prevBounds = this.wordBounds[this.currentWordIndex];
+                                        let jumpIndex = prevBounds.space;
+                                        
+                                        // Hapus status pada spasi
+                                        this.inputResults[jumpIndex] = null;
+                                        
+                                        // Bersihkan status 'skipped' dan lompat mundur melewati huruf-huruf yang tidak pernah diketik
+                                        while(jumpIndex > prevBounds.start && this.inputResults[jumpIndex - 1] === 'skipped') {
+                                            jumpIndex--;
+                                            this.inputResults[jumpIndex] = null;
+                                        }
+                                        
+                                        this.currentIndex = jumpIndex;
                                         this.$nextTick(() => this.updatePosition());
                                     }
                                 }
@@ -342,6 +365,9 @@
                         return;
                     }
 
+                    // Mulai dari titik ini, berarti user menekan tuts karakter/spasi (bukan backspace)
+                    this.totalKeystrokes++;
+
                     // Jika kursor sedang di posisi spasi pembatas antar kata
                     if (this.currentIndex === bounds.space) {
                         if (e.key !== ' ') {
@@ -355,6 +381,7 @@
                             return;
                         } else {
                             // SPASI DITEKAN: Pindah ke kata selanjutnya
+                            this.correctKeystrokes++; // Spasi di akhir kata adalah tuts benar
                             this.inputResults[this.currentIndex] = true;
                             this.currentIndex++;
                             this.currentWordIndex++;
@@ -368,10 +395,16 @@
                     // Jika user menekan spasi di tengah kata (belum selesai)
                     if (e.key === ' ') {
                         for (let i = this.currentIndex; i <= bounds.end; i++) {
-                            this.inputResults[i] = false; // Tandai karakter yang terlewat sebagai salah
+                            this.inputResults[i] = 'skipped'; // Tandai terlewat
+                            
+                            // Track missed character
+                            const expectedChar = this.targetArray[i].toLowerCase();
+                            if (expectedChar !== ' ' && expectedChar.length === 1) {
+                                this.missedChars[expectedChar] = (this.missedChars[expectedChar] || 0) + 1;
+                            }
                         }
                         if (bounds.space !== null) {
-                            this.inputResults[bounds.space] = true;
+                            this.inputResults[bounds.space] = 'skipped'; // Jangan berikan WPM gratis untuk spasi yang di-skip
                             this.currentIndex = bounds.space + 1;
                             this.currentWordIndex++;
                         } else {
@@ -384,7 +417,18 @@
                     }
 
                     // Pengetikan normal
-                    this.inputResults[this.currentIndex] = (e.key === this.targetArray[this.currentIndex]);
+                    const isCorrect = (e.key === this.targetArray[this.currentIndex]);
+                    if (isCorrect) {
+                        this.correctKeystrokes++;
+                    } else {
+                        // Track missed character
+                        const expectedChar = this.targetArray[this.currentIndex].toLowerCase();
+                        if (expectedChar !== ' ' && expectedChar.length === 1) {
+                            this.missedChars[expectedChar] = (this.missedChars[expectedChar] || 0) + 1;
+                        }
+                    }
+                    
+                    this.inputResults[this.currentIndex] = isCorrect;
                     this.currentIndex++;
 
                     if (this.currentIndex === this.targetArray.length) this.finish();
@@ -394,16 +438,43 @@
 
                 calculateStats() {
                     if (!this.startTime) return;
-                    const timeElapsed = (Date.now() - this.startTime) / 60000;
+                    
+                    const elapsedMs = Date.now() - this.startTime;
+                    
+                    // Pencegahan WPM meledak (infinite/ribuan) di awal ketikan
+                    // Kita asumsikan minimal waktu berlalu adalah 1 detik untuk kalkulasi live
+                    const effectiveMs = (elapsedMs < 1000 && !this.isFinished) ? 1000 : elapsedMs;
+                    const timeElapsed = effectiveMs / 60000;
+                    
                     if (timeElapsed <= 0) return;
+
+                    // 1. WPM Calculation (Berdasarkan jumlah tuts benar dibagi 5)
+                    // Pada mode Monkeytype default, setiap ketikan benar akan menyumbang ke WPM,
+                    // dan kita telah memastikan spasi 'skip' tidak lagi terhitung sebagai tuts benar.
                     const correctChars = this.inputResults.filter(r => r === true).length;
                     this.wpm = Math.round((correctChars / 5) / timeElapsed) || 0;
-                    this.accuracy = Math.round((correctChars / this.currentIndex) * 100) || 0;
+                    
+                    // 2. Accuracy Calculation (Monkeytype style: based on physical keystrokes)
+                    if (this.totalKeystrokes > 0) {
+                        this.accuracy = Math.round((this.correctKeystrokes / this.totalKeystrokes) * 100);
+                    } else {
+                        this.accuracy = 0;
+                    }
                 },
 
                 finish() {
                     this.isFinished = true;
                     clearInterval(this.timerInterval);
+
+                    let timeSpent = this.timer;
+                    if (this.currentMain === 'time') {
+                        timeSpent = parseInt(this.currentSub) - this.timer;
+                    }
+
+                    let correct = this.correctKeystrokes || this.inputResults.filter(r => r === true).length;
+                    let total = this.totalKeystrokes || this.currentIndex;
+
+                    this.$wire.saveResult(this.wpm, this.accuracy, timeSpent, total, correct, this.wpmHistory, this.rawHistory, this.missedChars);
                 }
             }
         }

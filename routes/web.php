@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Livewire\TypingEngine;
+use App\Livewire\TypingResult;
 
 Route::get('/', function () {
     return view('welcome');
@@ -19,5 +20,6 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::get('/typing', TypingEngine::class);
+Route::get('/result', TypingResult::class)->name('typing.result');
 
 require __DIR__.'/auth.php';

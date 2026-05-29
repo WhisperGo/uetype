@@ -18,6 +18,13 @@ class TypingEngine extends Component
 
     public function mount()
     {
+        // Pulihkan preferensi sebelumnya jika ada
+        if (session()->has('typing_preferences')) {
+            $prefs = session('typing_preferences');
+            $this->mainMode = $prefs['mode'] ?? 'time';
+            $this->subMode = $prefs['subMode'] ?? '30';
+        }
+
         $this->generateText();
     }
 
@@ -26,6 +33,14 @@ class TypingEngine extends Component
     {
         $this->mainMode = $main;
         $this->subMode = $sub;
+        
+        // Simpan preferensi pengguna ke session agar tidak reset
+        session()->put('typing_preferences', [
+            'mode' => $main,
+            'subMode' => $sub
+        ]);
+        session()->save();
+
         $this->generateText();
 
         // Kirim event dengan detail teks baru, mode, dan sub-mode
@@ -79,6 +94,25 @@ class TypingEngine extends Component
                 $this->textToType = "error: file wordlist tidak ditemukan";
             }
         }
+    }
+
+    public function saveResult($wpm, $accuracy, $time, $totalKeystrokes, $correctKeystrokes, $wpmHistory = [], $rawHistory = [], $missedChars = [])
+    {
+        session()->put('typing_result', [
+            'wpm' => $wpm,
+            'accuracy' => $accuracy,
+            'time' => $time,
+            'mode' => $this->mainMode,
+            'subMode' => $this->subMode,
+            'totalKeystrokes' => $totalKeystrokes,
+            'correctKeystrokes' => $correctKeystrokes,
+            'wpmHistory' => $wpmHistory,
+            'rawHistory' => $rawHistory,
+            'missedChars' => $missedChars,
+        ]);
+        session()->save();
+
+        $this->redirect(route('typing.result'), navigate: true);
     }
 
     public function render()
