@@ -12,7 +12,8 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                sans: ['"JetBrains Mono"', ...defaultTheme.fontFamily.sans],
+                mono: ['"JetBrains Mono"', ...defaultTheme.fontFamily.mono],
             },
         },
     },

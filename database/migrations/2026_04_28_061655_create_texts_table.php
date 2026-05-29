@@ -18,6 +18,7 @@ return new class extends Migration
             $table->enum('mode', ['wordlist', 'quote', 'code']);
             $table->enum('difficulty', ['easy', 'medium', 'hard']);
             $table->string('author');
+            $table->integer('word_count')->nullable();
             $table->timestamps();
         });
     }

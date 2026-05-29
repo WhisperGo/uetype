@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use Livewire\Component;
 use App\Models\Text;
+use Illuminate\Support\Facades\File;
 
 class TypingEngine extends Component
 {
@@ -48,24 +49,35 @@ class TypingEngine extends Component
 
     public function generateText()
     {
-        // Logika pengambilan teks berdasarkan mode
-        $query = Text::query();
-
         if ($this->mainMode === 'quote') {
-            $query->where('mode', 'quote');
-            // Tambahkan logika difficulty/length di sini nanti
+            $text = Text::where('mode', 'quote')->inRandomOrder()->first();
+            $this->textToType = $text ? $text->content : "Kutipan belum tersedia di database.";
         } else {
-            $query->where('mode', 'wordlist');
-        }
-
-        $text = $query->inRandomOrder()->first();
-        
-        // Jika mode 'words', kita potong jumlah katanya sesuai subMode
-        if ($this->mainMode === 'words' && $text) {
-            $words = explode(' ', $text->content);
-            $this->textToType = implode(' ', array_slice($words, 0, (int)$this->subMode));
-        } else {
-            $this->textToType = $text ? $text->content : "siapkan jemari anda untuk tantangan uetype";
+            // Mode time atau words menggunakan file JSON
+            // Secara default menggunakan english.json (bisa disesuaikan nanti dengan state bahasa)
+            $path = base_path('database/data/indonesian.json');
+            
+            if (File::exists($path)) {
+                $jsonString = File::get($path);
+                $data = json_decode($jsonString, true);
+                
+                // Pastikan data['words'] ada dan berupa array
+                if (is_array($data) && isset($data['words']) && is_array($data['words'])) {
+                    $wordsArray = $data['words'];
+                    shuffle($wordsArray);
+                    
+                    // Jika mode time, kita berikan 100 kata (atau cukup banyak agar tidak habis)
+                    // Jika mode words, kita berikan sesuai jumlah yang dipilih
+                    $limit = ($this->mainMode === 'words') ? (int)$this->subMode : 100;
+                    $selectedWords = array_slice($wordsArray, 0, $limit);
+                    
+                    $this->textToType = implode(' ', $selectedWords);
+                } else {
+                    $this->textToType = "error: struktur file json tidak valid";
+                }
+            } else {
+                $this->textToType = "error: file wordlist tidak ditemukan";
+            }
         }
     }
 
