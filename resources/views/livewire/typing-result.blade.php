@@ -1,10 +1,10 @@
 <div class="min-h-screen bg-[#323437] text-[#646669] font-mono selection:bg-yellow-500 selection:text-black outline-none flex py-12"
      x-data
      @keydown.window="if($event.key === 'Tab') { $event.preventDefault(); document.getElementById('restartButton').focus(); }">
-    <div class="max-w-4xl w-full px-4 m-auto">
+    <div class="max-w-5xl w-full px-4 m-auto">
         
         <!-- Headers -->
-        <div class="flex gap-4 mb-10 text-gray-500 text-lg tracking-widest justify-center">
+        <div class="flex gap-4 mb-8 text-gray-500 text-lg tracking-widest justify-center">
             <span class="text-yellow-500">{{ $mode }}</span>
             <span>/</span>
             <span class="text-yellow-500">{{ $subMode }}</span>
@@ -41,7 +41,7 @@
         </div>
 
         <!-- Chart -->
-        <div class="mt-16 w-full h-64" wire:ignore>
+        <div class="mt-12 w-full h-56 md:h-64" wire:ignore>
             <canvas id="wpmChart"></canvas>
         </div>
 
@@ -95,7 +95,12 @@
                         scales: {
                             x: {
                                 grid: { color: '#2c2e31' },
-                                ticks: { color: '#646669' }
+                                ticks: { 
+                                    color: '#646669',
+                                    autoSkip: true,
+                                    maxTicksLimit: 10,
+                                    maxRotation: 0
+                                }
                             },
                             y: {
                                 grid: { color: '#2c2e31' },
@@ -138,8 +143,8 @@
             $maxMiss = count($missedChars) > 0 ? max($missedChars) : 0;
         @endphp
         
-        <div class="mt-20 flex flex-col items-center gap-2">
-            <h3 class="text-gray-500 text-xl tracking-widest mb-6">heatmap</h3>
+        <div class="mt-12 flex flex-col items-center gap-2">
+            <h3 class="text-gray-500 text-xl tracking-widest mb-4">heatmap</h3>
             <div class="flex flex-col gap-2 md:gap-3">
                 @foreach($keyboard as $rowIndex => $row)
                     <div class="flex justify-center gap-2 md:gap-3" style="margin-left: {{ $rowIndex * 1.5 }}rem;">
@@ -166,7 +171,7 @@
             </div>
         </div>
 
-        <div class="mt-24 flex justify-center">
+        <div class="mt-12 flex justify-center">
             <a id="restartButton" href="/typing" wire:navigate class="text-gray-600 hover:text-[#d1d0c5] focus:text-yellow-500 focus:scale-110 transition-all transform hover:scale-110 outline-none p-2 rounded-xl group" title="Next Test">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 group-hover:stroke-yellow-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />

@@ -12,6 +12,8 @@ class Matches extends Model
         'text_id',
         'match_type',
         'status',
+        'mode_played',
+        'generated_text',
         'started_at',
         'ended_at',
     ];

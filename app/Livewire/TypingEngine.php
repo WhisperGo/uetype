@@ -5,6 +5,9 @@ namespace App\Livewire;
 use Livewire\Component;
 use App\Models\Text;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Auth;
+use App\Models\Matches;
+use App\Models\MatchParticipant;
 
 class TypingEngine extends Component
 {
@@ -81,10 +84,16 @@ class TypingEngine extends Component
                     $wordsArray = $data['words'];
                     shuffle($wordsArray);
                     
-                    // Jika mode time, kita berikan 100 kata (atau cukup banyak agar tidak habis)
+                    // Jika mode time, kita berikan 500 kata (cukup untuk tes 120 detik, namun jauh lebih ringan untuk performa browser)
                     // Jika mode words, kita berikan sesuai jumlah yang dipilih
-                    $limit = ($this->mainMode === 'words') ? (int)$this->subMode : 100;
-                    $selectedWords = array_slice($wordsArray, 0, $limit);
+                    $limit = ($this->mainMode === 'words') ? (int)$this->subMode : 350;
+                    
+                    $selectedWords = [];
+                    while (count($selectedWords) < $limit) {
+                        shuffle($wordsArray);
+                        $needed = $limit - count($selectedWords);
+                        $selectedWords = array_merge($selectedWords, array_slice($wordsArray, 0, $needed));
+                    }
                     
                     $this->textToType = implode(' ', $selectedWords);
                 } else {
@@ -98,6 +107,41 @@ class TypingEngine extends Component
 
     public function saveResult($wpm, $accuracy, $time, $totalKeystrokes, $correctKeystrokes, $wpmHistory = [], $rawHistory = [], $missedChars = [])
     {
+        if (Auth::check()) {
+            $user = Auth::user();
+            
+            // 1. Buat record di tabel Matches
+            $match = Matches::create([
+                'match_type' => 'solo_practice',
+                'status' => 'completed',
+                'mode_played' => $this->mainMode === 'quote' ? 'quote' : 'wordlist',
+                'started_at' => now()->subSeconds($time),
+                'ended_at' => now(),
+            ]);
+
+            // 2. Buat record di tabel MatchParticipants
+            MatchParticipant::create([
+                'match_id' => $match->id,
+                'user_id' => $user->id,
+                'wpm' => $wpm,
+                'accuracy' => $accuracy,
+                'placement' => 1,
+            ]);
+
+            // 3. Update User stats
+            $gainedXp = round($wpm * ($accuracy / 100));
+            $gainedCoins = round($wpm / 2);
+
+            $user->xp += $gainedXp;
+            $user->coins += $gainedCoins;
+
+            if ($wpm > $user->highest_wpm) {
+                $user->highest_wpm = $wpm;
+            }
+
+            $user->save();
+        }
+
         session()->put('typing_result', [
             'wpm' => $wpm,
             'accuracy' => $accuracy,

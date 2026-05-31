@@ -1,5 +1,5 @@
 <div
-    class="min-h-screen bg-[#323437] text-[#646669] font-mono selection:bg-yellow-500 selection:text-black outline-none">
+    class="min-h-screen bg-typing-bg text-typing-muted font-mono selection:bg-typing-accent selection:text-black outline-none">
     <div wire:key="typing-app-{{ str()->random(10) }}" x-data="{
         currentMain: @entangle('mainMode'),
         currentSub: @entangle('subMode'),
@@ -19,22 +19,22 @@
             <div class="flex justify-center mb-10 transition-all duration-500"
                 :class="isStarted ? 'opacity-0 -translate-y-10 pointer-events-none' : 'opacity-100'">
                 <div
-                    class="flex items-center gap-6 bg-[#2c2e31] px-6 py-2 rounded-xl text-sm shadow-xl border border-gray-800">
+                    class="flex items-center gap-6 bg-typing-surface px-6 py-2 rounded-xl text-sm shadow-xl border border-gray-800">
                     <div class="flex items-center gap-4 border-r border-gray-700 pr-6 text-gray-500 font-bold">
                         <button
                             @click.prevent="currentMain = 'time'; currentSub = '30'; $wire.setMode('time', '30'); $el.blur()"
                             class="flex items-center gap-2 transition-colors duration-200 py-1 px-2 rounded-md outline-none"
-                            :class="currentMain === 'time' ? 'text-yellow-500' : 'hover:text-gray-200'">time</button>
+                            :class="currentMain === 'time' ? 'text-typing-accent' : 'hover:text-gray-200'">time</button>
 
                         <button
                             @click.prevent="currentMain = 'words'; currentSub = '50'; $wire.setMode('words', '50'); $el.blur()"
                             class="flex items-center gap-2 transition-colors duration-200 py-1 px-2 rounded-md outline-none"
-                            :class="currentMain === 'words' ? 'text-yellow-500' : 'hover:text-gray-200'">words</button>
+                            :class="currentMain === 'words' ? 'text-typing-accent' : 'hover:text-gray-200'">words</button>
 
                         <button
                             @click.prevent="currentMain = 'quote'; currentSub = 'medium'; $wire.setMode('quote', 'medium'); $el.blur()"
                             class="flex items-center gap-2 transition-colors duration-200 py-1 px-2 rounded-md outline-none"
-                            :class="currentMain === 'quote' ? 'text-yellow-500' : 'hover:text-gray-200'">quote</button>
+                            :class="currentMain === 'quote' ? 'text-typing-accent' : 'hover:text-gray-200'">quote</button>
                     </div>
 
                     <div class="flex items-center gap-2">
@@ -45,7 +45,7 @@
                                         @click.prevent="currentSub = '{{ $t }}'; $wire.setMode('time', '{{ $t }}'); $el.blur()"
                                         class="px-2 py-0.5 rounded transition-all duration-200 outline-none"
                                         :class="currentSub == '{{ $t }}' ?
-                                            'text-yellow-500 outline outline-2 outline-yellow-500/50' :
+                                            'text-typing-accent outline outline-2 outline-typing-accent/50' :
                                             'hover:text-gray-200'">{{ $t }}</button>
                                 @endforeach
                             </div>
@@ -57,7 +57,7 @@
                                         @click.prevent="currentSub = '{{ $w }}'; $wire.setMode('words', '{{ $w }}'); $el.blur()"
                                         class="px-2 py-0.5 rounded transition-all duration-200 outline-none"
                                         :class="currentSub == '{{ $w }}' ?
-                                            'text-yellow-500 outline outline-2 outline-yellow-500/50' :
+                                            'text-typing-accent outline outline-2 outline-typing-accent/50' :
                                             'hover:text-gray-200'">{{ $w }}</button>
                                 @endforeach
                             </div>
@@ -69,13 +69,13 @@
             <div class="flex gap-10 mb-6 text-3xl transition-opacity duration-300"
                 :class="isStarted ? 'opacity-100' : 'opacity-0'">
                 <div><span class="text-xs block text-gray-500 font-bold uppercase tracking-widest">wpm</span> <span
-                        class="text-yellow-500 font-bold" x-text="wpm">0</span></div>
+                        class="text-typing-accent font-bold" x-text="wpm">0</span></div>
                 <div><span class="text-xs block text-gray-500 font-bold uppercase tracking-widest">acc</span> <span
-                        class="text-yellow-500 font-bold" x-text="accuracy">0</span>%</div>
+                        class="text-typing-accent font-bold" x-text="accuracy">0</span>%</div>
                 <div>
                     <span class="text-xs block text-gray-500 font-bold uppercase tracking-widest">time</span>
                     <span class="transition-colors duration-300 font-bold"
-                        :class="(currentMain === 'time' && timer < 5 && isStarted) ? 'text-[#ca4754]' : 'text-yellow-500'"
+                        :class="(currentMain === 'time' && timer < 5 && isStarted) ? 'text-typing-error' : 'text-typing-accent'"
                         x-text="timer">0</span>
                 </div>
             </div>
@@ -89,7 +89,7 @@
 
                     <!-- SINGLE SMOOTH CURSOR -->
                     <div x-show="!isFinished"
-                        class="absolute top-0 left-0 w-[2.5px] h-[1.5em] bg-yellow-500 transition-all duration-100 ease-out z-20 rounded"
+                        class="absolute top-0 left-0 w-[2.5px] h-[1.5em] bg-typing-accent transition-all duration-100 ease-out z-20 rounded"
                         :style="`transform: translate(${cursorLeft}px, ${cursorTop}px);`"
                         :class="isTyping ? '' : 'animate-[pulse_0.8s_infinite]'">
                     </div>
@@ -104,9 +104,10 @@
                             @foreach (str_split($word) as $char)
                                 <span id="char-{{ $charPointer }}" class="char-element relative transition-colors duration-100 inline-block"
                                     :class="{
-                                        'text-[#d1d0c5]': {{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === true,
-                                        'text-[#ca4754] border-b-2 border-[#ca4754]': {{ $charPointer }} < currentIndex && (inputResults[{{ $charPointer }}] === false || inputResults[{{ $charPointer }}] === 'skipped'),
-                                        'text-[#646669]': {{ $charPointer }} >= currentIndex
+                                        'text-typing-text': {{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === true,
+                                        'text-typing-error': {{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === false,
+                                        'text-typing-muted': {{ $charPointer }} >= currentIndex || ({{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === 'skipped'),
+                                        'border-b-2 border-typing-error': {{ $charPointer }} < currentIndex && (inputResults[{{ $charPointer }}] === false || inputResults[{{ $charPointer }}] === 'skipped')
                                     }">
                                     {{ $char }}
                                 </span>
@@ -119,7 +120,7 @@
                                 <template x-for="(extra, idx) in extraChars[{{ $loop->index }}]"
                                     :key="idx">
                                     <span :id="'extra-' + {{ $loop->index }} + '-' + idx"
-                                        class="char-element relative transition-colors duration-100 inline-block text-[#ca4754] tracking-tight opacity-90">
+                                        class="char-element relative transition-colors duration-100 inline-block text-typing-error tracking-tight opacity-90">
                                         <span x-text="extra"></span>
                                     </span>
                                 </template>
@@ -128,7 +129,7 @@
                             @if (!$loop->last)
                                 <span id="char-{{ $charPointer }}"
                                     class="char-element relative w-[0.5em] inline-block"
-                                    :class="inputResults[{{ $charPointer }}] === false ? 'bg-[#ca4754]/30' : ''">
+                                    :class="inputResults[{{ $charPointer }}] === false ? 'bg-typing-error/30' : ''">
                                     &nbsp;
                                 </span>
                                 @php $charPointer++; @endphp
@@ -140,7 +141,7 @@
 
             <div class="mt-20 flex justify-center">
                 <button id="restartButton" @click.prevent="$wire.restart(); $el.blur()"
-                    class="text-gray-600 hover:text-[#d1d0c5] focus:text-yellow-500 focus:scale-110 transition-all transform hover:scale-110 outline-none p-2 rounded-xl">
+                    class="text-gray-600 hover:text-typing-text focus:text-typing-accent focus:scale-110 transition-all transform hover:scale-110 outline-none p-2 rounded-xl">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
                         stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -394,6 +395,11 @@
 
                     // Jika user menekan spasi di tengah kata (belum selesai)
                     if (e.key === ' ') {
+                        // Mencegah spam spasi: Abaikan spasi jika user belum mengetik huruf apapun di kata ini
+                        if (this.currentIndex === bounds.start) {
+                            return;
+                        }
+
                         for (let i = this.currentIndex; i <= bounds.end; i++) {
                             this.inputResults[i] = 'skipped'; // Tandai terlewat
                             

@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\View\View;
+use App\Models\MatchParticipant;
 
 class ProfileController extends Controller
 {
@@ -16,8 +17,15 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
+        $recentMatches = MatchParticipant::where('user_id', $request->user()->id)
+            ->with('match')
+            ->latest()
+            ->take(5)
+            ->get();
+
         return view('profile.edit', [
             'user' => $request->user(),
+            'recentMatches' => $recentMatches,
         ]);
     }
 

@@ -5,12 +5,10 @@ use Illuminate\Support\Facades\Route;
 use App\Livewire\TypingEngine;
 use App\Livewire\TypingResult;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', TypingEngine::class)->name('home');
 
 Route::get('/dashboard', function () {
-    return view('dashboard');
+    return redirect('/');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {

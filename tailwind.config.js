@@ -11,6 +11,16 @@ export default {
 
     theme: {
         extend: {
+            colors: {
+                typing: {
+                    bg: '#323437',
+                    surface: '#2c2e31',
+                    text: '#d1d0c5',
+                    muted: '#646669',
+                    accent: '#eab308',
+                    error: '#ca4754'
+                }
+            },
             fontFamily: {
                 sans: ['"JetBrains Mono"', ...defaultTheme.fontFamily.sans],
                 mono: ['"JetBrains Mono"', ...defaultTheme.fontFamily.mono],
