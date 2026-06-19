@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
         RoleSeeder::class,
         LanguageSeeder::class, // Pastikan ini jalan duluan
         TextSeeder::class,
+        QuoteSeeder::class, // Kutipan untuk mode 'quote'
         ]);
 
         User::factory()->create([

@@ -11,11 +11,19 @@ class Matches extends Model
     protected $fillable = [
         'text_id',
         'match_type',
-        'status',
+        'is_ranked',
         'mode_played',
+        'mode_config',
+        'status',
         'generated_text',
         'started_at',
         'ended_at',
+    ];
+
+    protected $casts = [
+        'is_ranked' => 'boolean',
+        'started_at' => 'datetime',
+        'ended_at' => 'datetime',
     ];
 
     public function text(): BelongsTo

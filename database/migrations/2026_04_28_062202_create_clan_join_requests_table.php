@@ -11,13 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('items', function (Blueprint $table) {
+        Schema::create('clan_join_requests', function (Blueprint $table) {
             $table->id();
-            $table->string('name', 255);
-            $table->enum('type', ['theme', 'keyboard_sound', 'badge', 'border']);
-            $table->integer('price');
+            $table->foreignId('clan_id')->constrained('clans')->onDelete('cascade');
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->timestamps();
-            $table->softDeletes();
         });
     }
 
@@ -26,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('items');
+        Schema::dropIfExists('clan_join_requests');
     }
 };

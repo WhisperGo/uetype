@@ -24,7 +24,13 @@ class User extends Authenticatable
         'username',
         'email',
         'password',
+        'highest_wpm',
+        'elo_rating',
+        'xp',
+        'coins',
         'clan_id',
+        'clan_role',
+        'joined_at',
     ];
 
     /**
@@ -46,6 +52,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'joined_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -68,5 +75,10 @@ class User extends Authenticatable
     public function userItems(): HasMany
     {
         return $this->hasMany(UserItem::class);
+    }
+
+    public function clanJoinRequests(): HasMany
+    {
+        return $this->hasMany(ClanJoinRequest::class);
     }
 }

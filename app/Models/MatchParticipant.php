@@ -18,6 +18,17 @@ class MatchParticipant extends Model
         'placement',
         'elo_change',
         'connection_status',
+        'wpm_samples',
+        'heatmap_data',
+        'is_suspicious',
+        'cheat_summary',
+    ];
+
+    protected $casts = [
+        'wpm_samples' => 'array',
+        'heatmap_data' => 'array',
+        'cheat_summary' => 'array',
+        'is_suspicious' => 'boolean',
     ];
 
     public function match(): BelongsTo

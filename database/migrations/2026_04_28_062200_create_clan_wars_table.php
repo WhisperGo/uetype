@@ -11,14 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('clans', function (Blueprint $table) {
+        Schema::create('clan_wars', function (Blueprint $table) {
             $table->id();
             $table->string('name', 100);
-            $table->string('tag');
-            // FK ke users ditambahkan di migration terpisah (circular dgn users.clan_id)
-            $table->unsignedBigInteger('leader_id')->nullable();
-            $table->integer('clan_rating')->default(0);
-            $table->integer('member_count')->default(0);
+            $table->timestamp('starts_at');
+            $table->timestamp('ends_at');
+            $table->enum('status', ['upcoming', 'ongoing', 'finished'])->default('upcoming');
             $table->timestamps();
         });
     }
@@ -28,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('clans');
+        Schema::dropIfExists('clan_wars');
     }
 };

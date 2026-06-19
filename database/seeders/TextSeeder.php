@@ -41,7 +41,7 @@ class TextSeeder extends Seeder
             Text::create([
                 'language_id' => $language->id,
                 'content' => implode(' ', $chunk), // Gabungkan array jadi string
-                'mode' => 'wordlist',
+                'mode' => 'words',
                 'difficulty' => 'easy', // Default
                 'author' => 'Monkeytype',
             ]);

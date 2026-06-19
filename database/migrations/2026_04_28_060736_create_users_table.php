@@ -22,7 +22,10 @@ return new class extends Migration
             $table->integer('elo_rating')->default(0);
             $table->integer('xp')->default(0);
             $table->integer('coins')->default(0);
-            $table->foreignId('clan_id')->nullable()->constrained('clans')->onDelete('cascade');
+            // FK ke clans ditambahkan di migration terpisah (circular dgn clans.leader_id)
+            $table->unsignedBigInteger('clan_id')->nullable();
+            $table->enum('clan_role', ['leader', 'co-leader', 'member'])->nullable();
+            $table->timestamp('joined_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
 

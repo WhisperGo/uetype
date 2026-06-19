@@ -9,14 +9,11 @@ class KeystrokeLog extends Model
 {
     protected $fillable = [
         'match_participant_id',
-        'heatmap_data',
-        'is_bot_flag',
         'raw_keystroke',
     ];
 
     protected $casts = [
-        'raw_keystrokes' => 'array',
-        'heatmap_data' => 'array',
+        'raw_keystroke' => 'array',
     ];
 
     public function matchParticipant(): BelongsTo

@@ -1,5 +1,5 @@
 <div
-    class="min-h-screen bg-typing-bg text-typing-muted font-mono selection:bg-typing-accent selection:text-black outline-none">
+    class="min-h-screen bg-typing-bg text-typing-muted font-mono selection:bg-typing-accent selection:text-typing-bg outline-none">
     <div wire:key="typing-app-{{ str()->random(10) }}" x-data="{
         currentMain: @entangle('mainMode'),
         currentSub: @entangle('subMode'),
@@ -14,67 +14,77 @@
             }
         ">
 
-        <div class="max-w-5xl mx-auto pt-20 px-4">
+        <div class="max-w-5xl mx-auto pt-16 px-4">
 
-            <div class="flex justify-center mb-10 transition-all duration-500"
-                :class="isStarted ? 'opacity-0 -translate-y-10 pointer-events-none' : 'opacity-100'">
+            <!-- MODE SELECTOR -->
+            <div class="flex flex-col items-center gap-3 mb-12 transition-all duration-500"
+                :class="isStarted ? 'opacity-0 -translate-y-10 pointer-events-none h-0 !mb-0 overflow-hidden' : 'opacity-100'">
+                <span class="font-sans text-xs uppercase tracking-[0.3em] text-typing-muted">pilih mode</span>
                 <div
-                    class="flex items-center gap-6 bg-typing-surface px-6 py-2 rounded-xl text-sm shadow-xl border border-gray-800">
-                    <div class="flex items-center gap-4 border-r border-gray-700 pr-6 text-gray-500 font-bold">
+                    class="flex items-center gap-5 bg-typing-surface/80 backdrop-blur px-5 py-2.5 rounded-2xl text-sm font-mono border border-white/10 shadow-glow">
+                    <div class="flex items-center gap-1 border-r border-white/10 pr-5 font-semibold">
                         <button
                             @click.prevent="currentMain = 'time'; currentSub = '30'; $wire.setMode('time', '30'); $el.blur()"
-                            class="flex items-center gap-2 transition-colors duration-200 py-1 px-2 rounded-md outline-none"
-                            :class="currentMain === 'time' ? 'text-typing-accent' : 'hover:text-gray-200'">time</button>
+                            class="transition-all duration-200 py-1.5 px-3 rounded-lg outline-none"
+                            :class="currentMain === 'time' ? 'text-typing-bg bg-typing-accent' : 'text-typing-muted hover:text-typing-text'">time</button>
 
                         <button
                             @click.prevent="currentMain = 'words'; currentSub = '50'; $wire.setMode('words', '50'); $el.blur()"
-                            class="flex items-center gap-2 transition-colors duration-200 py-1 px-2 rounded-md outline-none"
-                            :class="currentMain === 'words' ? 'text-typing-accent' : 'hover:text-gray-200'">words</button>
+                            class="transition-all duration-200 py-1.5 px-3 rounded-lg outline-none"
+                            :class="currentMain === 'words' ? 'text-typing-bg bg-typing-accent' : 'text-typing-muted hover:text-typing-text'">words</button>
 
                         <button
                             @click.prevent="currentMain = 'quote'; currentSub = 'medium'; $wire.setMode('quote', 'medium'); $el.blur()"
-                            class="flex items-center gap-2 transition-colors duration-200 py-1 px-2 rounded-md outline-none"
-                            :class="currentMain === 'quote' ? 'text-typing-accent' : 'hover:text-gray-200'">quote</button>
+                            class="transition-all duration-200 py-1.5 px-3 rounded-lg outline-none"
+                            :class="currentMain === 'quote' ? 'text-typing-bg bg-typing-accent' : 'text-typing-muted hover:text-typing-text'">quote</button>
                     </div>
 
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-1.5 text-typing-muted font-semibold">
                         <template x-if="currentMain === 'time'">
-                            <div class="flex gap-2">
+                            <div class="flex gap-1.5">
                                 @foreach (['15', '30', '60', '120'] as $t)
                                     <button
                                         @click.prevent="currentSub = '{{ $t }}'; $wire.setMode('time', '{{ $t }}'); $el.blur()"
-                                        class="px-2 py-0.5 rounded transition-all duration-200 outline-none"
+                                        class="px-2.5 py-1 rounded-lg transition-all duration-200 outline-none"
                                         :class="currentSub == '{{ $t }}' ?
-                                            'text-typing-accent outline outline-2 outline-typing-accent/50' :
-                                            'hover:text-gray-200'">{{ $t }}</button>
+                                            'text-typing-accent bg-typing-accent/10 ring-1 ring-typing-accent/40' :
+                                            'hover:text-typing-text'">{{ $t }}</button>
                                 @endforeach
                             </div>
                         </template>
                         <template x-if="currentMain === 'words'">
-                            <div class="flex gap-2">
+                            <div class="flex gap-1.5">
                                 @foreach (['10', '25', '50', '100'] as $w)
                                     <button
                                         @click.prevent="currentSub = '{{ $w }}'; $wire.setMode('words', '{{ $w }}'); $el.blur()"
-                                        class="px-2 py-0.5 rounded transition-all duration-200 outline-none"
+                                        class="px-2.5 py-1 rounded-lg transition-all duration-200 outline-none"
                                         :class="currentSub == '{{ $w }}' ?
-                                            'text-typing-accent outline outline-2 outline-typing-accent/50' :
-                                            'hover:text-gray-200'">{{ $w }}</button>
+                                            'text-typing-accent bg-typing-accent/10 ring-1 ring-typing-accent/40' :
+                                            'hover:text-typing-text'">{{ $w }}</button>
                                 @endforeach
                             </div>
+                        </template>
+                        <template x-if="currentMain === 'quote'">
+                            <span class="px-2.5 py-1 text-typing-muted italic text-xs">kutipan acak</span>
                         </template>
                     </div>
                 </div>
             </div>
 
-            <div class="flex gap-10 mb-6 text-3xl transition-opacity duration-300"
+            <!-- LIVE STATS -->
+            <div class="flex gap-3 mb-6 transition-opacity duration-300"
                 :class="isStarted ? 'opacity-100' : 'opacity-0'">
-                <div><span class="text-xs block text-gray-500 font-bold uppercase tracking-widest">wpm</span> <span
-                        class="text-typing-accent font-bold" x-text="wpm">0</span></div>
-                <div><span class="text-xs block text-gray-500 font-bold uppercase tracking-widest">acc</span> <span
-                        class="text-typing-accent font-bold" x-text="accuracy">0</span>%</div>
-                <div>
-                    <span class="text-xs block text-gray-500 font-bold uppercase tracking-widest">time</span>
-                    <span class="transition-colors duration-300 font-bold"
+                <div class="flex-1 bg-typing-surface/60 border border-white/5 rounded-xl px-5 py-3">
+                    <span class="text-[0.65rem] block text-typing-muted font-sans font-semibold uppercase tracking-[0.2em]">wpm</span>
+                    <span class="text-4xl text-typing-accent font-mono font-bold" x-text="wpm">0</span>
+                </div>
+                <div class="flex-1 bg-typing-surface/60 border border-white/5 rounded-xl px-5 py-3">
+                    <span class="text-[0.65rem] block text-typing-muted font-sans font-semibold uppercase tracking-[0.2em]">acc</span>
+                    <span class="text-4xl text-typing-accent font-mono font-bold"><span x-text="accuracy">0</span>%</span>
+                </div>
+                <div class="flex-1 bg-typing-surface/60 border border-white/5 rounded-xl px-5 py-3">
+                    <span class="text-[0.65rem] block text-typing-muted font-sans font-semibold uppercase tracking-[0.2em]">time</span>
+                    <span class="text-4xl font-mono font-bold transition-colors duration-300"
                         :class="(currentMain === 'time' && timer < 5 && isStarted) ? 'text-typing-error' : 'text-typing-accent'"
                         x-text="timer">0</span>
                 </div>
@@ -141,12 +151,14 @@
 
             <div class="mt-20 flex justify-center">
                 <button id="restartButton" @click.prevent="$wire.restart(); $el.blur()"
-                    class="text-gray-600 hover:text-typing-text focus:text-typing-accent focus:scale-110 transition-all transform hover:scale-110 outline-none p-2 rounded-xl">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                    class="flex items-center gap-2 text-typing-muted hover:text-typing-text focus:text-typing-accent focus:scale-105 transition-all transform hover:scale-105 outline-none px-4 py-2 rounded-xl hover:bg-typing-surface/60">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
                         stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
+                    <span class="font-sans text-xs uppercase tracking-widest">restart</span>
+                    <kbd class="font-sans text-[0.6rem] px-1.5 py-0.5 rounded bg-typing-surface border border-white/10">tab</kbd>
                 </button>
             </div>
         </div>
@@ -179,6 +191,7 @@
                 wpmHistory: [],
                 rawHistory: [],
                 missedChars: {},
+                keystrokeTimings: [], // timestamp tiap tuts karakter (ms relatif ke start) untuk anti-cheat
 
                 init() {
                     this.timer = (this.currentMain === 'time') ? parseInt(this.currentSub) : 0;
@@ -191,6 +204,7 @@
                     this.wpmHistory = [];
                     this.rawHistory = [];
                     this.missedChars = {};
+                    this.keystrokeTimings = [];
                     let start = 0;
                     let wordIdx = 0;
                     for (let i = 0; i < this.targetArray.length; i++) {
@@ -368,6 +382,8 @@
 
                     // Mulai dari titik ini, berarti user menekan tuts karakter/spasi (bukan backspace)
                     this.totalKeystrokes++;
+                    // Rekam timing tiap tuts (ms relatif ke start) untuk validasi anti-cheat server-side
+                    this.keystrokeTimings.push(Date.now() - this.startTime);
 
                     // Jika kursor sedang di posisi spasi pembatas antar kata
                     if (this.currentIndex === bounds.space) {
@@ -480,7 +496,7 @@
                     let correct = this.correctKeystrokes || this.inputResults.filter(r => r === true).length;
                     let total = this.totalKeystrokes || this.currentIndex;
 
-                    this.$wire.saveResult(this.wpm, this.accuracy, timeSpent, total, correct, this.wpmHistory, this.rawHistory, this.missedChars);
+                    this.$wire.saveResult(this.wpm, this.accuracy, timeSpent, total, correct, this.wpmHistory, this.rawHistory, this.missedChars, this.keystrokeTimings);
                 }
             }
         }

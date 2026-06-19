@@ -1,11 +1,11 @@
 <section>
     <header>
-        <h2 class="text-lg font-medium text-typing-text">
-            {{ __('Profile Information') }}
+        <h2 class="font-sans text-lg font-semibold text-typing-text">
+            {{ __('Informasi Profil') }}
         </h2>
 
         <p class="mt-1 text-sm text-typing-muted">
-            {{ __("Update your account's profile information and email address.") }}
+            {{ __('Perbarui username dan alamat email akunmu.') }}
         </p>
     </header>
 
@@ -18,9 +18,9 @@
         @method('patch')
 
         <div>
-            <x-input-label for="name" :value="__('Name')" />
-            <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" :value="old('name', $user->name)" required autofocus autocomplete="name" />
-            <x-input-error class="mt-2" :messages="$errors->get('name')" />
+            <x-input-label for="username" :value="__('Username')" />
+            <x-text-input id="username" name="username" type="text" class="mt-1 block w-full" :value="old('username', $user->username)" required autofocus autocomplete="username" />
+            <x-input-error class="mt-2" :messages="$errors->get('username')" />
         </div>
 
         <div>

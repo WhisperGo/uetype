@@ -13,13 +13,15 @@ return new class extends Migration
     {
         Schema::create('matches', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('text_id')->constrained('texts')->onDelete('cascade')->nullable();
-            $table->enum('match_type', ['solo_practice', 'ranked_duel', 'ranked_multiplayer']);
-            $table->enum('status', ['waiting', 'ongoing', 'completed', 'cancelled'])->default('waiting');
-            $table->enum('mode_played', ['wordlist', 'quote', 'code']);
+            $table->foreignId('text_id')->nullable()->constrained('texts')->onDelete('cascade');
+            $table->enum('match_type', ['solo', '1v1', 'group']);
+            $table->boolean('is_ranked')->default(false);
+            $table->enum('mode_played', ['time', 'words', 'quote']);
+            $table->integer('mode_config')->nullable();
+            $table->enum('status', ['waiting', 'ongoing', 'completed', 'abandoned'])->default('waiting');
             $table->text('generated_text')->nullable();
-            $table->timestamp('started_at');
-            $table->timestamp('ended_at');
+            $table->timestamp('started_at')->nullable();
+            $table->timestamp('ended_at')->nullable();
             $table->timestamps();
         });
 
@@ -31,8 +33,15 @@ return new class extends Migration
             $table->float('accuracy', 10, 2)->default(0);
             $table->integer('placement')->default(0);
             $table->integer('elo_change')->default(0);
-            $table->string('connection_status', 30)->default('disconnected');
+            $table->enum('connection_status', ['connected', 'disconnected', 'abandoned'])->default('disconnected');
+            $table->json('wpm_samples')->nullable();
+            $table->json('heatmap_data')->nullable();
+            $table->boolean('is_suspicious')->default(false);
+            $table->json('cheat_summary')->nullable();
             $table->timestamp('created_at')->useCurrent();
+
+            $table->index('wpm');
+            $table->index('created_at');
         });
     }
 

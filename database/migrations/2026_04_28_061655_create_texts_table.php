@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('language_id')->constrained('languages')->onDelete('cascade');
             $table->text('content');
-            $table->enum('mode', ['wordlist', 'quote', 'code']);
+            $table->enum('mode', ['time', 'words', 'quote']);
             $table->enum('difficulty', ['easy', 'medium', 'hard']);
             $table->string('author');
             $table->integer('word_count')->nullable();
