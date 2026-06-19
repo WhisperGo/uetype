@@ -478,11 +478,10 @@
                     
                     if (timeElapsed <= 0) return;
 
-                    // 1. WPM Calculation (Berdasarkan jumlah tuts benar dibagi 5)
-                    // Pada mode Monkeytype default, setiap ketikan benar akan menyumbang ke WPM,
-                    // dan kita telah memastikan spasi 'skip' tidak lagi terhitung sebagai tuts benar.
-                    const correctChars = this.inputResults.filter(r => r === true).length;
-                    this.wpm = Math.round((correctChars / 5) / timeElapsed) || 0;
+                    // 1. Net WPM — pakai correctKeystrokes (SUMBER YANG SAMA dengan finish/server),
+                    // termasuk spasi antar-kata yang benar (definisi Monkeytype). Ini memastikan
+                    // angka live == angka di result page (tidak ada lagi WPM "gratis" saat finish).
+                    this.wpm = Math.round((this.correctKeystrokes / 5) / timeElapsed) || 0;
 
                     // 1b. Raw WPM (mengabaikan error: total tuts / 5) — stat sampingan
                     this.rawWpm = Math.round((this.totalKeystrokes / 5) / timeElapsed) || 0;
@@ -499,15 +498,17 @@
                     this.isFinished = true;
                     clearInterval(this.timerInterval);
 
-                    let timeSpent = this.timer;
-                    if (this.currentMain === 'time') {
-                        timeSpent = parseInt(this.currentSub) - this.timer;
-                    }
+                    // Durasi PRESISI (ms) dari keystroke pertama sampai sekarang — sumber yang
+                    // sama dengan perhitungan live, supaya WPM final == WPM saat mengetik.
+                    // (Sebelumnya pakai detik bulat 'subMode - timer' → durasi mengecil → WPM "gratis".)
+                    const durationMs = this.startTime ? (Date.now() - this.startTime) : 0;
 
-                    let correct = this.correctKeystrokes || this.inputResults.filter(r => r === true).length;
-                    let total = this.totalKeystrokes || this.currentIndex;
+                    // Pembilang konsisten: pakai correctKeystrokes (sudah termasuk spasi antar-kata
+                    // yang benar, sama seperti definisi Monkeytype).
+                    const correct = this.correctKeystrokes;
+                    const total = this.totalKeystrokes;
 
-                    this.$wire.saveResult(timeSpent, total, correct, this.wpmHistory, this.rawHistory, this.missedChars);
+                    this.$wire.saveResult(durationMs, total, correct, this.wpmHistory, this.rawHistory, this.missedChars);
                 }
             }
         }

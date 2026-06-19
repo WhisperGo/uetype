@@ -117,14 +117,17 @@ class TypingEngine extends Component
         }
     }
 
-    public function saveResult($time, $totalKeystrokes, $correctKeystrokes, $wpmHistory = [], $rawHistory = [], $missedChars = [])
+    public function saveResult($durationMs, $totalKeystrokes, $correctKeystrokes, $wpmHistory = [], $rawHistory = [], $missedChars = [])
     {
         // Catatan: WPM/akurasi dari client TIDAK diterima sebagai parameter — server
         // selalu menghitung ulang sendiri dari jumlah karakter & durasi (anti-cheat).
         $totalKeystrokes = (int) $totalKeystrokes;
         $correctKeystrokes = (int) $correctKeystrokes;
         $incorrectKeystrokes = max(0, $totalKeystrokes - $correctKeystrokes);
-        $duration = (float) $time;
+
+        // Durasi dikirim client dalam MILIDETIK (presisi penuh, sama dengan perhitungan live).
+        // Simpan dalam detik (boleh pecahan) agar WPM server == WPM yang dilihat user saat mengetik.
+        $duration = max(0.0, (float) $durationMs / 1000);
 
         // Validasi kewajaran server-side (requirement Scoring & Stats bag. 5):
         // server HITUNG ULANG WPM/akurasi dari karakter & durasi (bukan percaya angka client),
