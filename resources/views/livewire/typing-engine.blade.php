@@ -16,6 +16,17 @@
 
         <div class="max-w-5xl mx-auto pt-16 px-4">
 
+            @if (session('result_rejected'))
+                <div
+                    class="max-w-xl mx-auto mb-8 flex items-center gap-3 px-4 py-3 rounded-xl bg-typing-error/10 border border-typing-error/40 text-typing-error text-sm">
+                    <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
+                    </svg>
+                    <span class="font-sans">{{ session('result_rejected') }}</span>
+                </div>
+            @endif
+
             <!-- MODE SELECTOR -->
             <div class="flex flex-col items-center gap-3 mb-12 transition-all duration-500"
                 :class="isStarted ? 'opacity-0 -translate-y-10 pointer-events-none h-0 !mb-0 overflow-hidden' : 'opacity-100'">
@@ -173,6 +184,7 @@
                 startTime: null,
                 timer: 0,
                 wpm: 0,
+                rawWpm: 0,
                 accuracy: 0,
                 isStarted: false,
                 isFinished: false,
@@ -191,7 +203,6 @@
                 wpmHistory: [],
                 rawHistory: [],
                 missedChars: {},
-                keystrokeTimings: [], // timestamp tiap tuts karakter (ms relatif ke start) untuk anti-cheat
 
                 init() {
                     this.timer = (this.currentMain === 'time') ? parseInt(this.currentSub) : 0;
@@ -204,7 +215,6 @@
                     this.wpmHistory = [];
                     this.rawHistory = [];
                     this.missedChars = {};
-                    this.keystrokeTimings = [];
                     let start = 0;
                     let wordIdx = 0;
                     for (let i = 0; i < this.targetArray.length; i++) {
@@ -382,8 +392,6 @@
 
                     // Mulai dari titik ini, berarti user menekan tuts karakter/spasi (bukan backspace)
                     this.totalKeystrokes++;
-                    // Rekam timing tiap tuts (ms relatif ke start) untuk validasi anti-cheat server-side
-                    this.keystrokeTimings.push(Date.now() - this.startTime);
 
                     // Jika kursor sedang di posisi spasi pembatas antar kata
                     if (this.currentIndex === bounds.space) {
@@ -475,7 +483,10 @@
                     // dan kita telah memastikan spasi 'skip' tidak lagi terhitung sebagai tuts benar.
                     const correctChars = this.inputResults.filter(r => r === true).length;
                     this.wpm = Math.round((correctChars / 5) / timeElapsed) || 0;
-                    
+
+                    // 1b. Raw WPM (mengabaikan error: total tuts / 5) — stat sampingan
+                    this.rawWpm = Math.round((this.totalKeystrokes / 5) / timeElapsed) || 0;
+
                     // 2. Accuracy Calculation (Monkeytype style: based on physical keystrokes)
                     if (this.totalKeystrokes > 0) {
                         this.accuracy = Math.round((this.correctKeystrokes / this.totalKeystrokes) * 100);
@@ -496,7 +507,7 @@
                     let correct = this.correctKeystrokes || this.inputResults.filter(r => r === true).length;
                     let total = this.totalKeystrokes || this.currentIndex;
 
-                    this.$wire.saveResult(this.wpm, this.accuracy, timeSpent, total, correct, this.wpmHistory, this.rawHistory, this.missedChars, this.keystrokeTimings);
+                    this.$wire.saveResult(timeSpent, total, correct, this.wpmHistory, this.rawHistory, this.missedChars);
                 }
             }
         }

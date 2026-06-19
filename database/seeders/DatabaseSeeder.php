@@ -22,5 +22,10 @@ class DatabaseSeeder extends Seeder
             'username' => 'TestUser',
             'email' => 'test@example.com',
         ]);
+
+        // User dummy + hasil typing untuk testing (login via /dev-login di env lokal).
+        if (app()->environment('local')) {
+            $this->call(DummyUserSeeder::class);
+        }
     }
 }

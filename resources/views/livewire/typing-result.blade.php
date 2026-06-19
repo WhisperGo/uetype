@@ -13,40 +13,45 @@
             <span class="text-typing-accent">{{ $subMode }}</span>
         </div>
 
-        @if (!empty($is_suspicious))
-            <div
-                class="max-w-md mx-auto mb-8 flex items-center gap-3 px-4 py-3 rounded-xl bg-typing-error/10 border border-typing-error/40 text-typing-error text-sm">
-                <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
-                </svg>
-                <span class="font-sans">Hasil ini ditandai mencurigakan oleh sistem anti-cheat dan tidak dihitung ke
-                    rekor WPM-mu.</span>
-            </div>
-        @endif
-
         <!-- Main stat cards -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <!-- Net WPM = metrik utama (blueprint Scoring 2) -->
             <div
-                class="col-span-1 md:col-span-1 bg-typing-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center shadow-glow">
+                class="col-span-2 md:col-span-1 bg-typing-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center shadow-glow">
                 <span class="font-sans text-xs uppercase tracking-[0.2em] text-typing-muted mb-1">wpm</span>
                 <span class="text-5xl md:text-6xl text-typing-accent font-bold leading-none">{{ $wpm }}</span>
+                <span class="font-sans text-[0.65rem] uppercase tracking-[0.15em] text-typing-muted mt-1">net</span>
             </div>
             <div class="bg-typing-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
                 <span class="font-sans text-xs uppercase tracking-[0.2em] text-typing-muted mb-1">accuracy</span>
                 <span class="text-5xl md:text-6xl text-typing-accent2 font-bold leading-none">{{ $accuracy }}<span
                         class="text-2xl">%</span></span>
             </div>
+            <!-- Raw WPM = stat sampingan -->
+            <div class="bg-typing-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
+                <span class="font-sans text-xs uppercase tracking-[0.2em] text-typing-muted mb-1">raw wpm</span>
+                <span class="text-4xl text-typing-text font-bold leading-none">{{ $rawWpm }}</span>
+            </div>
             <div class="bg-typing-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
                 <span class="font-sans text-xs uppercase tracking-[0.2em] text-typing-muted mb-1">waktu</span>
                 <span class="text-4xl text-typing-text font-bold leading-none">{{ $time }}<span
                         class="text-xl text-typing-muted">s</span></span>
             </div>
-            <div class="bg-typing-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
-                <span class="font-sans text-xs uppercase tracking-[0.2em] text-typing-muted mb-1">karakter</span>
-                <span class="text-3xl text-typing-text font-bold leading-none"
-                    title="benar / total">{{ $correctKeystrokes }}<span
-                        class="text-typing-muted">/{{ $totalKeystrokes }}</span></span>
+        </div>
+
+        <!-- Secondary stat row: rincian karakter (benar / salah / total) -->
+        <div class="grid grid-cols-3 gap-3 mb-6">
+            <div class="bg-typing-surface/40 border border-white/5 rounded-xl px-5 py-3 flex flex-col">
+                <span class="font-sans text-[0.65rem] uppercase tracking-[0.2em] text-typing-muted mb-1">benar</span>
+                <span class="text-2xl text-typing-text font-bold leading-none">{{ $correctKeystrokes }}</span>
+            </div>
+            <div class="bg-typing-surface/40 border border-white/5 rounded-xl px-5 py-3 flex flex-col">
+                <span class="font-sans text-[0.65rem] uppercase tracking-[0.2em] text-typing-muted mb-1">salah</span>
+                <span class="text-2xl text-typing-error font-bold leading-none">{{ $incorrectKeystrokes }}</span>
+            </div>
+            <div class="bg-typing-surface/40 border border-white/5 rounded-xl px-5 py-3 flex flex-col">
+                <span class="font-sans text-[0.65rem] uppercase tracking-[0.2em] text-typing-muted mb-1">total tuts</span>
+                <span class="text-2xl text-typing-text font-bold leading-none">{{ $totalKeystrokes }}</span>
             </div>
         </div>
 

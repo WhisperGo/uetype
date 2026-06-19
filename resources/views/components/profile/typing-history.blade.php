@@ -13,18 +13,16 @@ new class extends Component
     {
         $user = auth()->user();
 
-        $query = $user->matchParticipants()->with('match');
+        $query = $user->typingResults();
 
         if ($this->filterMode !== 'all') {
-            $query->whereHas('match', function ($q) {
-                $q->where('mode_played', $this->filterMode);
-            });
+            $query->where('mode', $this->filterMode);
         }
 
-        // Aggregate stats (based on all matches, not filtered, or filtered? Let's do filtered stats)
+        // Statistik agregat dari hasil terfilter.
         $statsQuery = clone $query;
         $totalMatches = $statsQuery->count();
-        $averageWpm = $totalMatches > 0 ? $statsQuery->avg('wpm') : 0;
+        $averageWpm = $totalMatches > 0 ? $statsQuery->avg('net_wpm') : 0;
         $averageAccuracy = $totalMatches > 0 ? $statsQuery->avg('accuracy') : 0;
 
         $history = $query->latest('created_at')->paginate(5);
@@ -57,9 +55,11 @@ new class extends Component
         <div>
             <select wire:model.live="filterMode" class="border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm">
                 <option value="all">All Modes</option>
-                <option value="wordlist">Wordlist</option>
+                <option value="time">Time</option>
+                <option value="words">Words</option>
                 <option value="quote">Quote</option>
-                <option value="code">Code</option>
+                <option value="survival">Survival</option>
+                <option value="ghost">Ghost</option>
             </select>
         </div>
     </header>
@@ -85,39 +85,35 @@ new class extends Component
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-900/50 dark:text-gray-300">
                     <tr>
                         <th scope="col" class="px-6 py-3">Date</th>
-                        <th scope="col" class="px-6 py-3">Match Type</th>
                         <th scope="col" class="px-6 py-3">Mode</th>
                         <th scope="col" class="px-6 py-3">WPM</th>
+                        <th scope="col" class="px-6 py-3">Raw</th>
                         <th scope="col" class="px-6 py-3">Accuracy</th>
-                        <th scope="col" class="px-6 py-3">Placement</th>
+                        <th scope="col" class="px-6 py-3">Duration</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse ($history as $participant)
+                    @forelse ($history as $result)
                         <tr class="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                {{ $participant->created_at->format('d M Y, H:i') }}
-                            </td>
-                            <td class="px-6 py-4 capitalize font-medium text-gray-900 dark:text-gray-200">
-                                {{ str_replace('_', ' ', $participant->match->match_type) }}
+                                {{ $result->created_at->format('d M Y, H:i') }}
                             </td>
                             <td class="px-6 py-4">
                                 <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
-                                    {{ ucfirst($participant->match->mode_played) }}
+                                    {{ ucfirst($result->mode?->value ?? '-') }}{{ $result->mode_config ? ' '.$result->mode_config : '' }}
                                 </span>
                             </td>
                             <td class="px-6 py-4 font-bold text-green-600 dark:text-green-400">
-                                {{ $participant->wpm }}
+                                {{ $result->net_wpm }}
+                            </td>
+                            <td class="px-6 py-4 text-gray-500 dark:text-gray-400">
+                                {{ $result->raw_wpm }}
                             </td>
                             <td class="px-6 py-4 text-amber-600 dark:text-amber-500 font-semibold">
-                                {{ $participant->accuracy }}%
+                                {{ $result->accuracy }}%
                             </td>
-                            <td class="px-6 py-4">
-                                @if($participant->match->match_type === 'solo_practice')
-                                    <span class="text-gray-400">-</span>
-                                @else
-                                    #{{ $participant->placement ?: '-' }}
-                                @endif
+                            <td class="px-6 py-4 text-gray-500 dark:text-gray-400">
+                                {{ rtrim(rtrim(number_format($result->duration_seconds, 1), '0'), '.') }}s
                             </td>
                         </tr>
                     @empty

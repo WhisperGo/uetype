@@ -138,12 +138,9 @@
                                     <tr class="border-t border-white/5">
                                         <td class="py-2.5 text-typing-muted">{{ $p->created_at ? $p->created_at->format('d M Y H:i') : '-' }}</td>
                                         <td class="py-2.5 text-typing-text capitalize">
-                                            {{ $p->match?->mode_played ?? 'practice' }}
-                                            @if($p->is_suspicious)
-                                                <span class="ml-1 text-typing-error" title="Ditandai mencurigakan">⚠</span>
-                                            @endif
+                                            {{ $p->mode?->value ?? 'practice' }}
                                         </td>
-                                        <td class="py-2.5 text-right text-typing-accent font-bold">{{ rtrim(rtrim(number_format($p->wpm, 1), '0'), '.') }}</td>
+                                        <td class="py-2.5 text-right text-typing-accent font-bold">{{ rtrim(rtrim(number_format($p->net_wpm, 1), '0'), '.') }}</td>
                                         <td class="py-2.5 text-right text-typing-text">{{ rtrim(rtrim(number_format($p->accuracy, 1), '0'), '.') }}%</td>
                                     </tr>
                                     @endforeach

@@ -7,8 +7,7 @@ use App\Models\Text;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use App\Models\Matches;
-use App\Models\MatchParticipant;
+use App\Models\TypingResult;
 use App\Services\AntiCheatService;
 
 class TypingEngine extends Component
@@ -20,6 +19,10 @@ class TypingEngine extends Component
     public $subMode = '30';
 
     public $textToType;
+
+    // ID baris `texts` yang sedang diketik. Terisi untuk mode quote (teks dari DB),
+    // null untuk time/words (teks dirakit acak dari wordlist JSON, bukan dari satu baris texts).
+    public $textId = null;
 
     public function mount()
     {
@@ -74,7 +77,12 @@ class TypingEngine extends Component
         if ($this->mainMode === 'quote') {
             $text = Text::where('mode', 'quote')->inRandomOrder()->first();
             $this->textToType = $text ? $text->content : "Kutipan belum tersedia di database.";
+            // Simpan ID quote agar hasil sesi bisa mereferensikan teks yang diketik.
+            $this->textId = $text?->id;
         } else {
+            // Teks time/words dirakit acak dari JSON, tidak terikat ke satu baris texts.
+            $this->textId = null;
+
             // Mode time atau words menggunakan file JSON
             // Secara default menggunakan english.json (bisa disesuaikan nanti dengan state bahasa)
             $path = base_path('database/data/indonesian.json');
@@ -109,62 +117,69 @@ class TypingEngine extends Component
         }
     }
 
-    public function saveResult($wpm, $accuracy, $time, $totalKeystrokes, $correctKeystrokes, $wpmHistory = [], $rawHistory = [], $missedChars = [], $keystrokeTimings = [])
+    public function saveResult($time, $totalKeystrokes, $correctKeystrokes, $wpmHistory = [], $rawHistory = [], $missedChars = [])
     {
-        // Anti-cheat: server HITUNG ULANG wpm/akurasi dari timing keystroke,
-        // deteksi pola tak-manusiawi, lalu pakai angka hasil server (bukan client).
-        $verdict = app(AntiCheatService::class)->analyze(
-            is_array($keystrokeTimings) ? $keystrokeTimings : [],
-            (int) $correctKeystrokes,
-            (int) $totalKeystrokes,
-            $wpm,
+        // Catatan: WPM/akurasi dari client TIDAK diterima sebagai parameter — server
+        // selalu menghitung ulang sendiri dari jumlah karakter & durasi (anti-cheat).
+        $totalKeystrokes = (int) $totalKeystrokes;
+        $correctKeystrokes = (int) $correctKeystrokes;
+        $incorrectKeystrokes = max(0, $totalKeystrokes - $correctKeystrokes);
+        $duration = (float) $time;
+
+        // Validasi kewajaran server-side (requirement Scoring & Stats bag. 5):
+        // server HITUNG ULANG WPM/akurasi dari karakter & durasi (bukan percaya angka client),
+        // lalu menjadi gerbang — sesi yang tidak masuk akal DITOLAK, bukan disimpan.
+        $check = app(AntiCheatService::class)->check(
+            $correctKeystrokes,
+            $totalKeystrokes,
+            $duration,
         );
 
-        // Jika timing tak cukup untuk rekalkulasi (mis. <2 keystroke), jatuh ke angka client.
-        $finalWpm = $verdict['wpm'] > 0 ? $verdict['wpm'] : (float) $wpm;
-        $finalAccuracy = $verdict['accuracy'] > 0 ? $verdict['accuracy'] : (float) $accuracy;
-        $isSuspicious = $verdict['is_suspicious'];
-        $cheatSummary = $verdict['cheat_summary'];
+        // Angka final selalu pakai hasil hitung ulang server (sumber kebenaran).
+        $finalNetWpm = $check['net_wpm'];
+        $finalRawWpm = $check['raw_wpm'];
+        $finalAccuracy = $check['accuracy'];
+
+        // Sesi tidak valid: tolak. Jangan simpan, jangan beri EXP, jangan naikkan rekor.
+        if (! $check['valid']) {
+            session()->flash('result_rejected', 'Hasil sesi ini ditolak oleh validasi server (tidak masuk akal) dan tidak disimpan.');
+
+            return $this->redirect(route('typing'), navigate: true);
+        }
+
+        // EXP diperoleh dari hasil tervalidasi server (skala dengan akurasi).
+        $xpEarned = (int) round($finalNetWpm * ($finalAccuracy / 100));
 
         if (Auth::check()) {
             $user = Auth::user();
 
-            DB::transaction(function () use ($user, $time, $finalWpm, $finalAccuracy, $isSuspicious, $cheatSummary, $wpmHistory, $rawHistory, $missedChars) {
-                // 1. Buat record di tabel Matches
-                $match = Matches::create([
-                    'match_type' => 'solo',
-                    'is_ranked' => false,
-                    'mode_played' => $this->mainMode, // 'time' | 'words' | 'quote'
-                    'mode_config' => $this->mainMode === 'quote' ? null : (int) $this->subMode,
-                    'status' => 'completed',
-                    'started_at' => now()->subSeconds($time),
-                    'ended_at' => now(),
-                ]);
-
-                // 2. Buat record di tabel MatchParticipants (analitik + verdict anti-cheat menyatu)
-                MatchParticipant::create([
-                    'match_id' => $match->id,
+            DB::transaction(function () use (
+                $user, $duration, $finalNetWpm, $finalRawWpm, $finalAccuracy,
+                $correctKeystrokes, $incorrectKeystrokes, $xpEarned,
+                $wpmHistory, $rawHistory, $missedChars
+            ) {
+                // Satu sesi solo valid = satu baris di typing_results (requirement Database).
+                TypingResult::create([
                     'user_id' => $user->id,
-                    'wpm' => $finalWpm,
+                    'text_id' => $this->textId, // terisi untuk quote, null untuk time/words
+                    'mode' => $this->mainMode, // 'time' | 'words' | 'quote'
+                    'mode_config' => $this->mainMode === 'quote' ? null : (string) $this->subMode,
+                    'net_wpm' => $finalNetWpm,
+                    'raw_wpm' => $finalRawWpm,
                     'accuracy' => $finalAccuracy,
-                    'placement' => 1,
-                    'connection_status' => 'connected',
-                    'wpm_samples' => [
-                        'wpm' => $wpmHistory,
-                        'raw' => $rawHistory,
-                    ],
-                    'heatmap_data' => $missedChars,
-                    'is_suspicious' => $isSuspicious,
-                    'cheat_summary' => $cheatSummary,
+                    'correct_chars' => $correctKeystrokes,
+                    'incorrect_chars' => $incorrectKeystrokes,
+                    'duration_seconds' => $duration,
+                    'score' => null, // dipakai oleh survival mode nanti
+                    'xp_earned' => $xpEarned,
+                    'ghost_data' => null, // diisi selektif oleh ghost mode nanti
                 ]);
 
-                // 3. Update User stats (XP/coins dari hasil tervalidasi server)
-                $user->xp += (int) round($finalWpm * ($finalAccuracy / 100));
-                $user->coins += (int) round($finalWpm / 2);
+                // Akumulasi EXP ke total user & perbarui rekor WPM (hanya sesi valid sampai sini).
+                $user->total_xp += $xpEarned;
 
-                // Papan WPM solo HANYA naik dari hasil yang TIDAK mencurigakan (blueprint 5.2).
-                if (!$isSuspicious && $finalWpm > $user->highest_wpm) {
-                    $user->highest_wpm = $finalWpm;
+                if ($finalNetWpm > (float) $user->highest_wpm) {
+                    $user->highest_wpm = $finalNetWpm;
                 }
 
                 $user->save();
@@ -172,17 +187,18 @@ class TypingEngine extends Component
         }
 
         session()->put('typing_result', [
-            'wpm' => $finalWpm,
+            'wpm' => $finalNetWpm,
+            'rawWpm' => $finalRawWpm,
             'accuracy' => $finalAccuracy,
-            'time' => $time,
+            'time' => $duration,
             'mode' => $this->mainMode,
             'subMode' => $this->subMode,
             'totalKeystrokes' => $totalKeystrokes,
             'correctKeystrokes' => $correctKeystrokes,
+            'incorrectKeystrokes' => $incorrectKeystrokes,
             'wpmHistory' => $wpmHistory,
             'rawHistory' => $rawHistory,
             'missedChars' => $missedChars,
-            'is_suspicious' => $isSuspicious,
         ]);
         session()->save();
 

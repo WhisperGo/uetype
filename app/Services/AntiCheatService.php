@@ -3,118 +3,83 @@
 namespace App\Services;
 
 /**
- * Validasi anti-cheat server-side untuk hasil mengetik.
+ * Validasi kewajaran (sanity check) server-side untuk hasil mengetik.
  *
- * Alur (blueprint 5.1):
- *  - client mengirim timing tiap keystroke dalam payload,
- *  - server MENGHITUNG ULANG WPM/akurasi dari timing (tidak percaya angka client),
- *  - server mendeteksi pola tak-manusiawi (interval terlalu seragam / kecepatan superhuman),
- *  - server hanya menyimpan verdict (is_suspicious + cheat_summary); timing mentah dibuang.
+ * Sesuai requirement Statistics & Scores bagian 5: untuk skala proyek ini
+ * TIDAK perlu anti-cheat canggih. Cukup tolak hasil yang mustahil sebelum
+ * disimpan. Validasi per-keystroke (analisis timing/pola) sengaja TIDAK
+ * dilakukan karena "terlalu mahal untuk timeline; jangan ke sana".
+ *
+ * Prinsip: jangan percaya angka client mentah-mentah untuk hal yang masuk
+ * leaderboard / memberi EXP. Server menghitung ulang dari karakter & durasi,
+ * lalu menolak sesi yang tidak masuk akal (bukan menyimpannya).
  */
 class AntiCheatService
 {
-    /**
-     * Ambang batas. Disetel konservatif agar pengetik cepat asli tidak salah-tuduh.
-     */
-    private const SUPERHUMAN_WPM = 250;          // rekor dunia ~ 210-230 WPM
-    private const MIN_HUMAN_INTERVAL_MS = 30;     // <30ms antar tuts konsisten = tidak manusiawi
-    private const MIN_CV_THRESHOLD = 0.12;        // koefisien variansi interval < 0.12 = terlalu robotik
+    /** Batas WPM manusiawi; di atas ini hampir pasti palsu (rekor dunia ~210-230). */
+    private const MAX_HUMAN_WPM = 300;
+
+    /** Durasi minimum (detik) agar sebuah sesi dianggap bermakna. */
+    private const MIN_DURATION_SECONDS = 1.0;
 
     /**
-     * @param  array<int|float>  $timings  Timestamp tiap keystroke karakter (ms, relatif ke start).
-     * @param  int  $correctKeystrokes  Jumlah tuts benar (dari client, dipakai utk akurasi).
-     * @param  int  $totalKeystrokes    Jumlah seluruh tuts (dari client).
-     * @param  int|float  $clientWpm     WPM laporan client (untuk dibandingkan).
-     * @return array{wpm: float, accuracy: float, is_suspicious: bool, cheat_summary: array|null}
+     * Periksa kewajaran sebuah hasil sesi.
+     *
+     * @param  int    $correctChars   Jumlah karakter benar (untuk Net WPM).
+     * @param  int    $totalChars     Jumlah seluruh karakter diketik (untuk Raw WPM & accuracy).
+     * @param  float  $durationSeconds Durasi sesi dalam detik.
+     * @return array{valid: bool, net_wpm: float, raw_wpm: float, accuracy: float, reasons: array<string>}
      */
-    public function analyze(array $timings, int $correctKeystrokes, int $totalKeystrokes, $clientWpm): array
+    public function check(int $correctChars, int $totalChars, float $durationSeconds): array
     {
         $reasons = [];
-        $count = count($timings);
 
-        // Timing tak cukup untuk dianalisis -> jangan tuduh curang (absennya data bukan bukti).
-        // Kembalikan fallback ke angka client tanpa verdict mencurigakan.
-        if ($count < 5) {
-            return [
-                'wpm' => (float) $clientWpm,
-                'accuracy' => $totalKeystrokes > 0
-                    ? round(($correctKeystrokes / $totalKeystrokes) * 100, 2)
-                    : 0.0,
-                'is_suspicious' => false,
-                'cheat_summary' => null,
-            ];
+        // --- Server HITUNG ULANG dari karakter & durasi (tidak percaya WPM client) ---
+        // Standar: 1 kata = 5 karakter.
+        $durationMinutes = $durationSeconds / 60;
+        $netWpm = 0.0;
+        $rawWpm = 0.0;
+
+        if ($durationMinutes > 0) {
+            $netWpm = round(($correctChars / 5) / $durationMinutes, 2);
+            $rawWpm = round(($totalChars / 5) / $durationMinutes, 2);
         }
 
-        // --- Rekalkulasi WPM dari timing (sumber kebenaran = server) ---
-        $serverWpm = 0.0;
-
-        if ($count >= 2) {
-            $durationMs = (float) end($timings) - (float) reset($timings);
-            $durationMin = $durationMs / 60000;
-
-            if ($durationMin > 0) {
-                // standar: 1 kata = 5 karakter; pakai jumlah tuts benar sebagai karakter ter-"commit"
-                $serverWpm = round(($correctKeystrokes / 5) / $durationMin, 2);
-            }
-        }
-
-        // --- Rekalkulasi akurasi ---
-        $serverAccuracy = $totalKeystrokes > 0
-            ? round(($correctKeystrokes / $totalKeystrokes) * 100, 2)
+        $accuracy = $totalChars > 0
+            ? round(($correctChars / $totalChars) * 100, 2)
             : 0.0;
 
-        // --- Deteksi 1: kecepatan superhuman ---
-        if ($serverWpm > self::SUPERHUMAN_WPM) {
-            $reasons[] = 'superhuman_wpm';
+        // --- Sanity check 1: durasi terlalu pendek = sesi tidak bermakna ---
+        if ($durationSeconds < self::MIN_DURATION_SECONDS) {
+            $reasons[] = 'duration_too_short';
         }
 
-        // --- Deteksi 2: selisih besar antara WPM client vs server (manipulasi angka kirim) ---
-        if ($clientWpm > 0 && abs($clientWpm - $serverWpm) > max(20, $serverWpm * 0.4)) {
-            $reasons[] = 'client_server_wpm_mismatch';
+        // --- Sanity check 2: WPM di atas batas manusiawi ---
+        if ($netWpm > self::MAX_HUMAN_WPM || $rawWpm > self::MAX_HUMAN_WPM) {
+            $reasons[] = 'wpm_too_high';
         }
 
-        // --- Hitung interval antar keystroke untuk deteksi pola ---
-        $intervals = [];
-        for ($i = 1; $i < $count; $i++) {
-            $intervals[] = (float) $timings[$i] - (float) $timings[$i - 1];
+        // --- Sanity check 3: accuracy mustahil ---
+        if ($accuracy > 100) {
+            $reasons[] = 'accuracy_impossible';
         }
 
-        if (count($intervals) >= 5) {
-            $mean = array_sum($intervals) / count($intervals);
-
-            // Deteksi 3: interval rata-rata di bawah batas fisik manusia
-            if ($mean > 0 && $mean < self::MIN_HUMAN_INTERVAL_MS) {
-                $reasons[] = 'inhuman_interval';
-            }
-
-            // Deteksi 4: interval terlalu seragam (variansi rendah = autotyper/macro)
-            if ($mean > 0) {
-                $variance = 0.0;
-                foreach ($intervals as $iv) {
-                    $variance += ($iv - $mean) ** 2;
-                }
-                $variance /= count($intervals);
-                $stdDev = sqrt($variance);
-                $cv = $stdDev / $mean; // koefisien variansi
-
-                if ($cv < self::MIN_CV_THRESHOLD) {
-                    $reasons[] = 'uniform_intervals';
-                }
-            }
+        // --- Sanity check 4: konsistensi karakter (benar tak boleh > total) ---
+        if ($correctChars > $totalChars) {
+            $reasons[] = 'char_count_inconsistent';
         }
 
-        $isSuspicious = ! empty($reasons);
+        // --- Sanity check 5: tidak ada karakter sama sekali = bukan sesi nyata ---
+        if ($totalChars <= 0) {
+            $reasons[] = 'no_input';
+        }
 
         return [
-            'wpm' => $serverWpm,
-            'accuracy' => $serverAccuracy,
-            'is_suspicious' => $isSuspicious,
-            'cheat_summary' => $isSuspicious ? [
-                'reasons' => $reasons,
-                'server_wpm' => $serverWpm,
-                'client_wpm' => (float) $clientWpm,
-                'keystroke_count' => $count,
-            ] : null,
+            'valid' => empty($reasons),
+            'net_wpm' => $netWpm,
+            'raw_wpm' => $rawWpm,
+            'accuracy' => $accuracy,
+            'reasons' => $reasons,
         ];
     }
 }
