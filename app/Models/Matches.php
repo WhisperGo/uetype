@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\MatchStatus;
+use App\Enums\MatchType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,29 +11,34 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Matches extends Model
 {
     protected $fillable = [
+        'room_code',
+        'host_user_id',
         'text_id',
-        'match_type',
-        'is_ranked',
-        'mode_played',
-        'mode_config',
-        'status',
         'generated_text',
+        'match_type',
+        'status',
         'started_at',
         'ended_at',
     ];
 
     protected $casts = [
-        'is_ranked' => 'boolean',
+        'match_type' => MatchType::class,
+        'status' => MatchStatus::class,
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
     ];
+
+    public function host(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'host_user_id');
+    }
 
     public function text(): BelongsTo
     {
         return $this->belongsTo(Text::class);
     }
 
-    public function matchParticipants(): HasMany
+    public function participants(): HasMany
     {
         return $this->hasMany(MatchParticipant::class, 'match_id');
     }

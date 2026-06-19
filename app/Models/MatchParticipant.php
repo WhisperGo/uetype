@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MatchParticipant extends Model
 {
@@ -16,19 +15,13 @@ class MatchParticipant extends Model
         'wpm',
         'accuracy',
         'placement',
-        'elo_change',
-        'connection_status',
-        'wpm_samples',
-        'heatmap_data',
-        'is_suspicious',
-        'cheat_summary',
+        'finished_at',
     ];
 
     protected $casts = [
-        'wpm_samples' => 'array',
-        'heatmap_data' => 'array',
-        'cheat_summary' => 'array',
-        'is_suspicious' => 'boolean',
+        'wpm' => 'decimal:2',
+        'accuracy' => 'decimal:2',
+        'finished_at' => 'datetime',
     ];
 
     public function match(): BelongsTo
@@ -39,10 +32,5 @@ class MatchParticipant extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function keystrokeLogs(): HasMany
-    {
-        return $this->hasMany(KeystrokeLog::class);
     }
 }

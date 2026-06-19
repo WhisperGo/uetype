@@ -44,7 +44,6 @@ class QuoteSeeder extends Seeder
                 'mode' => 'quote',
                 'difficulty' => $q['difficulty'],
                 'author' => $q['author'],
-                'word_count' => str_word_count($q['content']),
             ]);
         }
 

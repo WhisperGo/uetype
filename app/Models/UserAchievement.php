@@ -5,18 +5,20 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class ClanJoinRequest extends Model
+class UserAchievement extends Model
 {
+    public const UPDATED_AT = null;
+    public const CREATED_AT = null;
+
     protected $fillable = [
-        'clan_id',
         'user_id',
-        'status',
+        'achievement_key',
+        'unlocked_at',
     ];
 
-    public function clan(): BelongsTo
-    {
-        return $this->belongsTo(Clan::class);
-    }
+    protected $casts = [
+        'unlocked_at' => 'datetime',
+    ];
 
     public function user(): BelongsTo
     {

@@ -2,69 +2,42 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
-        'role_id',
-        'username',
+        'google_id',
         'email',
-        'password',
+        'username',
+        'avatar',
         'highest_wpm',
-        'elo_rating',
-        'xp',
-        'coins',
-        'clan_id',
-        'clan_role',
-        'joined_at',
+        'total_xp',
+        'is_admin',
+        'preferences',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
-        'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'joined_at' => 'datetime',
-            'password' => 'hashed',
+            'highest_wpm' => 'decimal:2',
+            'is_admin' => 'boolean',
+            'preferences' => 'array',
         ];
     }
 
-    public function role(): BelongsTo
+    public function typingResults(): HasMany
     {
-        return $this->belongsTo(Role::class);
-    }
-
-    public function clan(): BelongsTo
-    {
-        return $this->belongsTo(Clan::class);
+        return $this->hasMany(TypingResult::class);
     }
 
     public function matchParticipants(): HasMany
@@ -72,13 +45,23 @@ class User extends Authenticatable
         return $this->hasMany(MatchParticipant::class);
     }
 
-    public function userItems(): HasMany
+    public function hostedMatches(): HasMany
     {
-        return $this->hasMany(UserItem::class);
+        return $this->hasMany(Matches::class, 'host_user_id');
     }
 
-    public function clanJoinRequests(): HasMany
+    public function sentFriendRequests(): HasMany
     {
-        return $this->hasMany(ClanJoinRequest::class);
+        return $this->hasMany(Friendship::class, 'requester_id');
+    }
+
+    public function receivedFriendRequests(): HasMany
+    {
+        return $this->hasMany(Friendship::class, 'addressee_id');
+    }
+
+    public function achievements(): HasMany
+    {
+        return $this->hasMany(UserAchievement::class);
     }
 }

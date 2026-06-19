@@ -6,26 +6,19 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('texts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('language_id')->constrained('languages')->onDelete('cascade');
             $table->text('content');
-            $table->enum('mode', ['time', 'words', 'quote']);
-            $table->enum('difficulty', ['easy', 'medium', 'hard']);
-            $table->string('author');
-            $table->integer('word_count')->nullable();
+            $table->string('mode', 20);
+            $table->string('difficulty', 20);
+            $table->string('author')->nullable();
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('texts');

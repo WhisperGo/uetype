@@ -6,29 +6,20 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('role_id')->constrained('roles')->onDelete('cascade');
+            $table->string('google_id')->nullable()->unique();
+            $table->string('email')->unique();
             $table->string('username')->unique();
-            $table->string('email');
-            $table->timestamp('email_verified_at')->nullable(); 
-            $table->string('password');
+            $table->string('avatar')->nullable();
             $table->decimal('highest_wpm', 6, 2)->default(0.00);
-            $table->integer('elo_rating')->default(0);
-            $table->integer('xp')->default(0);
-            $table->integer('coins')->default(0);
-            // FK ke clans ditambahkan di migration terpisah (circular dgn clans.leader_id)
-            $table->unsignedBigInteger('clan_id')->nullable();
-            $table->enum('clan_role', ['leader', 'co-leader', 'member'])->nullable();
-            $table->timestamp('joined_at')->nullable();
+            $table->bigInteger('total_xp')->default(0);
+            $table->boolean('is_admin')->default(false);
+            $table->json('preferences')->nullable();
             $table->rememberToken();
             $table->timestamps();
-
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
@@ -45,24 +36,12 @@ return new class extends Migration
             $table->longText('payload');
             $table->integer('last_activity')->index();
         });
-
-        Schema::create('user_items', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('item_id')->constrained('items')->onDelete('cascade');
-            $table->boolean('is_equipped')->default(false);
-            $table->timestamp('purchased_at')->useCurrent();
-        });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('users');
-        Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
-        Schema::dropIfExists('user_items');
+        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('users');
     }
 };
