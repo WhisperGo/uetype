@@ -131,10 +131,11 @@ class TypingEngine extends Component
         $correctKeystrokes = (int) $correctKeystrokes;
         $incorrectKeystrokes = max(0, $totalKeystrokes - $correctKeystrokes);
 
-        // Skor survival = jumlah kata bersih yang berhasil diketik sebelum nyawa habis
-        // (inilah angka yang masuk leaderboard survival — requirement Survival/Scoring).
-        // Mode lain tidak memakai kolom score.
-        $score = $this->mainMode === 'survival' ? max(0, (int) $wordsCompleted) : null;
+        // Survival (model stamina): metrik leaderboard = durasi bertahan (duration_seconds),
+        // BUKAN lagi kolom score. Kolom score dipakai sebagai stat sampingan: jumlah karakter
+        // benar selama bertahan. Mode lain tidak memakai kolom score.
+        // ($wordsCompleted masih dikirim client sebagai info tambahan, tak jadi metrik utama.)
+        $score = $this->mainMode === 'survival' ? $correctKeystrokes : null;
 
         // Durasi dikirim client dalam MILIDETIK (presisi penuh, sama dengan perhitungan live).
         // Simpan dalam detik (boleh pecahan) agar WPM server == WPM yang dilihat user saat mengetik.
@@ -176,7 +177,9 @@ class TypingEngine extends Component
                 TypingResult::create([
                     'user_id' => $user->id,
                     'text_id' => $this->textId, // terisi untuk quote, null untuk time/words
-                    'mode' => $this->mainMode, // 'time' | 'words' | 'quote'
+                    'mode' => $this->mainMode, // 'time' | 'words' | 'quote' | 'survival'
+                    // mode_config: detail sub-mode. time/words = angka, survival = difficulty
+                    // ('easy'|'medium'|'hard' — kunci filter leaderboard per-difficulty), quote = null.
                     'mode_config' => $this->mainMode === 'quote' ? null : (string) $this->subMode,
                     'net_wpm' => $finalNetWpm,
                     'raw_wpm' => $finalRawWpm,
@@ -207,7 +210,7 @@ class TypingEngine extends Component
             'time' => $duration,
             'mode' => $this->mainMode,
             'subMode' => $this->subMode,
-            'score' => $score, // kata bersih survival (null untuk mode lain)
+            'score' => $score, // survival: karakter benar (stat sampingan); null untuk mode lain
             'totalKeystrokes' => $totalKeystrokes,
             'correctKeystrokes' => $correctKeystrokes,
             'incorrectKeystrokes' => $incorrectKeystrokes,

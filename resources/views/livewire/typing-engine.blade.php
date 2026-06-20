@@ -50,7 +50,7 @@
                             :class="currentMain === 'quote' ? 'text-typing-bg bg-typing-accent' : 'text-typing-muted hover:text-typing-text'">quote</button>
 
                         <button
-                            @click.prevent="currentMain = 'survival'; currentSub = 'classic'; $wire.setMode('survival', 'classic'); $el.blur()"
+                            @click.prevent="currentMain = 'survival'; currentSub = 'medium'; $wire.setMode('survival', 'medium'); $el.blur()"
                             class="transition-all duration-200 py-1.5 px-3 rounded-lg outline-none"
                             :class="currentMain === 'survival' ? 'text-typing-bg bg-typing-accent' : 'text-typing-muted hover:text-typing-text'">survival</button>
                     </div>
@@ -84,29 +84,39 @@
                             <span class="px-2.5 py-1 text-typing-muted italic text-xs">kutipan acak</span>
                         </template>
                         <template x-if="currentMain === 'survival'">
-                            <span class="px-2.5 py-1 text-typing-muted italic text-xs">bertahan selama mungkin</span>
+                            <div class="flex gap-1.5">
+                                @foreach (['easy', 'medium', 'hard'] as $d)
+                                    <button
+                                        @click.prevent="currentSub = '{{ $d }}'; $wire.setMode('survival', '{{ $d }}'); $el.blur()"
+                                        class="px-2.5 py-1 rounded-lg transition-all duration-200 outline-none capitalize"
+                                        :class="currentSub == '{{ $d }}' ?
+                                            'text-typing-accent bg-typing-accent/10 ring-1 ring-typing-accent/40' :
+                                            'hover:text-typing-text'">{{ $d }}</button>
+                                @endforeach
+                            </div>
                         </template>
                     </div>
                 </div>
             </div>
 
-            <!-- SURVIVAL: indikator nyawa & streak (hanya saat mode survival) -->
+            <!-- SURVIVAL: bar stamina terpadu (hanya saat mode survival) -->
             <template x-if="currentMain === 'survival'">
-                <div class="flex items-center justify-between gap-4 mb-4 transition-opacity duration-300"
+                <div class="mb-5 transition-opacity duration-300"
                     :class="isStarted ? 'opacity-100' : 'opacity-50'">
-                    <div class="flex items-center gap-1.5">
-                        <template x-for="n in maxLives" :key="n">
-                            <svg class="w-7 h-7 transition-all duration-300"
-                                :class="n <= lives ? 'text-typing-error scale-100' : 'text-typing-surface scale-90'"
-                                fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-                            </svg>
-                        </template>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="font-sans text-[0.7rem] uppercase tracking-[0.25em] text-typing-muted">stamina</span>
+                        <span class="font-sans text-[0.7rem] uppercase tracking-[0.2em] text-typing-muted capitalize"
+                            x-text="currentSub"></span>
                     </div>
-                    <div class="flex items-center gap-2 font-sans text-[0.7rem] uppercase tracking-[0.2em] text-typing-muted">
-                        <span>kata bersih</span>
-                        <span class="font-mono text-typing-accent font-bold" x-text="cleanWordStreak"></span>
-                        <span class="text-typing-muted">/ <span x-text="regenThreshold"></span></span>
+                    <!-- Track bar -->
+                    <div class="w-full h-4 rounded-full bg-typing-surface/80 border border-white/5 overflow-hidden">
+                        <!-- Fill: warna bergeser cyan→amber→rose sesuai sisa stamina.
+                             Warna dipasang lewat inline background-color (bukan class Tailwind dinamis)
+                             agar TIDAK ikut ke-purge JIT — bug sebelumnya: bar hilang di bawah 50%
+                             karena class warna ternary tak ter-generate. -->
+                        <div class="h-full rounded-full transition-all duration-100 ease-linear"
+                            :style="`width: ${staminaPct}%; background-color: ${staminaPct > 50 ? '#22d3ee' : (staminaPct > 25 ? '#fbbf24' : '#f43f5e')};`">
+                        </div>
                     </div>
                 </div>
             </template>
@@ -205,6 +215,25 @@
     </div>
 
     <script>
+        // Preset parameter Survival (stamina bar). Semua angka SEMENTARA — gampang di-tuning
+        // saat playtest. Yang dikunci adalah polanya, bukan angkanya (lihat catatan revisi).
+        //   sMax     : kapasitas bar (cap atas — cegah "menabung" stamina lalu santai)
+        //   sStart   : stamina awal saat mulai
+        //   graceSec : detik awal tanpa/dengan drain sangat lembut (biar pemain sempat "panas")
+        //   dStart   : drain pasif awal per detik
+        //   dAccel   : percepatan drain per detik² (escalation — drain makin deras seiring waktu)
+        //   refill   : stamina bertambah per KARAKTER benar (berbasis char, bukan per-kata flat)
+        //   penalty  : drain ekstra saat kata "kotor" di-commit (cap per-kata)
+        const SURVIVAL_PRESETS = {
+            easy:   { sMax: 120, sStart: 120, graceSec: 4, dStart: 2.2, dAccel: 0.08, refill: 2.6, penalty: 6 },
+            medium: { sMax: 100, sStart: 100, graceSec: 3, dStart: 3.0, dAccel: 0.15, refill: 2.0, penalty: 8 },
+            hard:   { sMax: 85,  sStart: 85,  graceSec: 2, dStart: 4.0, dAccel: 0.26, refill: 1.6, penalty: 11 },
+        };
+
+        function survivalConfig(difficulty) {
+            return SURVIVAL_PRESETS[difficulty] || SURVIVAL_PRESETS.medium;
+        }
+
         function typingGame(initialText) {
             return {
                 targetArray: initialText.split(''),
@@ -233,25 +262,36 @@
                 rawHistory: [],
                 missedChars: {},
 
-                // --- State khusus Survival Mode ---
-                // Nyawa dipotong PER-KATA (maks -1/kata), pulih tiap 10 kata bersih (regen).
-                lives: 5,
-                maxLives: 5,
-                regenThreshold: 10,   // jumlah kata bersih untuk +1 nyawa (revisi playtest: 20→10)
-                cleanWordStreak: 0,   // kata bersih beruntun (reset saat kata kotor)
+                // --- State khusus Survival Mode (bar stamina terpadu) ---
+                // Stamina menyusut seiring waktu (drain), terisi tiap karakter benar (refill),
+                // terkuras ekstra saat kata kotor (penalti). Habis (0) = game over.
+                stamina: 100,         // nilai stamina sekarang
+                staminaMax: 100,      // kapasitas/cap bar (di-set dari preset difficulty)
+                staminaPct: 100,      // persentase untuk UI (0–100)
+                survivalCfg: null,    // preset parameter aktif (lihat SURVIVAL_PRESETS)
+                staminaInterval: null,// loop tick drain (halus, ~100ms)
+                lastTickTime: 0,      // timestamp tick terakhir (untuk Δt presisi)
                 currentWordDirty: false, // apakah kata yang sedang diketik sudah pernah error
-                wordsCompleted: 0,    // total kata selesai (skor survival = ini saat mati)
+                wordsCompleted: 0,    // total kata selesai (stat sampingan)
                 committedWordResults: {}, // {wordIndex: 'clean'|'dirty'} — kata yang sudah dinilai (idempoten)
 
                 init() {
                     this.timer = (this.currentMain === 'time') ? parseInt(this.currentSub) : 0;
 
-                    // Reset state survival tiap mulai/restart.
-                    this.lives = this.maxLives;
-                    this.cleanWordStreak = 0;
+                    // Reset state survival tiap mulai/restart. Preset diambil dari currentSub
+                    // (difficulty: 'easy'|'medium'|'hard'); mode lain tak terpengaruh.
+                    this.survivalCfg = survivalConfig(this.currentSub);
+                    this.staminaMax = this.survivalCfg.sMax;
+                    this.stamina = this.survivalCfg.sStart;
+                    this.staminaPct = Math.round((this.stamina / this.staminaMax) * 100);
+                    this.lastTickTime = 0;
                     this.currentWordDirty = false;
                     this.wordsCompleted = 0;
                     this.committedWordResults = {};
+                    if (this.staminaInterval) {
+                        clearInterval(this.staminaInterval);
+                        this.staminaInterval = null;
+                    }
                     
                     this.wordBounds = [];
                     this.extraChars = {};
@@ -312,13 +352,11 @@
                 },
 
                 // Dipanggil tiap satu kata selesai (spasi ditekan / kata di-skip).
-                // Di sinilah nyawa dicek — basis PER-KATA:
-                //   - kata kotor (ada error apa pun, walau dikoreksi) → -1 nyawa, streak reset.
-                //   - kata bersih (nol error) → streak +1; tiap 10 kata bersih → regen +1 nyawa.
-                // Bersih & kotor saling eksklusif: satu kata tak bisa sekaligus regen & potong.
-                // IDEMPOTEN per-index: kalau kata yang sama di-commit ulang (mis. user backspace
-                // mundur lalu maju lagi), penilaian lama dibatalkan dulu lewat uncommitWord —
-                // sehingga satu kata tetap berkontribusi maksimal -1 nyawa (revisi playtest).
+                // Model STAMINA: kata kotor kena DRAIN EKSTRA tetap (penalti akurasi), cap per-kata.
+                //   - kata bersih (nol error) → tak ada penalti (refill sudah datang dari karakter).
+                //   - kata kotor (ada error apa pun, walau dikoreksi) → stamina -= penalty (sekali).
+                // IDEMPOTEN per-index: kalau kata sama di-commit ulang (user backspace mundur lalu
+                // maju lagi), penalti lama tak dikenakan dua kali — cap per-kata (revisi playtest).
                 completeWord(wordIndex) {
                     this.wordsCompleted++;
 
@@ -327,41 +365,28 @@
                     const isDirty = this.currentWordDirty;
                     this.currentWordDirty = false;
 
-                    // Apakah kata ini SUDAH pernah memotong nyawa pada commit sebelumnya?
-                    // (Terjadi bila user mundur untuk koreksi lalu maju lagi.) Cap per-kata:
-                    // satu kata maksimal -1 nyawa sepanjang hidupnya — jangan potong dua kali.
+                    // Apakah kata ini SUDAH pernah kena penalti pada commit sebelumnya?
+                    // Cap per-kata: satu kata maksimal -1 penalti sepanjang hidupnya.
                     const alreadyPenalized = this.committedWordResults[wordIndex] === 'dirty';
 
                     if (isDirty) {
-                        // Tandai kotor (permanen untuk kata ini sampai uncommit penuh).
                         this.committedWordResults[wordIndex] = 'dirty';
-                        this.cleanWordStreak = 0;
-
-                        // Potong nyawa hanya jika belum pernah dipotong untuk kata ini.
                         if (!alreadyPenalized) {
-                            this.lives = Math.max(0, this.lives - 1);
-                            if (this.lives <= 0) {
-                                this.finish();
-                            }
+                            this.stamina = Math.max(0, this.stamina - this.survivalCfg.penalty);
+                            this.syncStaminaPct();
+                            if (this.stamina <= 0) this.survivalGameOver();
                         }
                         return;
                     }
 
-                    // Kata bersih: catat, tambah streak, regen nyawa bila mencapai ambang.
+                    // Kata bersih: cukup catat (refill stamina sudah terjadi per-karakter saat diketik).
                     this.committedWordResults[wordIndex] = 'clean';
-                    this.cleanWordStreak++;
-                    if (this.cleanWordStreak >= this.regenThreshold) {
-                        this.cleanWordStreak = 0;
-                        this.lives = Math.min(this.maxLives, this.lives + 1);
-                    }
                 },
 
                 // Dipanggil saat user backspace mundur ke kata sebelumnya untuk mengoreksi.
-                // Membatalkan kontribusi STREAK & hitung kata dari commit terakhir, supaya saat
-                // kata di-commit ulang tidak double-count. Yang TIDAK dibatalkan: potongan nyawa
-                // untuk kata kotor (aturan "kotor tetap -1 walau dikoreksi") — status 'dirty'
-                // sengaja DIPERTAHANKAN di committedWordResults agar commit ulang tahu nyawa sudah
-                // terpotong dan tidak memotong lagi (cap per-kata).
+                // Membatalkan hitung kata dari commit terakhir agar tak double-count saat re-commit.
+                // Penalti stamina untuk kata kotor TIDAK dikembalikan (aturan "kotor tetap kena
+                // walau dikoreksi") — status 'dirty' DIPERTAHANKAN agar re-commit tak memotong lagi.
                 uncommitWord(wordIndex) {
                     if (this.currentMain !== 'survival') return;
 
@@ -371,16 +396,63 @@
                     this.wordsCompleted = Math.max(0, this.wordsCompleted - 1);
 
                     if (prev === 'clean') {
-                        // Kata tadinya bersih: cabut kontribusinya ke streak, dan lupakan total —
-                        // saat di-commit ulang akan dinilai dari nol lagi.
-                        if (this.cleanWordStreak > 0) this.cleanWordStreak--;
+                        // Kata tadinya bersih: lupakan total, dinilai ulang dari nol saat re-commit.
                         delete this.committedWordResults[wordIndex];
                     }
-                    // Jika 'dirty': biarkan tetap 'dirty' agar nyawa tak terpotong dua kali.
+                    // Jika 'dirty': biarkan tetap 'dirty' agar penalti tak dikenakan dua kali.
+                },
+
+                // Refill stamina tiap satu karakter benar (cap di staminaMax). No-op di luar survival.
+                refillStamina() {
+                    if (this.currentMain !== 'survival' || this.isFinished) return;
+                    this.stamina = Math.min(this.staminaMax, this.stamina + this.survivalCfg.refill);
+                    this.syncStaminaPct();
+                },
+
+                // Satu tick drain pasif. Δt = detik sejak tick sebelumnya (presisi, bukan asumsi
+                // interval tetap). Drain naik seiring waktu (escalation) dengan grace di awal.
+                staminaTick() {
+                    if (this.currentMain !== 'survival' || this.isFinished || !this.startTime) return;
+
+                    const now = Date.now();
+                    const dt = this.lastTickTime ? (now - this.lastTickTime) / 1000 : 0;
+                    this.lastTickTime = now;
+                    if (dt <= 0) return;
+
+                    const elapsed = (now - this.startTime) / 1000;
+                    const cfg = this.survivalCfg;
+
+                    // Grace: beberapa detik pertama drain dilembutkan agar awal tak terasa kasar.
+                    const graceFactor = elapsed < cfg.graceSec ? (elapsed / cfg.graceSec) : 1;
+
+                    // D = D_start + D_accel * elapsed  (escalation: makin lama makin deras).
+                    const drainPerSec = (cfg.dStart + cfg.dAccel * elapsed) * graceFactor;
+
+                    this.stamina = Math.max(0, this.stamina - drainPerSec * dt);
+                    this.syncStaminaPct();
+
+                    if (this.stamina <= 0) this.survivalGameOver();
+                },
+
+                // Sinkronkan persentase bar untuk UI (0–100).
+                syncStaminaPct() {
+                    this.staminaPct = Math.max(0, Math.min(100, Math.round((this.stamina / this.staminaMax) * 100)));
+                },
+
+                // Game over survival: stamina habis. Hentikan loop tick lalu selesaikan sesi
+                // lewat jalur finish() yang sama dengan mode lain.
+                survivalGameOver() {
+                    if (this.isFinished) return;
+                    if (this.staminaInterval) {
+                        clearInterval(this.staminaInterval);
+                        this.staminaInterval = null;
+                    }
+                    this.finish();
                 },
 
                 destroy() {
                     clearInterval(this.timerInterval);
+                    if (this.staminaInterval) clearInterval(this.staminaInterval);
                 },
 
                 updatePosition() {
@@ -449,6 +521,14 @@
                     if (!this.isStarted) {
                         this.isStarted = true;
                         this.startTime = Date.now();
+
+                        // Survival: jalankan loop drain stamina yang halus (~100ms) agar tekanan
+                        // terasa mulus (bukan patah-patah per detik). Drain & game over di staminaTick.
+                        if (this.currentMain === 'survival') {
+                            this.lastTickTime = this.startTime;
+                            this.staminaInterval = setInterval(() => this.staminaTick(), 100);
+                        }
+
                         this.timerInterval = setInterval(() => {
                             const timeElapsed = Math.floor((Date.now() - this.startTime) / 1000);
                             if (this.currentMain === 'time') {
@@ -544,6 +624,7 @@
                         } else {
                             // SPASI DITEKAN: Pindah ke kata selanjutnya
                             this.correctKeystrokes++; // Spasi di akhir kata adalah tuts benar
+                            this.refillStamina();      // survival: spasi benar juga me-refill
                             this.inputResults[this.currentIndex] = true;
                             this.currentIndex++;
                             this.currentWordIndex++;
@@ -592,6 +673,7 @@
                     const isCorrect = (e.key === this.targetArray[this.currentIndex]);
                     if (isCorrect) {
                         this.correctKeystrokes++;
+                        this.refillStamina(); // survival: karakter benar me-refill stamina
                     } else {
                         // Track missed character
                         const expectedChar = this.targetArray[this.currentIndex].toLowerCase();
@@ -642,6 +724,10 @@
                 finish() {
                     this.isFinished = true;
                     clearInterval(this.timerInterval);
+                    if (this.staminaInterval) {
+                        clearInterval(this.staminaInterval);
+                        this.staminaInterval = null;
+                    }
 
                     // Durasi PRESISI (ms) dari keystroke pertama sampai sekarang — sumber yang
                     // sama dengan perhitungan live, supaya WPM final == WPM saat mengetik.

@@ -13,13 +13,15 @@
             <span class="text-typing-accent">{{ $subMode }}</span>
         </div>
 
-        <!-- SURVIVAL: skor utama = jumlah kata yang berhasil sebelum mati -->
+        <!-- SURVIVAL (model stamina): metrik utama = durasi bertahan terlama (leaderboard) -->
         @if ($mode === 'survival')
             <div
                 class="max-w-md mx-auto mb-6 bg-typing-surface/70 border border-typing-accent/30 rounded-2xl p-6 flex flex-col items-center shadow-glow">
-                <span class="font-sans text-xs uppercase tracking-[0.25em] text-typing-muted mb-1">kata bertahan</span>
-                <span class="text-6xl text-typing-accent font-bold leading-none">{{ $score ?? 0 }}</span>
-                <span class="font-sans text-[0.65rem] uppercase tracking-[0.15em] text-typing-muted mt-2">skor survival</span>
+                <span class="font-sans text-xs uppercase tracking-[0.25em] text-typing-muted mb-1">bertahan selama</span>
+                <span class="text-6xl text-typing-accent font-bold leading-none">{{ round($time, 1) }}<span
+                        class="text-3xl text-typing-muted">s</span></span>
+                <span class="font-sans text-[0.65rem] uppercase tracking-[0.15em] text-typing-muted mt-2 capitalize">survival
+                    · {{ $subMode }}</span>
             </div>
         @endif
 
