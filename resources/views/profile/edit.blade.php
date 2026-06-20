@@ -101,7 +101,7 @@
                     </div>
                     <div class="bg-typing-surface/40 border border-white/5 rounded-2xl p-5">
                         <p class="text-xs uppercase tracking-[0.15em] text-typing-muted font-sans mb-1">Koin</p>
-                        <p class="text-2xl font-bold font-mono text-yellow-400">{{ $user->coins ?? 0 }}</p>
+                        <p class="text-2xl font-bold font-mono text-typing-gold">{{ $user->coins ?? 0 }}</p>
                     </div>
                     <div class="bg-typing-surface/40 border border-white/5 rounded-2xl p-5">
                         <p class="text-xs uppercase tracking-[0.15em] text-typing-muted font-sans mb-1">Best WPM</p>

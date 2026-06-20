@@ -19,8 +19,8 @@
         <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-typing-bg bg-[radial-gradient(ellipse_at_top,_rgba(34,211,238,0.08),_transparent_55%)]">
             <div>
                 <a href="/" class="flex items-center gap-2 group">
-                    <x-application-logo class="w-14 h-14 fill-current text-typing-accent transition-transform group-hover:scale-105" />
-                    <span class="font-sans text-2xl font-bold tracking-tight">Ue<span class="text-typing-accent">Type</span></span>
+                    <x-application-logo class="h-12 w-auto transition-transform group-hover:scale-105" />
+                    <span class="font-sans text-2xl font-bold tracking-tight text-typing-text">Ue<span class="text-typing-accent">Type</span></span>
                 </a>
             </div>
 

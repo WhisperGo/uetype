@@ -28,8 +28,11 @@
             @endif
 
             <!-- MODE SELECTOR -->
-            <div class="flex flex-col items-center gap-3 mb-12 transition-all duration-500"
-                :class="isStarted ? 'opacity-0 -translate-y-10 pointer-events-none h-0 !mb-0 overflow-hidden' : 'opacity-100'">
+            <!-- Saat mengetik, selector di-fade DI TEMPAT (ruang tetap dipesan) supaya
+                 area teks tidak melonjak ke atas. Sebelumnya pakai h-0/!mb-0 yang meng-collapse
+                 tinggi → menyebabkan layout shift ~128px tiap kali mulai mengetik. -->
+            <div class="flex flex-col items-center gap-3 mb-12 transition-opacity duration-500"
+                :class="isStarted ? 'opacity-0 pointer-events-none' : 'opacity-100'">
                 <span class="font-sans text-xs uppercase tracking-[0.3em] text-typing-muted">pilih mode</span>
                 <div
                     class="flex items-center gap-5 bg-typing-surface/80 backdrop-blur px-5 py-2.5 rounded-2xl text-sm font-mono border border-white/10 shadow-glow">
@@ -122,21 +125,26 @@
             </template>
 
             <!-- LIVE STATS -->
-            <div class="flex gap-3 mb-6 transition-opacity duration-300"
+            <!-- Selalu dirender (ruang dipesan sejak awal) dan hanya di-fade lewat opacity —
+                 BUKAN ditambah/dihapus dari DOM — supaya area teks tidak melonjak saat mulai
+                 mengetik (nol layout shift). Fade dibuat lembut (500ms) agar tak mengagetkan.
+                 Label waktu menyesuaikan mode: mode 'time' = hitung mundur; mode lain = stopwatch. -->
+            <div class="flex gap-3 mb-6 transition-opacity duration-500"
                 :class="isStarted ? 'opacity-100' : 'opacity-0'">
                 <div class="flex-1 bg-typing-surface/60 border border-white/5 rounded-xl px-5 py-3">
                     <span class="text-[0.65rem] block text-typing-muted font-sans font-semibold uppercase tracking-[0.2em]">wpm</span>
-                    <span class="text-4xl text-typing-accent font-mono font-bold" x-text="wpm">0</span>
+                    <span class="text-4xl text-typing-accent font-mono font-bold tabular-nums" x-text="wpm">0</span>
                 </div>
                 <div class="flex-1 bg-typing-surface/60 border border-white/5 rounded-xl px-5 py-3">
                     <span class="text-[0.65rem] block text-typing-muted font-sans font-semibold uppercase tracking-[0.2em]">acc</span>
-                    <span class="text-4xl text-typing-accent font-mono font-bold"><span x-text="accuracy">0</span>%</span>
+                    <span class="text-4xl text-typing-accent font-mono font-bold tabular-nums"><span x-text="accuracy">0</span>%</span>
                 </div>
                 <div class="flex-1 bg-typing-surface/60 border border-white/5 rounded-xl px-5 py-3">
-                    <span class="text-[0.65rem] block text-typing-muted font-sans font-semibold uppercase tracking-[0.2em]">time</span>
-                    <span class="text-4xl font-mono font-bold transition-colors duration-300"
+                    <span class="text-[0.65rem] block text-typing-muted font-sans font-semibold uppercase tracking-[0.2em]"
+                        x-text="currentMain === 'time' ? 'time' : 'waktu'">time</span>
+                    <span class="text-4xl font-mono font-bold tabular-nums transition-colors duration-300"
                         :class="(currentMain === 'time' && timer < 5 && isStarted) ? 'text-typing-error' : 'text-typing-accent'"
-                        x-text="timer">0</span>
+                        x-text="currentMain === 'time' ? timer : timer + 's'">0</span>
                 </div>
             </div>
 
@@ -227,7 +235,7 @@
         const SURVIVAL_PRESETS = {
             easy:   { sMax: 120, sStart: 120, graceSec: 4, dStart: 2.2, dAccel: 0.08, refill: 2.6, penalty: 6 },
             medium: { sMax: 100, sStart: 100, graceSec: 3, dStart: 3.0, dAccel: 0.15, refill: 2.0, penalty: 8 },
-            hard:   { sMax: 85,  sStart: 85,  graceSec: 2, dStart: 4.0, dAccel: 0.26, refill: 1.6, penalty: 11 },
+            hard:   { sMax: 85,  sStart: 70,  graceSec: 0, dStart: 5.5, dAccel: 0.40, refill: 1.3, penalty: 16 },
         };
 
         function survivalConfig(difficulty) {

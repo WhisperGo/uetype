@@ -5,7 +5,7 @@
                 <!-- Logo / Wordmark -->
                 <div class="flex items-center shrink-0">
                     <a href="{{ route('home') }}" class="flex items-center gap-2 group">
-                        <x-application-logo class="block w-auto fill-current h-8 text-typing-accent transition-transform group-hover:scale-110" />
+                        <x-application-logo class="block w-auto h-8 transition-transform group-hover:scale-110" />
                         <span class="font-sans text-xl font-bold tracking-tight text-typing-text">Ue<span class="text-typing-accent">Type</span></span>
                     </a>
                 </div>
@@ -15,12 +15,14 @@
                     <x-nav-link href="{{ url('/typing') }}" :active="request()->is('typing')">
                         {{ __('Solo') }}
                     </x-nav-link>
-                    <x-nav-link :href="route('home')" :active="false">
+                    <span class="inline-flex items-center gap-1.5 px-3 pt-1 text-sm font-medium leading-5 text-typing-muted/50 cursor-not-allowed" title="Segera hadir">
                         {{ __('Multiplayer') }}
-                    </x-nav-link>
-                    <x-nav-link :href="route('home')" :active="false">
-                        {{ __('Clan') }}
-                    </x-nav-link>
+                        <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-typing-muted/60">soon</span>
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 px-3 pt-1 text-sm font-medium leading-5 text-typing-muted/50 cursor-not-allowed" title="Segera hadir">
+                        {{ __('Klan') }}
+                        <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-typing-muted/60">soon</span>
+                    </span>
                 </div>
             </div>
 
@@ -33,7 +35,7 @@
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                             {{ rtrim(rtrim(number_format(Auth::user()->highest_wpm, 1), '0'), '.') }}
                         </span>
-                        <span class="flex items-center gap-1 text-yellow-400" title="Coins">
+                        <span class="flex items-center gap-1 text-typing-gold" title="Koin">
                             <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="10" cy="10" r="3.5"/></svg>
                             {{ Auth::user()->coins }}
                         </span>
@@ -96,8 +98,14 @@
     <div :class="{ 'block': open, 'hidden': !open }" class="hidden sm:hidden border-t border-white/5">
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link href="{{ url('/typing') }}" :active="request()->is('typing')">{{ __('Solo') }}</x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('home')" :active="false">{{ __('Multiplayer') }}</x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('home')" :active="false">{{ __('Clan') }}</x-responsive-nav-link>
+            <span class="flex items-center gap-2 w-full ps-3 pe-4 py-2 text-base font-medium text-typing-muted/50 cursor-not-allowed">
+                {{ __('Multiplayer') }}
+                <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-typing-muted/60">soon</span>
+            </span>
+            <span class="flex items-center gap-2 w-full ps-3 pe-4 py-2 text-base font-medium text-typing-muted/50 cursor-not-allowed">
+                {{ __('Klan') }}
+                <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-typing-muted/60">soon</span>
+            </span>
         </div>
 
         <div class="pt-4 pb-1 border-t border-white/5">

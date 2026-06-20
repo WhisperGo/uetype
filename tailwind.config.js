@@ -24,6 +24,7 @@ export default {
                     accent2: '#14b8a6',  // teal-500, aksen sekunder/grafik
                     success: '#34d399',  // emerald, untuk metrik positif
                     error: '#f43f5e',    // rose-500, error/missed
+                    gold: '#facc15',     // amber-400, khusus koin/mata uang
                 },
             },
             fontFamily: {

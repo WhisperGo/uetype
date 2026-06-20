@@ -43,18 +43,18 @@ new class extends Component
 ?>
 
 <section class="space-y-6">
-    <header class="flex justify-between items-center">
+    <header class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-            <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                {{ __('Typing History') }}
+            <h2 class="font-sans text-lg font-semibold text-typing-text">
+                {{ __('Riwayat Mengetik') }}
             </h2>
-            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                {{ __('Review your recent typing test performances and statistics.') }}
+            <p class="mt-1 text-sm text-typing-muted">
+                {{ __('Tinjau performa dan statistik tes mengetikmu yang terakhir.') }}
             </p>
         </div>
         <div>
-            <select wire:model.live="filterMode" class="border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm">
-                <option value="all">All Modes</option>
+            <select wire:model.live="filterMode" class="bg-typing-bg/60 border-white/10 text-typing-text focus:border-typing-accent focus:ring-typing-accent rounded-lg shadow-sm font-sans text-sm">
+                <option value="all">Semua Mode</option>
                 <option value="time">Time</option>
                 <option value="words">Words</option>
                 <option value="quote">Quote</option>
@@ -64,62 +64,62 @@ new class extends Component
         </div>
     </header>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col items-center justify-center shadow-sm">
-            <span class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Matches</span>
-            <span class="text-3xl font-bold text-indigo-600 dark:text-indigo-400 mt-2">{{ $totalMatches }}</span>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="bg-typing-surface/40 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+            <span class="text-xs font-sans font-semibold text-typing-muted uppercase tracking-[0.15em]">Total Tes</span>
+            <span class="text-3xl font-bold font-mono text-typing-accent mt-2">{{ $totalMatches }}</span>
         </div>
-        <div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col items-center justify-center shadow-sm">
-            <span class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Average WPM</span>
-            <span class="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">{{ $averageWpm }}</span>
+        <div class="bg-typing-surface/40 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+            <span class="text-xs font-sans font-semibold text-typing-muted uppercase tracking-[0.15em]">Rata-rata WPM</span>
+            <span class="text-3xl font-bold font-mono text-typing-accent2 mt-2">{{ $averageWpm }}</span>
         </div>
-        <div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col items-center justify-center shadow-sm">
-            <span class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Average Accuracy</span>
-            <span class="text-3xl font-bold text-amber-500 dark:text-amber-400 mt-2">{{ $averageAccuracy }}%</span>
+        <div class="bg-typing-surface/40 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+            <span class="text-xs font-sans font-semibold text-typing-muted uppercase tracking-[0.15em]">Rata-rata Akurasi</span>
+            <span class="text-3xl font-bold font-mono text-typing-success mt-2">{{ $averageAccuracy }}%</span>
         </div>
     </div>
 
-    <div class="overflow-hidden bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg border border-gray-200 dark:border-gray-700">
+    <div class="overflow-hidden bg-typing-surface/40 border border-white/5 rounded-2xl">
         <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-900/50 dark:text-gray-300">
+            <table class="w-full text-sm text-left">
+                <thead class="text-xs text-typing-muted uppercase tracking-wider font-sans bg-white/5">
                     <tr>
-                        <th scope="col" class="px-6 py-3">Date</th>
-                        <th scope="col" class="px-6 py-3">Mode</th>
-                        <th scope="col" class="px-6 py-3">WPM</th>
-                        <th scope="col" class="px-6 py-3">Raw</th>
-                        <th scope="col" class="px-6 py-3">Accuracy</th>
-                        <th scope="col" class="px-6 py-3">Duration</th>
+                        <th scope="col" class="px-6 py-3 font-semibold">Tanggal</th>
+                        <th scope="col" class="px-6 py-3 font-semibold">Mode</th>
+                        <th scope="col" class="px-6 py-3 font-semibold">WPM</th>
+                        <th scope="col" class="px-6 py-3 font-semibold">Raw</th>
+                        <th scope="col" class="px-6 py-3 font-semibold">Akurasi</th>
+                        <th scope="col" class="px-6 py-3 font-semibold">Durasi</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="font-mono">
                     @forelse ($history as $result)
-                        <tr class="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                            <td class="px-6 py-4 whitespace-nowrap">
+                        <tr class="border-t border-white/5 hover:bg-white/5 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap text-typing-muted">
                                 {{ $result->created_at->format('d M Y, H:i') }}
                             </td>
                             <td class="px-6 py-4">
-                                <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
+                                <span class="bg-typing-accent/15 text-typing-accent text-xs font-sans font-medium px-2.5 py-0.5 rounded capitalize">
                                     {{ ucfirst($result->mode?->value ?? '-') }}{{ $result->mode_config ? ' '.$result->mode_config : '' }}
                                 </span>
                             </td>
-                            <td class="px-6 py-4 font-bold text-green-600 dark:text-green-400">
+                            <td class="px-6 py-4 font-bold text-typing-accent">
                                 {{ $result->net_wpm }}
                             </td>
-                            <td class="px-6 py-4 text-gray-500 dark:text-gray-400">
+                            <td class="px-6 py-4 text-typing-muted">
                                 {{ $result->raw_wpm }}
                             </td>
-                            <td class="px-6 py-4 text-amber-600 dark:text-amber-500 font-semibold">
+                            <td class="px-6 py-4 text-typing-accent2 font-semibold">
                                 {{ $result->accuracy }}%
                             </td>
-                            <td class="px-6 py-4 text-gray-500 dark:text-gray-400">
+                            <td class="px-6 py-4 text-typing-muted">
                                 {{ rtrim(rtrim(number_format($result->duration_seconds, 1), '0'), '.') }}s
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                                No typing history found for the selected mode.
+                            <td colspan="6" class="px-6 py-8 text-center text-typing-muted font-sans">
+                                Belum ada riwayat untuk mode yang dipilih.
                             </td>
                         </tr>
                     @endforelse
@@ -127,7 +127,7 @@ new class extends Component
             </table>
         </div>
     </div>
-    
+
     @if($history->hasPages())
         <div class="mt-4">
             {{ $history->links() }}

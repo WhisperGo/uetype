@@ -1,2 +1,2 @@
-<img src="{{ asset('logo/logo.png') }}" alt="UeType Logo"
-class="block w-auto h-12 text-gray-500" />
+<img src="{{ asset('icon/uetype_mascot.png') }}" alt="UeType"
+    {{ $attributes->merge(['class' => 'block object-contain']) }} />
