@@ -233,8 +233,8 @@
         //   refill   : stamina bertambah per KARAKTER benar (berbasis char, bukan per-kata flat)
         //   penalty  : drain ekstra saat kata "kotor" di-commit (cap per-kata)
         const SURVIVAL_PRESETS = {
-            easy:   { sMax: 120, sStart: 120, graceSec: 4, dStart: 2.2, dAccel: 0.08, refill: 2.6, penalty: 6 },
-            medium: { sMax: 100, sStart: 100, graceSec: 3, dStart: 3.0, dAccel: 0.15, refill: 2.0, penalty: 8 },
+            easy:   { sMax: 120, sStart: 120, graceSec: 4, dStart: 3.0, dAccel: 0.11, refill: 2.4, penalty: 7 },
+            medium: { sMax: 100, sStart: 100, graceSec: 3, dStart: 3.8, dAccel: 0.20, refill: 1.9, penalty: 10 },
             hard:   { sMax: 85,  sStart: 70,  graceSec: 0, dStart: 5.5, dAccel: 0.40, refill: 1.3, penalty: 16 },
         };
 
