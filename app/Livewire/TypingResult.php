@@ -12,6 +12,7 @@ class TypingResult extends Component
     public $time;
     public $mode;
     public $subMode;
+    public $score;
     public $totalKeystrokes;
     public $correctKeystrokes;
     public $incorrectKeystrokes;
@@ -33,6 +34,7 @@ class TypingResult extends Component
         $this->time = $result['time'];
         $this->mode = $result['mode'] ?? 'time';
         $this->subMode = $result['subMode'] ?? '30';
+        $this->score = $result['score'] ?? null;
         $this->totalKeystrokes = $result['totalKeystrokes'] ?? 0;
         $this->correctKeystrokes = $result['correctKeystrokes'] ?? 0;
         $this->incorrectKeystrokes = $result['incorrectKeystrokes'] ?? 0;

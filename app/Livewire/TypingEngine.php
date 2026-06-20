@@ -96,9 +96,15 @@ class TypingEngine extends Component
                     $wordsArray = $data['words'];
                     shuffle($wordsArray);
 
-                    // Jika mode time, kita berikan 500 kata (cukup untuk tes 120 detik, namun jauh lebih ringan untuk performa browser)
-                    // Jika mode words, kita berikan sesuai jumlah yang dipilih
-                    $limit = ($this->mainMode === 'words') ? (int) $this->subMode : 350;
+                    // Jika mode words, kita berikan sesuai jumlah yang dipilih.
+                    // Survival tidak punya batas waktu/kata, jadi butuh stok kata panjang
+                    // (kalau benar-benar habis, finish() tetap terpanggil saat teks selesai).
+                    // Selain itu (time) cukup 350 kata.
+                    $limit = match ($this->mainMode) {
+                        'words' => (int) $this->subMode,
+                        'survival' => 500,
+                        default => 350,
+                    };
 
                     $selectedWords = [];
                     while (count($selectedWords) < $limit) {
@@ -117,13 +123,18 @@ class TypingEngine extends Component
         }
     }
 
-    public function saveResult($durationMs, $totalKeystrokes, $correctKeystrokes, $wpmHistory = [], $rawHistory = [], $missedChars = [])
+    public function saveResult($durationMs, $totalKeystrokes, $correctKeystrokes, $wpmHistory = [], $rawHistory = [], $missedChars = [], $wordsCompleted = 0)
     {
         // Catatan: WPM/akurasi dari client TIDAK diterima sebagai parameter — server
         // selalu menghitung ulang sendiri dari jumlah karakter & durasi (anti-cheat).
         $totalKeystrokes = (int) $totalKeystrokes;
         $correctKeystrokes = (int) $correctKeystrokes;
         $incorrectKeystrokes = max(0, $totalKeystrokes - $correctKeystrokes);
+
+        // Skor survival = jumlah kata bersih yang berhasil diketik sebelum nyawa habis
+        // (inilah angka yang masuk leaderboard survival — requirement Survival/Scoring).
+        // Mode lain tidak memakai kolom score.
+        $score = $this->mainMode === 'survival' ? max(0, (int) $wordsCompleted) : null;
 
         // Durasi dikirim client dalam MILIDETIK (presisi penuh, sama dengan perhitungan live).
         // Simpan dalam detik (boleh pecahan) agar WPM server == WPM yang dilihat user saat mengetik.
@@ -158,7 +169,7 @@ class TypingEngine extends Component
 
             DB::transaction(function () use (
                 $user, $duration, $finalNetWpm, $finalRawWpm, $finalAccuracy,
-                $correctKeystrokes, $incorrectKeystrokes, $xpEarned,
+                $correctKeystrokes, $incorrectKeystrokes, $xpEarned, $score,
                 $wpmHistory, $rawHistory, $missedChars
             ) {
                 // Satu sesi solo valid = satu baris di typing_results (requirement Database).
@@ -173,7 +184,7 @@ class TypingEngine extends Component
                     'correct_chars' => $correctKeystrokes,
                     'incorrect_chars' => $incorrectKeystrokes,
                     'duration_seconds' => $duration,
-                    'score' => null, // dipakai oleh survival mode nanti
+                    'score' => $score, // jumlah kata bersih (survival), null untuk mode lain
                     'xp_earned' => $xpEarned,
                     'ghost_data' => null, // diisi selektif oleh ghost mode nanti
                 ]);
@@ -196,6 +207,7 @@ class TypingEngine extends Component
             'time' => $duration,
             'mode' => $this->mainMode,
             'subMode' => $this->subMode,
+            'score' => $score, // kata bersih survival (null untuk mode lain)
             'totalKeystrokes' => $totalKeystrokes,
             'correctKeystrokes' => $correctKeystrokes,
             'incorrectKeystrokes' => $incorrectKeystrokes,

@@ -13,6 +13,16 @@
             <span class="text-typing-accent">{{ $subMode }}</span>
         </div>
 
+        <!-- SURVIVAL: skor utama = jumlah kata yang berhasil sebelum mati -->
+        @if ($mode === 'survival')
+            <div
+                class="max-w-md mx-auto mb-6 bg-typing-surface/70 border border-typing-accent/30 rounded-2xl p-6 flex flex-col items-center shadow-glow">
+                <span class="font-sans text-xs uppercase tracking-[0.25em] text-typing-muted mb-1">kata bertahan</span>
+                <span class="text-6xl text-typing-accent font-bold leading-none">{{ $score ?? 0 }}</span>
+                <span class="font-sans text-[0.65rem] uppercase tracking-[0.15em] text-typing-muted mt-2">skor survival</span>
+            </div>
+        @endif
+
         <!-- Main stat cards -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <!-- Net WPM = metrik utama (blueprint Scoring 2) -->
@@ -34,7 +44,7 @@
             </div>
             <div class="bg-typing-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
                 <span class="font-sans text-xs uppercase tracking-[0.2em] text-typing-muted mb-1">waktu</span>
-                <span class="text-4xl text-typing-text font-bold leading-none">{{ $time }}<span
+                <span class="text-4xl text-typing-text font-bold leading-none">{{ round($time, 2) }}<span
                         class="text-xl text-typing-muted">s</span></span>
             </div>
         </div>

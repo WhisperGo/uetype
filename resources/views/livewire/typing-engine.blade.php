@@ -48,6 +48,11 @@
                             @click.prevent="currentMain = 'quote'; currentSub = 'medium'; $wire.setMode('quote', 'medium'); $el.blur()"
                             class="transition-all duration-200 py-1.5 px-3 rounded-lg outline-none"
                             :class="currentMain === 'quote' ? 'text-typing-bg bg-typing-accent' : 'text-typing-muted hover:text-typing-text'">quote</button>
+
+                        <button
+                            @click.prevent="currentMain = 'survival'; currentSub = 'classic'; $wire.setMode('survival', 'classic'); $el.blur()"
+                            class="transition-all duration-200 py-1.5 px-3 rounded-lg outline-none"
+                            :class="currentMain === 'survival' ? 'text-typing-bg bg-typing-accent' : 'text-typing-muted hover:text-typing-text'">survival</button>
                     </div>
 
                     <div class="flex items-center gap-1.5 text-typing-muted font-semibold">
@@ -78,9 +83,33 @@
                         <template x-if="currentMain === 'quote'">
                             <span class="px-2.5 py-1 text-typing-muted italic text-xs">kutipan acak</span>
                         </template>
+                        <template x-if="currentMain === 'survival'">
+                            <span class="px-2.5 py-1 text-typing-muted italic text-xs">bertahan selama mungkin</span>
+                        </template>
                     </div>
                 </div>
             </div>
+
+            <!-- SURVIVAL: indikator nyawa & streak (hanya saat mode survival) -->
+            <template x-if="currentMain === 'survival'">
+                <div class="flex items-center justify-between gap-4 mb-4 transition-opacity duration-300"
+                    :class="isStarted ? 'opacity-100' : 'opacity-50'">
+                    <div class="flex items-center gap-1.5">
+                        <template x-for="n in maxLives" :key="n">
+                            <svg class="w-7 h-7 transition-all duration-300"
+                                :class="n <= lives ? 'text-typing-error scale-100' : 'text-typing-surface scale-90'"
+                                fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                            </svg>
+                        </template>
+                    </div>
+                    <div class="flex items-center gap-2 font-sans text-[0.7rem] uppercase tracking-[0.2em] text-typing-muted">
+                        <span>kata bersih</span>
+                        <span class="font-mono text-typing-accent font-bold" x-text="cleanWordStreak"></span>
+                        <span class="text-typing-muted">/ <span x-text="regenThreshold"></span></span>
+                    </div>
+                </div>
+            </template>
 
             <!-- LIVE STATS -->
             <div class="flex gap-3 mb-6 transition-opacity duration-300"
@@ -204,8 +233,25 @@
                 rawHistory: [],
                 missedChars: {},
 
+                // --- State khusus Survival Mode ---
+                // Nyawa dipotong PER-KATA (maks -1/kata), pulih tiap 10 kata bersih (regen).
+                lives: 5,
+                maxLives: 5,
+                regenThreshold: 10,   // jumlah kata bersih untuk +1 nyawa (revisi playtest: 20→10)
+                cleanWordStreak: 0,   // kata bersih beruntun (reset saat kata kotor)
+                currentWordDirty: false, // apakah kata yang sedang diketik sudah pernah error
+                wordsCompleted: 0,    // total kata selesai (skor survival = ini saat mati)
+                committedWordResults: {}, // {wordIndex: 'clean'|'dirty'} — kata yang sudah dinilai (idempoten)
+
                 init() {
                     this.timer = (this.currentMain === 'time') ? parseInt(this.currentSub) : 0;
+
+                    // Reset state survival tiap mulai/restart.
+                    this.lives = this.maxLives;
+                    this.cleanWordStreak = 0;
+                    this.currentWordDirty = false;
+                    this.wordsCompleted = 0;
+                    this.committedWordResults = {};
                     
                     this.wordBounds = [];
                     this.extraChars = {};
@@ -251,6 +297,86 @@
                         return true;
                     }
                     return false;
+                },
+
+                // --- Helper Survival ---
+
+                // Dipanggil tiap kali terjadi error di kata aktif (typo / huruf di-skip /
+                // karakter berlebih). Hanya MENANDAI kata sebagai "kotor" — TIDAK memotong
+                // nyawa di sini. Pemotongan nyawa terjadi sekali saat kata di-commit, maksimal
+                // -1 per kata berapa pun jumlah errornya (revisi playtest: per-kata, bukan
+                // per-karakter). Koreksi tidak menghapus status kotor. No-op di luar survival.
+                markWordDirty() {
+                    if (this.currentMain !== 'survival' || this.isFinished) return;
+                    this.currentWordDirty = true;
+                },
+
+                // Dipanggil tiap satu kata selesai (spasi ditekan / kata di-skip).
+                // Di sinilah nyawa dicek — basis PER-KATA:
+                //   - kata kotor (ada error apa pun, walau dikoreksi) → -1 nyawa, streak reset.
+                //   - kata bersih (nol error) → streak +1; tiap 10 kata bersih → regen +1 nyawa.
+                // Bersih & kotor saling eksklusif: satu kata tak bisa sekaligus regen & potong.
+                // IDEMPOTEN per-index: kalau kata yang sama di-commit ulang (mis. user backspace
+                // mundur lalu maju lagi), penilaian lama dibatalkan dulu lewat uncommitWord —
+                // sehingga satu kata tetap berkontribusi maksimal -1 nyawa (revisi playtest).
+                completeWord(wordIndex) {
+                    this.wordsCompleted++;
+
+                    if (this.currentMain !== 'survival') return;
+
+                    const isDirty = this.currentWordDirty;
+                    this.currentWordDirty = false;
+
+                    // Apakah kata ini SUDAH pernah memotong nyawa pada commit sebelumnya?
+                    // (Terjadi bila user mundur untuk koreksi lalu maju lagi.) Cap per-kata:
+                    // satu kata maksimal -1 nyawa sepanjang hidupnya — jangan potong dua kali.
+                    const alreadyPenalized = this.committedWordResults[wordIndex] === 'dirty';
+
+                    if (isDirty) {
+                        // Tandai kotor (permanen untuk kata ini sampai uncommit penuh).
+                        this.committedWordResults[wordIndex] = 'dirty';
+                        this.cleanWordStreak = 0;
+
+                        // Potong nyawa hanya jika belum pernah dipotong untuk kata ini.
+                        if (!alreadyPenalized) {
+                            this.lives = Math.max(0, this.lives - 1);
+                            if (this.lives <= 0) {
+                                this.finish();
+                            }
+                        }
+                        return;
+                    }
+
+                    // Kata bersih: catat, tambah streak, regen nyawa bila mencapai ambang.
+                    this.committedWordResults[wordIndex] = 'clean';
+                    this.cleanWordStreak++;
+                    if (this.cleanWordStreak >= this.regenThreshold) {
+                        this.cleanWordStreak = 0;
+                        this.lives = Math.min(this.maxLives, this.lives + 1);
+                    }
+                },
+
+                // Dipanggil saat user backspace mundur ke kata sebelumnya untuk mengoreksi.
+                // Membatalkan kontribusi STREAK & hitung kata dari commit terakhir, supaya saat
+                // kata di-commit ulang tidak double-count. Yang TIDAK dibatalkan: potongan nyawa
+                // untuk kata kotor (aturan "kotor tetap -1 walau dikoreksi") — status 'dirty'
+                // sengaja DIPERTAHANKAN di committedWordResults agar commit ulang tahu nyawa sudah
+                // terpotong dan tidak memotong lagi (cap per-kata).
+                uncommitWord(wordIndex) {
+                    if (this.currentMain !== 'survival') return;
+
+                    const prev = this.committedWordResults[wordIndex];
+                    if (prev === undefined) return;
+
+                    this.wordsCompleted = Math.max(0, this.wordsCompleted - 1);
+
+                    if (prev === 'clean') {
+                        // Kata tadinya bersih: cabut kontribusinya ke streak, dan lupakan total —
+                        // saat di-commit ulang akan dinilai dari nol lagi.
+                        if (this.cleanWordStreak > 0) this.cleanWordStreak--;
+                        delete this.committedWordResults[wordIndex];
+                    }
+                    // Jika 'dirty': biarkan tetap 'dirty' agar nyawa tak terpotong dua kali.
                 },
 
                 destroy() {
@@ -362,7 +488,15 @@
                                     let prevWordIdx = this.currentWordIndex - 1;
                                     if (this.wordHasError(prevWordIdx)) {
                                         this.currentWordIndex--;
-                                        
+
+                                        // Survival: kita kembali masuk ke kata ini untuk koreksi.
+                                        // Batalkan penilaian commit-nya agar tidak dihitung dua kali;
+                                        // kata akan dinilai ulang saat di-commit kembali nanti.
+                                        // currentWordDirty di-set true: kata yang sempat punya error
+                                        // tetap "kotor" walau dikoreksi (koreksi tak memberi kekebalan).
+                                        this.uncommitWord(this.currentWordIndex);
+                                        this.markWordDirty();
+
                                         let prevBounds = this.wordBounds[this.currentWordIndex];
                                         let jumpIndex = prevBounds.space;
                                         
@@ -401,6 +535,9 @@
                             if (this.extraChars[this.currentWordIndex].length < 15) {
                                 this.extraChars[this.currentWordIndex].push(e.key);
                             }
+                            // Survival: karakter berlebih = error → tandai kata kotor (nyawa
+                            // dipotong nanti saat kata di-commit, maks -1 per kata).
+                            this.markWordDirty();
                             this.calculateStats();
                             this.$nextTick(() => this.updatePosition());
                             return;
@@ -410,6 +547,7 @@
                             this.inputResults[this.currentIndex] = true;
                             this.currentIndex++;
                             this.currentWordIndex++;
+                            this.completeWord(this.currentWordIndex - 1); // survival: nilai kata yang baru selesai
                             if (this.currentIndex === this.targetArray.length) this.finish();
                             this.calculateStats();
                             this.$nextTick(() => this.updatePosition());
@@ -426,17 +564,21 @@
 
                         for (let i = this.currentIndex; i <= bounds.end; i++) {
                             this.inputResults[i] = 'skipped'; // Tandai terlewat
-                            
+
                             // Track missed character
                             const expectedChar = this.targetArray[i].toLowerCase();
                             if (expectedChar !== ' ' && expectedChar.length === 1) {
                                 this.missedChars[expectedChar] = (this.missedChars[expectedChar] || 0) + 1;
                             }
                         }
+                        // Survival: melewati huruf = error → tandai kata kotor (potongan nyawa
+                        // terjadi sekali saat completeWord, maks -1 untuk kata ini).
+                        this.markWordDirty();
                         if (bounds.space !== null) {
                             this.inputResults[bounds.space] = 'skipped'; // Jangan berikan WPM gratis untuk spasi yang di-skip
                             this.currentIndex = bounds.space + 1;
                             this.currentWordIndex++;
+                            this.completeWord(this.currentWordIndex - 1); // kata (ternoda) tetap terhitung selesai
                         } else {
                             this.currentIndex = this.targetArray.length;
                             this.finish();
@@ -456,8 +598,11 @@
                         if (expectedChar !== ' ' && expectedChar.length === 1) {
                             this.missedChars[expectedChar] = (this.missedChars[expectedChar] || 0) + 1;
                         }
+                        // Survival: typo → tandai kata kotor saja. Nyawa baru dipotong saat
+                        // kata di-commit (maks -1 per kata), bukan per-karakter.
+                        this.markWordDirty();
                     }
-                    
+
                     this.inputResults[this.currentIndex] = isCorrect;
                     this.currentIndex++;
 
@@ -508,7 +653,7 @@
                     const correct = this.correctKeystrokes;
                     const total = this.totalKeystrokes;
 
-                    this.$wire.saveResult(durationMs, total, correct, this.wpmHistory, this.rawHistory, this.missedChars);
+                    this.$wire.saveResult(durationMs, total, correct, this.wpmHistory, this.rawHistory, this.missedChars, this.wordsCompleted);
                 }
             }
         }
