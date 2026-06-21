@@ -73,7 +73,9 @@ class DummyUserSeeder extends Seeder
             $incorrectChars = (int) round($correctChars * ((100 - $accuracy) / 100));
             $totalChars = $correctChars + $incorrectChars;
 
-            $xpEarned = (int) round($netWpm * ($accuracy / 100));
+            // EXP berbasis volume + bonus akurasi tipis — selaras dengan rumus di TypingEngine.
+            $accuracyMultiplier = 0.5 + 0.5 * ($accuracy / 100);
+            $xpEarned = (int) round($correctChars * 0.1 * $accuracyMultiplier);
             $totalXp += $xpEarned;
             $highestWpm = max($highestWpm, $netWpm);
 

@@ -37,10 +37,12 @@ class ProfileController extends Controller
         // Total waktu mengetik (detik) dari seluruh sesi valid.
         $stats['total_seconds'] = (int) (clone $base)->sum('duration_seconds');
 
-        // Level sederhana dari XP (tiap level butuh 1000 XP).
-        $xp = (int) ($user->total_xp ?? 0);
-        $stats['level'] = intdiv($xp, 1000) + 1;
-        $stats['level_progress'] = $xp % 1000; // 0-999 menuju level berikutnya
+        // Level diturunkan dari total_xp lewat SATU sumber kebenaran (User::levelData()).
+        // Kurva progresif: tiap level butuh BASE × level EXP (requirement Level/EXP).
+        $levelData = $user->levelData();
+        $stats['level'] = $levelData['level'];
+        $stats['level_progress'] = $levelData['progress']; // EXP di dalam level ini
+        $stats['level_needed'] = $levelData['needed'];     // EXP rentang menuju level berikutnya
 
         // Data grafik progres WPM (urut kronologis, maks 20 sesi terakhir, hanya yang valid).
         $progress = (clone $base)->latest('created_at')->take(20)->get()->reverse()->values();

@@ -38,11 +38,11 @@
                         </p>
                         <div class="mt-3 max-w-xs">
                             <div class="flex justify-between text-[0.65rem] text-typing-muted font-mono mb-1">
-                                <span>{{ $stats['level_progress'] }} / 1000 XP</span>
+                                <span>{{ $stats['level_progress'] }} / {{ $stats['level_needed'] }} XP</span>
                                 <span>Level {{ $stats['level'] + 1 }}</span>
                             </div>
                             <div class="h-2 rounded-full bg-white/5 overflow-hidden">
-                                <div class="h-full rounded-full bg-gradient-to-r from-typing-accent to-typing-accent2" style="width: {{ ($stats['level_progress'] / 1000) * 100 }}%"></div>
+                                <div class="h-full rounded-full bg-gradient-to-r from-typing-accent to-typing-accent2" style="width: {{ $stats['level_needed'] > 0 ? ($stats['level_progress'] / $stats['level_needed']) * 100 : 0 }}%"></div>
                             </div>
                         </div>
                     </div>

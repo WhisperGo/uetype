@@ -206,8 +206,14 @@ class TypingEngine extends Component
             return $this->redirect(route('typing'), navigate: true);
         }
 
-        // EXP diperoleh dari hasil tervalidasi server (skala dengan akurasi).
-        $xpEarned = (int) round($finalNetWpm * ($finalAccuracy / 100));
+        // EXP BERBASIS VOLUME + bonus akurasi tipis (requirement Level/EXP bag. 1).
+        // SENGAJA bukan berbasis WPM: requirement eksplisit melarang EXP murni-WPM karena
+        // menghukum pemula yang lambat & membuat level mencerminkan bakat, bukan usaha.
+        //   - Basis volume : jumlah karakter benar (makin banyak latihan → makin banyak EXP).
+        //   - Bonus akurasi: hanya menggeser pengali 0.5–1.0 (tipis, tak menghukum pemula).
+        // Contoh: 250 char @95% ≈ 24 XP; 250 char @70% ≈ 21 XP. Angka faktor boleh di-tuning.
+        $accuracyMultiplier = 0.5 + 0.5 * ($finalAccuracy / 100);
+        $xpEarned = (int) round($correctKeystrokes * 0.1 * $accuracyMultiplier);
 
         if (Auth::check()) {
             $user = Auth::user();
