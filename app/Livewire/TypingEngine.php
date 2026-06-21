@@ -18,6 +18,19 @@ class TypingEngine extends Component
     // Sub Mode (Pilihan angka/panjang)
     public $subMode = '30';
 
+    // Whitelist sub-mode yang sah PER mode utama. Dipakai sebagai gerbang server-side:
+    // mainMode & subMode adalah properti Livewire publik (dikendalikan client), jadi
+    // request yang dipalsukan bisa mengirim mode/difficulty sembarang. Karena mode_config
+    // (difficulty survival) jadi kunci filter leaderboard, nilai liar HARUS ditolak —
+    // sejalan dengan prinsip "jangan percaya angka client untuk hal yang masuk leaderboard".
+    // 'quote' tidak punya sub-mode (mode_config = null).
+    private const ALLOWED_SUBMODES = [
+        'time' => ['15', '30', '60', '120'],
+        'words' => ['10', '25', '50', '100'],
+        'quote' => [],
+        'survival' => ['easy', 'medium', 'hard'],
+    ];
+
     public $textToType;
 
     // ID baris `texts` yang sedang diketik. Terisi untuk mode quote (teks dari DB),
@@ -36,11 +49,38 @@ class TypingEngine extends Component
         $this->generateText();
     }
 
+    // Validasi mode utama + sub-mode terhadap whitelist. Mengembalikan pasangan
+    // [mainMode, subMode] yang sudah dinormalkan (fallback ke default aman jika liar).
+    // Satu sumber kebenaran dipakai oleh setMode (saat ganti mode) DAN saveResult
+    // (gerbang sebelum persist) supaya nilai client tak pernah lolos mentah ke DB.
+    private function normalizeMode($main, $sub): array
+    {
+        if (! array_key_exists($main, self::ALLOWED_SUBMODES)) {
+            return ['time', '30'];
+        }
+
+        $allowed = self::ALLOWED_SUBMODES[$main];
+
+        // Quote tak punya sub-mode; mode lain harus cocok dengan whitelist-nya.
+        if ($main === 'quote') {
+            return ['quote', null];
+        }
+
+        $sub = (string) $sub;
+        if (! in_array($sub, $allowed, true)) {
+            $sub = $allowed[0]; // default aman pertama (mis. time→'15', survival→'easy')
+        }
+
+        return [$main, $sub];
+    }
+
     // Fungsi untuk mengganti mode dan ambil teks baru
     public function setMode($main, $sub)
     {
+        [$main, $sub] = $this->normalizeMode($main, $sub);
+
         $this->mainMode = $main;
-        $this->subMode = $sub;
+        $this->subMode = $sub ?? 'medium';
 
         // Simpan preferensi pengguna ke session agar tidak reset
         session()->put('typing_preferences', [
@@ -123,8 +163,13 @@ class TypingEngine extends Component
         }
     }
 
-    public function saveResult($durationMs, $totalKeystrokes, $correctKeystrokes, $wpmHistory = [], $rawHistory = [], $missedChars = [], $wordsCompleted = 0)
+    public function saveResult($durationMs, $totalKeystrokes, $correctKeystrokes, $wpmHistory = [], $rawHistory = [], $missedChars = [])
     {
+        // Gerbang mode: mainMode/subMode adalah properti publik yang dikendalikan client.
+        // Normalkan terhadap whitelist SEBELUM dipakai untuk menentukan score/mode_config,
+        // supaya difficulty/sub-mode liar tak pernah masuk DB & mencemari filter leaderboard.
+        [$this->mainMode, $this->subMode] = $this->normalizeMode($this->mainMode, $this->subMode);
+
         // Catatan: WPM/akurasi dari client TIDAK diterima sebagai parameter — server
         // selalu menghitung ulang sendiri dari jumlah karakter & durasi (anti-cheat).
         $totalKeystrokes = (int) $totalKeystrokes;
@@ -134,7 +179,6 @@ class TypingEngine extends Component
         // Survival (model stamina): metrik leaderboard = durasi bertahan (duration_seconds),
         // BUKAN lagi kolom score. Kolom score dipakai sebagai stat sampingan: jumlah karakter
         // benar selama bertahan. Mode lain tidak memakai kolom score.
-        // ($wordsCompleted masih dikirim client sebagai info tambahan, tak jadi metrik utama.)
         $score = $this->mainMode === 'survival' ? $correctKeystrokes : null;
 
         // Durasi dikirim client dalam MILIDETIK (presisi penuh, sama dengan perhitungan live).
@@ -195,7 +239,11 @@ class TypingEngine extends Component
                 // Akumulasi EXP ke total user & perbarui rekor WPM (hanya sesi valid sampai sini).
                 $user->total_xp += $xpEarned;
 
-                if ($finalNetWpm > (float) $user->highest_wpm) {
+                // Rekor WPM HANYA dari mode terukur-waktu/teks (time/words/quote). Survival
+                // sengaja DIKECUALIKAN: WPM-nya dicapai di bawah tekanan stamina (bukan apple-to-
+                // apple dengan run standar) dan di doc selalu berstatus "stat sampingan", bukan
+                // metrik utama. Memasukkannya akan mencemari rekor profil pemain.
+                if ($this->mainMode !== 'survival' && $finalNetWpm > (float) $user->highest_wpm) {
                     $user->highest_wpm = $finalNetWpm;
                 }
 

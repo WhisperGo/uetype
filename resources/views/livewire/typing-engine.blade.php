@@ -280,7 +280,6 @@
                 staminaInterval: null,// loop tick drain (halus, ~100ms)
                 lastTickTime: 0,      // timestamp tick terakhir (untuk Δt presisi)
                 currentWordDirty: false, // apakah kata yang sedang diketik sudah pernah error
-                wordsCompleted: 0,    // total kata selesai (stat sampingan)
                 committedWordResults: {}, // {wordIndex: 'clean'|'dirty'} — kata yang sudah dinilai (idempoten)
 
                 init() {
@@ -294,7 +293,6 @@
                     this.staminaPct = Math.round((this.stamina / this.staminaMax) * 100);
                     this.lastTickTime = 0;
                     this.currentWordDirty = false;
-                    this.wordsCompleted = 0;
                     this.committedWordResults = {};
                     if (this.staminaInterval) {
                         clearInterval(this.staminaInterval);
@@ -366,8 +364,6 @@
                 // IDEMPOTEN per-index: kalau kata sama di-commit ulang (user backspace mundur lalu
                 // maju lagi), penalti lama tak dikenakan dua kali — cap per-kata (revisi playtest).
                 completeWord(wordIndex) {
-                    this.wordsCompleted++;
-
                     if (this.currentMain !== 'survival') return;
 
                     const isDirty = this.currentWordDirty;
@@ -392,7 +388,7 @@
                 },
 
                 // Dipanggil saat user backspace mundur ke kata sebelumnya untuk mengoreksi.
-                // Membatalkan hitung kata dari commit terakhir agar tak double-count saat re-commit.
+                // Membatalkan penilaian commit terakhir agar tak dinilai dua kali saat re-commit.
                 // Penalti stamina untuk kata kotor TIDAK dikembalikan (aturan "kotor tetap kena
                 // walau dikoreksi") — status 'dirty' DIPERTAHANKAN agar re-commit tak memotong lagi.
                 uncommitWord(wordIndex) {
@@ -400,8 +396,6 @@
 
                     const prev = this.committedWordResults[wordIndex];
                     if (prev === undefined) return;
-
-                    this.wordsCompleted = Math.max(0, this.wordsCompleted - 1);
 
                     if (prev === 'clean') {
                         // Kata tadinya bersih: lupakan total, dinilai ulang dari nol saat re-commit.
@@ -747,7 +741,7 @@
                     const correct = this.correctKeystrokes;
                     const total = this.totalKeystrokes;
 
-                    this.$wire.saveResult(durationMs, total, correct, this.wpmHistory, this.rawHistory, this.missedChars, this.wordsCompleted);
+                    this.$wire.saveResult(durationMs, total, correct, this.wpmHistory, this.rawHistory, this.missedChars);
                 }
             }
         }

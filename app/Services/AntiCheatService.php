@@ -23,6 +23,16 @@ class AntiCheatService
     private const MIN_DURATION_SECONDS = 1.0;
 
     /**
+     * Throughput minimum (karakter per detik) yang dianggap aktivitas mengetik nyata.
+     * Manusia yang benar-benar mengetik menghasilkan jauh lebih dari ini; nilai sangat
+     * rendah berarti durasi besar tapi input sepele — pola sesi idle/dipalsukan. Krusial
+     * untuk survival, di mana duration_seconds ADALAH metrik leaderboard: tanpa ambang ini,
+     * client bisa mengirim durasi raksasa + segelintir keystroke untuk menjuarai papan.
+     * ~0.5 cps ≈ 6 WPM — di bawah pengetik paling lambat sekalipun.
+     */
+    private const MIN_CHARS_PER_SECOND = 0.5;
+
+    /**
      * Periksa kewajaran sebuah hasil sesi.
      *
      * @param  int    $correctChars   Jumlah karakter benar (untuk Net WPM).
@@ -72,6 +82,16 @@ class AntiCheatService
         // --- Sanity check 5: tidak ada karakter sama sekali = bukan sesi nyata ---
         if ($totalChars <= 0) {
             $reasons[] = 'no_input';
+        }
+
+        // --- Sanity check 6: throughput terlalu rendah untuk durasi yang diklaim ---
+        // Konsistensi karakter-vs-durasi (requirement: "apakah jumlah karakter masuk akal
+        // dengan durasi?"). Menutup vektor cheat survival: durasi raksasa + input sepele.
+        // Hanya berlaku untuk sesi yang sudah melewati durasi minimum (sesi pendek wajar
+        // punya rasio yang lebih bising).
+        if ($durationSeconds >= self::MIN_DURATION_SECONDS
+            && ($totalChars / $durationSeconds) < self::MIN_CHARS_PER_SECOND) {
+            $reasons[] = 'throughput_too_low';
         }
 
         return [
