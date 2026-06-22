@@ -15,7 +15,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             LanguageSeeder::class, // Pastikan ini jalan duluan
             TextSeeder::class,
-            QuoteSeeder::class, // Kutipan untuk mode 'quote'
+            QuoteSeeder::class,
+            DummyDataSeeder::class,
         ]);
 
         User::factory()->admin()->create([

@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use App\Livewire\TypingEngine;
 use App\Livewire\TypingResult;
 use App\Models\User;
+use Livewire\Volt\Volt;
 
 Route::get('/', TypingEngine::class)->name('home');
 
@@ -20,6 +21,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/typing', TypingEngine::class)->name('typing');
     Route::get('/result', TypingResult::class)->name('typing.result');
+    Volt::route('/leaderboard', 'leaderboard')->name('leaderboard');
 });
 
 // Login cepat sebagai user dummy untuk TESTING. Hanya aktif di environment lokal.

@@ -23,6 +23,9 @@
                         {{ __('Klan') }}
                         <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-typing-muted/60">soon</span>
                     </span>
+                    <x-nav-link href="{{ url('/leaderboard') }}" :active="request()->is('leaderboard')">
+                        {{ __('Leaderboard') }}
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -48,12 +51,12 @@
                         <button
                             class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium leading-4 transition rounded-lg text-typing-muted hover:text-typing-text hover:bg-typing-surface focus:outline-none">
                             @auth
-                                <span class="flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-typing-accent to-typing-accent2 text-typing-bg text-xs font-bold uppercase">
+                                <span class="flex items-center justify-center text-xs font-bold uppercase rounded-full w-7 h-7 bg-gradient-to-br from-typing-accent to-typing-accent2 text-typing-bg">
                                     {{ Str::substr(Auth::user()->username, 0, 1) }}
                                 </span>
-                                <span class="text-typing-text font-medium">{{ Auth::user()->username }}</span>
+                                <span class="font-medium text-typing-text">{{ Auth::user()->username }}</span>
                             @else
-                                <span class="text-typing-text font-medium">Tamu</span>
+                                <span class="font-medium text-typing-text">Tamu</span>
                             @endauth
                             <svg class="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -95,14 +98,14 @@
     </div>
 
     <!-- Responsive Navigation Menu -->
-    <div :class="{ 'block': open, 'hidden': !open }" class="hidden sm:hidden border-t border-white/5">
+    <div :class="{ 'block': open, 'hidden': !open }" class="hidden border-t sm:hidden border-white/5">
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link href="{{ url('/typing') }}" :active="request()->is('typing')">{{ __('Solo') }}</x-responsive-nav-link>
-            <span class="flex items-center gap-2 w-full ps-3 pe-4 py-2 text-base font-medium text-typing-muted/50 cursor-not-allowed">
+            <span class="flex items-center w-full gap-2 py-2 text-base font-medium cursor-not-allowed ps-3 pe-4 text-typing-muted/50">
                 {{ __('Multiplayer') }}
                 <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-typing-muted/60">soon</span>
             </span>
-            <span class="flex items-center gap-2 w-full ps-3 pe-4 py-2 text-base font-medium text-typing-muted/50 cursor-not-allowed">
+            <span class="flex items-center w-full gap-2 py-2 text-base font-medium cursor-not-allowed ps-3 pe-4 text-typing-muted/50">
                 {{ __('Klan') }}
                 <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-typing-muted/60">soon</span>
             </span>

@@ -11,7 +11,8 @@
         "laravel/reverb": "^1.0",
         "laravel/socialite": "^5.28",
         "laravel/tinker": "^2.10.1",
-        "livewire/livewire": "^4.2"
+        "livewire/livewire": "^4.2",
+        "livewire/volt": "^1.10"
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "^4.2",

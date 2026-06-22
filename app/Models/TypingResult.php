@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\TypingMode;
+use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -42,5 +44,10 @@ class TypingResult extends Model
     public function text(): BelongsTo
     {
         return $this->belongsTo(Text::class);
+    }
+
+    public function scopeToday($query)
+    {
+        return $query->whereDate('created_at', '>=', Carbon::today());
     }
 }
