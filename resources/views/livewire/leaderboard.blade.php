@@ -82,7 +82,7 @@ $userRank = computed(function () {
 
 ?>
 
-<div class="min-h-screen bg-[#121824] text-[#4f6585] font-mono pt-16 px-4 selection:bg-[#24e5ff] selection:text-[#121824]">
+<div class="min-h-screen bg-[#0f172a] text-[#334155] font-mono pt-16 px-4 selection:bg-[#22d3ee] selection:text-[#121824]">
     <div class="max-w-4xl mx-auto">
 
         <div class="flex items-center justify-between mb-10">

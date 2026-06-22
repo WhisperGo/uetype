@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-sans font-semibold text-xl text-typing-text tracking-tight">
+        <h2 class="font-sans text-xl font-semibold tracking-tight text-typing-text">
             {{ __('Profil') }}
         </h2>
     </x-slot>
@@ -13,17 +13,17 @@
     @endphp
 
     <div class="py-10" x-data="{ activeTab: 'stats' }">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+        <div class="max-w-5xl px-4 mx-auto space-y-8 sm:px-6 lg:px-8">
 
             <!-- ===== IDENTITY HEADER ===== -->
-            <div class="relative overflow-hidden bg-typing-surface/70 border border-white/10 rounded-3xl p-6 sm:p-8 shadow-glow">
-                <div class="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-typing-accent/10 blur-3xl"></div>
-                <div class="relative flex flex-col sm:flex-row sm:items-center gap-6">
-                    <div class="flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-typing-accent to-typing-accent2 text-typing-bg text-3xl font-bold uppercase shrink-0">
+            <div class="relative p-6 overflow-hidden border bg-typing-surface/70 border-white/10 rounded-3xl sm:p-8 shadow-glow">
+                <div class="absolute w-48 h-48 rounded-full -top-16 -right-16 bg-typing-accent/10 blur-3xl"></div>
+                <div class="relative flex flex-col gap-6 sm:flex-row sm:items-center">
+                    <div class="flex items-center justify-center w-20 h-20 text-3xl font-bold uppercase rounded-2xl bg-gradient-to-br from-typing-accent to-typing-accent2 text-typing-bg shrink-0">
                         {{ \Illuminate\Support\Str::substr($user->username, 0, 1) }}
                     </div>
                     <div class="flex-1">
-                        <div class="flex items-center gap-3 flex-wrap">
+                        <div class="flex flex-wrap items-center gap-3">
                             <h1 class="font-sans text-2xl font-bold text-typing-text">{{ $user->username }}</h1>
                             @if($user->clan)
                                 <span class="px-2 py-0.5 rounded-md bg-typing-accent/15 text-typing-accent text-xs font-mono font-semibold">
@@ -32,39 +32,44 @@
                             @endif
                             <span class="px-2 py-0.5 rounded-md bg-white/5 text-typing-muted text-xs font-mono">Level {{ $stats['level'] }}</span>
                         </div>
-                        <p class="text-typing-muted text-sm mt-1 font-mono">{{ $user->email }}</p>
-                        <p class="text-typing-muted text-xs mt-1">
+                        <p class="mt-1 font-mono text-sm text-typing-muted">{{ $user->email }}</p>
+                        <p class="mt-1 text-xs text-typing-muted">
                             Bergabung {{ optional($user->joined_at ?? $user->created_at)->translatedFormat('d F Y') }}
                         </p>
-                        <div class="mt-3 max-w-xs">
+                        <div class="max-w-xs mt-3">
                             <div class="flex justify-between text-[0.65rem] text-typing-muted font-mono mb-1">
                                 <span>{{ $stats['level_progress'] }} / {{ $stats['level_needed'] }} XP</span>
                                 <span>Level {{ $stats['level'] + 1 }}</span>
                             </div>
-                            <div class="h-2 rounded-full bg-white/5 overflow-hidden">
+                            <div class="h-2 overflow-hidden rounded-full bg-white/5">
                                 <div class="h-full rounded-full bg-gradient-to-r from-typing-accent to-typing-accent2" style="width: {{ $stats['level_needed'] > 0 ? ($stats['level_progress'] / $stats['level_needed']) * 100 : 0 }}%"></div>
                             </div>
                         </div>
                     </div>
-                    <div class="text-center sm:text-right shrink-0 border-t sm:border-t-0 sm:border-l border-white/10 pt-4 sm:pt-0 sm:pl-6">
+                    <div class="pt-4 text-center border-t sm:text-right shrink-0 sm:border-t-0 sm:border-l border-white/10 sm:pt-0 sm:pl-6">
                         <p class="text-xs uppercase tracking-[0.2em] text-typing-muted font-sans">ELO</p>
-                        <p class="text-4xl font-bold text-typing-accent2 font-mono leading-none mt-1">{{ $user->elo_rating ?? 0 }}</p>
-                        <p class="text-xs text-typing-muted mt-1">Ranking</p>
+                        <p class="mt-1 font-mono text-4xl font-bold leading-none text-typing-accent2">{{ $user->elo_rating ?? 0 }}</p>
+                        <p class="mt-1 text-xs text-typing-muted">Ranking</p>
                     </div>
                 </div>
             </div>
 
             <!-- Tabs -->
             <div class="border-b border-white/10">
-                <nav class="-mb-px flex gap-6" aria-label="Tabs">
+                <nav class="flex gap-6 -mb-px" aria-label="Tabs">
                     <button @click="activeTab = 'stats'"
                             :class="activeTab === 'stats' ? 'border-typing-accent text-typing-accent' : 'border-transparent text-typing-muted hover:text-typing-text'"
-                            class="font-sans whitespace-nowrap py-3 px-1 border-b-2 text-sm font-semibold transition-colors">
+                            class="px-1 py-3 font-sans text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
                         Statistik
                     </button>
                     <button @click="activeTab = 'settings'"
                             :class="activeTab === 'settings' ? 'border-typing-accent text-typing-accent' : 'border-transparent text-typing-muted hover:text-typing-text'"
-                            class="font-sans whitespace-nowrap py-3 px-1 border-b-2 text-sm font-semibold transition-colors">
+                            class="px-1 py-3 font-sans text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
+                        Pengaturan Akun
+                    </button>
+                    <button @click="activeTab = 'BestRecords'"
+                            :class="activeTab === 'BestRecords' ? 'border-typing-accent text-typing-accent' : 'border-transparent text-typing-muted hover:text-typing-text'"
+                            class="px-1 py-3 font-sans text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
                         Pengaturan Akun
                     </button>
                 </nav>
@@ -73,7 +78,7 @@
             <!-- ===== STATS TAB ===== -->
             <div x-show="activeTab === 'stats'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="space-y-6">
 
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     @php
                         $cards = [
                             ['label' => 'WPM Tertinggi', 'value' => rtrim(rtrim(number_format($user->highest_wpm, 1), '0'), '.'), 'accent' => 'text-typing-accent'],
@@ -83,50 +88,50 @@
                         ];
                     @endphp
                     @foreach($cards as $card)
-                        <div class="bg-typing-surface/60 border border-white/5 rounded-2xl p-5">
+                        <div class="p-5 border bg-typing-surface/60 border-white/5 rounded-2xl">
                             <p class="text-xs uppercase tracking-[0.15em] text-typing-muted font-sans mb-1">{{ $card['label'] }}</p>
                             <p class="text-3xl font-bold font-mono {{ $card['accent'] }}">{{ $card['value'] }}</p>
                         </div>
                     @endforeach
                 </div>
 
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div class="bg-typing-surface/40 border border-white/5 rounded-2xl p-5">
+                <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <div class="p-5 border bg-typing-surface/40 border-white/5 rounded-2xl">
                         <p class="text-xs uppercase tracking-[0.15em] text-typing-muted font-sans mb-1">Total Waktu</p>
-                        <p class="text-2xl font-bold font-mono text-typing-text">{{ $timeLabel }}</p>
+                        <p class="font-mono text-2xl font-bold text-typing-text">{{ $timeLabel }}</p>
                     </div>
-                    <div class="bg-typing-surface/40 border border-white/5 rounded-2xl p-5">
+                    <div class="p-5 border bg-typing-surface/40 border-white/5 rounded-2xl">
                         <p class="text-xs uppercase tracking-[0.15em] text-typing-muted font-sans mb-1">XP</p>
-                        <p class="text-2xl font-bold font-mono text-typing-success">{{ $user->xp ?? 0 }}</p>
+                        <p class="font-mono text-2xl font-bold text-typing-success">{{ $user->xp ?? 0 }}</p>
                     </div>
-                    <div class="bg-typing-surface/40 border border-white/5 rounded-2xl p-5">
+                    <div class="p-5 border bg-typing-surface/40 border-white/5 rounded-2xl">
                         <p class="text-xs uppercase tracking-[0.15em] text-typing-muted font-sans mb-1">Koin</p>
-                        <p class="text-2xl font-bold font-mono text-typing-gold">{{ $user->coins ?? 0 }}</p>
+                        <p class="font-mono text-2xl font-bold text-typing-gold">{{ $user->coins ?? 0 }}</p>
                     </div>
-                    <div class="bg-typing-surface/40 border border-white/5 rounded-2xl p-5">
+                    <div class="p-5 border bg-typing-surface/40 border-white/5 rounded-2xl">
                         <p class="text-xs uppercase tracking-[0.15em] text-typing-muted font-sans mb-1">Best WPM</p>
-                        <p class="text-2xl font-bold font-mono text-typing-accent">{{ $stats['best_wpm'] }}</p>
+                        <p class="font-mono text-2xl font-bold text-typing-accent">{{ $stats['best_wpm'] }}</p>
                     </div>
                 </div>
 
-                <div class="bg-typing-surface/40 border border-white/5 rounded-2xl p-5 sm:p-6">
-                    <h3 class="font-sans text-sm font-semibold text-typing-text mb-4">Progres WPM (tes terakhir)</h3>
+                <div class="p-5 border bg-typing-surface/40 border-white/5 rounded-2xl sm:p-6">
+                    <h3 class="mb-4 font-sans text-sm font-semibold text-typing-text">Progres WPM (tes terakhir)</h3>
                     @if(count($wpmProgress) >= 2)
                         <div class="w-full h-48" wire:ignore>
                             <canvas id="profileWpmChart"></canvas>
                         </div>
                     @else
-                        <p class="text-typing-muted text-sm font-mono">Belum cukup data. Selesaikan beberapa tes untuk melihat progresmu.</p>
+                        <p class="font-mono text-sm text-typing-muted">Belum cukup data. Selesaikan beberapa tes untuk melihat progresmu.</p>
                     @endif
                 </div>
 
-                <div class="bg-typing-surface/40 border border-white/5 rounded-2xl p-5 sm:p-6">
-                    <h3 class="font-sans text-sm font-semibold text-typing-text mb-4">Riwayat Pertandingan Terakhir</h3>
+                <div class="p-5 border bg-typing-surface/40 border-white/5 rounded-2xl sm:p-6">
+                    <h3 class="mb-4 font-sans text-sm font-semibold text-typing-text">Riwayat Pertandingan Terakhir</h3>
                     @if(isset($recentMatches) && $recentMatches->count() > 0)
                         <div class="overflow-x-auto">
                             <table class="w-full text-left">
                                 <thead>
-                                    <tr class="text-typing-muted text-xs uppercase tracking-wider font-sans">
+                                    <tr class="font-sans text-xs tracking-wider uppercase text-typing-muted">
                                         <th class="pb-3 font-semibold">Tanggal</th>
                                         <th class="pb-3 font-semibold">Mode</th>
                                         <th class="pb-3 font-semibold text-right">WPM</th>
@@ -148,22 +153,48 @@
                             </table>
                         </div>
                     @else
-                        <p class="text-typing-muted text-sm font-mono">Belum ada riwayat mengetik. <a href="{{ url('/typing') }}" class="text-typing-accent hover:underline">Mulai tes pertamamu →</a></p>
+                        <p class="font-mono text-sm text-typing-muted">Belum ada riwayat mengetik. <a href="{{ url('/typing') }}" class="text-typing-accent hover:underline">Mulai tes pertamamu →</a></p>
                     @endif
                 </div>
             </div>
 
             <!-- ===== SETTINGS TAB ===== -->
             <div x-show="activeTab === 'settings'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" style="display: none;" class="space-y-6">
-                <div class="p-6 sm:p-8 bg-typing-surface/60 border border-white/5 rounded-2xl">
+                <div class="p-6 border sm:p-8 bg-typing-surface/60 border-white/5 rounded-2xl">
                     <div class="max-w-xl">@include('profile.partials.update-profile-information-form')</div>
                 </div>
-                <div class="p-6 sm:p-8 bg-typing-surface/60 border border-white/5 rounded-2xl">
+                <div class="p-6 border sm:p-8 bg-typing-surface/60 border-white/5 rounded-2xl">
                     <div class="max-w-xl">@include('profile.partials.update-password-form')</div>
                 </div>
-                <div class="p-6 sm:p-8 bg-typing-surface/60 border border-white/5 rounded-2xl">
+                <div class="p-6 border sm:p-8 bg-typing-surface/60 border-white/5 rounded-2xl">
                     <div class="max-w-xl">@include('profile.partials.delete-user-form')</div>
                 </div>
+            </div>
+
+            <div x-show="activeTab === 'BestRecords'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" style="display: none;" class="space-y-6">
+            <div class="p-5 mb-6 border bg-typing-surface/40 border-white/5 rounded-2xl sm:p-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-typing-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                    </svg>
+                    <h3 class="font-sans text-xs uppercase tracking-[0.15em] text-typing-text font-semibold">Rekor Terbaik per Kategori</h3>
+                </div>
+                @if(isset($bestRecords) && $bestRecords->count() > 0)
+                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        @foreach($bestRecords as $record)
+                            <div class="flex flex-col justify-between p-3 transition-colors border bg-typing-bg/40 border-white/5 rounded-xl hover:border-typing-accent/30">
+                                <span class="text-[0.65rem] uppercase tracking-wider text-typing-muted font-mono">
+                                    {{ $record->mode }} ({{ $record->mode_config }}{{ $record->mode === 'time' ? 's' : '' }})
+                                </span>
+                                <span class="mt-1 font-mono text-lg font-bold text-typing-accent">
+                                    {{ round($record->high_wpm) }} <span class="text-xs font-normal text-typing-text">WPM</span>
+                                </span>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <p class="font-mono text-sm text-typing-muted">Belum ada data rekor kategori yang tercatat.</p>
+                @endif
             </div>
         </div>
     </div>

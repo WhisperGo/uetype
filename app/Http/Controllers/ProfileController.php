@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\TypingResult;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\View\View;
-use App\Models\TypingResult;
 
 class ProfileController extends Controller
 {
@@ -44,6 +46,11 @@ class ProfileController extends Controller
         $stats['level_progress'] = $levelData['progress']; // EXP di dalam level ini
         $stats['level_needed'] = $levelData['needed'];     // EXP rentang menuju level berikutnya
 
+        $bestRecords = (clone $base)
+            ->select('mode', 'mode_config', DB::raw('MAX(net_wpm) as high_wpm'))
+            ->groupBy('mode', 'mode_config')
+            ->get();
+
         // Data grafik progres WPM (urut kronologis, maks 20 sesi terakhir, hanya yang valid).
         $progress = (clone $base)->latest('created_at')->take(20)->get()->reverse()->values();
         $wpmProgress = $progress->pluck('net_wpm')->map(fn ($v) => (float) $v)->all();
@@ -52,6 +59,7 @@ class ProfileController extends Controller
             'user' => $user,
             'recentMatches' => $recentMatches,
             'stats' => $stats,
+            'bestRecords' => $bestRecords,
             'wpmProgress' => $wpmProgress,
         ]);
     }
