@@ -7,6 +7,7 @@ use App\Livewire\TypingEngine;
 use App\Livewire\TypingResult;
 use App\Models\User;
 use Livewire\Volt\Volt;
+use App\Http\Controllers\GoogleAuthController;
 
 Route::get('/', TypingEngine::class)->name('home');
 
@@ -23,6 +24,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/result', TypingResult::class)->name('typing.result');
     Volt::route('/leaderboard', 'leaderboard')->name('leaderboard');
 });
+
+
+// Route untuk redirect ke Google
+Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])->name('auth.google');
+
+// Route Callback menerima data dari Google
+Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
 
 // Login cepat sebagai user dummy untuk TESTING. Hanya aktif di environment lokal.
 // Buka /dev-login (opsional /dev-login?email=other@uetype.test) untuk langsung masuk.

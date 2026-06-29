@@ -13,7 +13,7 @@ return new class extends Migration
             $table->string('google_id')->nullable()->unique();
             $table->string('email')->unique();
             $table->string('username')->unique();
-            $table->string('avatar')->nullable();
+            $table->string('avatar')->nullable()->after('google_id');
             $table->decimal('highest_wpm', 6, 2)->default(0.00);
             $table->bigInteger('total_xp')->default(0);
             $table->boolean('is_admin')->default(false);
