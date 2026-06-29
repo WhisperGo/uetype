@@ -16,13 +16,9 @@
                     <x-nav-link href="{{ url('/typing') }}" :active="request()->is('typing')">
                         {{ __('Solo') }}
                     </x-nav-link>
-                    <span
-                        class="inline-flex items-center gap-1.5 px-3 pt-1 text-sm font-medium leading-5 text-typing-muted/50 cursor-not-allowed"
-                        title="Segera hadir">
+                    <x-nav-link href="{{ url('/multiplayer') }}" :active="request()->is('multiplayer')">
                         {{ __('Multiplayer') }}
-                        <span
-                            class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-typing-muted/60">soon</span>
-                    </span>
+                    </x-nav-link>
                     <span
                         class="inline-flex items-center gap-1.5 px-3 pt-1 text-sm font-medium leading-5 text-typing-muted/50 cursor-not-allowed"
                         title="Segera hadir">

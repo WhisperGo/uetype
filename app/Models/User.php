@@ -2,6 +2,11 @@
 
 namespace App\Models;
 
+use App\Models\Friendship;
+use App\Models\Matches;
+use App\Models\MatchParticipant;
+use App\Models\TypingResult;
+use App\Models\UserAchievement;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -120,5 +125,10 @@ class User extends Authenticatable
     public function achievements(): HasMany
     {
         return $this->hasMany(UserAchievement::class);
+    }
+
+    public function currentRoom()
+    {
+        return $this->hasOneThrough(Room::class, RoomMember::class, 'user_id', 'id', 'id', 'room_id');
     }
 }

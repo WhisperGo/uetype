@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use App\Livewire\MultiplayerLobby;
 use App\Livewire\TypingEngine;
 use App\Livewire\TypingResult;
 use App\Models\User;
@@ -22,6 +23,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/typing', TypingEngine::class)->name('typing');
     Route::get('/result', TypingResult::class)->name('typing.result');
+
+    Route::get('/multiplayer', MultiplayerLobby::class)->name('multiplayer.lobby');
+
     Volt::route('/leaderboard', 'leaderboard')->name('leaderboard');
 });
 
