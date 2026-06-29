@@ -28,7 +28,12 @@ class GoogleAuthController extends Controller
             if ($user) {
                 // JIKA AKUN SUDAH ADA: Langsung sinkronisasi ID dan login (Alur Login Biasa)
                 if (!$user->google_id) {
-                    $user->update(['google_id' => $googleUser->id]);
+                    $user->update(
+                        [
+                            'google_id' => $googleUser->id,
+                            'avatar' => $googleUser->avatar
+                        ]
+                    );
                 }
                 Auth::login($user);
                 return redirect()->intended('/typing');
@@ -42,7 +47,12 @@ class GoogleAuthController extends Controller
                 'avatar' => $googleUser->avatar,
             ]);
 
-            // Alihkan user ke halaman khusus untuk memilih username
+            $request->session()->put('google_register_data', [
+                'email' => $googleUser->email,
+                'google_id' => $googleUser->id,
+                'avatar' => $googleUser->avatar, 
+            ]);
+            
             return redirect()->route('auth.google.choose-username');
 
         } catch (\Exception $e) {
@@ -73,12 +83,26 @@ class GoogleAuthController extends Controller
             return redirect('/register');
         }
 
-        // 2. Validasi input username dari user (wajib unik, tidak boleh ada spasi)
+        $googleData = $request->session()->get('google_register_data');
+
+        // 🔥 PERTAHANAN TAMBAHAN: Cek ulang database sebelum insert untuk mencegah Duplicate Entry
+        $existingUser = User::where('google_id', $googleData['google_id'])
+                            ->orWhere('email', $googleData['email'])
+                            ->first();
+
+        if ($existingUser) {
+            // Jika ternyata datanya sudah ada di database, batalkan register, langsung loginkan saja!
+            $request->session()->forget('google_register_data');
+            Auth::login($existingUser);
+            return redirect('/typing');
+        }
+
+        // 2. Validasi input username dari user (wajib unik)
         $request->validate([
             'username' => [
                 'required', 
                 'string', 
-                'alpha_dash', // Memastikan hanya huruf, angka, dash (-), dan underscore (_)
+                'alpha_dash', 
                 'min:3', 
                 'max:20', 
                 'unique:users,username'
@@ -88,15 +112,13 @@ class GoogleAuthController extends Controller
             'username.alpha_dash' => 'Nama pengguna hanya boleh berisi huruf, angka, strip, dan garis bawah.',
         ]);
 
-        $googleData = $request->session()->get('google_register_data');
-
-        // 3. Buat user baru di database secara permanen
+        // 3. Buat user baru di database secara aman
         $user = User::create([
             'username' => $request->username,
             'email' => $googleData['email'],
             'google_id' => $googleData['google_id'],
             'avatar' => $googleData['avatar'],
-            'password' => encrypt(Str::random(16)), // Password acak aman
+            'password' => encrypt(\Illuminate\Support\Str::random(16)), 
         ]);
 
         // 4. Bersihkan session data Google agar aman
