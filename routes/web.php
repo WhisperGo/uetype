@@ -39,6 +39,9 @@ Route::post('/auth/google/username', [GoogleAuthController::class, 'storeUsernam
 // Login cepat sebagai user dummy untuk TESTING. Hanya aktif di environment lokal.
 // Buka /dev-login (opsional /dev-login?email=other@uetype.test) untuk langsung masuk.
 if (app()->environment('local')) {
+    // Acuan design system (token, tipografi, komponen) — alat internal, lokal saja.
+    Route::get('/style-guide', fn () => view('style-guide'))->name('style-guide');
+
     Route::get('/dev-login', function () {
         $email = request('email', 'dummy@uetype.test');
         $user = User::where('email', $email)->first();

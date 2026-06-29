@@ -1,0 +1,97 @@
+# UeType — Design System
+
+Acuan tunggal token, tipografi, dan aturan UI. Tema default: **"moonlight"** (biru dominan,
+emas hangat sebagai aksen, netral gelap untuk struktur).
+
+Pratinjau hidup: jalankan lokal lalu buka **`/style-guide`** (hanya aktif di environment `local`).
+
+## Arsitektur token (2 lapis)
+
+1. **Primitive** — ramp warna mentah `1–10` per keluarga. Sumber kebenaran palette,
+   didefinisikan di [`tailwind.config.js`](../tailwind.config.js). Pakai langsung **hanya** di
+   style guide atau saat mendefinisikan token semantic — **bukan** di komponen biasa.
+2. **Semantic** — token *peran* (`background`, `surface`, `brand`, dst). Inilah yang dipakai
+   komponen. Nilainya berupa CSS variable di [`resources/css/app.css`](../resources/css/app.css)
+   (`:root`), format channel `R G B` agar opacity Tailwind (`bg-surface/50`) tetap jalan.
+
+Ganti tema = ganti blok `:root` saja; komponen tidak perlu disentuh.
+
+## Palet primitive
+
+| Step | primary (biru) | secondary (emas) | accent (netral) | tertiary (merah) |
+|------|----------------|------------------|-----------------|------------------|
+| 1  | `#E8EAF4` | `#F9F5F0` | `#E8E9EA` | `#F8E8EA` |
+| 2  | `#C7CDE5` | `#F1E8DB` | `#C8C9CB` | `#EEC8CC` |
+| 3  | `#9BA5D1` | `#E6D6BE` | `#9C9FA3` | `#E09DA4` |
+| 4  | `#6C7BBB` | `#DBC3A0` | `#6E7278` | `#D26F7A` |
+| 5  | `#4054A6` | `#D0B083` | `#42474F` | `#C54452` |
+| 6  | `#162E93` | `#C69F68` | `#191F28` | `#B81B2C` |
+| 7  | `#13277D` | `#A88758` | `#151A22` | `#9C1725` |
+| 8  | `#102168` | `#8D714A` | `#12161C` | `#83131F` |
+| 9  | `#0D1A54` | `#715B3B` | `#0E1217` | `#690F19` |
+| 10 | `#0A1542` | `#59482F` | `#0B0E12` | `#530C14` |
+
+Pakai via class Tailwind, mis. `bg-primary-6`, `text-secondary-3`, `border-accent-5`.
+
+## Token semantic
+
+| Token | → Primitive | Peran | Contoh class |
+|-------|-------------|-------|--------------|
+| `background` | primary-10 | latar halaman | `bg-background` |
+| `surface` | primary-9 | kartu / panel | `bg-surface` |
+| `elevated` | primary-7 | panel terangkat / border aktif | `bg-elevated` |
+| `foreground` | secondary-1 | teks utama | `text-foreground` |
+| `muted` | accent-3 | teks sekunder | `text-muted` |
+| `border` | accent-5 | garis / pemisah | `border-border` |
+| `brand` | primary-6 | biru logo / maskot | `bg-brand` `text-brand` |
+| `gold` | secondary-6 | highlight, koin, aksen hangat | `text-gold` |
+| `danger` | tertiary-6 | error / missed / loss | `bg-danger` |
+
+> **State positif / "win" / success:** belum ada token hijau (Foundation tidak punya). Untuk
+> sekarang pakai `gold` (emas) atau `brand` (biru). Tambah token success hanya bila playtest menuntut.
+
+## Tipografi
+
+Tiga keluarga font, satu skala modular (~1.2):
+
+| Token | px | Class |
+|-------|----|-------|
+| h1 | 47.78 | `text-h1` |
+| h2 | 39.81 | `text-h2` |
+| h3 | 33.18 | `text-h3` |
+| h4 | 27.65 | `text-h4` |
+| h5 | 23.04 | `text-h5` |
+| h6 | 19.20 | `text-h6` |
+| body | 16 | `text-body` |
+| small | 13.33 | `text-small` |
+| x-small | 11.11 | `text-x-small` |
+
+| Font | Class | Pakai untuk |
+|------|-------|-------------|
+| JetBrains Mono | `font-mono` | font utama UI & area mengetik |
+| Pixelify Sans | `font-pixel` | heading / aksen game (piksel mudah dibaca) |
+| Press Start 2P | `font-display` | display / judul besar — **hemat**, demi kenyamanan baca |
+
+> `lineHeight` token = `1` (sesuai Figma "100%"). Untuk paragraf panjang, longgarkan manual
+> (mis. `leading-relaxed`).
+
+## Aturan pakai
+
+- **Komponen pakai token semantic**, bukan primitive atau hex mentah. Primitive hanya untuk
+  mendefinisikan semantic / showcase.
+- **Press Start 2P jangan memenuhi layar** — cukup untuk judul/aksen agar teks tetap nyaman.
+- Butuh warna yang belum ada perannya? Tambahkan **token semantic baru** yang menunjuk primitive —
+  jangan tulis hex langsung di komponen.
+
+## Menambah token / tema
+
+- **Token semantic baru:** tambah `--color-x` di `app.css` (`:root`) lalu daftarkan di
+  `tailwind.config.js` (`x: token('--color-x')`).
+- **Tema baru** (mis. Deep Blue / Midnight / Carbon): tambah blok
+  `:root[data-theme="..."] { --color-...: ...; }` di `app.css`, set `data-theme` di `<html>`.
+
+## Catatan
+
+- Token lama `typing-*` (cyan) **deprecated** — masih dipakai view existing, akan dimigrasi
+  per-halaman. Jangan pakai untuk kode baru.
+- Build memakai **Tailwind v3** (`tailwind.config.js` + `@tailwind` di `app.css`).
