@@ -19,9 +19,21 @@
             <div class="relative p-6 overflow-hidden border bg-typing-surface/70 border-white/10 rounded-3xl sm:p-8 shadow-glow">
                 <div class="absolute w-48 h-48 rounded-full -top-16 -right-16 bg-typing-accent/10 blur-3xl"></div>
                 <div class="relative flex flex-col gap-6 sm:flex-row sm:items-center">
-                    <div class="flex items-center justify-center w-20 h-20 text-3xl font-bold uppercase rounded-2xl bg-gradient-to-br from-typing-accent to-typing-accent2 text-typing-bg shrink-0">
-                        {{ \Illuminate\Support\Str::substr($user->username, 0, 1) }}
-                    </div>
+                    
+                    <!-- MODIFIKASI DISINI: RENDER AVATAR GOOGLE / INITIALS FALLBACK -->
+                    @if($user->avatar)
+                        <!-- Tampilkan Foto Profil Asli Google -->
+                        <img src="{{ $user->avatar }}" 
+                             alt="{{ $user->username }}" 
+                             class="w-20 h-20 object-cover rounded-2xl border border-white/10 shadow-md shrink-0"
+                             referrerpolicy="no-referrer">
+                    @else
+                        <!-- Cadangan Inisial Huruf (Jika daftar manual) -->
+                        <div class="flex items-center justify-center w-20 h-20 text-3xl font-bold uppercase rounded-2xl bg-gradient-to-br from-typing-accent to-typing-accent2 text-typing-bg shrink-0">
+                            {{ \Illuminate\Support\Str::substr($user->username, 0, 1) }}
+                        </div>
+                    @endif
+
                     <div class="flex-1">
                         <div class="flex flex-wrap items-center gap-3">
                             <h1 class="font-sans text-2xl font-bold text-typing-text">{{ $user->username }}</h1>
@@ -171,148 +183,148 @@
                 </div>
             </div>
 
-
+            <!-- ===== BEST RECORDS TAB ===== -->
             <div x-show="activeTab === 'BestRecords'"
-            x-transition:enter="transition ease-out duration-300"
-            x-transition:enter-start="opacity-0 translate-y-2"
-            x-transition:enter-end="opacity-100 translate-y-0"
-            style="display: none;"
-            class="space-y-4"
-            x-data="{ openMode: 'time' }">
-            @php
-            // Kelompokkan data bestRecords berdasarkan mode utama agar mudah di-render
-            $timeRecords = $bestRecords->where('mode', 'time');
-            $wordsRecords = $bestRecords->where('mode', 'words');
-            $survivalRecords = $bestRecords->where('mode', 'survival');
-            $quoteRecords = $bestRecords->where('mode', 'quote'); // Cadangan jika ada mode quote
-            @endphp
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 translate-y-2"
+                 x-transition:enter-end="opacity-100 translate-y-0"
+                 style="display: none;"
+                 class="space-y-4"
+                 x-data="{ openMode: 'time' }">
+                @php
+                    $timeRecords = $bestRecords->where('mode', 'time');
+                    $wordsRecords = $bestRecords->where('mode', 'words');
+                    $survivalRecords = $bestRecords->where('mode', 'survival');
+                    $quoteRecords = $bestRecords->where('mode', 'quote');
+                @endphp
 
-        <div class="overflow-hidden border bg-typing-surface/40 border-white/5 rounded-2xl">
-            <button @click="openMode = (openMode === 'time' ? '' : 'time')"
-                    class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
-                <div class="flex items-center gap-3">
-                    <span class="text-xl">⏱️</span>
-                    <div>
-                        <h4 class="text-sm font-semibold capitalize text-typing-text">Time Mode</h4>
-                        <p class="text-xs text-typing-muted font-mono mt-0.5">Rekor berdasarkan durasi waktu pengetikan</p>
+                <div class="overflow-hidden border bg-typing-surface/40 border-white/5 rounded-2xl">
+                    <button @click="openMode = (openMode === 'time' ? '' : 'time')"
+                            class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xl">⏱️</span>
+                            <div>
+                                <h4 class="text-sm font-semibold capitalize text-typing-text">Time Mode</h4>
+                                <p class="text-xs text-typing-muted font-mono mt-0.5">Rekor berdasarkan durasi waktu pengetikan</p>
+                            </div>
+                        </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-200 text-typing-muted" :class="openMode === 'time' ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <div x-show="openMode === 'time'" x-collapse class="px-5 pt-4 pb-5 border-t border-white/5 bg-typing-bg/20">
+                        @if($timeRecords->count() > 0)
+                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                @foreach($timeRecords as $record)
+                                    <div class="p-4 border bg-typing-surface/60 border-white/5 rounded-xl">
+                                        <span class="text-[0.65rem] uppercase tracking-wider text-typing-muted font-mono">{{ $record->mode_config }} Detik</span>
+                                        <p class="mt-1 font-mono text-xl font-bold text-typing-accent">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-typing-text">WPM</span></p>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <p class="py-2 font-mono text-xs text-typing-muted">Belum ada riwayat rekor untuk mode waktu.</p>
+                        @endif
                     </div>
                 </div>
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-200 text-typing-muted" :class="openMode === 'time' ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
-            </button>
 
-            <div x-show="openMode === 'time'" x-collapse class="px-5 pt-4 pb-5 border-t border-white/5 bg-typing-bg/20">
-                @if($timeRecords->count() > 0)
-                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        @foreach($timeRecords as $record)
-                            <div class="p-4 border bg-typing-surface/60 border-white/5 rounded-xl">
-                                <span class="text-[0.65rem] uppercase tracking-wider text-typing-muted font-mono">{{ $record->mode_config }} Detik</span>
-                                <p class="mt-1 font-mono text-xl font-bold text-typing-accent">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-typing-text">WPM</span></p>
+                <div class="overflow-hidden border bg-typing-surface/40 border-white/5 rounded-2xl">
+                    <button @click="openMode = (openMode === 'words' ? '' : 'words')"
+                            class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xl">🔤</span>
+                            <div>
+                                <h4 class="text-sm font-semibold capitalize text-typing-text">Words Mode</h4>
+                                <p class="text-xs text-typing-muted font-mono mt-0.5">Rekor berdasarkan volume target jumlah kata</p>
                             </div>
-                        @endforeach
+                        </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-200 text-typing-muted" :class="openMode === 'words' ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <div x-show="openMode === 'words'" x-collapse class="px-5 pt-4 pb-5 border-t border-white/5 bg-typing-bg/20">
+                        @if($wordsRecords->count() > 0)
+                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                @foreach($wordsRecords as $record)
+                                    <div class="p-4 border bg-typing-surface/60 border-white/5 rounded-xl">
+                                        <span class="text-[0.65rem] uppercase tracking-wider text-typing-muted font-mono">{{ $record->mode_config }} Kata</span>
+                                        <p class="mt-1 font-mono text-xl font-bold text-typing-accent2">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-typing-text">WPM</span></p>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <p class="py-2 font-mono text-xs text-typing-muted">Belum ada riwayat rekor untuk mode jumlah kata.</p>
+                        @endif
                     </div>
-                @else
-                    <p class="py-2 font-mono text-xs text-typing-muted">Belum ada riwayat rekor untuk mode waktu.</p>
+                </div>
+
+                <div class="overflow-hidden border bg-typing-surface/40 border-white/5 rounded-2xl">
+                    <button @click="openMode = (openMode === 'survival' ? '' : 'survival')"
+                            class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xl">❤️</span>
+                            <div>
+                                <h4 class="text-sm font-semibold capitalize text-typing-text">Survival Mode</h4>
+                                <p class="text-xs text-typing-muted font-mono mt-0.5">Rekor durasi bertahan terlama tanpa kehabisan nyawa</p>
+                            </div>
+                        </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-200 text-typing-muted" :class="openMode === 'survival' ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <div x-show="openMode === 'survival'" x-collapse class="px-5 pt-4 pb-5 border-t border-white/5 bg-typing-bg/20">
+                        @if($survivalRecords->count() > 0)
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                @foreach($survivalRecords as $record)
+                                    <div class="p-4 border bg-typing-surface/60 border-white/5 rounded-xl">
+                                        <span class="text-[0.65rem] uppercase tracking-wider text-typing-muted font-mono capitalize">{{ $record->mode_config }} Difficulty</span>
+                                        <p class="mt-1 font-mono text-xl font-bold text-typing-success">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-typing-text">WPM</span></p>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <p class="py-2 font-mono text-xs text-typing-muted">Belum ada riwayat rekor untuk mode survival.</p>
+                        @endif
+                    </div>
+                </div>
+
+                @if($quoteRecords->count() > 0)
+                <div class="overflow-hidden border bg-typing-surface/40 border-white/5 rounded-2xl">
+                    <button @click="openMode = (openMode === 'quote' ? '' : 'quote')"
+                            class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xl">💬</span>
+                            <div>
+                                <h4 class="text-sm font-semibold capitalize text-typing-text">Quote Mode</h4>
+                                <p class="text-xs text-typing-muted font-mono mt-0.5">Rekor pengetikan kalimat kutipan utuh</p>
+                            </div>
+                        </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-200 text-typing-muted" :class="openMode === 'quote' ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <div x-show="openMode === 'quote'" x-collapse class="px-5 pt-4 pb-5 border-t border-white/5 bg-typing-bg/20">
+                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                            @foreach($quoteRecords as $record)
+                                <div class="p-4 border bg-typing-surface/60 border-white/5 rounded-xl">
+                                    <span class="text-[0.65rem] uppercase tracking-wider text-typing-muted font-mono capitalize">{{ $record->mode_config }}</span>
+                                    <p class="mt-1 font-mono text-xl font-bold text-typing-accent">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-typing-text">WPM</span></p>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
                 @endif
             </div>
-        </div>
 
-        <div class="overflow-hidden border bg-typing-surface/40 border-white/5 rounded-2xl">
-            <button @click="openMode = (openMode === 'words' ? '' : 'words')"
-                    class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
-                <div class="flex items-center gap-3">
-                    <span class="text-xl">🔤</span>
-                    <div>
-                        <h4 class="text-sm font-semibold capitalize text-typing-text">Words Mode</h4>
-                        <p class="text-xs text-typing-muted font-mono mt-0.5">Rekor berdasarkan volume target jumlah kata</p>
-                    </div>
-                </div>
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-200 text-typing-muted" :class="openMode === 'words' ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
-            </button>
-
-            <div x-show="openMode === 'words'" x-collapse class="px-5 pt-4 pb-5 border-t border-white/5 bg-typing-bg/20">
-                @if($wordsRecords->count() > 0)
-                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        @foreach($wordsRecords as $record)
-                            <div class="p-4 border bg-typing-surface/60 border-white/5 rounded-xl">
-                                <span class="text-[0.65rem] uppercase tracking-wider text-typing-muted font-mono">{{ $record->mode_config }} Kata</span>
-                                <p class="mt-1 font-mono text-xl font-bold text-typing-accent2">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-typing-text">WPM</span></p>
-                            </div>
-                        @endforeach
-                    </div>
-                @else
-                    <p class="py-2 font-mono text-xs text-typing-muted">Belum ada riwayat rekor untuk mode jumlah kata.</p>
-                @endif
-            </div>
-        </div>
-
-        <div class="overflow-hidden border bg-typing-surface/40 border-white/5 rounded-2xl">
-            <button @click="openMode = (openMode === 'survival' ? '' : 'survival')"
-                    class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
-                <div class="flex items-center gap-3">
-                    <span class="text-xl">❤️</span>
-                    <div>
-                        <h4 class="text-sm font-semibold capitalize text-typing-text">Survival Mode</h4>
-                        <p class="text-xs text-typing-muted font-mono mt-0.5">Rekor durasi bertahan terlama tanpa kehabisan nyawa</p>
-                    </div>
-                </div>
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-200 text-typing-muted" :class="openMode === 'survival' ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
-            </button>
-
-            <div x-show="openMode === 'survival'" x-collapse class="px-5 pt-4 pb-5 border-t border-white/5 bg-typing-bg/20">
-                @if($survivalRecords->count() > 0)
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        @foreach($survivalRecords as $record)
-                            <div class="p-4 border bg-typing-surface/60 border-white/5 rounded-xl">
-                                <span class="text-[0.65rem] uppercase tracking-wider text-typing-muted font-mono capitalize">{{ $record->mode_config }} Difficulty</span>
-                                <p class="mt-1 font-mono text-xl font-bold text-typing-success">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-typing-text">WPM</span></p>
-                            </div>
-                        @endforeach
-                    </div>
-                @else
-                    <p class="py-2 font-mono text-xs text-typing-muted">Belum ada riwayat rekor untuk mode survival.</p>
-                @endif
-            </div>
-        </div>
-
-    @if($quoteRecords->count() > 0)
-    <div class="overflow-hidden border bg-typing-surface/40 border-white/5 rounded-2xl">
-        <button @click="openMode = (openMode === 'quote' ? '' : 'quote')"
-                class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
-            <div class="flex items-center gap-3">
-                <span class="text-xl">💬</span>
-                <div>
-                    <h4 class="text-sm font-semibold capitalize text-typing-text">Quote Mode</h4>
-                    <p class="text-xs text-typing-muted font-mono mt-0.5">Rekor pengetikan kalimat kutipan utuh</p>
-                </div>
-            </div>
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-200 text-typing-muted" :class="openMode === 'quote' ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-        </button>
-
-        <div x-show="openMode === 'quote'" x-collapse class="px-5 pt-4 pb-5 border-t border-white/5 bg-typing-bg/20">
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                @foreach($quoteRecords as $record)
-                    <div class="p-4 border bg-typing-surface/60 border-white/5 rounded-xl">
-                        <span class="text-[0.65rem] uppercase tracking-wider text-typing-muted font-mono capitalize">{{ $record->mode_config }}</span>
-                        <p class="mt-1 font-mono text-xl font-bold text-typing-accent">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-typing-text">WPM</span></p>
-                    </div>
-                @endforeach
-            </div>
         </div>
     </div>
-    @endif
 
-</div>
-        </div>
-    </div>
-
+    <!-- Script Chart.js -->
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const el = document.getElementById('profileWpmChart');
