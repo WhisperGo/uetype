@@ -25,12 +25,12 @@ Route::middleware('auth')->group(function () {
     Volt::route('/leaderboard', 'leaderboard')->name('leaderboard');
 });
 
-
-// Route untuk redirect ke Google
 Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])->name('auth.google');
-
-// Route Callback menerima data dari Google
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
+
+// Route Baru khusus untuk alur pemilihan username setelah Google Auth
+Route::get('/auth/google/username', [GoogleAuthController::class, 'showChooseUsernameForm'])->name('auth.google.choose-username');
+Route::post('/auth/google/username', [GoogleAuthController::class, 'storeUsername'])->name('auth.google.store-username');
 
 // Login cepat sebagai user dummy untuk TESTING. Hanya aktif di environment lokal.
 // Buka /dev-login (opsional /dev-login?email=other@uetype.test) untuk langsung masuk.

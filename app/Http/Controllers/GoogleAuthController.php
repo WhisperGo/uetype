@@ -10,56 +10,100 @@ use Laravel\Socialite\Facades\Socialite;
 
 class GoogleAuthController extends Controller
 {
-    /**
-     * Alihkan user ke halaman login Google.
-     */
     public function redirect()
     {
         return Socialite::driver('google')->redirect();
     }
 
-    /**
-     * Tangani callback dari Google setelah user berhasil login.
-     */
-    public function callback()
+    public function callback(Request $request)
     {
         try {
-            // Ambil data user dari Google
             $googleUser = Socialite::driver('google')->user();
             
-            // Cari apakah user dengan google_id atau email ini sudah terdaftar
+            // 1. Cek apakah user sudah terdaftar di database
             $user = User::where('google_id', $googleUser->id)
                         ->orWhere('email', $googleUser->email)
                         ->first();
 
             if ($user) {
-                // Jika user sudah ada tetapi google_id belum tersimpan, update id-nya
+                // JIKA AKUN SUDAH ADA: Langsung sinkronisasi ID dan login (Alur Login Biasa)
                 if (!$user->google_id) {
                     $user->update(['google_id' => $googleUser->id]);
                 }
-            } else {
-                // Jika benar-benar user baru, buat akun otomatis
-                // Buat username acak dari nama Google atau email
-                $username = Str::slug($googleUser->name ?? explode('@', $googleUser->email)[0], '_') . rand(10, 99);
-
-                $user = User::create([
-                    'username' => $username,
-                    'email' => $googleUser->email,
-                    'google_id' => $googleUser->id,
-                    'avatar' => $googleUser->avatar, // Jika tabel user menampung link foto profil
-                    'password' => encrypt(Str::random(16)), // Password acak aman karena login via OAuth
-                ]);
+                Auth::login($user);
+                return redirect()->intended('/typing');
             }
 
-            // Login-kan user ke aplikasi
-            Auth::login($user);
+            // JIKA AKUN BELUM ADA (ALUR REGISTER):
+            // Jangan simpan ke database dulu. Titipkan data Google ke dalam Session.
+            $request->session()->put('google_register_data', [
+                'email' => $googleUser->email,
+                'google_id' => $googleUser->id,
+                'avatar' => $googleUser->avatar,
+            ]);
 
-            // Alihkan ke halaman game/typing utama
-            return redirect()->intended('/typing');
+            // Alihkan user ke halaman khusus untuk memilih username
+            return redirect()->route('auth.google.choose-username');
 
         } catch (\Exception $e) {
-            // Jika terjadi error (misal token expired atau dibatalkan user)
-            return redirect('/login')->with('error', 'Gagal login menggunakan Google. Silakan coba lagi.');
+            return redirect('/login')->with('error', 'Gagal autentikasi via Google.');
         }
+    }
+
+    /**
+     * Tampilkan halaman form pilih username.
+     */
+    public function showChooseUsernameForm(Request $request)
+    {
+        // Pastikan ada session data Google, kalau tidak ada kembalikan ke register
+        if (!$request->session()->has('google_register_data')) {
+            return redirect('/register');
+        }
+
+        return view('auth.google-username');
+    }
+
+    /**
+     * Simpan user baru setelah memilih username.
+     */
+    public function storeUsername(Request $request)
+    {
+        // 1. Validasi data Google di session
+        if (!$request->session()->has('google_register_data')) {
+            return redirect('/register');
+        }
+
+        // 2. Validasi input username dari user (wajib unik, tidak boleh ada spasi)
+        $request->validate([
+            'username' => [
+                'required', 
+                'string', 
+                'alpha_dash', // Memastikan hanya huruf, angka, dash (-), dan underscore (_)
+                'min:3', 
+                'max:20', 
+                'unique:users,username'
+            ],
+        ], [
+            'username.unique' => 'Nama pengguna ini sudah dipakai, cari nama lain!',
+            'username.alpha_dash' => 'Nama pengguna hanya boleh berisi huruf, angka, strip, dan garis bawah.',
+        ]);
+
+        $googleData = $request->session()->get('google_register_data');
+
+        // 3. Buat user baru di database secara permanen
+        $user = User::create([
+            'username' => $request->username,
+            'email' => $googleData['email'],
+            'google_id' => $googleData['google_id'],
+            'avatar' => $googleData['avatar'],
+            'password' => encrypt(Str::random(16)), // Password acak aman
+        ]);
+
+        // 4. Bersihkan session data Google agar aman
+        $request->session()->forget('google_register_data');
+
+        // 5. Otomatis login-kan dan lempar ke game
+        Auth::login($user);
+        return redirect('/typing');
     }
 }

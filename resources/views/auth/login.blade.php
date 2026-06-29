@@ -33,6 +33,7 @@
             </label>
         </div>
 
+        <!-- Tombol Google -->
         <div class="mt-4">
             <a href="{{ route('auth.google') }}"
                 class="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#1a2333] border border-white/5 rounded-2xl font-sans text-sm font-semibold text-typing-text hover:bg-white/5 transition duration-200 shadow-lg">
@@ -57,17 +58,34 @@
             </a>
         </div>
 
-        <div class="flex items-center justify-end mt-4">
-            @if (Route::has('password.request'))
-                <a class="underline text-sm text-typing-muted hover:text-typing-text rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-typing-surface focus:ring-typing-accent"
-                    href="{{ route('password.request') }}">
-                    {{ __('Lupa kata sandi?') }}
-                </a>
-            @endif
+        <!-- Bagian Aksi Tombol (Ditambahkan tautan Registrasi) -->
+        <!-- Bagian Aksi Tombol (Kiri: Register, Kanan: Lupa Password + Masuk) -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6">
 
-            <x-primary-button class="ms-3">
-                {{ __('Masuk') }}
-            </x-primary-button>
+            <!-- Kiri: Belum punya akun -->
+            <div>
+                @if (Route::has('register'))
+                    <a class="underline text-xs text-typing-muted hover:text-typing-text rounded-md focus:outline-none"
+                        href="{{ route('register') }}">
+                        {{ __('Belum punya akun?') }}
+                    </a>
+                @endif
+            </div>
+
+            <!-- Kanan: Rombongan Lupa Kata Sandi & Tombol Masuk -->
+            <div class="flex items-center justify-between sm:justify-end gap-4">
+                @if (Route::has('password.request'))
+                    <a class="underline text-xs text-typing-muted hover:text-typing-text rounded-md focus:outline-none"
+                        href="{{ route('password.request') }}">
+                        {{ __('Lupa kata sandi?') }}
+                    </a>
+                @endif
+
+                <x-primary-button>
+                    {{ __('Masuk') }}
+                </x-primary-button>
+            </div>
+
         </div>
     </form>
 </x-guest-layout>
