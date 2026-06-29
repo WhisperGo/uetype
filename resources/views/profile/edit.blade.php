@@ -114,7 +114,7 @@
                     </div>
                     <div class="p-5 border bg-typing-surface/40 border-white/5 rounded-2xl">
                         <p class="text-xs uppercase tracking-[0.15em] text-typing-muted font-sans mb-1">XP</p>
-                        <p class="font-mono text-2xl font-bold text-typing-success">{{ $user->xp ?? 0 }}</p>
+                        <p class="font-mono text-2xl font-bold text-typing-success">{{ $user->total_xp ?? 0 }}</p>
                     </div>
                     <div class="p-5 border bg-typing-surface/40 border-white/5 rounded-2xl">
                         <p class="text-xs uppercase tracking-[0.15em] text-typing-muted font-sans mb-1">Koin</p>
