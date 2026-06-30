@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Livewire\Component;
 
+use Livewire\Attributes\On;
+
 class MultiplayerLobby extends Component
 {
     public string $step = 'choose';
@@ -16,6 +18,8 @@ class MultiplayerLobby extends Component
     public string $roomCode = '';
 
     public array $joinCodeInput = ['', '', '', '', '', ''];
+
+    public string $typedText = '';
 
     public function createRoom(): void
     {
@@ -41,6 +45,8 @@ class MultiplayerLobby extends Component
 
         $this->roomCode = $code;
         $this->step = 'waiting';
+
+        $this->dispatch('subscribe-room', room: $code);
     }
 
     public function joinRoom(): void
@@ -77,7 +83,25 @@ class MultiplayerLobby extends Component
         $this->roomCode = $code;
         $this->step = 'waiting';
 
+        $this->dispatch('subscribe-room', room: $code);
+
         broadcast(new RoomUpdated($code))->toOthers();
+    }
+    
+    #[On('room-updated')]
+    public function roomUpdated()
+    {
+        logger('EVENT MASUK');
+
+        $room = Room::where('code', $this->roomCode)->first();
+
+        if (!$room) {
+            return;
+        }
+
+        if ($room->status === 'racing') {
+            $this->step = 'racing';
+        }
     }
 
     public function toggleReady(): void
@@ -116,11 +140,16 @@ class MultiplayerLobby extends Component
         $this->roomCode = '';
         $this->joinCodeInput = ['', '', '', '', '', ''];
         $this->step = 'choose';
+
+        $this->dispatch('leave-room');
     }
 
     public function getRoomDataProperty(): ?Room
     {
-        if ($this->step !== 'waiting' || empty($this->roomCode)) {
+        if (
+            ($this->step !== 'waiting' && $this->step !== 'racing')
+            || empty($this->roomCode)
+        ) {
             return null;
         }
 
@@ -164,5 +193,46 @@ class MultiplayerLobby extends Component
     public function render()
     {
         return view('livewire.multiplayer-lobby')->layout('layouts.app');
+    }
+
+    public function startRace(): void
+    {
+        // dd(config('broadcasting.default'));
+        $room = Room::where('code', $this->roomCode)->first();
+
+        if (! $room) {
+            return;
+        }
+
+        if ($room->host_id !== Auth::id()) {
+            return;
+        }
+
+        $room->update([
+            'status' => 'racing',
+        ]);
+
+        // $this->step = 'racing';
+
+        // logger('Broadcasting RoomUpdated');
+
+        broadcast(new RoomUpdated($this->roomCode));
+    }
+
+    public function checkRoomStatus(): void
+    {
+        if (!$this->roomCode) {
+            return;
+        }
+
+        $room = Room::where('code', $this->roomCode)->first();
+
+        if (!$room) {
+            return;
+        }
+
+        if ($room->status === 'racing') {
+            $this->step = 'racing';
+        }
     }
 }

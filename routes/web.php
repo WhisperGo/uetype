@@ -24,7 +24,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/typing', TypingEngine::class)->name('typing');
     Route::get('/result', TypingResult::class)->name('typing.result');
 
-    Route::get('/multiplayer', MultiplayerLobby::class)->name('multiplayer.lobby');
+    Volt::route('/multiplayer', 'multiplayer-lobby')->name('multiplayer.lobby');
 
     Volt::route('/leaderboard', 'leaderboard')->name('leaderboard');
 });
