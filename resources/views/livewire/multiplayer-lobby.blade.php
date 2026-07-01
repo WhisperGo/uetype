@@ -112,7 +112,9 @@
 
                 <div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
                     @foreach (range(0, 4) as $i)
-                        @php($member = $this->roomData->members->values()->get($i))
+                        @php 
+                            $member = $this->roomData->members->values()->get($i);
+                        @endphp
                         @if ($member)
                             <div
                                 class="p-5 border flex flex-col items-center justify-center text-center rounded-2xl relative transition duration-300 {{ $member->user_id === Auth::id() ? 'bg-[#1a2333]/60 border-typing-accent' : 'bg-typing-surface/40 border-white/5' }}">
