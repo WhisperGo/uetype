@@ -1,14 +1,15 @@
 <?php
 
+use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\ProfileController;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Route;
-use App\Livewire\MultiplayerLobby;
+use App\Livewire\About;
+use App\Livewire\Terms;
 use App\Livewire\TypingEngine;
 use App\Livewire\TypingResult;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
-use App\Http\Controllers\GoogleAuthController;
 
 Route::get('/', TypingEngine::class)->name('home');
 
@@ -35,6 +36,10 @@ Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
 // Route Baru khusus untuk alur pemilihan username setelah Google Auth
 Route::get('/auth/google/username', [GoogleAuthController::class, 'showChooseUsernameForm'])->name('auth.google.choose-username');
 Route::post('/auth/google/username', [GoogleAuthController::class, 'storeUsername'])->name('auth.google.store-username');
+
+Route::get('/about', About::class)->name('about');
+
+Route::get('/privacy-policy', Terms::class)->name('terms');
 
 // Login cepat sebagai user dummy untuk TESTING. Hanya aktif di environment lokal.
 // Buka /dev-login (opsional /dev-login?email=other@uetype.test) untuk langsung masuk.

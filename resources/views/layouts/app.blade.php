@@ -41,8 +41,8 @@
             <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-x-small text-muted">
                 <span>&copy; 2026 uetype</span>
                 <nav class="flex items-center gap-6">
-                    <a href="#" class="hover:text-foreground transition-colors">About</a>
-                    <a href="#" class="hover:text-foreground transition-colors">Privacy</a>
+                    <a href="/about" class="hover:text-foreground transition-colors">About</a>
+                    <a href="/privacy-policy" class="hover:text-foreground transition-colors">Privacy</a>
                 </nav>
             </div>
         </footer>
