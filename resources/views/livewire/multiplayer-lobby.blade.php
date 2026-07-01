@@ -66,14 +66,14 @@
                     1</div>
                 <span class="font-mono text-sm text-typing-muted tracking-wide">Create or join a room</span>
             </div>
-            <span class="text-white/20 font-mono text-sm hidden md:block">-></span>
+            <span class="text-white/20 font-mono text-sm hidden md:block">→</span>
             <div class="flex items-center gap-3">
                 <div
                     class="w-7 h-7 rounded-full border border-[#cbb38a] bg-[#1a2333]/80 flex items-center justify-center font-mono text-xs font-bold text-white shadow-inner">
                     2</div>
                 <span class="font-mono text-sm text-typing-muted tracking-wide">Share the code with friends</span>
             </div>
-            <span class="text-white/20 font-mono text-sm hidden md:block">-></span>
+            <span class="text-white/20 font-mono text-sm hidden md:block">→</span>
             <div class="flex items-center gap-3">
                 <div
                     class="w-7 h-7 rounded-full border border-[#cbb38a] bg-[#1a2333]/80 flex items-center justify-center font-mono text-xs font-bold text-white shadow-inner">
@@ -111,7 +111,8 @@
                 </div>
 
                 <div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
-                    @foreach ($this->roomData->members->values()->pad(5, null) as $member)
+                    @foreach (range(0, 4) as $i)
+                        @php($member = $this->roomData->members->values()->get($i))
                         @if ($member)
                             <div
                                 class="p-5 border flex flex-col items-center justify-center text-center rounded-2xl relative transition duration-300 {{ $member->user_id === Auth::id() ? 'bg-[#1a2333]/60 border-typing-accent' : 'bg-typing-surface/40 border-white/5' }}">
@@ -121,7 +122,7 @@
                                         <img src="{{ $member->user->avatar }}" referrerpolicy="no-referrer"
                                             class="w-full h-full object-cover">
                                     @else
-                                        [PC]
+                                        👨‍💻
                                     @endif
                                 </div>
                                 <span
@@ -184,18 +185,23 @@
     @endif
 
     <!-- ===================================================================== -->
-    <!-- 3. HALAMAN ARENA PERTANDINGAN: BATTLE STAGE -->
+    <!-- 3. HALAMAN ARENA PERTANDINGAN: BATTLE STAGE (MODIFIED FOR TYPERACER MECHANICS) -->
     <!-- ===================================================================== -->
     @if ($this->step === 'racing' && $this->roomData)
         <div class="space-y-8" wire:poll.1s="checkSuddenDeath" x-data="{
             countdown: 3,
             raceStarted: false,
-            {{-- textToType: '{{ $this->roomData->text_to_type }}', --}}
-            textToType: @js($this->roomData->text_to_type),
-            typedText: @entangle('typedText'),
+            textToType: '{{ $this->roomData->text_to_type }}',
+            words: [],
+            currentWordIndex: 0,
+            typedText: '',
             startTime: null,
             isFinished: false,
+            hasError: false,
+            correctCharsFromPastWords: 0,
+        
             init() {
+                this.words = this.textToType.split(' ');
                 let timer = setInterval(() => {
                     if (this.countdown > 1) {
                         this.countdown--;
@@ -211,33 +217,69 @@
                 }, 1000);
             },
             checkInput() {
-                if (this.isFinished) return;
+                if (this.isFinished || !this.raceStarted) return;
         
-                let correctChars = 0;
-                let minLength = Math.min(this.typedText.length, this.textToType.length);
+                let targetWord = this.words[this.currentWordIndex];
         
-                for (let i = 0; i < minLength; i++) {
-                    if (this.typedText[i] === this.textToType[i]) {
-                        correctChars++;
-                    } else {
-                        break;
+                // Cek live typo/kesalahan ketik di kata aktif
+                if (this.typedText.length > 0) {
+                    this.hasError = !targetWord.startsWith(this.typedText);
+                } else {
+                    this.hasError = false;
+                }
+        
+                // Kalkulasi hitungan karakter benar live
+                let correctInCurrent = 0;
+                if (!this.hasError) {
+                    correctInCurrent = this.typedText.length;
+                } else {
+                    for (let i = 0; i < this.typedText.length; i++) {
+                        if (this.typedText[i] === targetWord[i]) {
+                            correctInCurrent++;
+                        } else {
+                            break;
+                        }
                     }
                 }
         
-                let progressPercent = Math.floor((correctChars / this.textToType.length) * 100);
+                let totalCorrectChars = this.correctCharsFromPastWords + correctInCurrent;
+                let progressPercent = Math.floor((totalCorrectChars / this.textToType.length) * 100);
         
-                let timePassedMinutes = (new Date().getTime() - this.startTime) / 60000;
-                let liveWpm = timePassedMinutes > 0 ? Math.floor((correctChars / 5) / timePassedMinutes) : 0;
-        
-                if (progressPercent >= 100) {
+                // 🔥 SPESIAL KATA TERAKHIR: Selesai otomatis saat huruf terakhir diketik akurat (tanpa butuh spasi)
+                if (this.currentWordIndex === this.words.length - 1 && this.typedText === targetWord) {
                     this.isFinished = true;
+                    progressPercent = 100;
+                    let timePassedMinutes = (new Date().getTime() - this.startTime) / 60000;
+                    let liveWpm = timePassedMinutes > 0 ? Math.floor((totalCorrectChars / 5) / timePassedMinutes) : 0;
+                    $wire.updateRaceProgress(100, liveWpm);
+                    return;
                 }
         
+                let timePassedMinutes = (new Date().getTime() - this.startTime) / 60000;
+                let liveWpm = timePassedMinutes > 0 ? Math.floor((totalCorrectChars / 5) / timePassedMinutes) : 0;
+        
                 $wire.updateRaceProgress(progressPercent, liveWpm);
+            },
+            handleSpace(e) {
+                if (this.isFinished || !this.raceStarted) return;
+        
+                let targetWord = this.words[this.currentWordIndex];
+        
+                // Lock on Error: Hanya izinkan pindah kata jika ketikan COCOK PERSIS dengan target kata
+                if (this.typedText === targetWord) {
+                    e.preventDefault(); // Cegah karakter spasi masuk ke kotak input baru
+                    this.correctCharsFromPastWords += targetWord.length + 1; // Ditambah 1 untuk spasi
+                    this.currentWordIndex++;
+                    this.typedText = '';
+                    this.hasError = false;
+                    this.checkInput();
+                } else {
+                    e.preventDefault(); // Mengunci spasi apabila masih ada typo atau huruf kurang
+                }
             }
         }">
 
-            <!-- BANNER SUDDEN DEATH TIMER -->
+            <!-- ⚠️ BANNER SUDDEN DEATH TIMER -->
             @if ($this->roomData->countdown_started_at)
                 @php
                     $sisaWaktu = 15 - now()->diffInSeconds($this->roomData->countdown_started_at);
@@ -245,7 +287,7 @@
                 @endphp
                 <div
                     class="p-3 bg-amber-950/40 border border-amber-700/50 rounded-2xl text-center animate-pulse flex items-center justify-center gap-2">
-                    <span class="text-amber-400 font-mono text-sm uppercase tracking-wider font-bold">Sudden Death
+                    <span class="text-amber-400 font-mono text-sm uppercase tracking-wider font-bold">⚠️ Sudden Death
                         Activated! Room Closes In:</span>
                     <span
                         class="text-xl font-mono font-black text-white bg-amber-600 px-3 py-0.5 rounded-lg">{{ $sisaWaktu }}s</span>
@@ -262,7 +304,7 @@
                 </div>
             </template>
 
-            <!-- VISUALISASI ARENA BALAPAN MASKOT UETYPE -->
+            <!-- 🏎️ VISUALISASI ARENA BALAPAN MASKOT UETYPE -->
             <div class="p-6 border bg-typing-surface/50 border-white/5 rounded-3xl space-y-4 shadow-xl">
                 <span class="text-xs font-mono uppercase tracking-widest text-typing-muted block mb-2">Mascot Race
                     Track</span>
@@ -288,7 +330,7 @@
                                 class="h-10 w-full bg-typing-bg/80 rounded-xl relative border border-white/5 overflow-hidden flex items-center">
                                 <div
                                     class="absolute right-0 top-0 bottom-0 w-8 bg-zinc-900 border-l border-dashed border-white/20 flex items-center justify-center font-mono text-[10px] text-zinc-600 select-none">
-                                    FINISH</div>
+                                    🏁</div>
 
                                 <div class="h-full bg-white/[0.02] transition-all duration-300 flex items-center justify-end relative"
                                     style="width: calc(10% + {{ $player->progress_percent ?? 0 }}% * 0.85);">
@@ -304,7 +346,7 @@
                 </div>
             </div>
 
-            <!-- CONTAINER UTAMA TEKS -->
+            <!-- CONTAINER UTAMA TEKS (VISUAL HIGH-RESPONSIVE TYPERACER STYLE) -->
             <div class="p-8 border bg-typing-surface/40 border-white/5 rounded-3xl space-y-6 shadow-xl">
                 <div class="flex justify-between items-center border-b border-white/5 pb-4">
                     <span class="text-xs font-mono uppercase tracking-widest text-typing-muted">Arena - Fast Typing
@@ -313,17 +355,34 @@
                             class="text-white">{{ $this->roomCode }}</strong></span>
                 </div>
 
+                <!-- BLOK DRAF PARAGRAF DENGAN INDIKATOR WARNA TYPERACER (Sesuai image_b78d8a.png) -->
                 <div
-                    class="font-mono text-xl leading-relaxed text-zinc-500 tracking-wide select-none p-5 bg-black/20 rounded-xl border border-white/[0.02]">
-                    {{ $this->roomData->text_to_type }}
+                    class="font-mono text-xl leading-relaxed tracking-wide select-none p-5 bg-black/20 rounded-xl border border-white/[0.02] flex flex-wrap gap-x-2 gap-y-1">
+                    <template x-for="(word, wIdx) in words" :key="wIdx">
+                        <span
+                            :class="{
+                                'text-emerald-400': wIdx < currentWordIndex,
+                                'text-red-400 bg-red-950/40 ring-1 ring-red-500/30 px-1 rounded underline underline-offset-4 decoration-2': wIdx ===
+                                    currentWordIndex && hasError,
+                                'text-white font-bold ring-1 ring-white/10 bg-white/5 px-1 rounded': wIdx ===
+                                    currentWordIndex && !hasError,
+                                'text-zinc-500': wIdx > currentWordIndex
+                            }"
+                            x-text="word"></span>
+                    </template>
                 </div>
 
+                <!-- FIELD INPUT KATA TUNGGAL DENGAN HIGHLIGHT ERROR DYNAMIC -->
                 <div class="relative">
                     <input type="text" x-ref="typeInput" x-model="typedText" @input="checkInput()"
-                        :disabled="!raceStarted || isFinished"
-                        :placeholder="isFinished ? 'You finished the race!' : (raceStarted ? 'Type the text here...' :
+                        @keydown.space="handleSpace($event)" :disabled="!raceStarted || isFinished"
+                        :placeholder="isFinished ? 'You finished the race!' : (raceStarted ? 'Type the current word here...' :
                             'Wait for countdown...')"
-                        class="w-full px-5 py-4 bg-typing-bg border rounded-xl font-mono text-base transition-all duration-200 text-white focus:ring-1 focus:ring-[#cbb38a] focus:border-[#cbb38a] placeholder-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed border-white/10" />
+                        :class="{
+                            'border-red-500/60 focus:ring-red-500 focus:border-red-500 bg-red-950/10 text-red-200': hasError,
+                            'focus:ring-[#cbb38a] focus:border-[#cbb38a] border-white/10 text-white': !hasError
+                        }"
+                        class="w-full px-5 py-4 bg-typing-bg border rounded-xl font-mono text-base transition-all duration-200 placeholder-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed" />
                 </div>
 
                 <div class="pt-4 flex justify-between items-center">
@@ -342,7 +401,7 @@
                 </div>
             </div>
 
-            <!-- MODAL KLASEMEN AKHIR (SHOW RESULT MODAL) -->
+            <!-- 🏆 MODAL KLASEMEN AKHIR (SHOW RESULT MODAL) -->
             @if ($showResultModal)
                 <div
                     class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 select-none animate-fade-in">
@@ -360,21 +419,14 @@
                                 <div
                                     class="flex items-center justify-between p-4 border rounded-2xl bg-typing-surface/40 {{ $rank->user_id === Auth::id() ? 'border-[#cbb38a]' : 'border-white/5' }}">
                                     <div class="flex items-center gap-4">
-                                        <!-- Nomor Podium / Kolom 'place' dari DB -->
                                         <div
                                             class="w-8 h-8 rounded-full flex items-center justify-center font-mono text-sm font-bold 
-                        {{ $rank->place == 1 || $index === 0 ? 'bg-[#cbb38a] text-black' : ($rank->place == 2 || $index === 1 ? 'bg-zinc-400 text-black' : ($rank->place == 3 || $index === 2 ? 'bg-amber-700 text-white' : 'border border-white/10 text-typing-muted')) }}">
-                                            {{ $rank->place ?? $index + 1 }}
+                                            {{ $index === 0 ? 'bg-[#cbb38a] text-black' : ($index === 1 ? 'bg-zinc-400 text-black' : ($index === 2 ? 'bg-amber-700 text-white' : 'border border-white/10 text-typing-muted')) }}">
+                                            {{ $index + 1 }}
                                         </div>
-                                        <!-- Nama Player -->
                                         <div class="flex flex-col">
-                                            <span class="font-sans text-sm font-bold text-white">
-                                                {{ $rank->user->username }}
-                                                @if ($rank->finished_time_seconds == 999)
-                                                    <span
-                                                        class="text-[10px] text-red-400 font-mono ml-1">[TIMEOUT]</span>
-                                                @endif
-                                            </span>
+                                            <span
+                                                class="font-sans text-sm font-bold text-white">{{ $rank->user->username }}</span>
                                             <span class="text-[10px] font-mono text-typing-muted">Progress:
                                                 {{ $rank->progress_percent }}%</span>
                                         </div>

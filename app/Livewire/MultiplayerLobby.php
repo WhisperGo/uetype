@@ -5,11 +5,11 @@ namespace App\Livewire;
 use App\Events\RoomUpdated;
 use App\Models\Room;
 use App\Models\RoomMember;
+use App\Models\Text;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
-use Livewire\Component;
-
 use Livewire\Attributes\On;
+use Livewire\Component;
 
 class MultiplayerLobby extends Component
 {
@@ -23,15 +23,45 @@ class MultiplayerLobby extends Component
 
     public bool $showResultModal = false;
 
-    public function createRoom(): void
+public function createRoom(): void
     {
         $user = Auth::user();
 
         RoomMember::where('user_id', $user->id)->delete();
 
         $code = strtoupper(Str::random(6));
-        $textToType = "And i know we were perfect but i never felt this way for no one and i just can't imagine how you could be so okay now that I gone guess you did mean what you wrote in that song about me cause you said forever now i drive alone past";
 
+        // 🎲 ARSITEKTUR REUSE: Merakit kalimat acak dari Wordlist JSON (Mengikuti Jalur Solo Mode)
+        $textToType = "And i know we were perfect but i never felt this way for no one and i just can't imagine how you could be so okay now that I gone guess you did mean what you wrote in that song about me cause you said forever now i drive alone past";
+        
+        $path = base_path('database/data/indonesian.json');
+
+        if (\Illuminate\Support\Facades\File::exists($path)) {
+            $jsonString = \Illuminate\Support\Facades\File::get($path);
+            $data = json_decode($jsonString, true);
+
+            if (is_array($data) && isset($data['words']) && is_array($data['words'])) {
+                $wordsArray = $data['words'];
+                
+                // Acak seluruh isi wordlist
+                shuffle($wordsArray);
+
+                // Ambil batas aman kata untuk balapan bersama (misal: 45 hingga 50 kata)
+                $limit = 45;
+                $selectedWords = [];
+                
+                while (count($selectedWords) < $limit) {
+                    shuffle($wordsArray);
+                    $needed = $limit - count($selectedWords);
+                    $selectedWords = array_merge($selectedWords, array_slice($wordsArray, 0, $needed));
+                }
+
+                // Gabungkan kumpulan kata acak menjadi satu paragraf balapan utuh
+                $textToType = implode(' ', $selectedWords);
+            }
+        }
+
+        // Kunci kalimat acak yang sama ini ke dalam database ruangan
         $room = Room::create([
             'code' => $code,
             'host_id' => $user->id,
@@ -43,9 +73,9 @@ class MultiplayerLobby extends Component
             'room_id' => $room->id,
             'user_id' => $user->id,
             'is_ready' => true,
-            'progress' => 0,
+            'progress_percent' => 0,
             'wpm' => 0,
-            'finished_at' => null,
+            'finished_time_seconds' => null,
         ]);
 
         $this->roomCode = $code;
