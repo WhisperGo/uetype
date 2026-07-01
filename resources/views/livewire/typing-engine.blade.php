@@ -1,5 +1,5 @@
 <div
-    class="min-h-screen bg-typing-bg text-typing-muted font-mono selection:bg-typing-accent selection:text-typing-bg outline-none">
+    class="text-muted font-mono selection:bg-brand selection:text-foreground outline-none">
     <div wire:key="typing-app-{{ str()->random(10) }}" x-data="{
         currentMain: @entangle('mainMode'),
         currentSub: @entangle('subMode'),
@@ -8,17 +8,17 @@
         @keydown.window="
             if($event.key === 'Tab') {
                 $event.preventDefault();
-                document.getElementById('restartButton').focus(); 
+                document.getElementById('restartButton').focus();
             } else if (document.activeElement.tagName !== 'BUTTON') {
                 handleInput($event);
             }
         ">
 
-        <div class="max-w-5xl mx-auto pt-16 px-4">
+        <div class="max-w-5xl mx-auto px-4 pt-10 pb-16">
 
             @if (session('result_rejected'))
                 <div
-                    class="max-w-xl mx-auto mb-8 flex items-center gap-3 px-4 py-3 rounded-xl bg-typing-error/10 border border-typing-error/40 text-typing-error text-sm">
+                    class="max-w-xl mx-auto mb-8 flex items-center gap-3 px-4 py-3 rounded-xl bg-danger/10 border border-danger/40 text-danger text-sm">
                     <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
@@ -27,124 +27,151 @@
                 </div>
             @endif
 
-            <!-- MODE SELECTOR -->
-            <!-- Saat mengetik, selector di-fade DI TEMPAT (ruang tetap dipesan) supaya
+            <!-- MODE CONTROL BAR (selaras Figma: Standard/Survival/Ghost → config → EN/ID) -->
+            <!-- Saat mengetik, control bar di-fade DI TEMPAT (ruang tetap dipesan) supaya
                  area teks tidak melonjak ke atas. Sebelumnya pakai h-0/!mb-0 yang meng-collapse
-                 tinggi → menyebabkan layout shift ~128px tiap kali mulai mengetik. -->
-            <div class="flex flex-col items-center gap-3 mb-12 transition-opacity duration-500"
+                 tinggi → menyebabkan layout shift ~128px tiap kali mulai mengetik.
+                 Opsi A: "Standard" hanya grup VISUAL; mainMode backend tetap time/words/quote. -->
+            <div class="flex flex-col items-center gap-3 mb-2 transition-opacity duration-500"
                 :class="isStarted ? 'opacity-0 pointer-events-none' : 'opacity-100'">
-                <span class="font-sans text-xs uppercase tracking-[0.3em] text-typing-muted">pilih mode</span>
-                <div
-                    class="flex items-center gap-5 bg-typing-surface/80 backdrop-blur px-5 py-2.5 rounded-2xl text-sm font-mono border border-white/10 shadow-glow">
-                    <div class="flex items-center gap-1 border-r border-white/10 pr-5 font-semibold">
-                        <button
-                            @click.prevent="currentMain = 'time'; currentSub = '30'; $wire.setMode('time', '30'); $el.blur()"
-                            class="transition-all duration-200 py-1.5 px-3 rounded-lg outline-none"
-                            :class="currentMain === 'time' ? 'text-typing-bg bg-typing-accent' : 'text-typing-muted hover:text-typing-text'">time</button>
 
-                        <button
-                            @click.prevent="currentMain = 'words'; currentSub = '50'; $wire.setMode('words', '50'); $el.blur()"
-                            class="transition-all duration-200 py-1.5 px-3 rounded-lg outline-none"
-                            :class="currentMain === 'words' ? 'text-typing-bg bg-typing-accent' : 'text-typing-muted hover:text-typing-text'">words</button>
+                <!-- Row 1: Mode utama (segment) -->
+                <div class="inline-flex items-stretch gap-0.5 p-[3px] rounded-lg bg-surface border border-border"
+                    role="group" aria-label="Pilih mode utama">
+                    <button type="button" aria-label="Mode Standard"
+                        :aria-pressed="['time','words','quote'].includes(currentMain)"
+                        @click.prevent="if(!['time','words','quote'].includes(currentMain)){ currentMain='time'; currentSub='30'; $wire.setMode('time','30'); } $el.blur()"
+                        class="px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        :class="['time','words','quote'].includes(currentMain) ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">Standard</button>
 
-                        <button
-                            @click.prevent="currentMain = 'quote'; currentSub = 'medium'; $wire.setMode('quote', 'medium'); $el.blur()"
-                            class="transition-all duration-200 py-1.5 px-3 rounded-lg outline-none"
-                            :class="currentMain === 'quote' ? 'text-typing-bg bg-typing-accent' : 'text-typing-muted hover:text-typing-text'">quote</button>
+                    <button type="button" aria-label="Mode Survival"
+                        :aria-pressed="currentMain === 'survival'"
+                        @click.prevent="currentMain='survival'; currentSub='medium'; $wire.setMode('survival','medium'); $el.blur()"
+                        class="px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        :class="currentMain === 'survival' ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">Survival</button>
 
-                        <button
-                            @click.prevent="currentMain = 'survival'; currentSub = 'medium'; $wire.setMode('survival', 'medium'); $el.blur()"
-                            class="transition-all duration-200 py-1.5 px-3 rounded-lg outline-none"
-                            :class="currentMain === 'survival' ? 'text-typing-bg bg-typing-accent' : 'text-typing-muted hover:text-typing-text'">survival</button>
-                    </div>
+                    <span aria-disabled="true" title="Segera hadir"
+                        class="px-[18px] py-[7px] rounded-md text-small font-mono font-bold text-muted/50 cursor-not-allowed inline-flex items-center gap-1.5">
+                        Ghost
+                        <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
+                    </span>
+                </div>
 
-                    <div class="flex items-center gap-1.5 text-typing-muted font-semibold">
-                        <template x-if="currentMain === 'time'">
-                            <div class="flex gap-1.5">
-                                @foreach (['15', '30', '60', '120'] as $t)
-                                    <button
-                                        @click.prevent="currentSub = '{{ $t }}'; $wire.setMode('time', '{{ $t }}'); $el.blur()"
-                                        class="px-2.5 py-1 rounded-lg transition-all duration-200 outline-none"
-                                        :class="currentSub == '{{ $t }}' ?
-                                            'text-typing-accent bg-typing-accent/10 ring-1 ring-typing-accent/40' :
-                                            'hover:text-typing-text'">{{ $t }}</button>
-                                @endforeach
-                            </div>
-                        </template>
-                        <template x-if="currentMain === 'words'">
-                            <div class="flex gap-1.5">
-                                @foreach (['10', '25', '50', '100'] as $w)
-                                    <button
-                                        @click.prevent="currentSub = '{{ $w }}'; $wire.setMode('words', '{{ $w }}'); $el.blur()"
-                                        class="px-2.5 py-1 rounded-lg transition-all duration-200 outline-none"
-                                        :class="currentSub == '{{ $w }}' ?
-                                            'text-typing-accent bg-typing-accent/10 ring-1 ring-typing-accent/40' :
-                                            'hover:text-typing-text'">{{ $w }}</button>
-                                @endforeach
-                            </div>
-                        </template>
-                        <template x-if="currentMain === 'quote'">
-                            <span class="px-2.5 py-1 text-typing-muted italic text-xs">kutipan acak</span>
-                        </template>
-                        <template x-if="currentMain === 'survival'">
-                            <div class="flex gap-1.5">
-                                @foreach (['easy', 'medium', 'hard'] as $d)
-                                    <button
-                                        @click.prevent="currentSub = '{{ $d }}'; $wire.setMode('survival', '{{ $d }}'); $el.blur()"
-                                        class="px-2.5 py-1 rounded-lg transition-all duration-200 outline-none capitalize"
-                                        :class="currentSub == '{{ $d }}' ?
-                                            'text-typing-accent bg-typing-accent/10 ring-1 ring-typing-accent/40' :
-                                            'hover:text-typing-text'">{{ $d }}</button>
-                                @endforeach
-                            </div>
-                        </template>
-                    </div>
+                <!-- Row 2: Config (Standard → Time/Words/Quote + durasi; Survival → difficulty) -->
+                <div class="flex items-center gap-1.5 min-h-[34px] text-small font-mono"
+                    role="group" aria-label="Konfigurasi mode">
+                    <!-- STANDARD: pemilih tipe + sub-konfigurasi -->
+                    <template x-if="['time','words','quote'].includes(currentMain)">
+                        <div class="flex items-center gap-1.5">
+                            @foreach (['time' => 'Time', 'words' => 'Words', 'quote' => 'Quote'] as $type => $label)
+                                <button type="button" aria-label="Tipe {{ $label }}"
+                                    :aria-pressed="currentMain === '{{ $type }}'"
+                                    @click.prevent="currentMain='{{ $type }}'; currentSub='{{ $type === 'time' ? '15' : ($type === 'words' ? '25' : 'medium') }}'; $wire.setMode('{{ $type }}', currentSub); $el.blur()"
+                                    class="px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-brand"
+                                    :class="currentMain === '{{ $type }}' ? 'bg-elevated border-border text-foreground font-bold' : 'border-border text-muted hover:text-foreground'">{{ $label }}</button>
+                            @endforeach
+
+                            <span class="w-px h-4 bg-border mx-1" aria-hidden="true"></span>
+
+                            <template x-if="currentMain === 'time'">
+                                <div class="flex gap-1.5">
+                                    @foreach (['15', '30', '60', '120'] as $t)
+                                        <button type="button" aria-label="Durasi {{ $t }} detik"
+                                            :aria-pressed="currentSub == '{{ $t }}'"
+                                            @click.prevent="currentSub='{{ $t }}'; $wire.setMode('time','{{ $t }}'); $el.blur()"
+                                            class="px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-gold"
+                                            :class="currentSub == '{{ $t }}' ? 'bg-gold border-gold text-background font-bold' : 'border-border text-muted hover:text-foreground'">{{ $t }}s</button>
+                                    @endforeach
+                                </div>
+                            </template>
+                            <template x-if="currentMain === 'words'">
+                                <div class="flex gap-1.5">
+                                    @foreach (['10', '25', '50', '100'] as $w)
+                                        <button type="button" aria-label="{{ $w }} kata"
+                                            :aria-pressed="currentSub == '{{ $w }}'"
+                                            @click.prevent="currentSub='{{ $w }}'; $wire.setMode('words','{{ $w }}'); $el.blur()"
+                                            class="px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-gold"
+                                            :class="currentSub == '{{ $w }}' ? 'bg-gold border-gold text-background font-bold' : 'border-border text-muted hover:text-foreground'">{{ $w }}</button>
+                                    @endforeach
+                                </div>
+                            </template>
+                            <template x-if="currentMain === 'quote'">
+                                <span class="px-2.5 py-1 text-muted italic text-x-small">kutipan acak</span>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- SURVIVAL: difficulty -->
+                    <template x-if="currentMain === 'survival'">
+                        <div class="flex gap-1.5">
+                            @foreach (['easy', 'medium', 'hard'] as $d)
+                                <button type="button" aria-label="Tingkat {{ $d }}"
+                                    :aria-pressed="currentSub == '{{ $d }}'"
+                                    @click.prevent="currentSub='{{ $d }}'; $wire.setMode('survival','{{ $d }}'); $el.blur()"
+                                    class="px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none capitalize hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-gold"
+                                    :class="currentSub == '{{ $d }}' ? 'bg-gold border-gold text-background font-bold' : 'border-border text-muted hover:text-foreground'">{{ $d }}</button>
+                            @endforeach
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Row 3: Language switch (EN/ID) — tampil sesuai Figma, ID aktif; belum fungsional -->
+                <div class="inline-flex items-stretch gap-0.5 p-[3px] rounded-lg bg-surface border border-border"
+                    role="group" aria-label="Pilih bahasa (segera hadir)">
+                    <span aria-disabled="true" title="Segera hadir"
+                        class="px-[16px] py-[5px] rounded-md text-small font-mono font-bold text-muted/50 cursor-not-allowed">EN</span>
+                    <span aria-pressed="true"
+                        class="px-[16px] py-[5px] rounded-md text-small font-mono font-bold bg-brand text-foreground">ID</span>
                 </div>
             </div>
 
-            <!-- SURVIVAL: bar stamina terpadu (hanya saat mode survival) -->
             <template x-if="currentMain === 'survival'">
                 <div class="mb-5 transition-opacity duration-300"
                     :class="isStarted ? 'opacity-100' : 'opacity-50'">
                     <div class="flex items-center justify-between mb-1.5">
-                        <span class="font-sans text-[0.7rem] uppercase tracking-[0.25em] text-typing-muted">stamina</span>
-                        <span class="font-sans text-[0.7rem] uppercase tracking-[0.2em] text-typing-muted capitalize"
+                        <span class="font-sans text-[0.7rem] uppercase tracking-[0.25em] text-muted">stamina</span>
+                        <span class="font-sans text-[0.7rem] tracking-[0.2em] text-muted capitalize"
                             x-text="currentSub"></span>
                     </div>
-                    <!-- Track bar -->
-                    <div class="w-full h-4 rounded-full bg-typing-surface/80 border border-white/5 overflow-hidden">
-                        <!-- Fill: warna bergeser cyan→amber→rose sesuai sisa stamina.
-                             Warna dipasang lewat inline background-color (bukan class Tailwind dinamis)
-                             agar TIDAK ikut ke-purge JIT — bug sebelumnya: bar hilang di bawah 50%
-                             karena class warna ternary tak ter-generate. -->
+                    {{-- Warna fill via inline style (aman dari purge JIT); rgb dari token tema. --}}
+                    <div class="w-full h-4 rounded-full bg-surface/80 border border-white/5 overflow-hidden">
                         <div class="h-full rounded-full transition-all duration-100 ease-linear"
-                            :style="`width: ${staminaPct}%; background-color: ${staminaPct > 50 ? '#22d3ee' : (staminaPct > 25 ? '#fbbf24' : '#f43f5e')};`">
+                            :style="`width: ${staminaPct}%; background-color: rgb(${staminaPct > 50 ? 'var(--color-brand)' : (staminaPct > 25 ? 'var(--color-gold)' : 'var(--color-danger)')});`">
                         </div>
                     </div>
                 </div>
             </template>
 
-            <!-- LIVE STATS -->
-            <!-- Selalu dirender (ruang dipesan sejak awal) dan hanya di-fade lewat opacity —
-                 BUKAN ditambah/dihapus dari DOM — supaya area teks tidak melonjak saat mulai
-                 mengetik (nol layout shift). Fade dibuat lembut (500ms) agar tak mengagetkan.
-                 Label waktu menyesuaikan mode: mode 'time' = hitung mundur; mode lain = stopwatch. -->
-            <div class="flex gap-3 mb-6 transition-opacity duration-500"
-                :class="isStarted ? 'opacity-100' : 'opacity-0'">
-                <div class="flex-1 bg-typing-surface/60 border border-white/5 rounded-xl px-5 py-3">
-                    <span class="text-[0.65rem] block text-typing-muted font-sans font-semibold uppercase tracking-[0.2em]">wpm</span>
-                    <span class="text-4xl text-typing-accent font-mono font-bold tabular-nums" x-text="wpm">0</span>
+            <div class="group mb-6 transition-opacity duration-500"
+                :class="!isStarted ? 'opacity-0' : (isFinished ? 'opacity-100' : 'opacity-60 hover:opacity-100')">
+                <div class="flex items-start gap-10">
+                    <div class="flex flex-col">
+                        <span class="text-5xl font-mono font-bold tabular-nums leading-none transition-colors duration-300"
+                            :class="(currentMain === 'time' && timer < 5 && isStarted) ? 'text-danger' : 'text-gold'"
+                            aria-live="polite" x-text="currentMain === 'time' ? timer : timer + 's'">0</span>
+                        <span class="text-x-small uppercase tracking-wide text-muted mt-2"
+                            x-text="currentMain === 'time' ? 'left' : 'time'">time</span>
+                    </div>
+
+                    <div class="flex flex-col">
+                        <span class="text-2xl text-muted font-mono font-bold tabular-nums leading-none" x-text="wpm">0</span>
+                        <span class="text-x-small uppercase tracking-wide text-muted mt-1.5">wpm</span>
+                    </div>
+
+                    <div class="flex flex-col">
+                        <span class="text-2xl text-muted font-mono font-bold tabular-nums leading-none">
+                            <span x-text="accuracy">0</span>%
+                        </span>
+                        <span class="text-x-small uppercase tracking-wide text-muted mt-1.5">acc</span>
+                    </div>
                 </div>
-                <div class="flex-1 bg-typing-surface/60 border border-white/5 rounded-xl px-5 py-3">
-                    <span class="text-[0.65rem] block text-typing-muted font-sans font-semibold uppercase tracking-[0.2em]">acc</span>
-                    <span class="text-4xl text-typing-accent font-mono font-bold tabular-nums"><span x-text="accuracy">0</span>%</span>
-                </div>
-                <div class="flex-1 bg-typing-surface/60 border border-white/5 rounded-xl px-5 py-3">
-                    <span class="text-[0.65rem] block text-typing-muted font-sans font-semibold uppercase tracking-[0.2em]"
-                        x-text="currentMain === 'time' ? 'time' : 'waktu'">time</span>
-                    <span class="text-4xl font-mono font-bold tabular-nums transition-colors duration-300"
-                        :class="(currentMain === 'time' && timer < 5 && isStarted) ? 'text-typing-error' : 'text-typing-accent'"
-                        x-text="currentMain === 'time' ? timer : timer + 's'">0</span>
+
+                <div class="h-[28px] mt-2">
+                    <svg x-show="wpmHistory.length > 1" x-cloak width="120" height="28"
+                        viewBox="0 0 120 28" preserveAspectRatio="none" fill="none" aria-hidden="true">
+                        <polyline :points="sparklinePoints" stroke="rgb(var(--color-brand))"
+                            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
                 </div>
             </div>
 
@@ -157,7 +184,7 @@
 
                     <!-- SINGLE SMOOTH CURSOR -->
                     <div x-show="!isFinished"
-                        class="absolute top-0 left-0 w-[2.5px] h-[1.5em] bg-typing-accent transition-all duration-100 ease-out z-20 rounded"
+                        class="absolute top-0 left-0 w-[2.5px] h-[1.5em] bg-brand transition-all duration-100 ease-out z-20 rounded"
                         :style="`transform: translate(${cursorLeft}px, ${cursorTop}px);`"
                         :class="isTyping ? '' : 'animate-[pulse_0.8s_infinite]'">
                     </div>
@@ -172,10 +199,10 @@
                             @foreach (str_split($word) as $char)
                                 <span id="char-{{ $charPointer }}" class="char-element relative transition-colors duration-100 inline-block"
                                     :class="{
-                                        'text-typing-text': {{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === true,
-                                        'text-typing-error': {{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === false,
-                                        'text-typing-muted': {{ $charPointer }} >= currentIndex || ({{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === 'skipped'),
-                                        'border-b-2 border-typing-error': {{ $charPointer }} < currentIndex && (inputResults[{{ $charPointer }}] === false || inputResults[{{ $charPointer }}] === 'skipped')
+                                        'text-foreground': {{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === true,
+                                        'text-danger': {{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === false,
+                                        'text-muted': {{ $charPointer }} >= currentIndex || ({{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === 'skipped'),
+                                        'border-b-2 border-danger': {{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === 'skipped'
                                     }">
                                     {{ $char }}
                                 </span>
@@ -188,7 +215,7 @@
                                 <template x-for="(extra, idx) in extraChars[{{ $loop->index }}]"
                                     :key="idx">
                                     <span :id="'extra-' + {{ $loop->index }} + '-' + idx"
-                                        class="char-element relative transition-colors duration-100 inline-block text-typing-error tracking-tight opacity-90">
+                                        class="char-element relative transition-colors duration-100 inline-block text-danger tracking-tight opacity-90">
                                         <span x-text="extra"></span>
                                     </span>
                                 </template>
@@ -197,7 +224,7 @@
                             @if (!$loop->last)
                                 <span id="char-{{ $charPointer }}"
                                     class="char-element relative w-[0.5em] inline-block"
-                                    :class="inputResults[{{ $charPointer }}] === false ? 'bg-typing-error/30' : ''">
+                                    :class="inputResults[{{ $charPointer }}] === false ? 'bg-danger/30' : ''">
                                     &nbsp;
                                 </span>
                                 @php $charPointer++; @endphp
@@ -207,16 +234,18 @@
                 </div>
             </div>
 
-            <div class="mt-20 flex justify-center">
+            <div class="mt-12 flex justify-center">
                 <button id="restartButton" @click.prevent="$wire.restart(); $el.blur()"
-                    class="flex items-center gap-2 text-typing-muted hover:text-typing-text focus:text-typing-accent focus:scale-105 transition-all transform hover:scale-105 outline-none px-4 py-2 rounded-xl hover:bg-typing-surface/60">
+                    class="flex items-center gap-2 text-muted hover:text-foreground focus-visible:text-foreground focus-visible:ring-1 focus-visible:ring-border focus:bg-surface/60 transition-all transform hover:scale-105 outline-none px-4 py-2 rounded-xl hover:bg-surface/60">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
                         stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                     <span class="font-sans text-xs uppercase tracking-widest">restart</span>
-                    <kbd class="font-sans text-[0.6rem] px-1.5 py-0.5 rounded bg-typing-surface border border-white/10">tab</kbd>
+                    <kbd class="font-sans text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">tab</kbd>
+                    <span class="font-sans text-[0.6rem] text-muted">then</span>
+                    <kbd class="font-sans text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">enter</kbd>
                 </button>
             </div>
         </div>
@@ -298,7 +327,7 @@
                         clearInterval(this.staminaInterval);
                         this.staminaInterval = null;
                     }
-                    
+
                     this.wordBounds = [];
                     this.extraChars = {};
                     this.currentWordIndex = 0;
@@ -541,7 +570,7 @@
                                 this.timer = timeElapsed;
                             }
                             this.calculateStats();
-                            
+
                             if (timeElapsed > 0 && !this.isFinished) {
                                 this.wpmHistory.push(this.wpm);
                                 const timeElapsedMins = (Date.now() - this.startTime) / 60000;
@@ -581,16 +610,16 @@
 
                                         let prevBounds = this.wordBounds[this.currentWordIndex];
                                         let jumpIndex = prevBounds.space;
-                                        
+
                                         // Hapus status pada spasi
                                         this.inputResults[jumpIndex] = null;
-                                        
+
                                         // Bersihkan status 'skipped' dan lompat mundur melewati huruf-huruf yang tidak pernah diketik
                                         while(jumpIndex > prevBounds.start && this.inputResults[jumpIndex - 1] === 'skipped') {
                                             jumpIndex--;
                                             this.inputResults[jumpIndex] = null;
                                         }
-                                        
+
                                         this.currentIndex = jumpIndex;
                                         this.$nextTick(() => this.updatePosition());
                                     }
@@ -697,14 +726,14 @@
 
                 calculateStats() {
                     if (!this.startTime) return;
-                    
+
                     const elapsedMs = Date.now() - this.startTime;
-                    
+
                     // Pencegahan WPM meledak (infinite/ribuan) di awal ketikan
                     // Kita asumsikan minimal waktu berlalu adalah 1 detik untuk kalkulasi live
                     const effectiveMs = (elapsedMs < 1000 && !this.isFinished) ? 1000 : elapsedMs;
                     const timeElapsed = effectiveMs / 60000;
-                    
+
                     if (timeElapsed <= 0) return;
 
                     // 1. Net WPM — pakai correctKeystrokes (SUMBER YANG SAMA dengan finish/server),
@@ -721,6 +750,22 @@
                     } else {
                         this.accuracy = 0;
                     }
+                },
+
+                // Ubah wpmHistory[] menjadi string `points` untuk <polyline> sparkline.
+                // Auto-scale ke min/max history; getter reaktif Alpine (murni presentasi).
+                get sparklinePoints() {
+                    const h = this.wpmHistory;
+                    if (h.length < 2) return '';
+                    const w = 120, ht = 28, pad = 2;
+                    const max = Math.max(...h), min = Math.min(...h);
+                    const range = max - min || 1;
+                    const stepX = w / (h.length - 1);
+                    return h.map((v, i) => {
+                        const x = i * stepX;
+                        const y = ht - pad - ((v - min) / range) * (ht - pad * 2);
+                        return `${x.toFixed(1)},${y.toFixed(1)}`;
+                    }).join(' ');
                 },
 
                 finish() {

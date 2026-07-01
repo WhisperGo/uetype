@@ -22,10 +22,9 @@
 </head>
 
 <body class="font-sans antialiased text-foreground bg-background selection:bg-brand selection:text-foreground">
-    <div class="min-h-screen bg-background">
+    <div class="min-h-screen flex flex-col bg-background">
         @include('layouts.navigation')
 
-        <!-- Page Heading -->
         @isset($header)
             <header class="border-b border-white/5">
                 <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
@@ -34,10 +33,19 @@
             </header>
         @endisset
 
-        <!-- Page Content -->
-        <main>
+        <main class="flex-1">
             {{ $slot }}
         </main>
+
+        <footer class="border-t border-white/5">
+            <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-x-small text-muted">
+                <span>&copy; 2026 uetype</span>
+                <nav class="flex items-center gap-6">
+                    <a href="#" class="hover:text-foreground transition-colors">About</a>
+                    <a href="#" class="hover:text-foreground transition-colors">Privacy</a>
+                </nav>
+            </div>
+        </footer>
     </div>
 
     <script>
