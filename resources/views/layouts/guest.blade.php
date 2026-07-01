@@ -15,16 +15,16 @@
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="font-sans antialiased text-typing-text">
-        <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-typing-bg bg-[radial-gradient(ellipse_at_top,_rgba(34,211,238,0.08),_transparent_55%)]">
+    <body class="font-sans antialiased text-foreground">
+        <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-background">
             <div>
                 <a href="/" class="flex items-center gap-2 group">
                     <x-application-logo class="h-12 w-auto transition-transform group-hover:scale-105" />
-                    <span class="font-sans text-2xl font-bold tracking-tight text-typing-text">Ue<span class="text-typing-accent">Type</span></span>
+                    <span class="font-sans text-2xl font-bold tracking-tight text-foreground">Ue<span class="text-brand">Type</span></span>
                 </a>
             </div>
 
-            <div class="w-full sm:max-w-md mt-6 px-6 py-6 bg-typing-surface/80 backdrop-blur border border-white/10 shadow-glow overflow-hidden sm:rounded-2xl">
+            <div class="w-full sm:max-w-md mt-6 px-6 py-6 bg-surface/80 backdrop-blur border border-white/10 shadow-glow overflow-hidden sm:rounded-2xl">
                 {{ $slot }}
             </div>
         </div>

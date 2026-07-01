@@ -21,8 +21,8 @@
     @livewireScripts
 </head>
 
-<body class="font-sans antialiased text-typing-text bg-typing-bg selection:bg-typing-accent selection:text-typing-bg">
-    <div class="min-h-screen bg-typing-bg bg-[radial-gradient(ellipse_at_top,_rgba(34,211,238,0.06),_transparent_55%)]">
+<body class="font-sans antialiased text-foreground bg-background selection:bg-brand selection:text-foreground">
+    <div class="min-h-screen bg-background">
         @include('layouts.navigation')
 
         <!-- Page Heading -->

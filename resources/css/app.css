@@ -5,9 +5,9 @@
 /* Token semantic (tema default "moonlight"). Ganti/tambah blok ini untuk tema lain (Deep Blue, Midnight, Carbon). */
 @layer base {
     :root {
-        --color-background: 10 21 66;
-        --color-surface: 13 26 84;
-        --color-elevated: 19 39 125;
+        --color-background: 25 31 40;
+        --color-surface: 18 22 28;
+        --color-elevated: 21 26 34;
         --color-foreground: 249 245 240;
         --color-muted: 156 159 163;
         --color-border: 66 71 79;
