@@ -114,6 +114,21 @@ class MultiplayerLobby extends Component
         }
     }
 
+    public function finalizeRace(string $roomId): void
+    {
+        $members = RoomMember::where('room_id', $roomId)
+            ->orderByRaw('finished_time_seconds IS NULL, finished_time_seconds ASC')
+            ->orderBy('progress_percent', 'desc')
+            ->orderBy('wpm', 'desc')
+            ->get();
+
+        foreach ($members as $index => $member) {
+            $member->update([
+                'place' => $index + 1
+            ]);
+        }
+    }
+
     public function toggleReady(): void
     {
         $room = Room::where('code', $this->roomCode)->first();
@@ -206,23 +221,13 @@ class MultiplayerLobby extends Component
             $room->update(['status' => 'finished']);
             
             // Berikan peringkat default ke pemain yang belum selesai berdasarkan progress tertinggi
-            $unfinishedMembers = RoomMember::where('room_id', $room->id)
+            RoomMember::where('room_id', $room->id)
                 ->whereNull('finished_time_seconds')
-                ->orderBy('progress_percent', 'desc')
-                ->orderBy('wpm', 'desc')
-                ->get();
-
-            $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
-                ->whereNotNull('finished_time_seconds')
-                ->count();
-
-            foreach ($unfinishedMembers as $index => $m) {
-                $m->update([
-                    'finished_time_seconds' => 999, // Penanda tidak finish tepat waktu
-                    'place' => $alreadyFinishedCount + $index + 1
+                ->update([
+                    'finished_time_seconds' => 999, // Penanda DNF (Did Not Finish)
                 ]);
-            }
 
+            $this->finalizeRace($room->id);
             $this->showResultModal = true;
             broadcast(new RoomUpdated($this->roomCode))->toOthers();
         }

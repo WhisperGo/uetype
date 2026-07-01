@@ -360,14 +360,21 @@
                                 <div
                                     class="flex items-center justify-between p-4 border rounded-2xl bg-typing-surface/40 {{ $rank->user_id === Auth::id() ? 'border-[#cbb38a]' : 'border-white/5' }}">
                                     <div class="flex items-center gap-4">
+                                        <!-- Nomor Podium / Kolom 'place' dari DB -->
                                         <div
                                             class="w-8 h-8 rounded-full flex items-center justify-center font-mono text-sm font-bold 
-                                            {{ $index === 0 ? 'bg-[#cbb38a] text-black' : ($index === 1 ? 'bg-zinc-400 text-black' : ($index === 2 ? 'bg-amber-700 text-white' : 'border border-white/10 text-typing-muted')) }}">
-                                            {{ $index + 1 }}
+                        {{ $rank->place == 1 || $index === 0 ? 'bg-[#cbb38a] text-black' : ($rank->place == 2 || $index === 1 ? 'bg-zinc-400 text-black' : ($rank->place == 3 || $index === 2 ? 'bg-amber-700 text-white' : 'border border-white/10 text-typing-muted')) }}">
+                                            {{ $rank->place ?? $index + 1 }}
                                         </div>
+                                        <!-- Nama Player -->
                                         <div class="flex flex-col">
-                                            <span
-                                                class="font-sans text-sm font-bold text-white">{{ $rank->user->username }}</span>
+                                            <span class="font-sans text-sm font-bold text-white">
+                                                {{ $rank->user->username }}
+                                                @if ($rank->finished_time_seconds == 999)
+                                                    <span
+                                                        class="text-[10px] text-red-400 font-mono ml-1">[TIMEOUT]</span>
+                                                @endif
+                                            </span>
                                             <span class="text-[10px] font-mono text-typing-muted">Progress:
                                                 {{ $rank->progress_percent }}%</span>
                                         </div>
