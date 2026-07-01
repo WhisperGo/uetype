@@ -21,6 +21,8 @@ class MultiplayerLobby extends Component
 
     public string $typedText = '';
 
+    public bool $showResultModal = false;
+
     public function createRoom(): void
     {
         $user = Auth::user();
@@ -41,6 +43,9 @@ class MultiplayerLobby extends Component
             'room_id' => $room->id,
             'user_id' => $user->id,
             'is_ready' => true,
+            'progress' => 0,
+            'wpm' => 0,
+            'finished_at' => null,
         ]);
 
         $this->roomCode = $code;
@@ -71,13 +76,8 @@ class MultiplayerLobby extends Component
         }
 
         RoomMember::updateOrCreate(
-            [
-                'room_id' => $room->id,
-                'user_id' => Auth::id(),
-            ],
-            [
-                'is_ready' => false,
-            ],
+            ['room_id' => $room->id, 'user_id' => Auth::id()],
+            ['is_ready' => false, 'progress' => 0, 'wpm' => 0, 'finished_at' => null]
         );
 
         $this->roomCode = $code;
@@ -91,16 +91,26 @@ class MultiplayerLobby extends Component
     #[On('room-updated')]
     public function roomUpdated()
     {
-        logger('EVENT MASUK');
+        // logger('EVENT MASUK');
 
         $room = Room::where('code', $this->roomCode)->first();
 
-        if (!$room) {
-            return;
+        if (!$room) return;
+
+        if ($room->status === 'racing' && $this->step !== 'racing') {
+            $this->step = 'racing';
+            $this->showResultModal = false;
+            $this->typedText = '';
         }
 
-        if ($room->status === 'racing') {
-            $this->step = 'racing';
+        if ($room->status === 'finished') {
+            $this->showResultModal = true;
+        }
+
+        if ($room->status === 'waiting' && $this->step === 'racing') {
+            $this->step = 'waiting';
+            $this->typedText = '';
+            $this->showResultModal = false;
         }
     }
 
@@ -140,8 +150,102 @@ class MultiplayerLobby extends Component
         $this->roomCode = '';
         $this->joinCodeInput = ['', '', '', '', '', ''];
         $this->step = 'choose';
+        $this->typedText = '';
+        $this->showResultModal = false;
 
         $this->dispatch('leave-room');
+    }
+
+    public function updateRaceProgress(int $progressPercent, int $liveWpm): void
+    {
+        $room = Room::where('code', $this->roomCode)->first();
+        if (!$room || $room->status !== 'racing') return;
+
+        $member = RoomMember::where('room_id', $room->id)->where('user_id', Auth::id())->first();
+        if ($member && !$member->finished_at) {
+            $updateData = [
+                'progress_percent' => min(100, max(0, $progressPercent)),
+                'wpm' => $liveWpm
+            ];
+
+            if ($progressPercent >= 100) {
+                $updateData['finished_time_seconds'] = now()->diffInSeconds($room->updated_at);
+
+                $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
+                    ->whereNotNull('finished_time_seconds')
+                    ->count();
+                
+                $updateData['place'] = $alreadyFinishedCount + 1;
+
+                if ($alreadyFinishedCount === 0 && !$room->countdown_started_at) {
+                    $room->update([
+                        'countdown_started_at' => now()
+                    ]);
+                }
+                $this->showResultModal = true;
+            }
+
+            $member->update($updateData);
+
+            broadcast(new RoomUpdated($this->roomCode))->toOthers();
+        }
+    }
+
+    public function checkSuddenDeath(): void
+    {
+        if (!$this->roomCode || $this->step !== 'racing') return;
+
+        $room = Room::where('code', $this->roomCode)->first();
+        if (!$room || !$room->countdown_started_at) return;
+
+        // Hitung sisa waktu sudden death
+        $secondsPassed = now()->diffInSeconds($room->countdown_started_at);
+        
+        // Jika sudah melewati 15 detik, paksa kunci game menjadi 'finished'
+        if ($secondsPassed >= 15) {
+            $room->update(['status' => 'finished']);
+            
+            // Berikan peringkat default ke pemain yang belum selesai berdasarkan progress tertinggi
+            $unfinishedMembers = RoomMember::where('room_id', $room->id)
+                ->whereNull('finished_time_seconds')
+                ->orderBy('progress_percent', 'desc')
+                ->orderBy('wpm', 'desc')
+                ->get();
+
+            $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
+                ->whereNotNull('finished_time_seconds')
+                ->count();
+
+            foreach ($unfinishedMembers as $index => $m) {
+                $m->update([
+                    'finished_time_seconds' => 999, // Penanda tidak finish tepat waktu
+                    'place' => $alreadyFinishedCount + $index + 1
+                ]);
+            }
+
+            $this->showResultModal = true;
+            broadcast(new RoomUpdated($this->roomCode))->toOthers();
+        }
+    }
+
+    public function playAgain(): void
+    {
+        $room = Room::where('code', $this->roomCode)->first();
+        if ($room && $room->host_id === Auth::id()) {
+            $room->update(['status' => 'waiting']);
+            RoomMember::where('room_id', $room->id)->update([
+                'is_ready' => false,
+                'progress_percent' => 0,
+                'wpm' => 0,
+                'finished_time_seconds' => null
+            ]);
+            
+            $this->step = 'waiting';
+            $this->showResultModal = false;
+            $this->typedText = '';
+            
+            broadcast(new RoomUpdated($this->roomCode))->toOthers();
+        }
     }
 
     public function getRoomDataProperty(): ?Room
@@ -164,6 +268,17 @@ class MultiplayerLobby extends Component
 
         return $room;
     }
+
+    public function getLeaderboardDataProperty()
+    {
+        if (!$this->roomData) return [];
+        return $this->roomData->members()
+            ->orderByRaw('finished_time_seconds IS NULL, finished_time_seconds ASC')
+            ->orderBy('progress_percent', 'desc')
+            ->orderBy('wpm', 'desc')
+            ->get();
+    }
+    
 
     public function getRoomDataForViewProperty(): ?Room
     {
@@ -200,19 +315,22 @@ class MultiplayerLobby extends Component
         // dd(config('broadcasting.default'));
         $room = Room::where('code', $this->roomCode)->first();
 
-        if (! $room) {
+        if (! $room || $room->host_id !== Auth::id()) {
             return;
         }
 
-        if ($room->host_id !== Auth::id()) {
-            return;
-        }
+        RoomMember::where('room_id', $room->id)->update([
+            'progress_percent' => 0,
+            'wpm' => 0,
+            'finished_time_seconds' => null
+        ]);
 
         $room->update([
             'status' => 'racing',
         ]);
 
-        // $this->step = 'racing';
+        $this->step = 'racing';
+        $this->showResultModal = false;
 
         // logger('Broadcasting RoomUpdated');
 
