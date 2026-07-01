@@ -1,10 +1,10 @@
 <section>
     <header>
-        <h2 class="font-sans text-lg font-semibold text-typing-text">
+        <h2 class="font-sans text-lg font-semibold text-foreground">
             {{ __('Informasi Profil') }}
         </h2>
 
-        <p class="mt-1 text-sm text-typing-muted">
+        <p class="mt-1 text-sm text-muted">
             {{ __('Perbarui username dan alamat email akunmu.') }}
         </p>
     </header>
@@ -30,16 +30,16 @@
 
             @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
                 <div>
-                    <p class="text-sm mt-2 text-typing-text">
+                    <p class="text-sm mt-2 text-foreground">
                         {{ __('Alamat email kamu belum terverifikasi.') }}
 
-                        <button form="send-verification" class="underline text-sm text-typing-muted hover:text-typing-text rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-typing-surface focus:ring-typing-accent">
+                        <button form="send-verification" class="underline text-sm text-muted hover:text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface focus:ring-brand">
                             {{ __('Klik di sini untuk mengirim ulang email verifikasi.') }}
                         </button>
                     </p>
 
                     @if (session('status') === 'verification-link-sent')
-                        <p class="mt-2 font-medium text-sm text-typing-success">
+                        <p class="mt-2 font-medium text-sm text-gold">
                             {{ __('Tautan verifikasi baru telah dikirim ke alamat email kamu.') }}
                         </p>
                     @endif
@@ -56,7 +56,7 @@
                     x-show="show"
                     x-transition
                     x-init="setTimeout(() => show = false, 2000)"
-                    class="text-sm text-typing-muted"
+                    class="text-sm text-muted"
                 >{{ __('Tersimpan.') }}</p>
             @endif
         </div>

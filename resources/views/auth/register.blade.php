@@ -38,7 +38,7 @@
         <!-- Tombol Google (Tetap di Luar Grid agar Melebar Penuh di Bawahnya) -->
         <div class="mt-5">
             <a href="{{ route('auth.google') }}"
-                class="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#1a2333] border border-white/5 rounded-2xl font-sans text-sm font-semibold text-typing-text hover:bg-white/5 transition duration-200 shadow-lg">
+                class="w-full flex items-center justify-center gap-3 px-4 py-3 bg-surface border border-white/5 rounded-2xl font-sans text-sm font-semibold text-foreground hover:bg-white/5 transition duration-200 shadow-lg">
                 <!-- SVG Icon Google -->
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24">
                     <g transform="matrix(1, 0, 0, 1, 0, 0)">
@@ -58,7 +58,7 @@
 
         <!-- Bagian Aksi Tombol Submit -->
         <div class="flex items-center justify-end mt-5">
-            <a class="underline text-sm text-typing-muted hover:text-typing-text rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-typing-surface focus:ring-typing-accent"
+            <a class="underline text-sm text-muted hover:text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface focus:ring-brand"
                 href="{{ route('login') }}">
                 {{ __('Sudah punya akun?') }}
             </a>

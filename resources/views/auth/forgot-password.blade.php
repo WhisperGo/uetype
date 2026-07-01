@@ -1,5 +1,5 @@
 <x-guest-layout>
-    <div class="mb-4 text-sm text-typing-muted">
+    <div class="mb-4 text-sm text-muted">
         {{ __('Lupa kata sandi? Tidak masalah. Beri tahu kami alamat emailmu dan kami akan mengirim tautan untuk mengatur ulang kata sandi.') }}
     </div>
 

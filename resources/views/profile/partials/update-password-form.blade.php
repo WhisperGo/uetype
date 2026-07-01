@@ -1,10 +1,10 @@
 <section>
     <header>
-        <h2 class="font-sans text-lg font-semibold text-typing-text">
+        <h2 class="font-sans text-lg font-semibold text-foreground">
             {{ __('Ubah Kata Sandi') }}
         </h2>
 
-        <p class="mt-1 text-sm text-typing-muted">
+        <p class="mt-1 text-sm text-muted">
             {{ __('Pastikan akunmu memakai kata sandi yang panjang dan acak agar tetap aman.') }}
         </p>
     </header>
@@ -40,7 +40,7 @@
                     x-show="show"
                     x-transition
                     x-init="setTimeout(() => show = false, 2000)"
-                    class="text-sm text-typing-muted"
+                    class="text-sm text-muted"
                 >{{ __('Tersimpan.') }}</p>
             @endif
         </div>

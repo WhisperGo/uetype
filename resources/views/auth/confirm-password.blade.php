@@ -1,5 +1,5 @@
 <x-guest-layout>
-    <div class="mb-4 text-sm text-typing-muted">
+    <div class="mb-4 text-sm text-muted">
         {{ __('Ini area aman dari aplikasi. Konfirmasikan kata sandimu sebelum melanjutkan.') }}
     </div>
 
