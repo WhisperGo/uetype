@@ -27,16 +27,16 @@
         <div class="block mt-4">
             <label for="remember_me" class="inline-flex items-center">
                 <input id="remember_me" type="checkbox"
-                    class="rounded bg-typing-bg/60 border-white/10 text-typing-accent shadow-sm focus:ring-typing-accent focus:ring-offset-typing-surface"
+                    class="rounded bg-background/60 border-white/10 text-brand shadow-sm focus:ring-brand focus:ring-offset-surface"
                     name="remember">
-                <span class="ms-2 text-sm text-typing-muted">{{ __('Ingat saya') }}</span>
+                <span class="ms-2 text-sm text-muted">{{ __('Ingat saya') }}</span>
             </label>
         </div>
 
         <!-- Tombol Google -->
         <div class="mt-4">
             <a href="{{ route('auth.google') }}"
-                class="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#1a2333] border border-white/5 rounded-2xl font-sans text-sm font-semibold text-typing-text hover:bg-white/5 transition duration-200 shadow-lg">
+                class="w-full flex items-center justify-center gap-3 px-4 py-3 bg-surface border border-white/5 rounded-2xl font-sans text-sm font-semibold text-foreground hover:bg-white/5 transition duration-200 shadow-lg">
                 <!-- SVG Icon Google -->
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24">
                     <g transform="matrix(1, 0, 0, 1, 0, 0)">
@@ -65,7 +65,7 @@
             <!-- Kiri: Belum punya akun -->
             <div>
                 @if (Route::has('register'))
-                    <a class="underline text-xs text-typing-muted hover:text-typing-text rounded-md focus:outline-none"
+                    <a class="underline text-xs text-muted hover:text-foreground rounded-md focus:outline-none"
                         href="{{ route('register') }}">
                         {{ __('Belum punya akun?') }}
                     </a>
@@ -75,7 +75,7 @@
             <!-- Kanan: Rombongan Lupa Kata Sandi & Tombol Masuk -->
             <div class="flex items-center justify-between sm:justify-end gap-4">
                 @if (Route::has('password.request'))
-                    <a class="underline text-xs text-typing-muted hover:text-typing-text rounded-md focus:outline-none"
+                    <a class="underline text-xs text-muted hover:text-foreground rounded-md focus:outline-none"
                         href="{{ route('password.request') }}">
                         {{ __('Lupa kata sandi?') }}
                     </a>

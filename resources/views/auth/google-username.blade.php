@@ -1,5 +1,5 @@
 <x-guest-layout>
-    <div class="mb-4 text-sm text-typing-muted">
+    <div class="mb-4 text-sm text-muted">
         {{ __('Satu langkah lagi! Silakan tentukan nama pengguna (username) unik kamu untuk profil game UeType.') }}
     </div>
 
@@ -15,7 +15,7 @@
 
         <div class="flex items-center justify-end mt-6">
             <!-- Tombol Batal -->
-            <a class="underline text-sm text-typing-muted hover:text-typing-text rounded-md focus:outline-none"
+            <a class="underline text-sm text-muted hover:text-foreground rounded-md focus:outline-none"
                 href="{{ route('login') }}">
                 {{ __('Batal') }}
             </a>
