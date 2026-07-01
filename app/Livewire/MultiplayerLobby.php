@@ -75,6 +75,7 @@ public function createRoom(): void
             'is_ready' => true,
             'progress_percent' => 0,
             'wpm' => 0,
+            'accuracy' => 100,
             'finished_time_seconds' => null,
         ]);
 
@@ -107,7 +108,13 @@ public function createRoom(): void
 
         RoomMember::updateOrCreate(
             ['room_id' => $room->id, 'user_id' => Auth::id()],
-            ['is_ready' => false, 'progress' => 0, 'wpm' => 0, 'finished_at' => null]
+            [
+                'is_ready' => false,
+                'progress_percent' => 0,
+                'wpm' => 0,
+                'accuracy' => 100,
+                'finished_time_seconds' => null,
+            ]
         );
 
         $this->roomCode = $code;
@@ -147,9 +154,9 @@ public function createRoom(): void
     public function finalizeRace(string $roomId): void
     {
         $members = RoomMember::where('room_id', $roomId)
-            ->orderByRaw('finished_time_seconds IS NULL, finished_time_seconds ASC')
-            ->orderBy('progress_percent', 'desc')
             ->orderBy('wpm', 'desc')
+            ->orderBy('progress_percent', 'desc')
+            ->orderByRaw('finished_time_seconds IS NULL, finished_time_seconds ASC')
             ->get();
 
         foreach ($members as $index => $member) {
@@ -201,7 +208,7 @@ public function createRoom(): void
         $this->dispatch('leave-room');
     }
 
-    public function updateRaceProgress(int $progressPercent, int $liveWpm): void
+    public function updateRaceProgress(int $progressPercent, int $liveWpm, int $accuracy = 100): void
     {
         $room = Room::where('code', $this->roomCode)->first();
         if (!$room || $room->status !== 'racing') return;
@@ -210,11 +217,13 @@ public function createRoom(): void
         if ($member && !$member->finished_at) {
             $updateData = [
                 'progress_percent' => min(100, max(0, $progressPercent)),
-                'wpm' => $liveWpm
+                'wpm' => $liveWpm,
+                'accuracy' => min(100, max(0, $accuracy)),
             ];
 
             if ($progressPercent >= 100) {
-                $updateData['finished_time_seconds'] = now()->diffInSeconds($room->updated_at);
+                // absolute: true -> cegah hasil negatif (Carbon 3 default-nya signed diff)
+                $updateData['finished_time_seconds'] = $room->updated_at->diffInSeconds(now(), true);
 
                 $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
                     ->whereNotNull('finished_time_seconds')
@@ -244,7 +253,7 @@ public function createRoom(): void
         if (!$room || !$room->countdown_started_at) return;
 
         // Hitung sisa waktu sudden death
-        $secondsPassed = now()->diffInSeconds($room->countdown_started_at);
+        $secondsPassed = now()->diffInSeconds($room->countdown_started_at, true);
         
         // Jika sudah melewati 15 detik, paksa kunci game menjadi 'finished'
         if ($secondsPassed >= 15) {
@@ -272,6 +281,7 @@ public function createRoom(): void
                 'is_ready' => false,
                 'progress_percent' => 0,
                 'wpm' => 0,
+                'accuracy' => 100,
                 'finished_time_seconds' => null
             ]);
             
@@ -308,9 +318,9 @@ public function createRoom(): void
     {
         if (!$this->roomData) return [];
         return $this->roomData->members()
-            ->orderByRaw('finished_time_seconds IS NULL, finished_time_seconds ASC')
-            ->orderBy('progress_percent', 'desc')
             ->orderBy('wpm', 'desc')
+            ->orderBy('progress_percent', 'desc')
+            ->orderByRaw('finished_time_seconds IS NULL, finished_time_seconds ASC')
             ->get();
     }
     
@@ -357,6 +367,7 @@ public function createRoom(): void
         RoomMember::where('room_id', $room->id)->update([
             'progress_percent' => 0,
             'wpm' => 0,
+            'accuracy' => 100,
             'finished_time_seconds' => null
         ]);
 
