@@ -13,7 +13,7 @@
         <div class="mb-10">
             <h1 class="text-3xl font-mono font-bold text-foreground mb-2">About uetype</h1>
             <p class="font-sans text-small text-muted">
-                A gamified typing speed app — race, level up, and sharpen your keystrokes.
+                A gamified typing speed app - race, level up, and sharpen your keystrokes.
             </p>
         </div>
 
