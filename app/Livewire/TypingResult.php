@@ -19,6 +19,9 @@ class TypingResult extends Component
     public $wpmHistory;
     public $rawHistory;
     public $missedChars;
+    public $xpEarned;
+    public $isPersonalBest;
+    public $levelData;
 
     public function mount()
     {
@@ -41,6 +44,9 @@ class TypingResult extends Component
         $this->wpmHistory = $result['wpmHistory'] ?? [];
         $this->rawHistory = $result['rawHistory'] ?? [];
         $this->missedChars = $result['missedChars'] ?? [];
+        $this->xpEarned = $result['xpEarned'] ?? 0;
+        $this->isPersonalBest = $result['isPersonalBest'] ?? false;
+        $this->levelData = $result['levelData'] ?? null;
     }
 
     public function render()

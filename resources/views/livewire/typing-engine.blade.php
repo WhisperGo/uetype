@@ -142,7 +142,7 @@
                 </div>
             </template>
 
-            <div class="group mb-6 transition-opacity duration-500"
+            <div x-cloak class="group mb-6 transition-opacity duration-500"
                 :class="!isStarted ? 'opacity-0' : (isFinished ? 'opacity-100' : 'opacity-60 hover:opacity-100')">
                 <div class="flex items-start gap-10">
                     <div class="flex flex-col">

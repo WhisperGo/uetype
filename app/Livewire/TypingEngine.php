@@ -215,8 +215,15 @@ class TypingEngine extends Component
         $accuracyMultiplier = 0.5 + 0.5 * ($finalAccuracy / 100);
         $xpEarned = (int) round($correctKeystrokes * 0.1 * $accuracyMultiplier);
 
+        $isPersonalBest = false;
+        $levelData = null;
+
         if (Auth::check()) {
             $user = Auth::user();
+
+            // Ditangkap SEBELUM transaction menimpa highest_wpm. Survival dikecualikan
+            // dari rekor WPM (konsisten dengan aturan di bawah).
+            $isPersonalBest = $this->mainMode !== 'survival' && $finalNetWpm > (float) $user->highest_wpm;
 
             DB::transaction(function () use (
                 $user, $duration, $finalNetWpm, $finalRawWpm, $finalAccuracy,
@@ -255,6 +262,9 @@ class TypingEngine extends Component
 
                 $user->save();
             });
+
+            // Snapshot setelah XP masuk: level & progres untuk ditampilkan di halaman result.
+            $levelData = $user->fresh()->levelData();
         }
 
         session()->put('typing_result', [
@@ -271,6 +281,9 @@ class TypingEngine extends Component
             'wpmHistory' => $wpmHistory,
             'rawHistory' => $rawHistory,
             'missedChars' => $missedChars,
+            'xpEarned' => $xpEarned,
+            'isPersonalBest' => $isPersonalBest,
+            'levelData' => $levelData,
         ]);
         session()->save();
 

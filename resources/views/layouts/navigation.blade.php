@@ -4,10 +4,9 @@
             <div class="flex">
                 <!-- Logo / Wordmark -->
                 <div class="flex items-center shrink-0">
-                    <a href="{{ route('home') }}" class="flex items-center gap-2 group">
-                        <x-application-logo class="block w-auto h-8 transition-transform group-hover:scale-110" />
-                        <span class="font-sans text-xl font-bold tracking-tight text-foreground">Ue<span
-                                class="text-brand">Type</span></span>
+                    <a href="{{ route('home') }}" class="flex items-center gap-3 group">
+                        <x-application-logo class="block w-auto h-10 transition-transform group-hover:scale-110" />
+                        <span class="font-display text-base text-brand leading-none pt-1">UETYPE</span>
                     </a>
                 </div>
 
@@ -54,34 +53,45 @@
                             {{ Auth::user()->coins }}
                         </span>
                     </div>
+
+                    <!-- Trophy shortcut -> Leaderboard -->
+                    <a href="{{ route('leaderboard') }}" title="{{ __('Leaderboard') }}"
+                        class="p-2 rounded-lg text-muted hover:text-gold hover:bg-surface focus:outline-none focus-visible:ring-1 focus-visible:ring-border transition">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M8 21h8m-4-4v4m6.5-17H21v2a4 4 0 01-4 4m-11-6H3v2a4 4 0 004 4m1-9h8v5a5 5 0 01-10 0V3z" />
+                        </svg>
+                    </a>
+
+                    <div class="h-6 w-px bg-border"></div>
                 @endauth
 
                 <!-- Settings Dropdown -->
-                <x-dropdown align="right" width="48">
+                <x-dropdown align="right" width="w-56">
                     <x-slot name="trigger">
                         <button
-                            class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium leading-4 transition rounded-lg text-muted hover:text-foreground hover:bg-surface focus:outline-none">
+                            class="inline-flex items-center gap-2.5 px-2 py-1.5 leading-tight transition rounded-lg hover:bg-surface focus:outline-none focus-visible:ring-1 focus-visible:ring-border">
                             @auth
-                                <!-- PEMERIKSAAN FOTO PROFIL / AVATAR -->
                                 @if (Auth::user()->avatar)
-                                    <!-- Tampilkan Foto Profil Asli dari Google -->
                                     <img src="{{ Auth::user()->avatar }}" alt="{{ Auth::user()->username }}"
-                                        class="object-cover rounded-full w-7 h-7 border border-white/10 shadow-sm transition duration-200"
+                                        class="object-cover rounded-lg w-9 h-9 border-2 border-gold/70 shadow-sm shrink-0"
                                         referrerpolicy="no-referrer">
                                 @else
-                                    <!-- Cadangan (Fallback) Inisial Huruf jika Daftar Manual -->
                                     <span
-                                        class="flex items-center justify-center text-xs font-bold uppercase rounded-full w-7 h-7 bg-gradient-to-br from-brand to-gold text-background">
+                                        class="flex items-center justify-center text-sm font-bold uppercase rounded-lg w-9 h-9 border-2 border-gold/70 bg-gradient-to-br from-brand to-gold text-background shrink-0">
                                         {{ Str::substr(Auth::user()->username, 0, 1) }}
                                     </span>
                                 @endif
 
-                                <span class="font-medium text-foreground">{{ Auth::user()->username }}</span>
+                                <span class="flex flex-col items-start font-mono">
+                                    <span class="text-sm font-bold text-foreground leading-tight">{{ Auth::user()->username }}</span>
+                                    <span class="text-xs text-muted leading-tight">lv. {{ Auth::user()->levelData()['level'] }}</span>
+                                </span>
                             @else
-                                <span class="font-medium text-foreground">Tamu</span>
+                                <span class="font-medium text-sm text-foreground px-1">Tamu</span>
                             @endauth
 
-                            <svg class="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                            <svg class="w-4 h-4 fill-current text-muted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd"
                                     d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
                                     clip-rule="evenodd" />
@@ -92,11 +102,27 @@
                     <x-slot name="content">
                         @auth
                             <x-dropdown-link :href="route('profile.edit')">{{ __('Profile') }}</x-dropdown-link>
+
+                            <span class="flex items-center justify-between w-full px-4 py-2 text-sm text-muted/50 cursor-not-allowed" title="Segera hadir">
+                                {{ __('User Stats') }}
+                                <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
+                            </span>
+                            <span class="flex items-center justify-between w-full px-4 py-2 text-sm text-muted/50 cursor-not-allowed" title="Segera hadir">
+                                {{ __('Friends List') }}
+                                <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
+                            </span>
+                            <span class="flex items-center justify-between w-full px-4 py-2 text-sm text-muted/50 cursor-not-allowed" title="Segera hadir">
+                                {{ __('Settings') }}
+                                <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
+                            </span>
+
+                            <div class="my-1 border-t border-white/5"></div>
+
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
                                 <x-dropdown-link :href="route('logout')"
                                     onclick="event.preventDefault(); this.closest('form').submit();">
-                                    {{ __('Log Out') }}
+                                    {{ __('Sign Out') }}
                                 </x-dropdown-link>
                             </form>
                         @else
@@ -128,24 +154,25 @@
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link href="{{ url('/typing') }}"
                 :active="request()->is('typing')">{{ __('Solo') }}</x-responsive-nav-link>
-            <span
-                class="flex items-center w-full gap-2 py-2 text-base font-medium cursor-not-allowed ps-3 pe-4 text-muted/50">
-                {{ __('Multiplayer') }}
-                <span
-                    class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
-            </span>
+            <x-responsive-nav-link href="{{ url('/multiplayer') }}"
+                :active="request()->is('multiplayer')">{{ __('Multiplayer') }}</x-responsive-nav-link>
             <span
                 class="flex items-center w-full gap-2 py-2 text-base font-medium cursor-not-allowed ps-3 pe-4 text-muted/50">
                 {{ __('Klan') }}
                 <span
                     class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
             </span>
+            <x-responsive-nav-link href="{{ url('/leaderboard') }}"
+                :active="request()->is('leaderboard')">{{ __('Leaderboard') }}</x-responsive-nav-link>
         </div>
 
         <div class="pt-4 pb-1 border-t border-white/5">
             @auth
                 <div class="px-4">
-                    <div class="text-base font-medium text-foreground">{{ Auth::user()->username }}</div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-base font-medium text-foreground">{{ Auth::user()->username }}</span>
+                        <span class="font-mono text-xs text-muted">lv. {{ Auth::user()->levelData()['level'] }}</span>
+                    </div>
                     <div class="text-sm font-medium text-muted">{{ Auth::user()->email }}</div>
                 </div>
                 <div class="mt-3 space-y-1">
@@ -154,7 +181,7 @@
                         @csrf
                         <x-responsive-nav-link :href="route('logout')"
                             onclick="event.preventDefault(); this.closest('form').submit();">
-                            {{ __('Log Out') }}
+                            {{ __('Sign Out') }}
                         </x-responsive-nav-link>
                     </form>
                 </div>

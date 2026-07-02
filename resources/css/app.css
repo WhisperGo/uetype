@@ -15,4 +15,8 @@
         --color-gold: 198 159 104;
         --color-danger: 184 27 44;
     }
+
+    [x-cloak] {
+        display: none !important;
+    }
 }

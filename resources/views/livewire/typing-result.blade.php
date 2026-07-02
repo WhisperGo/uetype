@@ -1,77 +1,124 @@
-<div class="text-muted font-mono selection:bg-brand selection:text-foreground outline-none flex py-12"
+<div class="text-muted font-mono selection:bg-brand selection:text-foreground outline-none py-12"
     x-data
     @keydown.window="if($event.key === 'Tab') { $event.preventDefault(); document.getElementById('restartButton').focus(); }">
-    <div class="max-w-5xl w-full px-4 m-auto">
+    <div class="max-w-6xl w-full px-4 mx-auto">
 
-        <!-- Header -->
-        <div class="flex items-center justify-center gap-3 mb-2">
-            <span class="font-sans text-xs uppercase tracking-[0.3em] text-muted">hasil</span>
-        </div>
-        <div class="flex items-center gap-3 mb-8 text-lg tracking-widest justify-center">
-            <span class="text-brand">{{ $mode }}</span>
-            <span class="text-muted">/</span>
-            <span class="text-brand">{{ $subMode }}</span>
-        </div>
+        @php
+            $isSurvival = $mode === 'survival';
+            $mins = intdiv((int) $time, 60);
+            $secs = (int) $time % 60;
+            $heroValue = $isSurvival ? sprintf('%d:%02d', $mins, $secs) : $wpm;
+            $heroLabel = $isSurvival ? 'survived' : 'wpm';
+        @endphp
 
-        <!-- SURVIVAL (model stamina): metrik utama = durasi bertahan terlama (leaderboard) -->
-        @if ($mode === 'survival')
-            <div
-                class="max-w-md mx-auto mb-6 bg-surface/70 border border-brand/30 rounded-2xl p-6 flex flex-col items-center shadow-glow">
-                <span class="font-sans text-xs uppercase tracking-[0.25em] text-muted mb-1">bertahan selama</span>
-                <span class="text-6xl text-brand font-bold leading-none">{{ round($time, 1) }}<span
-                        class="text-3xl text-muted">s</span></span>
-                <span class="font-sans text-[0.65rem] uppercase tracking-[0.15em] text-muted mt-2">survival
-                    · {{ $subMode }}</span>
-            </div>
-        @endif
+        <!-- 2 kolom: kiri stats & aksi, kanan chart -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
 
-        <!-- Main stat cards -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <!-- Net WPM = metrik utama (blueprint Scoring 2) -->
-            <div
-                class="col-span-2 md:col-span-1 bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center shadow-glow">
-                <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">wpm</span>
-                <span class="text-5xl md:text-6xl text-brand font-bold leading-none">{{ $wpm }}</span>
-                <span class="font-sans text-[0.65rem] uppercase tracking-[0.15em] text-muted mt-1">net</span>
-            </div>
-            <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
-                <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">accuracy</span>
-                <span class="text-5xl md:text-6xl text-gold font-bold leading-none">{{ $accuracy }}<span
-                        class="text-2xl">%</span></span>
-            </div>
-            <!-- Raw WPM = stat sampingan -->
-            <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
-                <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">raw wpm</span>
-                <span class="text-4xl text-foreground font-bold leading-none">{{ $rawWpm }}</span>
-            </div>
-            <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
-                <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">waktu</span>
-                <span class="text-4xl text-foreground font-bold leading-none">{{ round($time, 2) }}<span
-                        class="text-xl text-muted">s</span></span>
-            </div>
-        </div>
+            <!-- ===== KOLOM KIRI ===== -->
+            <div class="flex flex-col gap-6">
 
-        <!-- Secondary stat row: rincian karakter (benar / salah / total) -->
-        <div class="grid grid-cols-3 gap-3 mb-6">
-            <div class="bg-surface/40 border border-white/5 rounded-xl px-5 py-3 flex flex-col">
-                <span class="font-sans text-[0.65rem] uppercase tracking-[0.2em] text-muted mb-1">benar</span>
-                <span class="text-2xl text-foreground font-bold leading-none">{{ $correctKeystrokes }}</span>
-            </div>
-            <div class="bg-surface/40 border border-white/5 rounded-xl px-5 py-3 flex flex-col">
-                <span class="font-sans text-[0.65rem] uppercase tracking-[0.2em] text-muted mb-1">salah</span>
-                <span class="text-2xl text-danger font-bold leading-none">{{ $incorrectKeystrokes }}</span>
-            </div>
-            <div class="bg-surface/40 border border-white/5 rounded-xl px-5 py-3 flex flex-col">
-                <span class="font-sans text-[0.65rem] uppercase tracking-[0.2em] text-muted mb-1">total tuts</span>
-                <span class="text-2xl text-foreground font-bold leading-none">{{ $totalKeystrokes }}</span>
-            </div>
-        </div>
+                <!-- Hero -->
+                <div>
+                    <div class="flex items-end gap-3">
+                        <span class="font-display text-5xl md:text-6xl text-gold leading-none">{{ $heroValue }}</span>
+                        <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted pb-1">{{ $heroLabel }}</span>
+                    </div>
+                    @if ($isPersonalBest)
+                        <p class="mt-3 flex items-center gap-1.5 text-sm text-gold font-mono">
+                            <span>✦</span> new personal best
+                        </p>
+                    @endif
+                    <p class="mt-2 font-mono text-xs uppercase tracking-[0.2em] text-muted">
+                        {{ $mode }} · {{ $subMode }}
+                    </p>
+                </div>
 
-        <!-- Chart -->
-        <div class="mt-6 bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6">
-            <h3 class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-3">progres wpm</h3>
-            <div class="w-full h-56 md:h-64" wire:ignore>
-                <canvas id="wpmChart"></canvas>
+                <!-- Sub-stats 2x2 -->
+                <div class="grid grid-cols-2 gap-3">
+                    @if ($isSurvival)
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">avg wpm</span>
+                            <span class="text-3xl text-foreground font-bold font-mono leading-none">{{ $wpm }}</span>
+                        </div>
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">accuracy</span>
+                            <span class="text-3xl text-gold font-bold font-mono leading-none">{{ $accuracy }}<span class="text-xl">%</span></span>
+                        </div>
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">correct</span>
+                            <span class="text-3xl text-foreground font-bold font-mono leading-none">{{ $correctKeystrokes }}</span>
+                        </div>
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">difficulty</span>
+                            <span class="text-2xl text-foreground font-bold font-mono leading-none capitalize">{{ $subMode }}</span>
+                        </div>
+                    @else
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">raw wpm</span>
+                            <span class="text-3xl text-foreground font-bold font-mono leading-none">{{ $rawWpm }}</span>
+                        </div>
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">accuracy</span>
+                            <span class="text-3xl text-gold font-bold font-mono leading-none">{{ $accuracy }}<span class="text-xl">%</span></span>
+                        </div>
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">duration</span>
+                            <span class="text-3xl text-foreground font-bold font-mono leading-none">{{ round($time, 1) }}<span class="text-xl text-muted">s</span></span>
+                        </div>
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">correct</span>
+                            <span class="text-3xl text-foreground font-bold font-mono leading-none">{{ $correctKeystrokes }}</span>
+                        </div>
+                    @endif
+                </div>
+
+                <!-- XP + level bar -->
+                @auth
+                    @if ($levelData)
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5">
+                            <div class="flex items-baseline justify-between mb-2">
+                                <div class="flex flex-col">
+                                    <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">xp earned</span>
+                                    <span class="text-2xl font-bold font-mono text-brand leading-none mt-1">+{{ $xpEarned }} XP</span>
+                                </div>
+                                <div class="text-right font-mono text-xs text-muted">
+                                    <div>{{ number_format($levelData['progress']) }} / {{ number_format($levelData['needed']) }} XP</div>
+                                    <div class="mt-1">Level {{ $levelData['level'] }} → {{ $levelData['next_level'] }}</div>
+                                </div>
+                            </div>
+                            <div class="h-2 overflow-hidden rounded-full bg-white/5">
+                                <div class="h-full rounded-full bg-brand transition-all"
+                                    style="width: {{ $levelData['needed'] > 0 ? min(100, ($levelData['progress'] / $levelData['needed']) * 100) : 0 }}%"></div>
+                            </div>
+                        </div>
+                    @endif
+                @endauth
+
+                <!-- Tombol aksi -->
+                <div class="flex items-center gap-3">
+                    <a id="restartButton" href="/typing" wire:navigate
+                        class="flex items-center gap-2 px-6 py-3 rounded-xl bg-gold text-background font-sans font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-1 focus-visible:ring-border transition-all"
+                        title="{{ $isSurvival ? 'Main Lagi' : 'Tes Berikutnya' }}">
+                        <span>{{ $isSurvival ? 'play again' : 'next test' }}</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </a>
+                    @unless ($isSurvival)
+                        <a href="/typing" wire:navigate
+                            class="px-6 py-3 rounded-xl bg-surface border border-white/5 text-muted hover:text-foreground font-sans font-semibold text-sm focus:outline-none focus-visible:ring-1 focus-visible:ring-border transition">
+                            retry
+                        </a>
+                    @endunless
+                </div>
+            </div>
+
+            <!-- ===== KOLOM KANAN: chart ===== -->
+            <div class="bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6">
+                <h3 class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-3">{{ $isSurvival ? 'stamina' : 'performance' }}</h3>
+                <div class="w-full h-72 lg:h-96" wire:ignore>
+                    <canvas id="wpmChart"></canvas>
+                </div>
             </div>
         </div>
 
@@ -184,7 +231,7 @@
         @endphp
 
         <div
-            class="mt-6 bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6 flex flex-col items-center gap-2">
+            class="mt-8 bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6 flex flex-col items-center gap-2">
             <h3 class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-4 self-start">heatmap kesalahan
             </h3>
             <div class="flex flex-col gap-2 md:gap-3">
@@ -214,18 +261,6 @@
                     </div>
                 @endforeach
             </div>
-        </div>
-
-        <div class="mt-10 flex justify-center">
-            <a id="restartButton" href="/typing" wire:navigate
-                class="flex items-center gap-2 px-6 py-3 rounded-xl bg-brand text-foreground font-sans font-semibold text-sm hover:shadow-glow focus:scale-105 transition-all transform hover:scale-105 outline-none group"
-                title="Tes Berikutnya">
-                <span>tes berikutnya</span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
-                    stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-            </a>
         </div>
     </div>
 </div>
