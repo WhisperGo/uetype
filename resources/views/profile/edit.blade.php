@@ -38,7 +38,7 @@
                         <div class="flex flex-wrap items-center gap-3">
                             <h1 class="font-sans text-2xl font-bold text-foreground">{{ $user->username }}</h1>
                             @if($user->clan)
-                                <span class="px-2 py-0.5 rounded-md bg-brand/15 text-brand text-xs font-mono font-semibold">
+                                <span class="px-2 py-0.5 rounded-md bg-brand/15 text-brand-bright text-xs font-mono font-semibold">
                                     [{{ $user->clan->tag }}] {{ ucfirst($user->clan_role ?? 'member') }}
                                 </span>
                             @endif
@@ -70,17 +70,17 @@
             <div class="border-b border-white/10">
                 <nav class="flex gap-6 -mb-px" aria-label="Tabs">
                     <button @click="activeTab = 'stats'"
-                            :class="activeTab === 'stats' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-foreground'"
+                            :class="activeTab === 'stats' ? 'border-brand-bright text-brand-bright' : 'border-transparent text-muted hover:text-foreground'"
                             class="px-1 py-3 font-sans text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
                         Statistik
                     </button>
                     <button @click="activeTab = 'settings'"
-                            :class="activeTab === 'settings' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-foreground'"
+                            :class="activeTab === 'settings' ? 'border-brand-bright text-brand-bright' : 'border-transparent text-muted hover:text-foreground'"
                             class="px-1 py-3 font-sans text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
                         Pengaturan Akun
                     </button>
                     <button @click="activeTab = 'BestRecords'"
-                            :class="activeTab === 'BestRecords' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-foreground'"
+                            :class="activeTab === 'BestRecords' ? 'border-brand-bright text-brand-bright' : 'border-transparent text-muted hover:text-foreground'"
                             class="px-1 py-3 font-sans text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
                         Rekor Terbaik
                     </button>
@@ -93,7 +93,7 @@
                 <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     @php
                         $cards = [
-                            ['label' => 'WPM Tertinggi', 'value' => rtrim(rtrim(number_format($user->highest_wpm, 1), '0'), '.'), 'accent' => 'text-brand'],
+                            ['label' => 'WPM Tertinggi', 'value' => rtrim(rtrim(number_format($user->highest_wpm, 1), '0'), '.'), 'accent' => 'text-brand-bright'],
                             ['label' => 'Rata-rata WPM', 'value' => $stats['avg_wpm'], 'accent' => 'text-gold'],
                             ['label' => 'Rata-rata Akurasi', 'value' => $stats['avg_accuracy'].'%', 'accent' => 'text-gold'],
                             ['label' => 'Total Tes', 'value' => $stats['total_matches'], 'accent' => 'text-foreground'],
@@ -102,7 +102,7 @@
                     @foreach($cards as $card)
                         <div class="p-5 border bg-surface/60 border-white/5 rounded-2xl">
                             <p class="text-xs uppercase tracking-[0.15em] text-muted font-sans mb-1">{{ $card['label'] }}</p>
-                            <p class="text-3xl font-bold font-mono {{ $card['accent'] }}">{{ $card['value'] }}</p>
+                            <p class="text-3xl font-bold font-mono tabular-nums {{ $card['accent'] }}">{{ $card['value'] }}</p>
                         </div>
                     @endforeach
                 </div>
@@ -110,19 +110,19 @@
                 <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
                         <p class="text-xs uppercase tracking-[0.15em] text-muted font-sans mb-1">Total Waktu</p>
-                        <p class="font-mono text-2xl font-bold text-foreground">{{ $timeLabel }}</p>
+                        <p class="font-mono text-2xl font-bold text-foreground tabular-nums">{{ $timeLabel }}</p>
                     </div>
                     <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
                         <p class="text-xs uppercase tracking-[0.15em] text-muted font-sans mb-1">XP</p>
-                        <p class="font-mono text-2xl font-bold text-gold">{{ $user->total_xp ?? 0 }}</p>
+                        <p class="font-mono text-2xl font-bold text-gold tabular-nums">{{ $user->total_xp ?? 0 }}</p>
                     </div>
                     <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
                         <p class="text-xs uppercase tracking-[0.15em] text-muted font-sans mb-1">Koin</p>
-                        <p class="font-mono text-2xl font-bold text-gold">{{ $user->coins ?? 0 }}</p>
+                        <p class="font-mono text-2xl font-bold text-gold tabular-nums">{{ $user->coins ?? 0 }}</p>
                     </div>
                     <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
                         <p class="text-xs uppercase tracking-[0.15em] text-muted font-sans mb-1">Best WPM</p>
-                        <p class="font-mono text-2xl font-bold text-brand">{{ $stats['best_wpm'] }}</p>
+                        <p class="font-mono text-2xl font-bold text-brand-bright tabular-nums">{{ $stats['best_wpm'] }}</p>
                     </div>
                 </div>
 
@@ -157,15 +157,15 @@
                                         <td class="py-2.5 text-foreground capitalize">
                                             {{ $p->mode?->value ?? 'practice' }}
                                         </td>
-                                        <td class="py-2.5 text-right text-brand font-bold">{{ rtrim(rtrim(number_format($p->net_wpm, 1), '0'), '.') }}</td>
-                                        <td class="py-2.5 text-right text-foreground">{{ rtrim(rtrim(number_format($p->accuracy, 1), '0'), '.') }}%</td>
+                                        <td class="py-2.5 text-right text-brand-bright font-bold tabular-nums">{{ rtrim(rtrim(number_format($p->net_wpm, 1), '0'), '.') }}</td>
+                                        <td class="py-2.5 text-right text-foreground tabular-nums">{{ rtrim(rtrim(number_format($p->accuracy, 1), '0'), '.') }}%</td>
                                     </tr>
                                     @endforeach
                                 </tbody>
                             </table>
                         </div>
                     @else
-                        <p class="font-mono text-sm text-muted">Belum ada riwayat mengetik. <a href="{{ url('/typing') }}" class="text-brand hover:underline">Mulai tes pertamamu →</a></p>
+                        <p class="font-mono text-sm text-muted">Belum ada riwayat mengetik. <a href="{{ url('/typing') }}" class="text-brand-bright hover:underline">Mulai tes pertamamu →</a></p>
                     @endif
                 </div>
             </div>
@@ -217,9 +217,9 @@
                         @if($timeRecords->count() > 0)
                             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                 @foreach($timeRecords as $record)
-                                    <div class="p-4 border bg-surface/60 border-white/5 rounded-xl">
+                                    <div class="p-4 border bg-surface/60 border-white/5 rounded-2xl">
                                         <span class="text-[0.65rem] uppercase tracking-wider text-muted font-mono">{{ $record->mode_config }} Detik</span>
-                                        <p class="mt-1 font-mono text-xl font-bold text-brand">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
+                                        <p class="mt-1 font-mono text-xl font-bold text-brand-bright tabular-nums">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
                                     </div>
                                 @endforeach
                             </div>
@@ -248,9 +248,9 @@
                         @if($wordsRecords->count() > 0)
                             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                 @foreach($wordsRecords as $record)
-                                    <div class="p-4 border bg-surface/60 border-white/5 rounded-xl">
+                                    <div class="p-4 border bg-surface/60 border-white/5 rounded-2xl">
                                         <span class="text-[0.65rem] uppercase tracking-wider text-muted font-mono">{{ $record->mode_config }} Kata</span>
-                                        <p class="mt-1 font-mono text-xl font-bold text-gold">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
+                                        <p class="mt-1 font-mono text-xl font-bold text-gold tabular-nums">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
                                     </div>
                                 @endforeach
                             </div>
@@ -279,9 +279,9 @@
                         @if($survivalRecords->count() > 0)
                             <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                 @foreach($survivalRecords as $record)
-                                    <div class="p-4 border bg-surface/60 border-white/5 rounded-xl">
+                                    <div class="p-4 border bg-surface/60 border-white/5 rounded-2xl">
                                         <span class="text-[0.65rem] uppercase tracking-wider text-muted font-mono capitalize">{{ $record->mode_config }} Difficulty</span>
-                                        <p class="mt-1 font-mono text-xl font-bold text-gold">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
+                                        <p class="mt-1 font-mono text-xl font-bold text-gold tabular-nums">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
                                     </div>
                                 @endforeach
                             </div>
@@ -310,9 +310,9 @@
                     <div x-show="openMode === 'quote'" x-collapse class="px-5 pt-4 pb-5 border-t border-white/5 bg-background/20">
                         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
                             @foreach($quoteRecords as $record)
-                                <div class="p-4 border bg-surface/60 border-white/5 rounded-xl">
+                                <div class="p-4 border bg-surface/60 border-white/5 rounded-2xl">
                                     <span class="text-[0.65rem] uppercase tracking-wider text-muted font-mono capitalize">{{ $record->mode_config }}</span>
-                                    <p class="mt-1 font-mono text-xl font-bold text-brand">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
+                                    <p class="mt-1 font-mono text-xl font-bold text-brand-bright tabular-nums">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
                                 </div>
                             @endforeach
                         </div>

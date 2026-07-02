@@ -67,7 +67,7 @@ new class extends Component
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div class="bg-surface/40 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
             <span class="text-xs font-sans font-semibold text-muted uppercase tracking-[0.15em]">Total Tes</span>
-            <span class="text-3xl font-bold font-mono text-brand mt-2">{{ $totalMatches }}</span>
+            <span class="text-3xl font-bold font-mono text-brand-bright tabular-nums mt-2">{{ $totalMatches }}</span>
         </div>
         <div class="bg-surface/40 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
             <span class="text-xs font-sans font-semibold text-muted uppercase tracking-[0.15em]">Rata-rata WPM</span>
@@ -99,11 +99,11 @@ new class extends Component
                                 {{ $result->created_at->format('d M Y, H:i') }}
                             </td>
                             <td class="px-6 py-4">
-                                <span class="bg-brand/15 text-brand text-xs font-sans font-medium px-2.5 py-0.5 rounded capitalize">
+                                <span class="bg-brand/15 text-brand-bright text-xs font-sans font-medium px-2.5 py-0.5 rounded capitalize">
                                     {{ ucfirst($result->mode?->value ?? '-') }}{{ $result->mode_config ? ' '.$result->mode_config : '' }}
                                 </span>
                             </td>
-                            <td class="px-6 py-4 font-bold text-brand">
+                            <td class="px-6 py-4 font-bold text-brand-bright tabular-nums">
                                 {{ $result->net_wpm }}
                             </td>
                             <td class="px-6 py-4 text-muted">
