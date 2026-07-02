@@ -190,131 +190,42 @@
     <!-- 3. HALAMAN ARENA PERTANDINGAN: BATTLE STAGE (TYPERACER MECHANICS) -->
     <!-- ===================================================================== -->
     @if ($this->step === 'racing' && $this->roomData && !$showResultModal)
-        <div class="space-y-8" wire:poll.1s="checkSuddenDeath" x-data="{
-            countdown: 3,
-            raceStarted: false,
-            textToType: '{{ $this->roomData->text_to_type }}',
-            words: [],
-            currentWordIndex: 0,
-            typedText: '',
-            startTime: null,
-            isFinished: false,
-            hasError: false,
-            correctCharsFromPastWords: 0,
-            totalKeystrokes: 0,
-            totalMistakes: 0,
-            prevTypedLength: 0,
-        
-            init() {
-                this.words = this.textToType.split(' ');
-                let timer = setInterval(() => {
-                    if (this.countdown > 1) {
-                        this.countdown--;
-                    } else {
-                        this.countdown = 'GO!';
-                        clearInterval(timer);
-                        setTimeout(() => {
-                            this.raceStarted = true;
-                            this.startTime = new Date().getTime();
-                            $nextTick(() => { $refs.typeInput.focus(); });
-                        }, 800);
-                    }
-                }, 1000);
-            },
-            checkInput() {
-                if (this.isFinished || !this.raceStarted) return;
-        
-                let targetWord = this.words[this.currentWordIndex];
-        
-                // Cek live typo/kesalahan ketik di kata aktif
-                if (this.typedText.length > 0) {
-                    this.hasError = !targetWord.startsWith(this.typedText);
-                } else {
-                    this.hasError = false;
-                }
-        
-                // Catat setiap karakter baru yang diketik untuk hitung akurasi
-                if (this.typedText.length > this.prevTypedLength) {
-                    this.totalKeystrokes++;
-                    if (this.hasError) {
-                        this.totalMistakes++;
-                    }
-                }
-                this.prevTypedLength = this.typedText.length;
-        
-                // Kalkulasi hitungan karakter benar live
-                let correctInCurrent = 0;
-                if (!this.hasError) {
-                    correctInCurrent = this.typedText.length;
-                } else {
-                    for (let i = 0; i < this.typedText.length; i++) {
-                        if (this.typedText[i] === targetWord[i]) {
-                            correctInCurrent++;
-                        } else {
-                            break;
-                        }
-                    }
-                }
-        
-                let totalCorrectChars = this.correctCharsFromPastWords + correctInCurrent;
-                let progressPercent = Math.floor((totalCorrectChars / this.textToType.length) * 100);
-        
-                // SPESIAL KATA TERAKHIR: Selesai otomatis saat huruf terakhir diketik akurat (tanpa butuh spasi)
-                let accuracyPercent = this.totalKeystrokes > 0 ?
-                    Math.round(((this.totalKeystrokes - this.totalMistakes) / this.totalKeystrokes) * 100) :
-                    100;
-        
-                if (this.currentWordIndex === this.words.length - 1 && this.typedText === targetWord) {
-                    this.isFinished = true;
-                    progressPercent = 100;
-                    let timePassedMinutes = (new Date().getTime() - this.startTime) / 60000;
-                    let liveWpm = timePassedMinutes > 0 ? Math.floor((totalCorrectChars / 5) / timePassedMinutes) : 0;
-                    $wire.updateRaceProgress(100, liveWpm, accuracyPercent);
-                    return;
-                }
-        
-                let timePassedMinutes = (new Date().getTime() - this.startTime) / 60000;
-                let liveWpm = timePassedMinutes > 0 ? Math.floor((totalCorrectChars / 5) / timePassedMinutes) : 0;
-        
-                $wire.updateRaceProgress(progressPercent, liveWpm, accuracyPercent);
-            },
-            handleSpace(e) {
-                if (this.isFinished || !this.raceStarted) return;
-        
-                let targetWord = this.words[this.currentWordIndex];
-        
-                // Lock on Error: Hanya izinkan pindah kata jika ketikan COCOK PERSIS dengan target kata
-                if (this.typedText === targetWord) {
-                    e.preventDefault(); // Cegah karakter spasi masuk ke kotak input baru
-                    this.correctCharsFromPastWords += targetWord.length + 1; // Ditambah 1 untuk spasi
-                    this.currentWordIndex++;
-                    this.typedText = '';
-                    this.hasError = false;
-                    this.prevTypedLength = 0;
-                    this.checkInput();
-                } else {
-                    e.preventDefault(); // Mengunci spasi apabila masih ada typo atau huruf kurang
-                }
-            }
-        }">
+        {{-- wire:key stabil: memberi tahu Livewire agar mempertahankan elemen
+             (beserta seluruh state Alpine di x-data) lintas re-render/poll.
+             Tanpa ini, morph bisa mengganti node -> x-data ter-reinisialisasi
+             -> raceStarted & countdown balik ke awal (overlay 3 detik nongol
+             lagi) sekaligus progress pengetikan hilang. --}}
+        {{-- Seluruh logika Alpine dipindah ke komponen terdaftar 'raceArena'
+             (lihat @script di bawah). Menaruh blok JS besar langsung di atribut
+             x-data rawan: komentar //, em-dash, dan karakter { } bisa merusak
+             parsing atribut HTML sehingga kode-nya bocor tampil sebagai teks di
+             halaman. Di sini x-data hanya memanggil fungsi + mengoper data server
+             lewat @js() yang sudah aman ter-escape. --}}
+        <div wire:key="race-arena-{{ $this->roomCode }}" class="space-y-8" wire:poll.1s="checkSuddenDeath"
+            x-data="raceArena({
+                textToType: @js($this->roomData->text_to_type),
+                suddenDeathActive: @js($this->suddenDeathActive),
+                suddenDeathRemaining: @js($this->suddenDeathRemaining),
+            })">
 
             <!-- BANNER SUDDEN DEATH TIMER -->
-            @if ($this->roomData->countdown_started_at)
-                @php
-                    $sisaWaktu = 15 - now()->diffInSeconds($this->roomData->countdown_started_at);
-                    $sisaWaktu = max(0, $sisaWaktu);
-                @endphp
+            @if ($this->suddenDeathActive)
                 <div
+                    x-init="syncSuddenDeath(@js($this->suddenDeathRemaining))"
                     class="p-3 bg-amber-950/40 border border-amber-700/50 rounded-2xl text-center animate-pulse flex items-center justify-center gap-2">
                     <span class="text-amber-400 font-mono text-sm uppercase tracking-wider font-bold">Sudden Death
                         Activated! Room Closes In:</span>
                     <span
-                        class="text-xl font-mono font-black text-white bg-amber-600 px-3 py-0.5 rounded-lg">{{ $sisaWaktu }}s</span>
+                        class="text-xl font-mono font-black text-white bg-amber-600 px-3 py-0.5 rounded-lg"
+                        x-text="suddenDeathRemaining + 's'"></span>
                 </div>
             @endif
 
             <!-- OVERLAY COUNTDOWN SCREEN -->
-            <template x-if="!raceStarted">
+            <!-- Hanya untuk permulaan race. Ditambah guard !suddenDeathActive
+                 supaya overlay ini tidak pernah nongol lagi ketika hitung mundur
+                 15 detik (sudden death) sedang berlangsung di tengah game. -->
+            <template x-if="!raceStarted && !suddenDeathActive">
                 <div class="fixed inset-0 bg-typing-bg/95 flex flex-col items-center justify-center z-50 select-none">
                     <span class="font-mono text-xs uppercase tracking-[0.4em] text-typing-muted mb-4">The Race is
                         Starting</span>
@@ -394,9 +305,9 @@
                 <!-- FIELD INPUT KATA TUNGGAL DENGAN HIGHLIGHT ERROR DYNAMIC -->
                 <div class="relative">
                     <input type="text" x-ref="typeInput" x-model="typedText" @input="checkInput()"
-                        @keydown.space="handleSpace($event)" :disabled="!raceStarted || isFinished"
-                        :placeholder="isFinished ? 'You finished the race!' : (raceStarted ? 'Type the current word here...' :
-                            'Wait for countdown...')"
+                        @keydown.space="handleSpace($event)" :disabled="!raceStarted || isFinished || lockedByTimeout"
+                        :placeholder="lockedByTimeout ? 'Times up! Race locked.' : (isFinished ? 'You finished the race!' : (raceStarted ? 'Type the current word here...' :
+                            'Wait for countdown...'))"
                         :class="{
                             'border-red-500/60 focus:ring-red-500 focus:border-red-500 bg-red-950/10 text-red-200': hasError,
                             'focus:ring-1 focus:ring-[#cbb38a] focus:border-[#cbb38a] border-white/10 text-white': !
@@ -610,6 +521,204 @@
         </div>
     @endif
 
+    {{-- @assets (BUKAN @script): definisi komponen Alpine diletakkan di sini.
+         @script membungkus isi <script> menjadi nilai atribut wire:effects pada
+         elemen pembungkus; kode yang mengandung banyak karakter '<' dan '>'
+         (mis. `a <= b`, `wIdx < currentWordIndex`) merusak parsing atribut/DOM
+         Livewire -> DOMDocument gagal -> <body> null -> "Attempt to read
+         property childNodes on null". @assets menyuntik script apa adanya ke
+         <head> sekali saja (sebelum Alpine init), jadi aman untuk kode besar. --}}
+    @assets
+        <script>
+            // === KOMPONEN ALPINE: raceArena ===
+            // Semua logika typing + sudden death ada di sini (bukan di atribut
+            // x-data) supaya tidak ada JS yang bocor ke HTML.
+            //
+            // Pendaftaran tahan dua kondisi timing: (1) skrip jalan SEBELUM
+            // Alpine init -> daftar via event 'alpine:init'; (2) skrip jalan
+            // SETELAH Alpine sudah booting -> window.Alpine sudah ada, daftar
+            // langsung. registerRaceArena() idempoten via flag global.
+            const registerRaceArena = (Alpine) => {
+                if (window.__raceArenaRegistered) return;
+                window.__raceArenaRegistered = true;
+                Alpine.data('raceArena', (config = {}) => ({
+                    countdown: 3,
+                    raceStarted: false,
+                    textToType: config.textToType || '',
+                    words: [],
+                    currentWordIndex: 0,
+                    typedText: '',
+                    startTime: null,
+                    isFinished: false,
+                    hasError: false,
+                    correctCharsFromPastWords: 0,
+                    totalKeystrokes: 0,
+                    totalMistakes: 0,
+                    prevTypedLength: 0,
+
+                    // Sudden death (client-side authoritative timer). Server tetap
+                    // sumber kebenaran final via checkSuddenDeath(), tapi input
+                    // dikunci di klien tepat saat hitung mundur menyentuh 0.
+                    suddenDeathActive: !!config.suddenDeathActive,
+                    suddenDeathRemaining: config.suddenDeathRemaining ?? 15,
+                    lockedByTimeout: false,
+                    _sdInterval: null,
+
+                    init() {
+                        this.words = this.textToType.split(' ');
+
+                        // Kalau sudden death SUDAH aktif saat komponen ini
+                        // (re)inisialisasi, race sudah lama berjalan -> overlay
+                        // countdown 3 detik tidak boleh muncul lagi. Langsung
+                        // anggap race berjalan.
+                        if (this.suddenDeathActive) {
+                            this.raceStarted = true;
+                            this.countdown = 'GO!';
+                            this.startTime = Date.now();
+                            this.startSuddenDeathClock();
+                            this.$nextTick(() => {
+                                if (this.$refs.typeInput) this.$refs.typeInput.focus();
+                            });
+                        } else {
+                            // Alur normal: overlay hitung mundur 3 detik.
+                            let timer = setInterval(() => {
+                                if (this.countdown > 1) {
+                                    this.countdown--;
+                                } else {
+                                    this.countdown = 'GO!';
+                                    clearInterval(timer);
+                                    setTimeout(() => {
+                                        this.raceStarted = true;
+                                        this.startTime = Date.now();
+                                        this.$nextTick(() => {
+                                            if (this.$refs.typeInput) this.$refs.typeInput.focus();
+                                        });
+                                    }, 800);
+                                }
+                            }, 1000);
+                        }
+
+                        // Sinyal server saat room resmi ditutup paksa -> kunci total.
+                        this.$wire.on('force-finish', () => this.lockRace());
+                    },
+
+                    // Dipanggil dari x-init banner sudden death untuk menyinkronkan
+                    // sisa waktu dari server dan memastikan clock lokal berjalan.
+                    syncSuddenDeath(remainingFromServer) {
+                        this.suddenDeathActive = true;
+                        this.suddenDeathRemaining = remainingFromServer;
+                        this.startSuddenDeathClock();
+                        if (this.suddenDeathRemaining <= 0) this.lockRace();
+                    },
+
+                    startSuddenDeathClock() {
+                        if (this._sdInterval) return; // sudah berjalan
+                        this._sdInterval = setInterval(() => {
+                            this.suddenDeathRemaining--;
+                            if (this.suddenDeathRemaining <= 0) {
+                                this.suddenDeathRemaining = 0;
+                                this.lockRace();
+                            }
+                        }, 1000);
+                    },
+
+                    // Kunci paksa: hentikan input & pengiriman progress. Idempoten.
+                    lockRace() {
+                        if (this.lockedByTimeout) return;
+                        this.lockedByTimeout = true;
+                        this.isFinished = true;
+                        if (this._sdInterval) {
+                            clearInterval(this._sdInterval);
+                            this._sdInterval = null;
+                        }
+                        if (this.$refs.typeInput) this.$refs.typeInput.blur();
+                    },
+
+                    checkInput() {
+                        if (this.lockedByTimeout || this.isFinished || !this.raceStarted) return;
+
+                        let targetWord = this.words[this.currentWordIndex];
+
+                        if (this.typedText.length > 0) {
+                            this.hasError = !targetWord.startsWith(this.typedText);
+                        } else {
+                            this.hasError = false;
+                        }
+
+                        if (this.typedText.length > this.prevTypedLength) {
+                            this.totalKeystrokes++;
+                            if (this.hasError) this.totalMistakes++;
+                        }
+                        this.prevTypedLength = this.typedText.length;
+
+                        let correctInCurrent = 0;
+                        if (!this.hasError) {
+                            correctInCurrent = this.typedText.length;
+                        } else {
+                            for (let i = 0; i < this.typedText.length; i++) {
+                                if (this.typedText[i] === targetWord[i]) {
+                                    correctInCurrent++;
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+
+                        let totalCorrectChars = this.correctCharsFromPastWords + correctInCurrent;
+                        let progressPercent = Math.floor((totalCorrectChars / this.textToType.length) * 100);
+
+                        let accuracyPercent = this.totalKeystrokes > 0 ?
+                            Math.round(((this.totalKeystrokes - this.totalMistakes) / this.totalKeystrokes) * 100) :
+                            100;
+
+                        // Kata terakhir: selesai otomatis saat huruf terakhir benar.
+                        if (this.currentWordIndex === this.words.length - 1 && this.typedText === targetWord) {
+                            this.isFinished = true;
+                            progressPercent = 100;
+                            let timePassedMinutes = (Date.now() - this.startTime) / 60000;
+                            let liveWpm = timePassedMinutes > 0 ? Math.floor((totalCorrectChars / 5) / timePassedMinutes) : 0;
+                            this.$wire.updateRaceProgress(100, liveWpm, accuracyPercent);
+                            return;
+                        }
+
+                        let timePassedMinutes = (Date.now() - this.startTime) / 60000;
+                        let liveWpm = timePassedMinutes > 0 ? Math.floor((totalCorrectChars / 5) / timePassedMinutes) : 0;
+
+                        this.$wire.updateRaceProgress(progressPercent, liveWpm, accuracyPercent);
+                    },
+
+                    handleSpace(e) {
+                        if (this.lockedByTimeout || this.isFinished || !this.raceStarted) return;
+
+                        let targetWord = this.words[this.currentWordIndex];
+
+                        // Lock on error: hanya pindah kata jika cocok persis.
+                        if (this.typedText === targetWord) {
+                            e.preventDefault();
+                            this.correctCharsFromPastWords += targetWord.length + 1;
+                            this.currentWordIndex++;
+                            this.typedText = '';
+                            this.hasError = false;
+                            this.prevTypedLength = 0;
+                            this.checkInput();
+                        } else {
+                            e.preventDefault();
+                        }
+                    },
+                }));
+            };
+
+            // Kondisi 1: Alpine sudah tersedia (skrip jalan setelah Alpine boot).
+            if (window.Alpine) {
+                registerRaceArena(window.Alpine);
+            }
+            // Kondisi 2: Alpine belum init -> daftar saat event alpine:init.
+            document.addEventListener('alpine:init', () => registerRaceArena(window.Alpine));
+        </script>
+    @endassets
+
+    {{-- Kode Echo/broadcast tetap di @script (butuh Livewire.on). Aman di sini
+         karena tidak mengandung karakter '<'/'>' yang bisa merusak parsing. --}}
     @script
         <script>
             let currentChannel = null;

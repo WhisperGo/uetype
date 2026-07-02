@@ -23,7 +23,14 @@ class MultiplayerLobby extends Component
 
     public bool $showResultModal = false;
 
-public function createRoom(): void
+    // Durasi sudden death dalam detik. Diekstrak jadi konstanta supaya
+    // checkSuddenDeath() dan getSuddenDeathRemainingProperty() selalu
+    // pakai angka yang sama persis (sebelumnya '15' ditulis manual di
+    // checkSuddenDeath() saja, sehingga view harus menebak/re-implement
+    // sendiri arah hitungannya — ini sumber bug "maju" tadi).
+    private const SUDDEN_DEATH_SECONDS = 15;
+
+    public function createRoom(): void
     {
         $user = Auth::user();
 
@@ -31,42 +38,12 @@ public function createRoom(): void
 
         $code = strtoupper(Str::random(6));
 
-        // 🎲 ARSITEKTUR REUSE: Merakit kalimat acak dari Wordlist JSON (Mengikuti Jalur Solo Mode)
-        $textToType = "And i know we were perfect but i never felt this way for no one and i just can't imagine how you could be so okay now that I gone guess you did mean what you wrote in that song about me cause you said forever now i drive alone past";
-        
-        $path = base_path('database/data/indonesian.json');
-
-        if (\Illuminate\Support\Facades\File::exists($path)) {
-            $jsonString = \Illuminate\Support\Facades\File::get($path);
-            $data = json_decode($jsonString, true);
-
-            if (is_array($data) && isset($data['words']) && is_array($data['words'])) {
-                $wordsArray = $data['words'];
-                
-                // Acak seluruh isi wordlist
-                shuffle($wordsArray);
-
-                // Ambil batas aman kata untuk balapan bersama (misal: 45 hingga 50 kata)
-                $limit = 45;
-                $selectedWords = [];
-                
-                while (count($selectedWords) < $limit) {
-                    shuffle($wordsArray);
-                    $needed = $limit - count($selectedWords);
-                    $selectedWords = array_merge($selectedWords, array_slice($wordsArray, 0, $needed));
-                }
-
-                // Gabungkan kumpulan kata acak menjadi satu paragraf balapan utuh
-                $textToType = implode(' ', $selectedWords);
-            }
-        }
-
         // Kunci kalimat acak yang sama ini ke dalam database ruangan
         $room = Room::create([
             'code' => $code,
             'host_id' => $user->id,
             'status' => 'waiting',
-            'text_to_type' => $textToType,
+            'text_to_type' => $this->generateRaceText(),
         ]);
 
         RoomMember::create([
@@ -83,6 +60,46 @@ public function createRoom(): void
         $this->step = 'waiting';
 
         $this->dispatch('subscribe-room', room: $code);
+    }
+
+    /**
+     * 🎲 ARSITEKTUR REUSE: Merakit kalimat acak dari Wordlist JSON (mengikuti
+     * jalur Solo Mode). Diekstrak dari createRoom() supaya bisa dipakai ulang
+     * di playAgain() — sebelumnya playAgain() tidak generate teks baru sama
+     * sekali, jadi teks race ke-2 dst selalu identik dengan race pertama.
+     */
+    private function generateRaceText(): string
+    {
+        $textToType = "And i know we were perfect but i never felt this way for no one and i just can't imagine how you could be so okay now that I gone guess you did mean what you wrote in that song about me cause you said forever now i drive alone past";
+
+        $path = base_path('database/data/indonesian.json');
+
+        if (\Illuminate\Support\Facades\File::exists($path)) {
+            $jsonString = \Illuminate\Support\Facades\File::get($path);
+            $data = json_decode($jsonString, true);
+
+            if (is_array($data) && isset($data['words']) && is_array($data['words'])) {
+                $wordsArray = $data['words'];
+
+                // Acak seluruh isi wordlist
+                shuffle($wordsArray);
+
+                // Ambil batas aman kata untuk balapan bersama (misal: 45 hingga 50 kata)
+                $limit = 45;
+                $selectedWords = [];
+
+                while (count($selectedWords) < $limit) {
+                    shuffle($wordsArray);
+                    $needed = $limit - count($selectedWords);
+                    $selectedWords = array_merge($selectedWords, array_slice($wordsArray, 0, $needed));
+                }
+
+                // Gabungkan kumpulan kata acak menjadi satu paragraf balapan utuh
+                $textToType = implode(' ', $selectedWords);
+            }
+        }
+
+        return $textToType;
     }
 
     public function joinRoom(): void
@@ -124,7 +141,7 @@ public function createRoom(): void
 
         broadcast(new RoomUpdated($code))->toOthers();
     }
-    
+
     #[On('room-updated')]
     public function roomUpdated()
     {
@@ -228,7 +245,7 @@ public function createRoom(): void
                 $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
                     ->whereNotNull('finished_time_seconds')
                     ->count();
-                
+
                 $updateData['place'] = $alreadyFinishedCount + 1;
 
                 if ($alreadyFinishedCount === 0 && !$room->countdown_started_at) {
@@ -252,13 +269,16 @@ public function createRoom(): void
         $room = Room::where('code', $this->roomCode)->first();
         if (!$room || !$room->countdown_started_at) return;
 
-        // Hitung sisa waktu sudden death
+        // Hitung detik yang SUDAH berlalu sejak sudden death dimulai (maju, 0 → 15).
+        // Ini dipakai HANYA sebagai syarat auto-finish — bukan untuk ditampilkan
+        // langsung ke player. Untuk tampilan mundur (15 → 0), pakai
+        // getSuddenDeathRemainingProperty() di bawah.
         $secondsPassed = now()->diffInSeconds($room->countdown_started_at, true);
-        
-        // Jika sudah melewati 15 detik, paksa kunci game menjadi 'finished'
-        if ($secondsPassed >= 15) {
+
+        // Jika sudah melewati batas waktu, paksa kunci game menjadi 'finished'
+        if ($secondsPassed >= self::SUDDEN_DEATH_SECONDS) {
             $room->update(['status' => 'finished']);
-            
+
             // Berikan peringkat default ke pemain yang belum selesai berdasarkan progress tertinggi
             RoomMember::where('room_id', $room->id)
                 ->whereNull('finished_time_seconds')
@@ -268,6 +288,15 @@ public function createRoom(): void
 
             $this->finalizeRace($room->id);
             $this->showResultModal = true;
+
+            // Lapisan kedua: perintahkan Alpine di klien ini untuk mengunci
+            // input SEKARANG JUGA. Timer lokal Alpine sudah menangani kasus
+            // normal, tapi tab yang di-background bisa membuat setInterval
+            // ter-throttle sehingga hitung mundur lokal telat. Poll 1 detik
+            // ini adalah jaring pengaman yang menjamin input tetap terkunci
+            // begitu server resmi menutup room.
+            $this->dispatch('force-finish');
+
             broadcast(new RoomUpdated($this->roomCode))->toOthers();
         }
     }
@@ -276,19 +305,34 @@ public function createRoom(): void
     {
         $room = Room::where('code', $this->roomCode)->first();
         if ($room && $room->host_id === Auth::id()) {
-            $room->update(['status' => 'waiting']);
+            $room->update([
+                'status' => 'waiting',
+                // FIX bug 1: countdown_started_at WAJIB direset ke null di sini.
+                // Sebelumnya kolom ini tidak disentuh, jadi timestamp sudden death
+                // dari race sebelumnya masih nyangkut. Begitu race baru dimulai dan
+                // status kembali 'racing', checkSuddenDeath() langsung melihat
+                // elapsed time yang sudah jauh lebih dari 15 detik (dihitung dari
+                // race lama) -> auto-finish dalam ~1 detik -> leaderboard "langsung"
+                // muncul lagi.
+                'countdown_started_at' => null,
+                // FIX bug 2: generate teks balapan baru, sama seperti createRoom().
+                // Sebelumnya text_to_type tidak pernah diperbarui di sini, jadi
+                // race ke-2 dst memakai teks yang identik dengan race pertama.
+                'text_to_type' => $this->generateRaceText(),
+            ]);
             RoomMember::where('room_id', $room->id)->update([
                 'is_ready' => false,
                 'progress_percent' => 0,
                 'wpm' => 0,
                 'accuracy' => 100,
-                'finished_time_seconds' => null
+                'finished_time_seconds' => null,
+                'place' => null,
             ]);
-            
+
             $this->step = 'waiting';
             $this->showResultModal = false;
             $this->typedText = '';
-            
+
             broadcast(new RoomUpdated($this->roomCode))->toOthers();
         }
     }
@@ -323,7 +367,7 @@ public function createRoom(): void
             ->orderByRaw('finished_time_seconds IS NULL, finished_time_seconds ASC')
             ->get();
     }
-    
+
 
     public function getRoomDataForViewProperty(): ?Room
     {
@@ -350,6 +394,37 @@ public function createRoom(): void
         return $participants->count() > 0 && $participants->where('is_ready', false)->count() === 0;
     }
 
+    /**
+     * True kalau sudden death sedang aktif (sudah ada minimal satu player
+     * finish, room masih racing). Dipakai di view untuk memunculkan/
+     * menyembunyikan badge countdown.
+     */
+    public function getSuddenDeathActiveProperty(): bool
+    {
+        $room = $this->roomData;
+
+        return (bool) ($room && $room->status === 'racing' && $room->countdown_started_at);
+    }
+
+    /**
+     * Sisa waktu sudden death dalam DETIK MUNDUR (15 → 0), bukan elapsed.
+     * Inilah angka yang seharusnya dipakai di view/badge countdown untuk
+     * player yang belum selesai — ganti tampilan yang sebelumnya hitung
+     * maju dengan properti ini.
+     */
+    public function getSuddenDeathRemainingProperty(): int
+    {
+        $room = $this->roomData;
+
+        if (! $room || ! $room->countdown_started_at) {
+            return self::SUDDEN_DEATH_SECONDS;
+        }
+
+        $elapsed = now()->diffInSeconds($room->countdown_started_at, true);
+
+        return max(0, self::SUDDEN_DEATH_SECONDS - (int) floor($elapsed));
+    }
+
     public function render()
     {
         return view('livewire.multiplayer-lobby')->layout('layouts.app');
@@ -373,6 +448,12 @@ public function createRoom(): void
 
         $room->update([
             'status' => 'racing',
+            // Jaga-jaga tambahan (defense in depth): pastikan sudden death
+            // timer selalu bersih setiap kali race BARU dimulai, apa pun
+            // penyebabnya. playAgain() sudah reset ini duluan, tapi kalau
+            // suatu saat ada jalur lain yang memanggil startRace() tanpa
+            // lewat playAgain(), race tetap tidak akan kebawa timer basi.
+            'countdown_started_at' => null,
         ]);
 
         $this->step = 'racing';
