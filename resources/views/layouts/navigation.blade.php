@@ -5,8 +5,8 @@
                 <!-- Logo / Wordmark -->
                 <div class="flex items-center shrink-0">
                     <a href="{{ route('home') }}" class="flex items-center gap-3 group">
-                        <x-application-logo class="block w-auto h-10 transition-transform group-hover:scale-110" />
-                        <span class="font-display text-base text-brand leading-none pt-1">UETYPE</span>
+                        <x-application-logo class="block w-auto h-12 transition-transform group-hover:scale-110" />
+                        <span class="font-display text-lg text-gold leading-none pt-1">UETYPE</span>
                     </a>
                 </div>
 
@@ -25,9 +25,6 @@
                         <span
                             class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
                     </span>
-                    <x-nav-link href="{{ url('/leaderboard') }}" :active="request()->is('leaderboard')">
-                        {{ __('Leaderboard') }}
-                    </x-nav-link>
                 </div>
             </div>
 
@@ -37,8 +34,8 @@
                     <!-- Quick stats pill -->
                     <div
                         class="flex items-center gap-3 px-3 py-1.5 rounded-full bg-surface border border-white/5 text-xs font-mono">
-                        <span class="flex items-center gap-1 text-brand" title="Highest WPM">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        <span class="flex items-center gap-1 text-foreground" title="Highest WPM">
+                            <svg class="w-3.5 h-3.5 text-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                 stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
@@ -56,7 +53,7 @@
 
                     <!-- Trophy shortcut -> Leaderboard -->
                     <a href="{{ route('leaderboard') }}" title="{{ __('Leaderboard') }}"
-                        class="p-2 rounded-lg text-muted hover:text-gold hover:bg-surface focus:outline-none focus-visible:ring-1 focus-visible:ring-border transition">
+                        class="p-2 rounded-lg border {{ request()->is('leaderboard') ? 'text-gold border-gold/40 bg-gold/10' : 'text-muted border-transparent hover:text-gold hover:border-gold/30 hover:bg-surface' }} focus:outline-none focus-visible:ring-1 focus-visible:ring-gold/40 transition">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M8 21h8m-4-4v4m6.5-17H21v2a4 4 0 01-4 4m-11-6H3v2a4 4 0 004 4m1-9h8v5a5 5 0 01-10 0V3z" />
@@ -168,8 +165,15 @@
                 <span
                     class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
             </span>
-            <x-responsive-nav-link href="{{ url('/leaderboard') }}"
-                :active="request()->is('leaderboard')">{{ __('Leaderboard') }}</x-responsive-nav-link>
+            <x-responsive-nav-link href="{{ url('/leaderboard') }}" :active="request()->is('leaderboard')">
+                <span class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M8 21h8m-4-4v4m6.5-17H21v2a4 4 0 01-4 4m-11-6H3v2a4 4 0 004 4m1-9h8v5a5 5 0 01-10 0V3z" />
+                    </svg>
+                    {{ __('Leaderboard') }}
+                </span>
+            </x-responsive-nav-link>
         </div>
 
         <div class="pt-4 pb-1 border-t border-white/5">

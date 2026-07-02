@@ -42,6 +42,7 @@ export default {
                 muted: token('--color-muted'),
                 border: token('--color-border'),
                 brand: token('--color-brand'),
+                'brand-bright': token('--color-brand-bright'),
                 gold: token('--color-gold'),
                 danger: token('--color-danger'),
 
