@@ -4,8 +4,8 @@
             <div class="flex">
                 <!-- Logo / Wordmark -->
                 <div class="flex items-center shrink-0">
-                    <a href="{{ route('home') }}" class="flex items-center gap-3 group">
-                        <x-application-logo class="block w-auto h-12 transition-transform group-hover:scale-110" />
+                    <a href="{{ route('home') }}" class="flex items-center gap-3">
+                        <x-application-logo class="block w-auto h-12" />
                         <span class="font-display text-lg text-gold leading-none pt-1">UETYPE</span>
                     </a>
                 </div>
