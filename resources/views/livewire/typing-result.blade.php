@@ -1,4 +1,4 @@
-<div class="text-muted font-mono selection:bg-brand selection:text-foreground outline-none py-12"
+<div class="text-muted font-mono selection:bg-brand selection:text-foreground outline-none py-16"
     x-data
     @keydown.window="if($event.key === 'Tab') { $event.preventDefault(); document.getElementById('restartButton').focus(); }">
     <div class="max-w-6xl w-full px-4 mx-auto">
@@ -9,6 +9,19 @@
             $secs = (int) $time % 60;
             $heroValue = $isSurvival ? sprintf('%d:%02d', $mins, $secs) : $wpm;
             $heroLabel = $isSurvival ? 'survived' : 'wpm';
+
+            $modeLabel = match ($mode) {
+                'time' => 'Time · ' . $subMode . 's',
+                'words' => 'Words · ' . $subMode,
+                'quote' => 'Quote',
+                'survival' => 'Survival · ' . ucfirst($subMode),
+                default => ucfirst($mode) . ' · ' . $subMode,
+            };
+
+            $recordDelta = null;
+            if (!$isSurvival && !$isPersonalBest && $previousBest > 0) {
+                $recordDelta = round($wpm - $previousBest, 1);
+            }
         @endphp
 
         <!-- 2 kolom: kiri stats & aksi, kanan chart -->
@@ -19,55 +32,73 @@
 
                 <!-- Hero -->
                 <div>
+                    <p class="font-mono text-xs uppercase tracking-[0.2em] text-muted mb-2">{{ $modeLabel }}</p>
                     <div class="flex items-end gap-3">
-                        <span class="font-display text-5xl md:text-6xl text-gold leading-none">{{ $heroValue }}</span>
-                        <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted pb-1">{{ $heroLabel }}</span>
+                        <span class="font-display text-6xl md:text-7xl text-gold leading-none tabular-nums">{{ $heroValue }}</span>
+                        <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted pb-1.5">{{ $heroLabel }}</span>
                     </div>
                     @if ($isPersonalBest)
                         <p class="mt-3 flex items-center gap-1.5 text-sm text-gold font-mono">
                             <span>✦</span> new personal best
                         </p>
+                    @elseif (!is_null($recordDelta))
+                        <p class="mt-3 font-mono text-sm text-muted tabular-nums">
+                            {{ $recordDelta >= 0 ? '+' : '' }}{{ $recordDelta }} <span class="text-muted/70">vs rekor {{ rtrim(rtrim(number_format($previousBest, 1), '0'), '.') }}</span>
+                        </p>
                     @endif
-                    <p class="mt-2 font-mono text-xs uppercase tracking-[0.2em] text-muted">
-                        {{ $mode }} · {{ $subMode }}
-                    </p>
                 </div>
 
-                <!-- Sub-stats 2x2 -->
-                <div class="grid grid-cols-2 gap-3">
+                <!-- Sub-stats -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     @if ($isSurvival)
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">avg wpm</span>
-                            <span class="text-3xl text-foreground font-bold font-mono leading-none">{{ $wpm }}</span>
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">avg wpm</span>
+                            <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $wpm }}</span>
                         </div>
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">accuracy</span>
-                            <span class="text-3xl text-gold font-bold font-mono leading-none">{{ $accuracy }}<span class="text-xl">%</span></span>
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">accuracy</span>
+                            <span class="text-2xl text-gold font-bold font-mono leading-none tabular-nums">{{ $accuracy }}<span class="text-lg">%</span></span>
                         </div>
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">correct</span>
-                            <span class="text-3xl text-foreground font-bold font-mono leading-none">{{ $correctKeystrokes }}</span>
+                        @if (!is_null($consistency))
+                            <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+                                <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">consistency</span>
+                                <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $consistency }}<span class="text-lg">%</span></span>
+                            </div>
+                        @endif
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">characters</span>
+                            <span class="text-2xl font-bold font-mono leading-none tabular-nums">
+                                <span class="text-foreground">{{ $correctKeystrokes }}</span><span class="text-muted"> / </span><span class="text-danger">{{ $incorrectKeystrokes }}</span>
+                            </span>
                         </div>
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">difficulty</span>
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">difficulty</span>
                             <span class="text-2xl text-foreground font-bold font-mono leading-none capitalize">{{ $subMode }}</span>
                         </div>
                     @else
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">raw wpm</span>
-                            <span class="text-3xl text-foreground font-bold font-mono leading-none">{{ $rawWpm }}</span>
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">raw wpm</span>
+                            <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $rawWpm }}</span>
                         </div>
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">accuracy</span>
-                            <span class="text-3xl text-gold font-bold font-mono leading-none">{{ $accuracy }}<span class="text-xl">%</span></span>
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">accuracy</span>
+                            <span class="text-2xl text-gold font-bold font-mono leading-none tabular-nums">{{ $accuracy }}<span class="text-lg">%</span></span>
                         </div>
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">duration</span>
-                            <span class="text-3xl text-foreground font-bold font-mono leading-none">{{ round($time, 1) }}<span class="text-xl text-muted">s</span></span>
+                        @if (!is_null($consistency))
+                            <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+                                <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">consistency</span>
+                                <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $consistency }}<span class="text-lg">%</span></span>
+                            </div>
+                        @endif
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">duration</span>
+                            <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ round($time, 1) }}<span class="text-lg text-muted">s</span></span>
                         </div>
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-1">correct</span>
-                            <span class="text-3xl text-foreground font-bold font-mono leading-none">{{ $correctKeystrokes }}</span>
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2 {{ is_null($consistency) ? 'col-span-2 sm:col-span-1' : '' }}">
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">characters</span>
+                            <span class="text-2xl font-bold font-mono leading-none tabular-nums">
+                                <span class="text-foreground">{{ $correctKeystrokes }}</span><span class="text-muted"> / </span><span class="text-danger">{{ $incorrectKeystrokes }}</span>
+                            </span>
                         </div>
                     @endif
                 </div>
@@ -75,15 +106,15 @@
                 <!-- XP + level bar -->
                 @auth
                     @if ($levelData)
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-5">
-                            <div class="flex items-baseline justify-between mb-2">
-                                <div class="flex flex-col">
+                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4">
+                            <div class="flex items-start justify-between mb-3">
+                                <div class="flex flex-col gap-2">
                                     <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">xp earned</span>
-                                    <span class="text-2xl font-bold font-mono text-brand leading-none mt-1">+{{ $xpEarned }} XP</span>
+                                    <span class="text-2xl font-bold font-mono text-brand leading-none">+{{ $xpEarned }} XP</span>
                                 </div>
-                                <div class="text-right font-mono text-xs text-muted">
+                                <div class="text-right font-mono text-xs text-muted leading-relaxed">
                                     <div>{{ number_format($levelData['progress']) }} / {{ number_format($levelData['needed']) }} XP</div>
-                                    <div class="mt-1">Level {{ $levelData['level'] }} → {{ $levelData['next_level'] }}</div>
+                                    <div>Level {{ $levelData['level'] }} → {{ $levelData['next_level'] }}</div>
                                 </div>
                             </div>
                             <div class="h-2 overflow-hidden rounded-full bg-white/5">
@@ -95,18 +126,19 @@
                 @endauth
 
                 <!-- Tombol aksi -->
-                <div class="flex items-center gap-3">
+                <div class="flex items-stretch gap-3">
                     <a id="restartButton" href="/typing" wire:navigate
-                        class="flex items-center gap-2 px-6 py-3 rounded-xl bg-gold text-background font-sans font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-1 focus-visible:ring-border transition-all"
+                        class="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-sans font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition"
                         title="{{ $isSurvival ? 'Main Lagi' : 'Tes Berikutnya' }}">
                         <span>{{ $isSurvival ? 'play again' : 'next test' }}</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
                         </svg>
                     </a>
                     @unless ($isSurvival)
                         <a href="/typing" wire:navigate
-                            class="px-6 py-3 rounded-xl bg-surface border border-white/5 text-muted hover:text-foreground font-sans font-semibold text-sm focus:outline-none focus-visible:ring-1 focus-visible:ring-border transition">
+                            class="inline-flex items-center justify-center h-12 px-6 rounded-2xl bg-surface border border-white/5 text-foreground/80 hover:text-foreground hover:border-white/10 font-sans font-semibold text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-border transition"
+                            title="Ulangi Tes">
                             retry
                         </a>
                     @endunless
