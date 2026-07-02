@@ -215,7 +215,10 @@ class TypingEngine extends Component
         $accuracyMultiplier = 0.5 + 0.5 * ($finalAccuracy / 100);
         $xpEarned = (int) round($correctKeystrokes * 0.1 * $accuracyMultiplier);
 
+        $consistency = $this->computeConsistency($wpmHistory);
+
         $isPersonalBest = false;
+        $previousBest = null;
         $levelData = null;
 
         if (Auth::check()) {
@@ -223,7 +226,8 @@ class TypingEngine extends Component
 
             // Ditangkap SEBELUM transaction menimpa highest_wpm. Survival dikecualikan
             // dari rekor WPM (konsisten dengan aturan di bawah).
-            $isPersonalBest = $this->mainMode !== 'survival' && $finalNetWpm > (float) $user->highest_wpm;
+            $previousBest = (float) $user->highest_wpm;
+            $isPersonalBest = $this->mainMode !== 'survival' && $finalNetWpm > $previousBest;
 
             DB::transaction(function () use (
                 $user, $duration, $finalNetWpm, $finalRawWpm, $finalAccuracy,
@@ -283,11 +287,35 @@ class TypingEngine extends Component
             'missedChars' => $missedChars,
             'xpEarned' => $xpEarned,
             'isPersonalBest' => $isPersonalBest,
+            'previousBest' => $previousBest,
+            'consistency' => $consistency,
             'levelData' => $levelData,
         ]);
         session()->save();
 
         $this->redirect(route('typing.result'), navigate: true);
+    }
+
+    // Consistency: seberapa stabil WPM sepanjang sesi (turunan dari wpmHistory per-detik).
+    // 100% = kecepatan rata sempurna; makin sering tersendat → makin rendah. Bukan metrik
+    // anti-cheat, hanya presentasi. Butuh minimal 2 sampel & mean > 0, selain itu null.
+    private function computeConsistency(array $history): ?int
+    {
+        $values = array_values(array_filter($history, fn ($v) => is_numeric($v)));
+        $n = count($values);
+        if ($n < 2) {
+            return null;
+        }
+
+        $mean = array_sum($values) / $n;
+        if ($mean <= 0) {
+            return null;
+        }
+
+        $variance = array_sum(array_map(fn ($v) => ($v - $mean) ** 2, $values)) / $n;
+        $sd = sqrt($variance);
+
+        return (int) round(max(0, 1 - $sd / $mean) * 100);
     }
 
     public function render()

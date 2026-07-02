@@ -21,6 +21,8 @@ class TypingResult extends Component
     public $missedChars;
     public $xpEarned;
     public $isPersonalBest;
+    public $previousBest;
+    public $consistency;
     public $levelData;
 
     public function mount()
@@ -46,6 +48,8 @@ class TypingResult extends Component
         $this->missedChars = $result['missedChars'] ?? [];
         $this->xpEarned = $result['xpEarned'] ?? 0;
         $this->isPersonalBest = $result['isPersonalBest'] ?? false;
+        $this->previousBest = $result['previousBest'] ?? null;
+        $this->consistency = $result['consistency'] ?? null;
         $this->levelData = $result['levelData'] ?? null;
     }
 
