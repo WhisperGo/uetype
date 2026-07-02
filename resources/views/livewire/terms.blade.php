@@ -1,10 +1,3 @@
-{{--
-    View untuk Livewire component app/Livewire/Terms.php.
-    Sama seperti about.blade.php dan privacy.blade.php: TIDAK ada
-    @extends/<x-layouts.app> di sini — Livewire yang membungkusnya ke
-    layouts/app.blade.php lewat atribut #[Layout('layouts.app')] di
-    component class-nya.
---}}
 <div class="text-muted font-mono">
     <div class="max-w-5xl mx-auto px-4 pt-10 pb-16">
 

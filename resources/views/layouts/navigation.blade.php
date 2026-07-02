@@ -156,6 +156,12 @@
                 :active="request()->is('typing')">{{ __('Solo') }}</x-responsive-nav-link>
             <x-responsive-nav-link href="{{ url('/multiplayer') }}"
                 :active="request()->is('multiplayer')">{{ __('Multiplayer') }}</x-responsive-nav-link>
+            {{-- <span
+                class="flex items-center w-full gap-2 py-2 text-base font-medium cursor-not-allowed ps-3 pe-4 text-muted/50">
+                {{ __('Multiplayer') }}
+                <span
+                    class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
+            </span> --}}
             <span
                 class="flex items-center w-full gap-2 py-2 text-base font-medium cursor-not-allowed ps-3 pe-4 text-muted/50">
                 {{ __('Klan') }}
