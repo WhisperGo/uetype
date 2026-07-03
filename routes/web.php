@@ -4,6 +4,7 @@ use App\Http\Controllers\AchievementController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\ProfileController;
 use App\Livewire\About;
+use App\Livewire\Friends;
 use App\Livewire\Terms;
 use App\Livewire\TypingEngine;
 use App\Livewire\TypingResult;
@@ -24,6 +25,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::get('/achievements', [AchievementController::class, 'index'])->name('achievements.index');
+
+    Route::get('/friends', Friends::class)->name('friends.index');
 
     Route::get('/typing', TypingEngine::class)->name('typing');
     Route::get('/result', TypingResult::class)->name('typing.result');

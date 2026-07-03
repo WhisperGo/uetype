@@ -1,0 +1,207 @@
+<div class="max-w-5xl px-4 mx-auto py-10 sm:px-6 lg:px-8">
+
+    <h1 class="font-display text-2xl tracking-wide text-foreground mb-4">FRIENDS</h1>
+
+    <!-- ===== TABS ===== -->
+    <div class="border-b border-white/10 mb-6">
+        <nav class="flex gap-6 -mb-px font-mono text-sm" aria-label="Friend tabs">
+            <button wire:click="setTab('friends')"
+                @class([
+                    'px-1 py-3 border-b-2 transition-colors whitespace-nowrap',
+                    'border-gold text-foreground font-semibold' => $tab === 'friends',
+                    'border-transparent text-muted hover:text-foreground' => $tab !== 'friends',
+                ])>
+                Friends ({{ $this->friendsList->count() }})
+            </button>
+            <button wire:click="setTab('requests')"
+                @class([
+                    'px-1 py-3 border-b-2 transition-colors whitespace-nowrap',
+                    'border-gold text-foreground font-semibold' => $tab === 'requests',
+                    'border-transparent text-muted hover:text-foreground' => $tab !== 'requests',
+                ])>
+                Requests ({{ $this->requestsCount }})
+            </button>
+            <button wire:click="setTab('find')"
+                @class([
+                    'px-1 py-3 border-b-2 transition-colors whitespace-nowrap',
+                    'border-gold text-foreground font-semibold' => $tab === 'find',
+                    'border-transparent text-muted hover:text-foreground' => $tab !== 'find',
+                ])>
+                Find Friends
+            </button>
+        </nav>
+    </div>
+
+    {{-- ===================================================================== --}}
+    {{-- TAB: FRIENDS LIST --}}
+    {{-- ===================================================================== --}}
+    @if ($tab === 'friends')
+        @if ($this->friendsList->count() > 0)
+            <div class="space-y-3">
+                @foreach ($this->friendsList as $row)
+                    <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl hover:border-white/10 transition group">
+                        <x-friend-avatar :user="$row['user']" />
+                        <div class="flex-1 min-w-0">
+                            <p class="font-mono text-sm font-bold text-foreground truncate">{{ $row['user']->username }}</p>
+                            <p class="font-mono text-xs text-muted mt-0.5">level {{ $row['user']->levelData()['level'] }}</p>
+                        </div>
+                        <button wire:click="removeFriend({{ $row['friendship_id'] }})"
+                            wire:confirm="Hapus {{ $row['user']->username }} dari daftar teman?"
+                            class="opacity-0 group-hover:opacity-100 px-3 py-1.5 font-mono text-xs text-red-400/80 border border-red-900/40 rounded-lg hover:bg-red-950/30 transition">
+                            Remove
+                        </button>
+                        <svg class="w-4 h-4 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <div class="flex flex-col items-center justify-center py-24 text-center select-none">
+                <img src="/icon/uetype_mascot.png" alt="" class="w-16 h-16 opacity-30 mb-4">
+                <p class="font-mono text-sm font-bold text-foreground">No friends yet</p>
+                <p class="font-mono text-xs text-muted mt-1">Search for friends by username to get started</p>
+                <button wire:click="setTab('find')"
+                    class="mt-5 px-5 py-2 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
+                    Find Friends
+                </button>
+            </div>
+        @endif
+    @endif
+
+    {{-- ===================================================================== --}}
+    {{-- TAB: REQUESTS (incoming + sent) --}}
+    {{-- ===================================================================== --}}
+    @if ($tab === 'requests')
+        @if ($this->incomingRequests->count() === 0 && $this->sentRequests->count() === 0)
+            <div class="flex flex-col items-center justify-center py-24 text-center select-none">
+                <img src="/icon/uetype_mascot.png" alt="" class="w-16 h-16 opacity-30 mb-4">
+                <p class="font-mono text-sm font-bold text-foreground">No pending requests</p>
+                <p class="font-mono text-xs text-muted mt-1">Friend requests will appear here</p>
+            </div>
+        @else
+            {{-- INCOMING --}}
+            @if ($this->incomingRequests->count() > 0)
+                <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">Incoming ({{ $this->incomingRequests->count() }})</p>
+                <div class="space-y-3 mb-8">
+                    @foreach ($this->incomingRequests as $req)
+                        <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl" wire:key="in-{{ $req->id }}">
+                            <x-friend-avatar :user="$req->requester" />
+                            <div class="flex-1 min-w-0">
+                                <p class="font-mono text-sm font-bold text-foreground truncate">{{ $req->requester->username }}</p>
+                                <p class="font-mono text-xs text-muted mt-0.5">level {{ $req->requester->levelData()['level'] }}</p>
+                            </div>
+                            <button wire:click="acceptRequest({{ $req->id }})"
+                                class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
+                                Accept
+                            </button>
+                            <button wire:click="rejectRequest({{ $req->id }})"
+                                class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                                Reject
+                            </button>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
+            {{-- SENT --}}
+            @if ($this->sentRequests->count() > 0)
+                <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">Sent ({{ $this->sentRequests->count() }})</p>
+                <div class="space-y-3">
+                    @foreach ($this->sentRequests as $req)
+                        <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl" wire:key="sent-{{ $req->id }}">
+                            <x-friend-avatar :user="$req->addressee" />
+                            <div class="flex-1 min-w-0">
+                                <p class="font-mono text-sm font-bold text-foreground truncate">{{ $req->addressee->username }}</p>
+                                <p class="font-mono text-xs text-muted mt-0.5">level {{ $req->addressee->levelData()['level'] }}</p>
+                            </div>
+                            <span class="font-mono text-xs text-muted">Pending</span>
+                            <button wire:click="cancelRequest({{ $req->id }})"
+                                class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                                Cancel
+                            </button>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        @endif
+    @endif
+
+    {{-- ===================================================================== --}}
+    {{-- TAB: FIND FRIENDS (search) --}}
+    {{-- ===================================================================== --}}
+    @if ($tab === 'find')
+        <div class="relative mb-6">
+            <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z" />
+            </svg>
+            <input type="text" wire:model.live.debounce.300ms="search"
+                placeholder="Search by username…"
+                class="w-full pl-11 pr-4 py-3.5 bg-surface/40 border border-white/10 rounded-2xl font-mono text-sm text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
+        </div>
+
+        @if (strlen(trim($search)) > 0)
+            <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">Results</p>
+            @if ($this->searchResults->count() > 0)
+                <div class="space-y-3">
+                    @foreach ($this->searchResults as $row)
+                        <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl" wire:key="find-{{ $row['user']->id }}">
+                            <x-friend-avatar :user="$row['user']" />
+                            <div class="flex-1 min-w-0">
+                                <p class="font-mono text-sm font-bold text-foreground truncate">{{ $row['user']->username }}</p>
+                                <p class="font-mono text-xs text-muted mt-0.5">level {{ $row['user']->levelData()['level'] }}</p>
+                            </div>
+
+                            @switch($row['relation'])
+                                @case('friends')
+                                    <span class="px-4 py-1.5 font-mono text-xs font-bold text-gold border border-gold/40 rounded-lg flex items-center gap-1.5">
+                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                        Friends
+                                    </span>
+                                    @break
+                                @case('sent')
+                                    <span class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg">Request Sent</span>
+                                    @break
+                                @case('incoming')
+                                    <button wire:click="setTab('requests')"
+                                        class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
+                                        Respond
+                                    </button>
+                                    @break
+                                @default
+                                    <button wire:click="sendRequest({{ $row['user']->id }})"
+                                        class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition flex items-center gap-1">
+                                        + Add
+                                    </button>
+                            @endswitch
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <p class="font-mono text-sm text-muted py-6">No users found matching "{{ trim($search) }}".</p>
+            @endif
+        @else
+            <div class="flex flex-col items-center justify-center py-20 text-center select-none">
+                <p class="font-mono text-xs text-muted">Type a username above to find players.</p>
+            </div>
+        @endif
+    @endif
+
+    {{-- ===== REAL-TIME: dengarkan channel friends.{me} ===== --}}
+    @script
+        <script>
+            const myFriendChannel = `friends.{{ Auth::id() }}`;
+
+            window.Echo.channel(myFriendChannel)
+                .listen('.friendship.updated', () => {
+                    // Ada perubahan pertemanan yang menyangkut saya -> segarkan.
+                    $wire.dispatch('friendship-updated');
+                });
+
+            // Bersihkan saat komponen dibongkar (navigasi keluar halaman).
+            document.addEventListener('livewire:navigating', () => {
+                window.Echo.leave(myFriendChannel);
+            });
+        </script>
+    @endscript
+</div>

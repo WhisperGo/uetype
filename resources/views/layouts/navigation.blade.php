@@ -86,10 +86,7 @@
                                 {{ __('User Stats') }}
                                 <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
                             </span>
-                            <span class="flex items-center justify-between w-full px-4 py-2 text-sm text-muted/50 cursor-not-allowed" title="Segera hadir">
-                                {{ __('Friends List') }}
-                                <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
-                            </span>
+                            <x-dropdown-link :href="route('friends.index')">{{ __('Friends List') }}</x-dropdown-link>
                             <span class="flex items-center justify-between w-full px-4 py-2 text-sm text-muted/50 cursor-not-allowed" title="Segera hadir">
                                 {{ __('Settings') }}
                                 <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
@@ -170,6 +167,7 @@
                 <div class="mt-3 space-y-1">
                     <x-responsive-nav-link :href="route('profile.edit')">{{ __('Profile') }}</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('achievements.index')">{{ __('Achievements') }}</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('friends.index')">{{ __('Friends List') }}</x-responsive-nav-link>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <x-responsive-nav-link :href="route('logout')"

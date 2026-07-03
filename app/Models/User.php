@@ -146,4 +146,20 @@ class User extends Authenticatable
     {
         return $this->hasOneThrough(Room::class, RoomMember::class, 'user_id', 'id', 'id', 'room_id');
     }
+
+    /**
+     * Cari baris friendship antara user ini dan $otherId, ke arah mana pun
+     * (baik user ini pengirim maupun penerima). Null jika belum ada relasi.
+     */
+    public function friendshipWith(int $otherId): ?Friendship
+    {
+        return Friendship::query()
+            ->where(function ($q) use ($otherId) {
+                $q->where('requester_id', $this->id)->where('addressee_id', $otherId);
+            })
+            ->orWhere(function ($q) use ($otherId) {
+                $q->where('requester_id', $otherId)->where('addressee_id', $this->id);
+            })
+            ->first();
+    }
 }
