@@ -15,14 +15,15 @@
         ">
 
         <div x-cloak aria-hidden="true"
-            class="fixed inset-0 z-40 pointer-events-none transition-opacity duration-300"
+            class="fixed inset-0 z-40 pointer-events-none transition-opacity duration-300 [will-change:opacity]"
+            style="background: radial-gradient(ellipse at center, transparent 55%, rgb(var(--color-danger) / 0.55) 100%);"
             :style="`opacity: ${
                 (() => {
                     const active = currentMain === 'survival' && isStarted && !isFinished;
                     const base = (!active || staminaPct >= 40) ? 0 : Math.min(1, (40 - staminaPct) / 40);
                     return drainFlash && active ? Math.max(base, 0.6) : base;
                 })()
-            }; box-shadow: inset 0 0 18vw 3vw rgb(var(--color-danger) / 0.55);`"></div>
+            };`"></div>
 
         <div class="max-w-5xl mx-auto px-4 pt-10 pb-16">
 
@@ -199,20 +200,21 @@
             <!-- Kontainer 3 Baris -->
             <div class="relative overflow-hidden text-3xl leading-relaxed tracking-tight select-none outline-none"
                 style="max-height: 4.875em;">
+
+                <!-- SINGLE SMOOTH CURSOR -->
+                <div x-ref="caret" x-show="!isFinished"
+                    class="absolute top-0 left-0 w-[2.5px] h-[1.5em] z-20 rounded [will-change:transform] [transition:background-color_150ms_ease-out]"
+                    :style="`background-color: ${
+                        (currentMain === 'survival' && isStarted && !isFinished)
+                            ? (staminaPct > 50 ? 'rgb(var(--color-brand))' : (staminaPct > 25 ? 'rgb(var(--color-gold))' : 'rgb(var(--color-danger))'))
+                            : 'rgb(var(--color-brand))'
+                    };`"
+                    :class="isTyping ? '' : 'animate-[pulse_0.8s_infinite]'">
+                </div>
+
                 <div x-ref="textContainer"
                     class="relative flex flex-wrap content-start gap-x-[0.5em] transition-transform duration-200 ease-in-out"
                     :style="`transform: translateY(-${scrollOffset}px)`">
-
-                    <!-- SINGLE SMOOTH CURSOR -->
-                    <div x-show="!isFinished"
-                        class="absolute top-0 left-0 w-[2.5px] h-[1.5em] transition-all duration-100 ease-out z-20 rounded"
-                        :style="`transform: translate(${cursorLeft}px, ${cursorTop}px); background-color: ${
-                            (currentMain === 'survival' && isStarted && !isFinished)
-                                ? (staminaPct > 50 ? 'rgb(var(--color-brand))' : (staminaPct > 25 ? 'rgb(var(--color-gold))' : 'rgb(var(--color-danger))'))
-                                : 'rgb(var(--color-brand))'
-                        };`"
-                        :class="isTyping ? '' : 'animate-[pulse_0.8s_infinite]'">
-                    </div>
 
                     @php
                         $words = explode(' ', $textToType);
@@ -222,7 +224,7 @@
                     @foreach ($words as $word)
                         <div class="flex" wire:key="word-{{ $loop->index }}-{{ $textToType }}">
                             @foreach (str_split($word) as $char)
-                                <span id="char-{{ $charPointer }}" class="char-element relative transition-colors duration-100 inline-block"
+                                <span id="char-{{ $charPointer }}" class="char-element relative inline-block"
                                     :class="{
                                         'text-foreground': {{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === true,
                                         'text-danger': {{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === false,
@@ -240,7 +242,7 @@
                                 <template x-for="(extra, idx) in extraChars[{{ $loop->index }}]"
                                     :key="idx">
                                     <span :id="'extra-' + {{ $loop->index }} + '-' + idx"
-                                        class="char-element relative transition-colors duration-100 inline-block text-danger tracking-tight opacity-90">
+                                        class="char-element relative inline-block text-danger tracking-tight opacity-90">
                                         <span x-text="extra"></span>
                                     </span>
                                 </template>
@@ -311,6 +313,10 @@
                 timerInterval: null,
                 scrollOffset: 0,
                 lineHeight: 0,
+                positionFrame: null,
+                caretInstant: true,
+                caretAnim: null,
+                caretDrawn: false,
                 currentWordIndex: 0,
                 wordBounds: [],
                 extraChars: {},
@@ -392,8 +398,12 @@
                         space: null
                     };
 
+                    this.caretInstant = true;
+                    this.caretDrawn = false;
+                    this.caretAnim?.cancel();
                     this.$nextTick(() => {
                         this.updatePosition();
+                        requestAnimationFrame(() => { this.caretInstant = false; });
                     });
                 },
 
@@ -525,6 +535,8 @@
                     if (this.staminaInterval) clearInterval(this.staminaInterval);
                     clearTimeout(this.drainFlashTimeout);
                     clearTimeout(this.typingTimeout);
+                    if (this.positionFrame) cancelAnimationFrame(this.positionFrame);
+                    this.caretAnim?.cancel();
                 },
 
                 updatePosition() {
@@ -549,33 +561,58 @@
 
                     if (!activeEl) return;
 
-                    let left = activeEl.offsetLeft;
-                    let top = activeEl.offsetTop;
+                    const left = activeEl.offsetLeft;
+                    const top = activeEl.offsetTop;
+                    const width = activeEl.offsetWidth;
 
-                    // Update Posisi Kursor Tunggal
-                    this.cursorLeft = isEnd ? left + activeEl.offsetWidth : left;
+                    const firstChar = document.getElementById('char-0');
+                    const containerTop = firstChar ? firstChar.offsetTop : 0;
+                    if (!this.lineHeight && firstChar) {
+                        this.lineHeight = firstChar.offsetHeight;
+                    }
+
+                    this.cursorLeft = isEnd ? left + width : left;
                     this.cursorTop = top;
 
-                    // Update Scroll
-                    const chars = this.$refs.textContainer.querySelectorAll('.char-element');
-                    if (chars.length > 0 && !this.lineHeight) {
-                        for (let i = 1; i < chars.length; i++) {
-                            if (chars[i].offsetTop > chars[0].offsetTop) {
-                                this.lineHeight = chars[i].offsetTop - chars[0].offsetTop;
-                                break;
-                            }
-                        }
-                    }
-
-                    const containerTop = chars.length > 0 ? chars[0].offsetTop : 0;
                     const currentTop = top - containerTop;
                     const lh = this.lineHeight || 48;
+                    this.scrollOffset = currentTop >= lh * 2 ? currentTop - lh : 0;
 
-                    if (currentTop >= lh * 2) {
-                        this.scrollOffset = currentTop - lh;
-                    } else {
-                        this.scrollOffset = 0;
+                    this.moveCaret(this.cursorLeft, this.cursorTop - this.scrollOffset, this.caretInstant);
+                },
+
+                moveCaret(targetLeft, targetTop, instant) {
+                    const el = this.$refs.caret;
+                    if (!el) return;
+
+                    const target = `translate(${targetLeft}px, ${targetTop}px)`;
+
+                    if (this.caretAnim) {
+                        try { this.caretAnim.commitStyles(); } catch (e) {}
+                        this.caretAnim.cancel();
+                        this.caretAnim = null;
                     }
+
+                    if (instant || !this.caretDrawn) {
+                        el.style.transform = target;
+                        this.caretDrawn = true;
+                        return;
+                    }
+
+                    const from = getComputedStyle(el).transform;
+                    this.caretAnim = el.animate(
+                        [{ transform: from }, { transform: target }],
+                        { duration: 100, easing: 'ease-in-out', fill: 'forwards' }
+                    );
+                    el.style.transform = target;
+                },
+
+                schedulePositionUpdate() {
+                    if (this.positionFrame) return;
+                    this.positionFrame = requestAnimationFrame(() => {
+                        this.positionFrame = null;
+                        this.updatePosition();
+                    });
                 },
 
                 handleInput(e) {
@@ -629,7 +666,7 @@
                             if (this.extraChars[this.currentWordIndex] && this.extraChars[this.currentWordIndex].length >
                                 0) {
                                 this.extraChars[this.currentWordIndex].pop();
-                                this.$nextTick(() => this.updatePosition());
+                                this.schedulePositionUpdate();
                                 return;
                             }
 
@@ -662,7 +699,7 @@
                                         }
 
                                         this.currentIndex = jumpIndex;
-                                        this.$nextTick(() => this.updatePosition());
+                                        this.schedulePositionUpdate();
                                     }
                                 }
                                 return;
@@ -671,7 +708,7 @@
                             // Backspace normal di dalam kata
                             this.currentIndex--;
                             this.inputResults[this.currentIndex] = null;
-                            this.$nextTick(() => this.updatePosition());
+                            this.schedulePositionUpdate();
                         }
                         return;
                     }
@@ -691,7 +728,7 @@
                             // dipotong nanti saat kata di-commit, maks -1 per kata).
                             this.markWordDirty();
                             this.calculateStats();
-                            this.$nextTick(() => this.updatePosition());
+                            this.schedulePositionUpdate();
                             return;
                         } else {
                             // SPASI DITEKAN: Pindah ke kata selanjutnya
@@ -703,7 +740,7 @@
                             this.completeWord(this.currentWordIndex - 1); // survival: nilai kata yang baru selesai
                             if (this.currentIndex === this.targetArray.length) this.finish();
                             this.calculateStats();
-                            this.$nextTick(() => this.updatePosition());
+                            this.schedulePositionUpdate();
                             return;
                         }
                     }
@@ -737,7 +774,7 @@
                             this.finish();
                         }
                         this.calculateStats();
-                        this.$nextTick(() => this.updatePosition());
+                        this.schedulePositionUpdate();
                         return;
                     }
 
@@ -762,7 +799,7 @@
 
                     if (this.currentIndex === this.targetArray.length) this.finish();
                     this.calculateStats();
-                    this.$nextTick(() => this.updatePosition());
+                    this.schedulePositionUpdate();
                 },
 
                 calculateStats() {
