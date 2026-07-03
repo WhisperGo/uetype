@@ -14,6 +14,16 @@
             }
         ">
 
+        <div x-cloak aria-hidden="true"
+            class="fixed inset-0 z-40 pointer-events-none transition-opacity duration-300"
+            :style="`opacity: ${
+                (() => {
+                    const active = currentMain === 'survival' && isStarted && !isFinished;
+                    const base = (!active || staminaPct >= 40) ? 0 : Math.min(1, (40 - staminaPct) / 40);
+                    return drainFlash && active ? Math.max(base, 0.6) : base;
+                })()
+            }; box-shadow: inset 0 0 18vw 3vw rgb(var(--color-danger) / 0.55);`"></div>
+
         <div class="max-w-5xl mx-auto px-4 pt-10 pb-16">
 
             @if (session('result_rejected'))
@@ -125,29 +135,16 @@
                 </div>
             </div>
 
-            <template x-if="currentMain === 'survival'">
-                <div class="mb-5 transition-opacity duration-300"
-                    :class="isStarted ? 'opacity-100' : 'opacity-50'">
-                    <div class="flex items-center justify-between mb-1.5">
-                        <span class="font-sans text-[0.7rem] uppercase tracking-[0.25em] text-muted">stamina</span>
-                        <span class="font-sans text-[0.7rem] tracking-[0.2em] text-muted capitalize"
-                            x-text="currentSub"></span>
-                    </div>
-                    {{-- Warna fill via inline style (aman dari purge JIT); rgb dari token tema. --}}
-                    <div class="w-full h-4 rounded-full bg-surface/80 border border-white/5 overflow-hidden">
-                        <div class="h-full rounded-full transition-all duration-100 ease-linear"
-                            :style="`width: ${staminaPct}%; background-color: rgb(${staminaPct > 50 ? 'var(--color-brand)' : (staminaPct > 25 ? 'var(--color-gold)' : 'var(--color-danger)')});`">
-                        </div>
-                    </div>
-                </div>
-            </template>
-
             <div x-cloak class="group mb-6 transition-opacity duration-500"
                 :class="!isStarted ? 'opacity-0' : (isFinished ? 'opacity-100' : 'opacity-60 hover:opacity-100')">
                 <div class="flex items-start gap-10">
                     <div class="flex flex-col">
                         <span class="text-5xl font-mono font-bold tabular-nums leading-none transition-colors duration-300"
-                            :class="(currentMain === 'time' && timer < 5 && isStarted) ? 'text-danger' : 'text-gold'"
+                            :class="{
+                                'text-danger': (currentMain === 'time' && timer < 5 && isStarted) || (currentMain === 'survival' && staminaPct < 25 && isStarted && !isFinished),
+                                'text-gold': !((currentMain === 'time' && timer < 5 && isStarted) || (currentMain === 'survival' && staminaPct < 25 && isStarted && !isFinished)),
+                                'motion-safe:animate-[stamina-critical_0.5s_ease-in-out_infinite]': currentMain === 'survival' && staminaPct < 25 && isStarted && !isFinished
+                            }"
                             aria-live="polite" x-text="currentMain === 'time' ? timer : timer + 's'">0</span>
                         <span class="text-x-small uppercase tracking-wide text-muted mt-2"
                             x-text="currentMain === 'time' ? 'left' : 'time'">time</span>
@@ -167,11 +164,35 @@
                 </div>
 
                 <div class="h-[28px] mt-2">
-                    <svg x-show="wpmHistory.length > 1" x-cloak width="120" height="28"
-                        viewBox="0 0 120 28" preserveAspectRatio="none" fill="none" aria-hidden="true">
-                        <polyline :points="sparklinePoints" stroke="rgb(var(--color-brand))"
-                            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
+                    <template x-if="currentMain !== 'survival'">
+                        <svg x-show="wpmHistory.length > 1" x-cloak width="120" height="28"
+                            viewBox="0 0 120 28" preserveAspectRatio="none" fill="none" aria-hidden="true">
+                            <polyline :points="sparklinePoints" stroke="rgb(var(--color-brand))"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </template>
+
+                    <template x-if="currentMain === 'survival'">
+                        <div class="flex items-center gap-3">
+                            <span class="font-display text-[0.55rem] uppercase tracking-[0.15em] text-muted shrink-0">stamina</span>
+                            <div class="relative flex-1 flex gap-[3px] p-[3px] bg-surface/80 border border-border/60"
+                                :class="(staminaPct < 25 && isStarted && !isFinished) ? 'animate-[pulse_0.7s_ease-in-out_infinite]' : ''">
+                                <template x-for="cell in staminaCells" :key="cell">
+                                    <div class="h-[14px] flex-1 transition-colors duration-150"
+                                        :style="`background-color: ${
+                                            cell <= Math.ceil(staminaPct / 100 * staminaCells.length)
+                                                ? (staminaPct > 50 ? 'rgb(var(--color-brand))' : (staminaPct > 25 ? 'rgb(var(--color-gold))' : 'rgb(var(--color-danger))'))
+                                                : 'rgb(var(--color-border) / 0.35)'
+                                        };`">
+                                    </div>
+                                </template>
+                                <div class="absolute inset-0 pointer-events-none transition-opacity duration-150 bg-danger/70"
+                                    :class="drainFlash ? 'opacity-100' : 'opacity-0'"></div>
+                            </div>
+                            <span class="font-display text-[0.55rem] uppercase tracking-[0.15em] text-muted shrink-0"
+                                x-text="currentSub"></span>
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -184,8 +205,12 @@
 
                     <!-- SINGLE SMOOTH CURSOR -->
                     <div x-show="!isFinished"
-                        class="absolute top-0 left-0 w-[2.5px] h-[1.5em] bg-brand transition-all duration-100 ease-out z-20 rounded"
-                        :style="`transform: translate(${cursorLeft}px, ${cursorTop}px);`"
+                        class="absolute top-0 left-0 w-[2.5px] h-[1.5em] transition-all duration-100 ease-out z-20 rounded"
+                        :style="`transform: translate(${cursorLeft}px, ${cursorTop}px); background-color: ${
+                            (currentMain === 'survival' && isStarted && !isFinished)
+                                ? (staminaPct > 50 ? 'rgb(var(--color-brand))' : (staminaPct > 25 ? 'rgb(var(--color-gold))' : 'rgb(var(--color-danger))'))
+                                : 'rgb(var(--color-brand))'
+                        };`"
                         :class="isTyping ? '' : 'animate-[pulse_0.8s_infinite]'">
                     </div>
 
@@ -311,6 +336,16 @@
                 currentWordDirty: false, // apakah kata yang sedang diketik sudah pernah error
                 committedWordResults: {}, // {wordIndex: 'clean'|'dirty'} — kata yang sudah dinilai (idempoten)
 
+                staminaCells: Array.from({ length: 16 }, (_, i) => i + 1),
+                drainFlash: false,
+                drainFlashTimeout: null,
+
+                triggerDrainFlash() {
+                    this.drainFlash = true;
+                    clearTimeout(this.drainFlashTimeout);
+                    this.drainFlashTimeout = setTimeout(() => { this.drainFlash = false; }, 250);
+                },
+
                 init() {
                     this.timer = (this.currentMain === 'time') ? parseInt(this.currentSub) : 0;
 
@@ -407,6 +442,7 @@
                         if (!alreadyPenalized) {
                             this.stamina = Math.max(0, this.stamina - this.survivalCfg.penalty);
                             this.syncStaminaPct();
+                            this.triggerDrainFlash();
                             if (this.stamina <= 0) this.survivalGameOver();
                         }
                         return;
@@ -484,6 +520,8 @@
                 destroy() {
                     clearInterval(this.timerInterval);
                     if (this.staminaInterval) clearInterval(this.staminaInterval);
+                    clearTimeout(this.drainFlashTimeout);
+                    clearTimeout(this.typingTimeout);
                 },
 
                 updatePosition() {

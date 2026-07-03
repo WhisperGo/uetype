@@ -21,3 +21,13 @@
         display: none !important;
     }
 }
+
+@layer utilities {
+    @keyframes stamina-critical {
+        0%, 100% { transform: translateX(0) scale(1); opacity: 1; }
+        20% { transform: translateX(-2px) scale(1.04); opacity: 0.7; }
+        40% { transform: translateX(2px) scale(1.04); }
+        60% { transform: translateX(-1.5px) scale(1.02); opacity: 0.8; }
+        80% { transform: translateX(1.5px) scale(1.02); }
+    }
+}
