@@ -58,8 +58,12 @@ class Friends extends Component
             'status' => FriendshipStatus::Pending,
         ]);
 
-        // Beri tahu penerima secara real-time (badge "Requests" bertambah).
-        $this->notify($userId);
+        // Beri tahu penerima secara real-time (badge "Requests" bertambah) +
+        // notifikasi "ada permintaan pertemanan dari <username>".
+        $this->notify($userId, [
+            'type' => 'request',
+            'message' => Auth::user()->username.' sent you a friend request',
+        ]);
     }
 
     public function acceptRequest(int $friendshipId): void
@@ -71,8 +75,12 @@ class Friends extends Component
 
         $friendship->update(['status' => FriendshipStatus::Accepted]);
 
-        // Pengirim asli langsung melihat statusnya jadi berteman.
-        $this->notify($friendship->requester_id);
+        // Pengirim asli langsung melihat statusnya jadi berteman + notifikasi
+        // "permintaanmu diterima oleh <username>".
+        $this->notify($friendship->requester_id, [
+            'type' => 'accepted',
+            'message' => Auth::user()->username.' accepted your friend request',
+        ]);
     }
 
     public function rejectRequest(int $friendshipId): void
@@ -144,11 +152,13 @@ class Friends extends Component
     }
 
     /**
-     * Siarkan perubahan ke user LAIN (real-time) + segarkan UI user ini.
+     * Siarkan perubahan ke user LAIN (real-time). $notification opsional:
+     * jika diisi, klien penerima memunculkan toast; jika null, hanya
+     * menyegarkan daftar (mis. reject/cancel/remove — tak perlu toast).
      */
-    private function notify(int $otherUserId): void
+    private function notify(int $otherUserId, ?array $notification = null): void
     {
-        broadcast(new FriendshipUpdated($otherUserId));
+        broadcast(new FriendshipUpdated($otherUserId, $notification));
     }
 
     // ---- DATA (computed) ----

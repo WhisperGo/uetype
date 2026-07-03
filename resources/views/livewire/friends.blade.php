@@ -187,21 +187,20 @@
         @endif
     @endif
 
-    {{-- ===== REAL-TIME: dengarkan channel friends.{me} ===== --}}
+    {{-- ===== REAL-TIME =====
+         Subscription Echo ke friends.{id} DIPEGANG oleh toast global di layout
+         (satu-satunya subscriber, agar tak dobel). Halaman ini cukup mendengar
+         event window 'friendship-updated-remote' yang diteruskan toast lalu
+         menyegarkan datanya. --}}
     @script
         <script>
-            const myFriendChannel = `friends.{{ Auth::id() }}`;
+            const onRemote = () => $wire.dispatch('friendship-updated');
+            window.addEventListener('friendship-updated-remote', onRemote);
 
-            window.Echo.channel(myFriendChannel)
-                .listen('.friendship.updated', () => {
-                    // Ada perubahan pertemanan yang menyangkut saya -> segarkan.
-                    $wire.dispatch('friendship-updated');
-                });
-
-            // Bersihkan saat komponen dibongkar (navigasi keluar halaman).
+            // Lepas listener saat komponen dibongkar (hindari penumpukan lintas navigate).
             document.addEventListener('livewire:navigating', () => {
-                window.Echo.leave(myFriendChannel);
-            });
+                window.removeEventListener('friendship-updated-remote', onRemote);
+            }, { once: true });
         </script>
     @endscript
 </div>

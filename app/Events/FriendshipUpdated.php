@@ -22,9 +22,18 @@ class FriendshipUpdated implements ShouldBroadcastNow
 
     public $userId;
 
-    public function __construct($userId)
+    public $notification;
+
+    /**
+     * @param  int  $userId  penerima siaran (channel friends.{userId})
+     * @param  array|null  $notification  payload notifikasi opsional:
+     *                                    ['type' => 'request'|'accepted', 'message' => string]. Null berarti
+     *                                    hanya menyegarkan UI tanpa memunculkan toast.
+     */
+    public function __construct($userId, ?array $notification = null)
     {
         $this->userId = $userId;
+        $this->notification = $notification;
     }
 
     public function broadcastOn(): array
