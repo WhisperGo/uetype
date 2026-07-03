@@ -339,6 +339,7 @@
                 staminaCells: Array.from({ length: 16 }, (_, i) => i + 1),
                 drainFlash: false,
                 drainFlashTimeout: null,
+                drainEventCount: 0,
 
                 triggerDrainFlash() {
                     this.drainFlash = true;
@@ -358,6 +359,7 @@
                     this.lastTickTime = 0;
                     this.currentWordDirty = false;
                     this.committedWordResults = {};
+                    this.drainEventCount = 0;
                     if (this.staminaInterval) {
                         clearInterval(this.staminaInterval);
                         this.staminaInterval = null;
@@ -443,6 +445,7 @@
                             this.stamina = Math.max(0, this.stamina - this.survivalCfg.penalty);
                             this.syncStaminaPct();
                             this.triggerDrainFlash();
+                            this.drainEventCount++;
                             if (this.stamina <= 0) this.survivalGameOver();
                         }
                         return;
@@ -824,7 +827,7 @@
                     const correct = this.correctKeystrokes;
                     const total = this.totalKeystrokes;
 
-                    this.$wire.saveResult(durationMs, total, correct, this.wpmHistory, this.rawHistory, this.missedChars);
+                    this.$wire.saveResult(durationMs, total, correct, this.wpmHistory, this.rawHistory, this.missedChars, this.drainEventCount);
                 }
             }
         }

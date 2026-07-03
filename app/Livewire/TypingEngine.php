@@ -163,7 +163,7 @@ class TypingEngine extends Component
         }
     }
 
-    public function saveResult($durationMs, $totalKeystrokes, $correctKeystrokes, $wpmHistory = [], $rawHistory = [], $missedChars = [])
+    public function saveResult($durationMs, $totalKeystrokes, $correctKeystrokes, $wpmHistory = [], $rawHistory = [], $missedChars = [], $drainEventCount = 0)
     {
         // Gerbang mode: mainMode/subMode adalah properti publik yang dikendalikan client.
         // Normalkan terhadap whitelist SEBELUM dipakai untuk menentukan score/mode_config,
@@ -212,6 +212,8 @@ class TypingEngine extends Component
         $previousBest = null;
         $levelData = null;
         $xpEarned = 0;
+        $survivalPreviousBest = null;
+        $isSurvivalPersonalBest = false;
 
         if (Auth::check()) {
             $user = Auth::user();
@@ -220,6 +222,16 @@ class TypingEngine extends Component
             // dari rekor WPM (konsisten dengan aturan di bawah).
             $previousBest = (float) $user->highest_wpm;
             $isPersonalBest = $this->mainMode !== 'survival' && $finalNetWpm > $previousBest;
+
+            if ($this->mainMode === 'survival') {
+                $survivalPreviousBest = TypingResult::where('user_id', $user->id)
+                    ->where('mode', 'survival')
+                    ->where('mode_config', (string) $this->subMode)
+                    ->max('duration_seconds');
+
+                $isSurvivalPersonalBest = $survivalPreviousBest === null
+                    || $duration > (float) $survivalPreviousBest;
+            }
 
             DB::transaction(function () use (
                 &$xpEarned, $user, $duration, $finalNetWpm, $finalRawWpm, $finalAccuracy,
@@ -283,6 +295,9 @@ class TypingEngine extends Component
             'previousBest' => $previousBest,
             'consistency' => $consistency,
             'levelData' => $levelData,
+            'drainEventCount' => (int) $drainEventCount,
+            'survivalPreviousBest' => $survivalPreviousBest !== null ? (float) $survivalPreviousBest : null,
+            'isSurvivalPersonalBest' => $isSurvivalPersonalBest,
         ]);
         session()->save();
 
