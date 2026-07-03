@@ -1,0 +1,111 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\TypingResult;
+use App\Models\User;
+use App\Models\UserAchievement;
+use App\Support\AchievementDefinitions;
+use Illuminate\Support\Carbon;
+
+/**
+ * Evaluasi achievement STATIS: dihitung dari data yang SUDAH ADA saat halaman
+ * dibuka (bukan rule engine yang berjalan terus). Semua metrik diturunkan dari
+ * typing_results + users (total_xp, highest_wpm) — tidak ada pelacakan streak/
+ * temporal (sesuai larangan MVP di 10. Achievement.md).
+ *
+ * Pendekatan B: saat sebuah achievement pertama kali terpenuhi, catat unlock-nya
+ * di tabel user_achievements (SIAPA meraih APA & KAPAN). Definisinya tetap di KODE
+ * (AchievementDefinitions), tabel hanya menyimpan penanda + tanggal.
+ */
+class AchievementService
+{
+    /**
+     * Hitung metrik yang dibutuhkan semua aturan, dalam SATU lintasan query murah.
+     *
+     * @return array{highest_wpm:float, level:int, total_tests:int, total_chars:int, perfect_runs:int}
+     */
+    public function computeStats(User $user): array
+    {
+        $base = TypingResult::where('user_id', $user->id);
+
+        return [
+            // WPM: pakai kolom rekor yang sudah dipelihara di users.
+            'highest_wpm' => (float) ($user->highest_wpm ?? 0),
+            // Level: turunan murni dari total_xp (satu sumber: User::levelData()).
+            'level' => $user->levelData()['level'],
+            // Jumlah tes = jumlah baris typing_results.
+            'total_tests' => (clone $base)->count(),
+            // Total karakter benar yang pernah diketik.
+            'total_chars' => (int) (clone $base)->sum('correct_chars'),
+            // Berapa kali mencapai akurasi 100% dalam satu tes.
+            'perfect_runs' => (clone $base)->where('accuracy', '>=', 100)->count(),
+        ];
+    }
+
+    /**
+     * Kembalikan daftar achievement lengkap dengan status earned + tanggal unlock.
+     * Sekaligus mencatat unlock baru (Pendekatan B) untuk yang baru terpenuhi.
+     *
+     * @return array{
+     *   items: array<int, array{key:string,title:string,description:string,category:string,icon_value:string,icon_unit:string,earned:bool,unlocked_at:?Carbon}>,
+     *   earned_count: int,
+     *   total: int,
+     *   newly_unlocked: array<int, string>
+     * }
+     */
+    public function evaluate(User $user): array
+    {
+        $stats = $this->computeStats($user);
+        $definitions = AchievementDefinitions::all();
+
+        // Ambil catatan unlock yang sudah ada -> tahu tanggal "diraih pada".
+        $existing = UserAchievement::where('user_id', $user->id)
+            ->get()
+            ->keyBy('achievement_key');
+
+        $items = [];
+        $earnedCount = 0;
+        $newlyUnlocked = [];
+        $now = now();
+
+        foreach ($definitions as $def) {
+            $earned = (bool) ($def['check'])($stats);
+            $record = $existing->get($def['key']);
+            $unlockedAt = $record?->unlocked_at;
+
+            // Baru terpenuhi & belum pernah dicatat -> catat unlock sekarang.
+            if ($earned && ! $record) {
+                UserAchievement::create([
+                    'user_id' => $user->id,
+                    'achievement_key' => $def['key'],
+                    'unlocked_at' => $now,
+                ]);
+                $unlockedAt = $now;
+                $newlyUnlocked[] = $def['key'];
+            }
+
+            if ($earned) {
+                $earnedCount++;
+            }
+
+            $items[] = [
+                'key' => $def['key'],
+                'title' => $def['title'],
+                'description' => $def['description'],
+                'category' => $def['category'],
+                'icon_value' => $def['icon_value'],
+                'icon_unit' => $def['icon_unit'],
+                'earned' => $earned,
+                'unlocked_at' => $earned ? $unlockedAt : null,
+            ];
+        }
+
+        return [
+            'items' => $items,
+            'earned_count' => $earnedCount,
+            'total' => count($definitions),
+            'newly_unlocked' => $newlyUnlocked,
+        ];
+    }
+}
