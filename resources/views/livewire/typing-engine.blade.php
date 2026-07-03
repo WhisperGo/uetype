@@ -215,29 +215,18 @@
 
                 <!-- SINGLE SMOOTH CURSOR -->
                 <div x-ref="caret" x-show="!isFinished"
-                    class="absolute top-0 left-0 w-[2.5px] h-[1.5em] z-20 rounded [will-change:transform] [transition:background-color_150ms_ease-out]"
+                    class="absolute top-0 left-0 w-[0.1em] h-[1.2em] z-20 rounded [transform-origin:top_left] [will-change:transform] [transition:background-color_150ms_ease-out]"
                     :style="`background-color: ${
                         (currentMain === 'survival' && isStarted && !isFinished)
-                            ? (staminaPct > 50 ? 'rgb(var(--color-brand))' : (staminaPct > 25 ? 'rgb(var(--color-gold))' : 'rgb(var(--color-danger))'))
-                            : 'rgb(var(--color-brand))'
+                            ? (staminaPct > 50 ? 'rgb(var(--color-brand-bright))' : (staminaPct > 25 ? 'rgb(var(--color-gold))' : 'rgb(var(--color-danger))'))
+                            : 'rgb(var(--color-brand-bright))'
                     };`"
-                    :class="isTyping ? '' : 'animate-[pulse_0.8s_infinite]'">
+                    :class="isTyping ? '' : 'animate-[caret-flash-smooth_1s_infinite]'">
                 </div>
 
                 <div x-ref="textContainer"
-                    class="relative flex flex-wrap content-start gap-x-[0.5em] transition-transform duration-200 ease-in-out"
+                    class="relative flex flex-wrap content-start gap-x-0 transition-transform duration-[85ms] ease-out"
                     :style="`transform: translateY(-${scrollOffset}px)`">
-
-                    <!-- SINGLE SMOOTH CURSOR -->
-                    <div x-show="!isFinished"
-                        class="absolute top-0 left-0 w-[2.5px] h-[1.5em] transition-all duration-100 ease-out z-20 rounded"
-                        :style="`transform: translate(${cursorLeft}px, ${cursorTop}px); background-color: ${
-                            (currentMain === 'survival' && isStarted && !isFinished)
-                                ? (staminaPct > 50 ? 'rgb(var(--color-brand))' : (staminaPct > 25 ? 'rgb(var(--color-gold))' : 'rgb(var(--color-danger))'))
-                                : 'rgb(var(--color-brand))'
-                        };`"
-                        :class="isTyping ? '' : 'animate-[pulse_0.8s_infinite]'">
-                    </div>
 
                     <!-- GHOST CURSOR: elemen kedua, tipis/transparan, di jalur teks yang SAMA.
                          z-10 (di bawah cursor asli z-20), opacity rendah, warna beda. Otomatis
@@ -788,8 +777,11 @@
                         this.lineHeight = firstChar.offsetHeight;
                     }
 
+                    const caretHeight = this.$refs.caret?.offsetHeight || activeEl.offsetHeight;
+                    const targetTop = top + ((activeEl.offsetHeight - caretHeight) / 2);
+
                     this.cursorLeft = isEnd ? left + width : left;
-                    this.cursorTop = top;
+                    this.cursorTop = targetTop;
 
                     const currentTop = top - containerTop;
                     const lh = this.lineHeight || 48;
@@ -819,7 +811,7 @@
                     const from = getComputedStyle(el).transform;
                     this.caretAnim = el.animate(
                         [{ transform: from }, { transform: target }],
-                        { duration: 100, easing: 'ease-in-out', fill: 'forwards' }
+                        { duration: 85, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' }
                     );
                     el.style.transform = target;
                 },

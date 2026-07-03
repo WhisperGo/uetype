@@ -23,6 +23,11 @@
 }
 
 @layer utilities {
+    @keyframes caret-flash-smooth {
+        0%, 100% { opacity: 0; }
+        50% { opacity: 1; }
+    }
+
     @keyframes stamina-critical {
         0%, 100% { transform: translateX(0) scale(1); opacity: 1; }
         20% { transform: translateX(-2px) scale(1.04); opacity: 0.7; }
