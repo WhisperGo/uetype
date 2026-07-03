@@ -24,6 +24,9 @@ class TypingResult extends Component
     public $previousBest;
     public $consistency;
     public $levelData;
+    public $drainEventCount;
+    public $survivalPreviousBest;
+    public $isSurvivalPersonalBest;
 
     public function mount()
     {
@@ -51,6 +54,9 @@ class TypingResult extends Component
         $this->previousBest = $result['previousBest'] ?? null;
         $this->consistency = $result['consistency'] ?? null;
         $this->levelData = $result['levelData'] ?? null;
+        $this->drainEventCount = $result['drainEventCount'] ?? 0;
+        $this->survivalPreviousBest = $result['survivalPreviousBest'] ?? null;
+        $this->isSurvivalPersonalBest = $result['isSurvivalPersonalBest'] ?? false;
     }
 
     public function render()
