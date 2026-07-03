@@ -163,8 +163,18 @@ class TypingEngine extends Component
         }
     }
 
-    public function saveResult($durationMs, $totalKeystrokes, $correctKeystrokes, $wpmHistory = [], $rawHistory = [], $missedChars = [], $drainEventCount = 0)
-    {
+    public function saveResult(
+        $durationMs,
+        $totalKeystrokes,
+        $correctKeystrokes,
+        $wpmHistory = [],
+        $rawHistory = [],
+        $missedChars = [],
+        $drainEventCount = 0,
+        $ghostWpm = null,
+        $ghostLabel = null,
+        $ghostCharsAtFinish = null
+    ) {
         // Gerbang mode: mainMode/subMode adalah properti publik yang dikendalikan client.
         // Normalkan terhadap whitelist SEBELUM dipakai untuk menentukan score/mode_config,
         // supaya difficulty/sub-mode liar tak pernah masuk DB & mencemari filter leaderboard.
@@ -276,6 +286,22 @@ class TypingEngine extends Component
             $levelData = $user->fresh()->levelData();
         }
 
+        // Ghost Mode: perbandingan ghost-vs-player EFEMERAL (session-only). TIDAK ditulis
+        // ke kolom ghost_data / typing_results manapun — attempt yang mendasari tetap
+        // tersimpan normal di atas (XP, highest_wpm, baris typing_results) persis seperti
+        // mode biasa; ghost murni overlay visual, jadi hanya hasil bandingnya yang
+        // "sekali pakai" untuk ditampilkan di halaman hasil.
+        $ghostResult = null;
+        if ($ghostWpm !== null && (float) $ghostWpm > 0) {
+            $ghostCharsAtFinish = (int) $ghostCharsAtFinish;
+            $ghostResult = [
+                'label' => (string) $ghostLabel,
+                'wpm' => round((float) $ghostWpm, 2),
+                'playerWon' => $correctKeystrokes > $ghostCharsAtFinish,
+                'charDelta' => $correctKeystrokes - $ghostCharsAtFinish,
+            ];
+        }
+
         session()->put('typing_result', [
             'wpm' => $finalNetWpm,
             'rawWpm' => $finalRawWpm,
@@ -298,6 +324,7 @@ class TypingEngine extends Component
             'drainEventCount' => (int) $drainEventCount,
             'survivalPreviousBest' => $survivalPreviousBest !== null ? (float) $survivalPreviousBest : null,
             'isSurvivalPersonalBest' => $isSurvivalPersonalBest,
+            'ghostResult' => $ghostResult,
         ]);
         session()->save();
 

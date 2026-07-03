@@ -153,6 +153,14 @@
                             {{ $recordDelta >= 0 ? '+' : '' }}{{ $recordDelta }} <span class="text-muted/70">vs rekor {{ rtrim(rtrim(number_format($previousBest, 1), '0'), '.') }}</span>
                         </p>
                     @endif
+
+                    @if ($ghostResult)
+                        <p class="mt-3 flex items-center gap-1.5 text-sm font-mono {{ $ghostResult['playerWon'] ? 'text-gold' : 'text-muted' }}">
+                            <span>{{ $ghostResult['playerWon'] ? '✦' : '·' }}</span>
+                            {{ $ghostResult['playerWon'] ? 'beat the ghost' : 'lost to the ghost' }}
+                            <span class="text-muted/70">vs {{ $ghostResult['label'] }} ({{ rtrim(rtrim(number_format($ghostResult['wpm'], 1), '0'), '.') }} wpm)</span>
+                        </p>
+                    @endif
                 </div>
 
                 <!-- Sub-stats -->

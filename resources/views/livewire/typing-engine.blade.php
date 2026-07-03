@@ -1,6 +1,14 @@
 <div
     class="text-muted font-mono selection:bg-brand selection:text-foreground outline-none">
-    <div wire:key="typing-app-{{ str()->random(10) }}" x-data="{
+    {{-- wire:key STABIL (bukan random) — sebelumnya "typing-app-{{ str()->random(10) }}"
+         berubah TIAP render, jadi Livewire selalu memperlakukan div ini sebagai elemen baru
+         dan menghancurkan+membangun ulang SELURUH state Alpine setiap restart/ganti mode.
+         Efek samping ini "berhasil menyamarkan" fakta bahwa tidak ada listener client-side
+         untuk textToType baru (lihat $wire.on('mode-changed', ...) di bawah, yang sekarang
+         MENGGANTIKAN peran itu secara eksplisit). Key baru hanya berubah saat mode/durasi
+         benar-benar berganti — di situ remount penuh tetap wajar. Restart di mode yang sama
+         kini menjaga state Alpine (termasuk ghost) tetap hidup. --}}
+    <div wire:key="typing-app-{{ $mainMode }}-{{ $subMode }}" x-data="{
         currentMain: @entangle('mainMode'),
         currentSub: @entangle('subMode'),
         ...typingGame(@js($textToType))
@@ -12,7 +20,15 @@
             } else if (document.activeElement.tagName !== 'BUTTON') {
                 handleInput($event);
             }
-        ">
+        "
+        x-on:ghost-selected.window="ghostActive = true; ghostWpm = $event.detail.wpm; ghostLabel = $event.detail.label; ghostCharIndex = 0; ghostFinished = false; ghostFinishTime = null; $nextTick(() => { const pos = getCharPosition(0); if (pos) { ghostCursorLeft = pos.left; ghostCursorTop = pos.top; } })"
+        x-on:ghost-cleared.window="ghostActive = false; ghostWpm = 0; ghostLabel = '';">
+
+        {{-- GhostPicker: komponen Livewire TERPISAH (query teman/leaderboard sendiri).
+             wire:key menyertakan mode/durasi supaya daftar leaderboard-nya ikut ter-scope
+             ulang saat mode/durasi berganti (sejalan dengan clear ghost otomatis). --}}
+        <livewire:ghost-picker :main-mode="$mainMode" :sub-mode="$subMode"
+            wire:key="ghost-picker-{{ $mainMode }}-{{ $subMode }}" />
 
         <div x-cloak aria-hidden="true"
             class="fixed inset-0 z-40 pointer-events-none transition-opacity duration-300"
@@ -60,11 +76,15 @@
                         class="px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand"
                         :class="currentMain === 'survival' ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">Survival</button>
 
-                    <span aria-disabled="true" title="Segera hadir"
-                        class="px-[18px] py-[7px] rounded-md text-small font-mono font-bold text-muted/50 cursor-not-allowed inline-flex items-center gap-1.5">
+                    <button type="button" aria-label="Mode Ghost"
+                        @click.prevent="$dispatch('open-modal', 'ghost-picker'); $el.blur()"
+                        class="px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand inline-flex items-center gap-1.5"
+                        :class="ghostActive ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">
                         Ghost
-                        <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
-                    </span>
+                        <template x-if="ghostActive">
+                            <span class="text-[0.6rem] font-sans normal-case tracking-normal opacity-80" x-text="'vs ' + ghostLabel"></span>
+                        </template>
+                    </button>
                 </div>
 
                 <!-- Row 2: Config (Standard → Time/Words/Quote + durasi; Survival → difficulty) -->
@@ -214,6 +234,15 @@
                         :class="isTyping ? '' : 'animate-[pulse_0.8s_infinite]'">
                     </div>
 
+                    <!-- GHOST CURSOR: elemen kedua, tipis/transparan, di jalur teks yang SAMA.
+                         z-10 (di bawah cursor asli z-20), opacity rendah, warna beda. Otomatis
+                         ikut translateY(-scrollOffset) container karena sibling di textContainer;
+                         TIDAK ikut mengontrol scroll (hanya cursor asli yang menggerakkan scroll). -->
+                    <div x-show="ghostActive && !isFinished" x-cloak
+                        class="absolute top-0 left-0 w-[2.5px] h-[1.5em] transition-all duration-150 ease-out z-10 rounded opacity-40"
+                        :style="`transform: translate(${ghostCursorLeft}px, ${ghostCursorTop}px); background-color: rgb(var(--color-muted));`">
+                    </div>
+
                     @php
                         $words = explode(' ', $textToType);
                         $charPointer = 0;
@@ -316,6 +345,21 @@
                 extraChars: {},
                 cursorLeft: 0,
                 cursorTop: 0,
+
+                // --- Ghost Mode: cursor kedua yang paced linear (WPM konstan) ---
+                // ghostActive/ghostWpm/ghostLabel diisi lewat event 'ghost-selected' dari
+                // GhostPicker (komponen Livewire terpisah); SENGAJA tidak direset di init()
+                // biasa supaya bertahan lintas restart pada mode yang sama. ghostCharIndex
+                // dst adalah progres balapan ghost, direset tiap restart (lihat resetForNewText).
+                ghostActive: false,
+                ghostWpm: 0,
+                ghostLabel: '',
+                ghostCharIndex: 0,
+                ghostCursorLeft: 0,
+                ghostCursorTop: 0,
+                ghostFinished: false,
+                ghostFinishTime: null,
+
                 isTyping: false,
                 typingTimeout: null,
                 totalKeystrokes: 0,
@@ -348,6 +392,61 @@
                 },
 
                 init() {
+                    this.resetProgress();
+
+                    // wire:key sekarang STABIL (lihat komentar di root div), jadi restart()/
+                    // setMode() tidak lagi menghancurkan komponen Alpine ini. Livewire tetap
+                    // mengubah $textToType di server, tapi kita perlu mendengarkannya sendiri
+                    // untuk menyuntikkan teks baru ke targetArray & mereset progres ketikan.
+                    // Didaftarkan SEKALI di sini (init() hanya jalan sekali per mount — mount
+                    // tetap terjadi saat mode/durasi benar-benar berganti karena wire:key
+                    // menyertakan keduanya) — bukan di resetForNewText(), supaya listener
+                    // tidak menumpuk tiap kali restart dipanggil berulang.
+                    this.$wire.on('mode-changed', (payload) => {
+                        this.resetForNewText(payload.text ?? '');
+                    });
+                },
+
+                // Reset penuh untuk teks BARU pada mode yang SAMA (dipanggil oleh restart()/
+                // setMode() lewat event 'mode-changed'). Ini menggantikan peran yang dulu
+                // "gratis" didapat dari remount total via wire:key acak — sekarang eksplisit.
+                resetForNewText(newText) {
+                    if (this.timerInterval) {
+                        clearInterval(this.timerInterval);
+                        this.timerInterval = null;
+                    }
+
+                    this.targetArray = newText.split('');
+                    this.currentIndex = 0;
+                    this.inputResults = [];
+                    this.startTime = null;
+                    this.isStarted = false;
+                    this.isFinished = false;
+                    this.wpm = 0;
+                    this.rawWpm = 0;
+                    this.accuracy = 0;
+                    this.cursorLeft = 0;
+                    this.cursorTop = 0;
+                    this.scrollOffset = 0;
+                    this.lineHeight = 0;
+                    this.isTyping = false;
+
+                    // Ghost: progres balapan direset, TAPI ghostActive/ghostWpm/ghostLabel
+                    // SENGAJA tidak disentuh di sini — ghost yang sudah dipilih bertahan
+                    // lintas restart pada mode yang sama (lihat init() ghost & GhostPicker).
+                    this.ghostCharIndex = 0;
+                    this.ghostFinished = false;
+                    this.ghostFinishTime = null;
+                    this.ghostCursorLeft = 0;
+                    this.ghostCursorTop = 0;
+
+                    this.resetProgress();
+                },
+
+                // Logika reset BERSAMA (wordBounds, survival, dsb) dari targetArray saat ini.
+                // Dipakai oleh init() (mount pertama) DAN resetForNewText() (restart di mode
+                // sama) — diekstrak supaya tidak duplikat & listener $wire.on tidak menumpuk.
+                resetProgress() {
                     this.timer = (this.currentMain === 'time') ? parseInt(this.currentSub) : 0;
 
                     // Reset state survival tiap mulai/restart. Preset diambil dari currentSub
@@ -527,6 +626,51 @@
                     clearTimeout(this.typingTimeout);
                 },
 
+                // Lookup posisi DOM char-{index} generik (dipakai cursor asli & ghost).
+                // Ghost tidak punya extraChars/overtyping sendiri (index-nya selalu murni
+                // 0..targetArray.length), jadi cukup fallback ke karakter terakhir kalau
+                // index melebihi teks (mis. ghost sudah "sampai" akhir).
+                getCharPosition(index) {
+                    let activeEl = document.getElementById('char-' + index);
+                    let isEnd = false;
+
+                    if (!activeEl) {
+                        activeEl = document.getElementById('char-' + (index - 1));
+                        isEnd = true;
+                    }
+
+                    if (!activeEl) return null;
+
+                    return {
+                        left: isEnd ? activeEl.offsetLeft + activeEl.offsetWidth : activeEl.offsetLeft,
+                        top: activeEl.offsetTop,
+                    };
+                },
+
+                // Posisi ghost dihitung dari progres waktu (pacing linear), BUKAN dari
+                // ketikan aktual. Dipanggil dari timerInterval (lihat area timer), bukan
+                // interval terpisah, supaya tak ada dua interval saling tabrakan.
+                updateGhostPosition() {
+                    if (!this.startTime || this.ghostFinished) return;
+
+                    const minutesElapsed = (Date.now() - this.startTime) / 60000;
+                    let expectedChars = Math.floor(this.ghostWpm * 5 * minutesElapsed);
+                    expectedChars = Math.max(0, Math.min(expectedChars, this.targetArray.length));
+
+                    this.ghostCharIndex = expectedChars;
+
+                    if (expectedChars >= this.targetArray.length) {
+                        this.ghostFinished = true;
+                        this.ghostFinishTime = Date.now() - this.startTime;
+                    }
+
+                    const pos = this.getCharPosition(expectedChars);
+                    if (pos) {
+                        this.ghostCursorLeft = pos.left;
+                        this.ghostCursorTop = pos.top;
+                    }
+                },
+
                 updatePosition() {
                     if (!this.$refs.textContainer) return;
 
@@ -617,6 +761,12 @@
                                 const timeElapsedMins = (Date.now() - this.startTime) / 60000;
                                 const raw = Math.round((this.totalKeystrokes / 5) / timeElapsedMins) || 0;
                                 this.rawHistory.push(raw);
+                            }
+
+                            // Ghost menumpang interval yang sama (bukan interval baru) supaya
+                            // tak ada dua timer saling drift/tabrakan.
+                            if (this.ghostActive && !this.ghostFinished) {
+                                this.updateGhostPosition();
                             }
                         }, 1000);
                     }
@@ -827,7 +977,16 @@
                     const correct = this.correctKeystrokes;
                     const total = this.totalKeystrokes;
 
-                    this.$wire.saveResult(durationMs, total, correct, this.wpmHistory, this.rawHistory, this.missedChars, this.drainEventCount);
+                    // Ghost: hitung posisi ghost PERSIS pada momen finish (bukan snapshot tick
+                    // interval terakhir yang bisa telat s.d. 1 detik) untuk perbandingan akurat.
+                    if (this.ghostActive && !this.ghostFinished) {
+                        this.updateGhostPosition();
+                    }
+                    const ghostWpmArg = this.ghostActive ? this.ghostWpm : null;
+                    const ghostLabelArg = this.ghostActive ? this.ghostLabel : null;
+                    const ghostCharsArg = this.ghostActive ? this.ghostCharIndex : null;
+
+                    this.$wire.saveResult(durationMs, total, correct, this.wpmHistory, this.rawHistory, this.missedChars, this.drainEventCount, ghostWpmArg, ghostLabelArg, ghostCharsArg);
                 }
             }
         }
