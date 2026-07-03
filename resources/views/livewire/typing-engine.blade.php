@@ -21,8 +21,8 @@
                 handleInput($event);
             }
         "
-        x-on:ghost-selected.window="ghostActive = true; ghostWpm = $event.detail.wpm; ghostLabel = $event.detail.label; ghostCharIndex = 0; ghostFinished = false; ghostFinishTime = null; $nextTick(() => { const pos = getCharPosition(0); if (pos) { ghostCursorLeft = pos.left; ghostCursorTop = pos.top; } })"
-        x-on:ghost-cleared.window="ghostActive = false; ghostWpm = 0; ghostLabel = '';">
+        x-on:ghost-selected.window="ghostActive = true; ghostWpm = $event.detail.wpm; ghostLabel = $event.detail.label; ghostCharIndex = 0; ghostFinished = false; ghostFinishTime = null; $nextTick(() => { const pos = getCharPosition(0); if (pos) { ghostCursorLeft = pos.left; ghostCursorTop = pos.top; } if (isStarted) startGhostAnimationLoop(); })"
+        x-on:ghost-cleared.window="ghostActive = false; ghostWpm = 0; ghostLabel = ''; stopGhostAnimationLoop();">
 
         {{-- GhostPicker: komponen Livewire TERPISAH (query teman/leaderboard sendiri).
              wire:key menyertakan mode/durasi supaya daftar leaderboard-nya ikut ter-scope
@@ -237,9 +237,16 @@
                     <!-- GHOST CURSOR: elemen kedua, tipis/transparan, di jalur teks yang SAMA.
                          z-10 (di bawah cursor asli z-20), opacity rendah, warna beda. Otomatis
                          ikut translateY(-scrollOffset) container karena sibling di textContainer;
-                         TIDAK ikut mengontrol scroll (hanya cursor asli yang menggerakkan scroll). -->
+                         TIDAK ikut mengontrol scroll (hanya cursor asli yang menggerakkan scroll).
+                         SENGAJA TANPA transition-all pada transform: posisi sudah di-update
+                         tiap frame via requestAnimationFrame + interpolasi pixel (lihat
+                         updateGhostPosition()), jadi geraknya sudah mulus dengan sendirinya.
+                         Menambah CSS transition di sini justru membuat cursor "mengejar" posisi
+                         yang terus berubah tiap frame -> terasa lamban/karet, bukan presisi
+                         linear sesuai WPM yang di-set. Transisi HANYA dipakai untuk opacity
+                         (show/hide), bukan transform. -->
                     <div x-show="ghostActive && !isFinished" x-cloak
-                        class="absolute top-0 left-0 w-[2.5px] h-[1.5em] transition-all duration-150 ease-out z-10 rounded opacity-40"
+                        class="absolute top-0 left-0 w-[2.5px] h-[1.5em] transition-opacity duration-150 z-10 rounded opacity-40"
                         :style="`transform: translate(${ghostCursorLeft}px, ${ghostCursorTop}px); background-color: rgb(var(--color-muted));`">
                     </div>
 
@@ -359,6 +366,7 @@
                 ghostCursorTop: 0,
                 ghostFinished: false,
                 ghostFinishTime: null,
+                _ghostRafId: null,
 
                 isTyping: false,
                 typingTimeout: null,
@@ -415,6 +423,9 @@
                         clearInterval(this.timerInterval);
                         this.timerInterval = null;
                     }
+                    // Hentikan loop rAF ghost race sebelumnya; akan dimulai lagi saat
+                    // keystroke pertama race baru (lihat handleInput -> startGhostAnimationLoop).
+                    this.stopGhostAnimationLoop();
 
                     this.targetArray = newText.split('');
                     this.currentIndex = 0;
@@ -624,6 +635,7 @@
                     if (this.staminaInterval) clearInterval(this.staminaInterval);
                     clearTimeout(this.drainFlashTimeout);
                     clearTimeout(this.typingTimeout);
+                    this.stopGhostAnimationLoop();
                 },
 
                 // Lookup posisi DOM char-{index} generik (dipakai cursor asli & ghost).
@@ -647,27 +659,85 @@
                     };
                 },
 
-                // Posisi ghost dihitung dari progres waktu (pacing linear), BUKAN dari
-                // ketikan aktual. Dipanggil dari timerInterval (lihat area timer), bukan
-                // interval terpisah, supaya tak ada dua interval saling tabrakan.
+                // Posisi ghost dihitung dari progres waktu (pacing linear). Dipanggil dari
+                // requestAnimationFrame (lihat startGhostAnimationLoop), BUKAN dari
+                // timerInterval 1 detik — itulah sebabnya dulu terlihat patah/loncat per
+                // detik. rAF jalan tiap frame (~60x/detik) sehingga interpolasi pixel di
+                // bawah benar-benar terlihat mulus, sesuai kecepatan WPM yang di-set.
+                //
+                // ghostCharIndex tetap dibulatkan (integer) — dipakai untuk logika menang/
+                // kalah di finish(), TIDAK untuk render. Posisi VISUAL (ghostCursorLeft/Top)
+                // dihitung terpisah dari nilai PECAHAN (fractionalChars) supaya cursor
+                // bergerak halus MELINTASI lebar tiap karakter, bukan meloncat karakter demi
+                // karakter tiap kali index integer bertambah.
                 updateGhostPosition() {
                     if (!this.startTime || this.ghostFinished) return;
 
                     const minutesElapsed = (Date.now() - this.startTime) / 60000;
-                    let expectedChars = Math.floor(this.ghostWpm * 5 * minutesElapsed);
-                    expectedChars = Math.max(0, Math.min(expectedChars, this.targetArray.length));
+                    const fractionalChars = Math.max(0, Math.min(
+                        this.ghostWpm * 5 * minutesElapsed,
+                        this.targetArray.length
+                    ));
 
-                    this.ghostCharIndex = expectedChars;
+                    const flooredIndex = Math.floor(fractionalChars);
+                    this.ghostCharIndex = Math.min(flooredIndex, this.targetArray.length);
 
-                    if (expectedChars >= this.targetArray.length) {
-                        this.ghostFinished = true;
-                        this.ghostFinishTime = Date.now() - this.startTime;
+                    if (fractionalChars >= this.targetArray.length) {
+                        if (!this.ghostFinished) {
+                            this.ghostFinished = true;
+                            this.ghostFinishTime = Date.now() - this.startTime;
+                        }
+                        const pos = this.getCharPosition(this.targetArray.length);
+                        if (pos) {
+                            this.ghostCursorLeft = pos.left;
+                            this.ghostCursorTop = pos.top;
+                        }
+                        return;
                     }
 
-                    const pos = this.getCharPosition(expectedChars);
-                    if (pos) {
-                        this.ghostCursorLeft = pos.left;
-                        this.ghostCursorTop = pos.top;
+                    // Interpolasi pixel: posisi karakter SEKARANG -> posisi karakter
+                    // BERIKUTNYA, digeser sebesar bagian pecahan (0..1) dari fractionalChars.
+                    // Hanya diterapkan kalau keduanya di baris yang SAMA (top identik) —
+                    // kalau beda baris (ganti kata yang wrap ke bawah), lompat langsung ke
+                    // posisi target tanpa interpolasi supaya cursor tak "terbang" diagonal.
+                    const fraction = fractionalChars - flooredIndex;
+                    const currentPos = this.getCharPosition(flooredIndex);
+                    if (!currentPos) return;
+
+                    const nextPos = this.getCharPosition(flooredIndex + 1);
+
+                    if (nextPos && nextPos.top === currentPos.top) {
+                        this.ghostCursorLeft = currentPos.left + (nextPos.left - currentPos.left) * fraction;
+                        this.ghostCursorTop = currentPos.top;
+                    } else {
+                        this.ghostCursorLeft = currentPos.left;
+                        this.ghostCursorTop = currentPos.top;
+                    }
+                },
+
+                // Loop animasi ghost via requestAnimationFrame — terpisah total dari
+                // timerInterval (yang tetap 1 detik untuk stats/timer). rAF memberi update
+                // per-frame (~60fps) yang dibutuhkan supaya interpolasi pixel di atas benar-
+                // benar mulus, bukan patah tiap 1 detik.
+                startGhostAnimationLoop() {
+                    if (this._ghostRafId) return; // sudah berjalan
+
+                    const tick = () => {
+                        if (!this.ghostActive || this.isFinished) {
+                            this._ghostRafId = null;
+                            return;
+                        }
+                        this.updateGhostPosition();
+                        this._ghostRafId = requestAnimationFrame(tick);
+                    };
+
+                    this._ghostRafId = requestAnimationFrame(tick);
+                },
+
+                stopGhostAnimationLoop() {
+                    if (this._ghostRafId) {
+                        cancelAnimationFrame(this._ghostRafId);
+                        this._ghostRafId = null;
                     }
                 },
 
@@ -745,6 +815,14 @@
                             this.staminaInterval = setInterval(() => this.staminaTick(), 100);
                         }
 
+                        // Ghost: loop requestAnimationFrame TERPISAH dari timerInterval di
+                        // bawah. Sebelumnya ghost menumpang interval 1 detik ini -> terlihat
+                        // loncat/patah karena posisi hanya di-update sekali per detik. rAF
+                        // jalan tiap frame (~60fps), jadi gerakan benar-benar mulus sesuai WPM.
+                        if (this.ghostActive) {
+                            this.startGhostAnimationLoop();
+                        }
+
                         this.timerInterval = setInterval(() => {
                             const timeElapsed = Math.floor((Date.now() - this.startTime) / 1000);
                             if (this.currentMain === 'time') {
@@ -761,12 +839,6 @@
                                 const timeElapsedMins = (Date.now() - this.startTime) / 60000;
                                 const raw = Math.round((this.totalKeystrokes / 5) / timeElapsedMins) || 0;
                                 this.rawHistory.push(raw);
-                            }
-
-                            // Ghost menumpang interval yang sama (bukan interval baru) supaya
-                            // tak ada dua timer saling drift/tabrakan.
-                            if (this.ghostActive && !this.ghostFinished) {
-                                this.updateGhostPosition();
                             }
                         }, 1000);
                     }
@@ -977,11 +1049,14 @@
                     const correct = this.correctKeystrokes;
                     const total = this.totalKeystrokes;
 
-                    // Ghost: hitung posisi ghost PERSIS pada momen finish (bukan snapshot tick
-                    // interval terakhir yang bisa telat s.d. 1 detik) untuk perbandingan akurat.
+                    // Ghost: hitung posisi ghost PERSIS pada momen finish (bukan snapshot rAF
+                    // terakhir yang bisa sedikit telat) untuk perbandingan akurat, lalu hentikan
+                    // loop animasinya (juga akan berhenti sendiri karena isFinished sudah true,
+                    // tapi dihentikan eksplisit di sini untuk kebersihan).
                     if (this.ghostActive && !this.ghostFinished) {
                         this.updateGhostPosition();
                     }
+                    this.stopGhostAnimationLoop();
                     const ghostWpmArg = this.ghostActive ? this.ghostWpm : null;
                     const ghostLabelArg = this.ghostActive ? this.ghostLabel : null;
                     const ghostCharsArg = this.ghostActive ? this.ghostCharIndex : null;
