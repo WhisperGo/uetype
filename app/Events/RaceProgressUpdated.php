@@ -13,7 +13,9 @@ class RaceProgressUpdated implements ShouldBroadcastNow
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $roomCode;
+
     public $userId;
+
     public $progressData;
 
     public function __construct($roomCode, $userId, $progressData)
@@ -25,7 +27,7 @@ class RaceProgressUpdated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [new Channel('race.' . $this->roomCode)];
+        return [new Channel('race.'.$this->roomCode)];
     }
 
     public function broadcastAs(): string

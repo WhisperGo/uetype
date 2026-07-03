@@ -2,13 +2,13 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
 use App\Models\Text;
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use App\Models\TypingResult;
 use App\Services\AntiCheatService;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Livewire\Component;
 
 class TypingEngine extends Component
 {
@@ -85,7 +85,7 @@ class TypingEngine extends Component
         // Simpan preferensi pengguna ke session agar tidak reset
         session()->put('typing_preferences', [
             'mode' => $main,
-            'subMode' => $sub
+            'subMode' => $sub,
         ]);
         session()->save();
 
@@ -116,7 +116,7 @@ class TypingEngine extends Component
     {
         if ($this->mainMode === 'quote') {
             $text = Text::where('mode', 'quote')->inRandomOrder()->first();
-            $this->textToType = $text ? $text->content : "Kutipan belum tersedia di database.";
+            $this->textToType = $text ? $text->content : 'Kutipan belum tersedia di database.';
             // Simpan ID quote agar hasil sesi bisa mereferensikan teks yang diketik.
             $this->textId = $text?->id;
         } else {
@@ -155,10 +155,10 @@ class TypingEngine extends Component
 
                     $this->textToType = implode(' ', $selectedWords);
                 } else {
-                    $this->textToType = "error: struktur file json tidak valid";
+                    $this->textToType = 'error: struktur file json tidak valid';
                 }
             } else {
-                $this->textToType = "error: file wordlist tidak ditemukan";
+                $this->textToType = 'error: file wordlist tidak ditemukan';
             }
         }
     }
@@ -206,20 +206,12 @@ class TypingEngine extends Component
             return $this->redirect(route('typing'), navigate: true);
         }
 
-        // EXP BERBASIS VOLUME + bonus akurasi tipis (requirement Level/EXP bag. 1).
-        // SENGAJA bukan berbasis WPM: requirement eksplisit melarang EXP murni-WPM karena
-        // menghukum pemula yang lambat & membuat level mencerminkan bakat, bukan usaha.
-        //   - Basis volume : jumlah karakter benar (makin banyak latihan → makin banyak EXP).
-        //   - Bonus akurasi: hanya menggeser pengali 0.5–1.0 (tipis, tak menghukum pemula).
-        // Contoh: 250 char @95% ≈ 24 XP; 250 char @70% ≈ 21 XP. Angka faktor boleh di-tuning.
-        $accuracyMultiplier = 0.5 + 0.5 * ($finalAccuracy / 100);
-        $xpEarned = (int) round($correctKeystrokes * 0.1 * $accuracyMultiplier);
-
         $consistency = $this->computeConsistency($wpmHistory);
 
         $isPersonalBest = false;
         $previousBest = null;
         $levelData = null;
+        $xpEarned = 0;
 
         if (Auth::check()) {
             $user = Auth::user();
@@ -230,10 +222,15 @@ class TypingEngine extends Component
             $isPersonalBest = $this->mainMode !== 'survival' && $finalNetWpm > $previousBest;
 
             DB::transaction(function () use (
-                $user, $duration, $finalNetWpm, $finalRawWpm, $finalAccuracy,
-                $correctKeystrokes, $incorrectKeystrokes, $xpEarned, $score,
-                $wpmHistory, $rawHistory, $missedChars
+                &$xpEarned, $user, $duration, $finalNetWpm, $finalRawWpm, $finalAccuracy,
+                $correctKeystrokes, $incorrectKeystrokes, $score
+
             ) {
+                // EXP berbasis volume + bonus akurasi (requirement Level/EXP bag. 1).
+                // Rumus dipusatkan di User::addExp() -> SATU sumber kebenaran dengan
+                // mode multiplayer. addExp() sekaligus mengakumulasi ke total_xp & save.
+                $xpEarned = $user->addExp($correctKeystrokes, $finalAccuracy);
+
                 // Satu sesi solo valid = satu baris di typing_results (requirement Database).
                 TypingResult::create([
                     'user_id' => $user->id,
@@ -253,18 +250,14 @@ class TypingEngine extends Component
                     'ghost_data' => null, // diisi selektif oleh ghost mode nanti
                 ]);
 
-                // Akumulasi EXP ke total user & perbarui rekor WPM (hanya sesi valid sampai sini).
-                $user->total_xp += $xpEarned;
-
                 // Rekor WPM HANYA dari mode terukur-waktu/teks (time/words/quote). Survival
                 // sengaja DIKECUALIKAN: WPM-nya dicapai di bawah tekanan stamina (bukan apple-to-
                 // apple dengan run standar) dan di doc selalu berstatus "stat sampingan", bukan
                 // metrik utama. Memasukkannya akan mencemari rekor profil pemain.
                 if ($this->mainMode !== 'survival' && $finalNetWpm > (float) $user->highest_wpm) {
                     $user->highest_wpm = $finalNetWpm;
+                    $user->save();
                 }
-
-                $user->save();
             });
 
             // Snapshot setelah XP masuk: level & progres untuk ditampilkan di halaman result.

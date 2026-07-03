@@ -87,7 +87,10 @@
     <!-- 2. HALAMAN RUANG TUNGGU: WAITING ROOM -->
     <!-- ===================================================================== -->
     @if ($this->step === 'waiting' && $this->roomData && !$showResultModal)
-        <div class="space-y-8" wire:poll.2s>
+        {{-- wire:poll dihapus: update lobby (join/ready/leave) sudah didorong lewat
+             WebSocket .room.updated -> Livewire.dispatch('room-updated'). Polling 2s
+             hanya menambah latensi & beban tanpa manfaat. --}}
+        <div class="space-y-8">
             <div
                 class="p-6 border bg-typing-surface/40 border-white/5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
@@ -201,9 +204,15 @@
              parsing atribut HTML sehingga kode-nya bocor tampil sebagai teks di
              halaman. Di sini x-data hanya memanggil fungsi + mengoper data server
              lewat @js() yang sudah aman ter-escape. --}}
-        <div wire:key="race-arena-{{ $this->roomCode }}" class="space-y-8" wire:poll.1s="checkSuddenDeath"
+        {{-- wire:poll.1s="checkSuddenDeath" dihapus: sudden death kini disinkron via
+             WebSocket .race.sudden_death (timestamp akhir dari server) + clock lokal.
+             Saat clock lokal capai 0, lockRace() memanggil checkSuddenDeath() SEKALI
+             sebagai gerbang final server (idempoten). Tidak perlu poll tiap detik. --}}
+        <div wire:key="race-arena-{{ $this->roomCode }}" class="space-y-8"
             x-data="raceArena({
+                myId: @js(Auth::id()),
                 textToType: @js($this->roomData->text_to_type),
+                raceStartsAt: @js($this->raceStartsAt),
                 suddenDeathActive: @js($this->suddenDeathActive),
                 suddenDeathRemaining: @js($this->suddenDeathRemaining),
             })">
@@ -241,19 +250,45 @@
 
                 <div class="space-y-3 bg-black/30 p-4 rounded-2xl border border-white/[0.02] divide-y divide-white/5">
                     @foreach ($this->roomData->members as $player)
-                        <div class="pt-3 first:pt-0">
+                        @php
+                            $isSelf = $player->user_id === Auth::id();
+                        @endphp
+                        {{-- x-data lane: setiap lane menghitung progress/wpm/finished-nya sendiri
+                             secara reaktif. Pemain SENDIRI membaca state lokal raceArena (gerak
+                             instan dari ketikan). Pemain LAWAN membaca $store.race.opponents[id]
+                             yang diisi langsung dari payload WebSocket (.race.progress) — TANPA
+                             re-render Livewire. Nilai Blade dipakai sebagai seed awal / fallback. --}}
+                        {{-- Semua lane (termasuk diri sendiri) membaca dari $store.race
+                             secara SERAGAM: raceArena mem-publish progress pemain lokal ke
+                             store dengan key userId-nya sendiri (lihat publishLocal()).
+                             Ini menghindari ketergantungan rapuh pada `this` komponen induk
+                             di dalam getter Alpine nested. Nilai Blade = seed awal/fallback. --}}
+                        <div class="pt-3 first:pt-0"
+                            x-data="{
+                                playerId: @js($player->user_id),
+                                seedProgress: @js((int) ($player->progress_percent ?? 0)),
+                                seedWpm: @js((int) ($player->wpm ?? 0)),
+                                seedFinished: @js((bool) $player->finished_time_seconds),
+                                get liveProgress() {
+                                    return $store.race.opponents[this.playerId]?.progress ?? this.seedProgress;
+                                },
+                                get liveWpmValue() {
+                                    return $store.race.opponents[this.playerId]?.wpm ?? this.seedWpm;
+                                },
+                                get liveFinished() {
+                                    return $store.race.opponents[this.playerId]?.finished ?? this.seedFinished;
+                                },
+                            }">
                             <div class="flex justify-between items-center mb-1 text-xs font-mono">
                                 <span
-                                    class="{{ $player->user_id === Auth::id() ? 'text-[#cbb38a] font-bold' : 'text-typing-muted' }}">
+                                    class="{{ $isSelf ? 'text-[#cbb38a] font-bold' : 'text-typing-muted' }}">
                                     {{ $player->user->username }}
                                     @if ($player->user_id === $this->roomData->host_id)
                                         <span class="text-[10px] text-zinc-500">[Host]</span>
                                     @endif
-                                    @if ($player->finished_time_seconds)
-                                        <span class="text-emerald-400 font-bold ml-1">[FINISHED]</span>
-                                    @endif
+                                    <span class="text-emerald-400 font-bold ml-1" x-show="liveFinished" x-cloak>[FINISHED]</span>
                                 </span>
-                                <span class="font-mono text-[#cbb38a] font-bold">{{ $player->wpm ?? 0 }} WPM</span>
+                                <span class="font-mono text-[#cbb38a] font-bold"><span x-text="liveWpmValue"></span> WPM</span>
                             </div>
 
                             <div
@@ -263,7 +298,7 @@
                                     FINISH</div>
 
                                 <div class="h-full bg-white/[0.02] transition-all duration-300 flex items-center justify-end relative"
-                                    style="width: calc(10% + {{ $player->progress_percent ?? 0 }}% * 0.85);">
+                                    :style="`width: calc(10% + ${liveProgress}% * 0.85);`">
                                     <div
                                         class="w-8 h-8 flex items-center justify-center animate-bounce transition-all duration-200">
                                         <img src="/icon/uetype_mascot.png" alt="Player Maskot"
@@ -486,23 +521,33 @@
                 </div>
             </div>
 
-            <!-- PANEL PROGRESS REPORT XP -->
-            <div class="p-5 border border-white/5 bg-typing-surface/30 rounded-2xl space-y-2">
-                <div class="flex justify-between items-center text-xs font-mono">
-                    <div class="flex flex-col">
-                        <span class="text-typing-muted text-[10px] uppercase tracking-wide">XP Earned</span>
-                        <span class="text-2xl font-black text-[#cbb38a] mt-0.5">+280 XP</span>
+            <!-- PANEL PROGRESS REPORT XP (data nyata dari getMyXpResultProperty) -->
+            @php
+                $xp = $this->myXpResult;
+                $lvl = $xp['level'] ?? null;
+                $xpProgress = $lvl['progress'] ?? 0;
+                $xpNeeded = $lvl['needed'] ?? 0;
+                $xpBarWidth = $xpNeeded > 0 ? min(100, ($xpProgress / $xpNeeded) * 100) : 0;
+            @endphp
+            @if ($xp)
+                <div class="p-5 border border-white/5 bg-typing-surface/30 rounded-2xl space-y-2">
+                    <div class="flex justify-between items-center text-xs font-mono">
+                        <div class="flex flex-col">
+                            <span class="text-typing-muted text-[10px] uppercase tracking-wide">XP Earned</span>
+                            <span class="text-2xl font-black text-[#cbb38a] mt-0.5">+{{ number_format($xp['earned']) }} XP</span>
+                        </div>
+                        <div class="text-right flex flex-col items-end">
+                            <span class="text-white font-bold text-xs">{{ number_format($xpProgress) }} / {{ number_format($xpNeeded) }} XP</span>
+                            <span class="text-typing-muted text-[10px] mt-0.5">Level {{ $lvl['level'] }} <span
+                                    class="text-white/30">→</span> {{ $lvl['next_level'] }}</span>
+                        </div>
                     </div>
-                    <div class="text-right flex flex-col items-end">
-                        <span class="text-white font-bold text-xs">6,800 / 10,000 XP</span>
-                        <span class="text-typing-muted text-[10px] mt-0.5">Level 24 <span
-                                class="text-white/30">→</span> 25</span>
+                    <div class="h-1.5 w-full bg-black/40 rounded-full overflow-hidden border border-white/[0.03]">
+                        <div class="h-full bg-blue-600 rounded-full transition-all duration-500"
+                            style="width: {{ $xpBarWidth }}%"></div>
                     </div>
                 </div>
-                <div class="h-1.5 w-full bg-black/40 rounded-full overflow-hidden border border-white/[0.03]">
-                    <div class="h-full bg-blue-600 rounded-full transition-all duration-500" style="width: 68%"></div>
-                </div>
-            </div>
+            @endif
 
             <!-- AKSI BUTTON MENU BAWAH -->
             <div class="pt-2 flex gap-4">
@@ -541,10 +586,41 @@
             const registerRaceArena = (Alpine) => {
                 if (window.__raceArenaRegistered) return;
                 window.__raceArenaRegistered = true;
+
+                // STORE GLOBAL 'race': menyimpan posisi maskot LAWAN, diisi langsung
+                // dari payload WebSocket (.race.progress). Sengaja store (bukan state
+                // komponen) supaya bertahan lintas Livewire morph — kalau raceArena
+                // ter-reinisialisasi saat re-render, posisi lawan tidak hilang.
+                // Bentuk: opponents = { [userId]: { progress, wpm, finished } }.
+                if (!Alpine.store('race')) {
+                    Alpine.store('race', {
+                        opponents: {},
+                        apply(userId, data) {
+                            // reassign object supaya reaktivitas Alpine ter-trigger
+                            this.opponents = {
+                                ...this.opponents,
+                                [userId]: {
+                                    progress: data.progress_percent ?? 0,
+                                    wpm: data.wpm ?? 0,
+                                    finished: !!data.finished,
+                                },
+                            };
+                        },
+                        reset() {
+                            this.opponents = {};
+                        },
+                    });
+                }
+
                 Alpine.data('raceArena', (config = {}) => ({
                     countdown: 3,
                     raceStarted: false,
+                    myId: config.myId,
                     textToType: config.textToType || '',
+                    // Waktu absolut (ms epoch) kapan race resmi mulai, dari server.
+                    // Countdown 3-2-1 dihitung mundur ke titik ini -> sinkron antar layar.
+                    raceStartsAtMs: config.raceStartsAt ? new Date(config.raceStartsAt).getTime() : null,
+                    _countdownInterval: null,
                     words: [],
                     currentWordIndex: 0,
                     typedText: '',
@@ -556,6 +632,16 @@
                     totalMistakes: 0,
                     prevTypedLength: 0,
 
+                    // Progress & WPM pemain LOKAL, reaktif -> dibaca oleh lane maskot
+                    // sendiri (self) di view. Diperbarui tiap checkInput().
+                    progressPercent: 0,
+                    liveWpm: 0,
+
+                    // Throttle emit progress ke server (Area 1.4). Visual lokal tetap
+                    // instan; pengiriman jaringan dibatasi ~120ms + trailing flush.
+                    _lastEmit: 0,
+                    _emitTimer: null,
+
                     // Sudden death (client-side authoritative timer). Server tetap
                     // sumber kebenaran final via checkSuddenDeath(), tapi input
                     // dikunci di klien tepat saat hitung mundur menyentuh 0.
@@ -566,6 +652,13 @@
 
                     init() {
                         this.words = this.textToType.split(' ');
+
+                        // Bersihkan posisi lawan dari race SEBELUMNYA saat memulai race
+                        // baru (mis. Play Again). Kalau sudden death sedang aktif berarti
+                        // ini re-init di TENGAH race yang sama -> jangan hapus posisi.
+                        if (!this.suddenDeathActive && this.$store.race) {
+                            this.$store.race.reset();
+                        }
 
                         // Kalau sudden death SUDAH aktif saat komponen ini
                         // (re)inisialisasi, race sudah lama berjalan -> overlay
@@ -580,33 +673,95 @@
                                 if (this.$refs.typeInput) this.$refs.typeInput.focus();
                             });
                         } else {
-                            // Alur normal: overlay hitung mundur 3 detik.
-                            let timer = setInterval(() => {
-                                if (this.countdown > 1) {
-                                    this.countdown--;
-                                } else {
-                                    this.countdown = 'GO!';
-                                    clearInterval(timer);
-                                    setTimeout(() => {
-                                        this.raceStarted = true;
-                                        this.startTime = Date.now();
-                                        this.$nextTick(() => {
-                                            if (this.$refs.typeInput) this.$refs.typeInput.focus();
-                                        });
-                                    }, 800);
-                                }
-                            }, 1000);
+                            // Alur normal: overlay hitung mundur ke race_starts_at (server).
+                            // Karena dihitung dari waktu absolut yang sama, kedua layar
+                            // menampilkan angka yang sama pada saat yang sama -> tidak ada
+                            // lagi delay ~1 detik antar host & peserta.
+                            this.startSyncedCountdown();
                         }
 
                         // Sinyal server saat room resmi ditutup paksa -> kunci total.
                         this.$wire.on('force-finish', () => this.lockRace());
+
+                        // Sudden death dimulai (broadcast .race.sudden_death via WebSocket).
+                        // Bridge event window -> sinkronkan hitung mundur di komponen ini.
+                        // Disimpan supaya bisa di-remove saat komponen dibongkar.
+                        this._onSuddenDeath = (ev) => this.syncSuddenDeath(ev.detail.remaining);
+                        window.addEventListener('race-sudden-death', this._onSuddenDeath);
                     },
 
-                    // Dipanggil dari x-init banner sudden death untuk menyinkronkan
-                    // sisa waktu dari server dan memastikan clock lokal berjalan.
+                    // Hitung mundur awal race berbasis WAKTU ABSOLUT server (race_starts_at),
+                    // bukan interval lokal yang dimulai saat render. Setiap ~100ms hitung
+                    // sisa waktu; tampilkan 3/2/1 lalu 'GO!' dan mulai race saat menyentuh 0.
+                    startSyncedCountdown() {
+                        const tick = () => {
+                            // Fallback aman jika server tidak mengirim raceStartsAt.
+                            if (!this.raceStartsAtMs) {
+                                this.beginRace();
+                                return;
+                            }
+
+                            const remainingMs = this.raceStartsAtMs - Date.now();
+
+                            if (remainingMs <= 0) {
+                                this.countdown = 'GO!';
+                                if (this._countdownInterval) {
+                                    clearInterval(this._countdownInterval);
+                                    this._countdownInterval = null;
+                                }
+                                // Jeda singkat menampilkan "GO!" lalu buka input.
+                                setTimeout(() => this.beginRace(), 400);
+                            } else {
+                                // ceil supaya 2001ms..3000ms => "3", dst. Minimal tampil "1".
+                                this.countdown = Math.max(1, Math.ceil(remainingMs / 1000));
+                            }
+                        };
+
+                        tick(); // render langsung tanpa menunggu interval pertama
+                        this._countdownInterval = setInterval(tick, 100);
+                    },
+
+                    // Mulai race: buka input & catat startTime. startTime dipatok ke
+                    // race_starts_at server (kalau ada) supaya perhitungan WPM antar
+                    // pemain memakai titik awal yang sama.
+                    beginRace() {
+                        if (this.raceStarted) return;
+                        this.raceStarted = true;
+                        this.startTime = this.raceStartsAtMs ?? Date.now();
+                        this.$nextTick(() => {
+                            if (this.$refs.typeInput) this.$refs.typeInput.focus();
+                        });
+                    },
+
+                    destroy() {
+                        if (this._onSuddenDeath) {
+                            window.removeEventListener('race-sudden-death', this._onSuddenDeath);
+                            this._onSuddenDeath = null;
+                        }
+                        if (this._countdownInterval) {
+                            clearInterval(this._countdownInterval);
+                            this._countdownInterval = null;
+                        }
+                        if (this._sdInterval) {
+                            clearInterval(this._sdInterval);
+                            this._sdInterval = null;
+                        }
+                        if (this._emitTimer) {
+                            clearTimeout(this._emitTimer);
+                            this._emitTimer = null;
+                        }
+                    },
+
+                    // Menyinkronkan sisa waktu dari server & memastikan clock lokal jalan.
+                    // Dipanggil dari x-init banner DAN dari event .race.sudden_death.
                     syncSuddenDeath(remainingFromServer) {
                         this.suddenDeathActive = true;
-                        this.suddenDeathRemaining = remainingFromServer;
+                        // Ambil yang paling konservatif kalau clock sudah jalan (hindari mundur naik).
+                        if (this._sdInterval) {
+                            this.suddenDeathRemaining = Math.min(this.suddenDeathRemaining, remainingFromServer);
+                        } else {
+                            this.suddenDeathRemaining = remainingFromServer;
+                        }
                         this.startSuddenDeathClock();
                         if (this.suddenDeathRemaining <= 0) this.lockRace();
                     },
@@ -631,7 +786,17 @@
                             clearInterval(this._sdInterval);
                             this._sdInterval = null;
                         }
+                        if (this._emitTimer) {
+                            clearTimeout(this._emitTimer);
+                            this._emitTimer = null;
+                        }
                         if (this.$refs.typeInput) this.$refs.typeInput.blur();
+
+                        // Gantikan peran poll 1 detik: saat hitung mundur lokal menyentuh
+                        // 0, minta server memfinalisasi SEKALI. checkSuddenDeath() idempoten
+                        // (guard `>= SUDDEN_DEATH_SECONDS`), jadi aman meski beberapa klien
+                        // memanggilnya bersamaan.
+                        if (this.$wire) this.$wire.checkSuddenDeath();
                     },
 
                     checkInput() {
@@ -671,20 +836,70 @@
                             Math.round(((this.totalKeystrokes - this.totalMistakes) / this.totalKeystrokes) * 100) :
                             100;
 
-                        // Kata terakhir: selesai otomatis saat huruf terakhir benar.
-                        if (this.currentWordIndex === this.words.length - 1 && this.typedText === targetWord) {
-                            this.isFinished = true;
-                            progressPercent = 100;
-                            let timePassedMinutes = (Date.now() - this.startTime) / 60000;
-                            let liveWpm = timePassedMinutes > 0 ? Math.floor((totalCorrectChars / 5) / timePassedMinutes) : 0;
-                            this.$wire.updateRaceProgress(100, liveWpm, accuracyPercent);
-                            return;
-                        }
-
                         let timePassedMinutes = (Date.now() - this.startTime) / 60000;
                         let liveWpm = timePassedMinutes > 0 ? Math.floor((totalCorrectChars / 5) / timePassedMinutes) : 0;
 
-                        this.$wire.updateRaceProgress(progressPercent, liveWpm, accuracyPercent);
+                        // Update state reaktif LOKAL -> maskot sendiri gerak INSTAN (tak
+                        // menunggu jaringan). Ini yang bikin pemain lokal zero delay.
+                        this.liveWpm = liveWpm;
+
+                        // Kata terakhir: selesai otomatis saat huruf terakhir benar.
+                        if (this.currentWordIndex === this.words.length - 1 && this.typedText === targetWord) {
+                            this.isFinished = true;
+                            this.progressPercent = 100;
+                            this.publishLocal(100, liveWpm, true);
+                            // Finish WAJIB dikirim sinkron & segera (tak boleh di-throttle).
+                            this.emitProgress(100, liveWpm, accuracyPercent, true);
+                            return;
+                        }
+
+                        this.progressPercent = progressPercent;
+                        this.publishLocal(progressPercent, liveWpm, false);
+                        this.emitProgress(progressPercent, liveWpm, accuracyPercent, false);
+                    },
+
+                    // Publikasikan posisi pemain LOKAL ke store dengan key userId sendiri,
+                    // supaya lane maskot diri sendiri membaca dari sumber yang SAMA dengan
+                    // lawan ($store.race.opponents[playerId]) -> gerak instan & seragam.
+                    publishLocal(progress, wpm, finished) {
+                        if (this.myId == null) return;
+                        this.$store.race.apply(this.myId, {
+                            progress_percent: progress,
+                            wpm: wpm,
+                            finished: finished,
+                        });
+                    },
+
+                    // Kirim progress ke server dengan throttle. Keystroke di-throttle
+                    // ~120ms (trailing-edge flush menjaga posisi terakhir tak hilang),
+                    // tapi `force` (finish / pindah kata) selalu dikirim segera.
+                    emitProgress(progress, wpm, accuracy, force) {
+                        const now = Date.now();
+                        const MIN_INTERVAL = 120;
+
+                        if (this._emitTimer) {
+                            clearTimeout(this._emitTimer);
+                            this._emitTimer = null;
+                        }
+
+                        if (force || (now - this._lastEmit) >= MIN_INTERVAL) {
+                            this._lastEmit = now;
+                            this.$wire.updateRaceProgress(progress, wpm, accuracy);
+                            return;
+                        }
+
+                        // Terlalu cepat: jadwalkan pengiriman terakhir (trailing edge)
+                        // memakai nilai TERBARU saat timer menyala.
+                        const delay = MIN_INTERVAL - (now - this._lastEmit);
+                        this._emitTimer = setTimeout(() => {
+                            this._emitTimer = null;
+                            this._lastEmit = Date.now();
+                            this.$wire.updateRaceProgress(
+                                this.progressPercent,
+                                this.liveWpm,
+                                accuracy,
+                            );
+                        }, delay);
                     },
 
                     handleSpace(e) {
@@ -721,31 +936,61 @@
          karena tidak mengandung karakter '<'/'>' yang bisa merusak parsing. --}}
     @script
         <script>
-            let currentChannel = null;
+            let currentRoomChannel = null;
+            let currentRaceChannel = null;
+
+            const leaveChannels = () => {
+                if (currentRoomChannel) {
+                    window.Echo.leave(currentRoomChannel);
+                    currentRoomChannel = null;
+                }
+                if (currentRaceChannel) {
+                    window.Echo.leave(currentRaceChannel);
+                    currentRaceChannel = null;
+                }
+                // Bersihkan posisi lawan supaya room berikutnya tidak kebawa state basi.
+                if (window.Alpine && window.Alpine.store('race')) {
+                    window.Alpine.store('race').reset();
+                }
+            };
 
             Livewire.on('subscribe-room', (event) => {
                 const room = event.room;
 
-                if (currentChannel) {
-                    window.Echo.leave(currentChannel);
-                }
+                leaveChannels();
 
-                currentChannel = `room.${room}`;
-                console.log("SUBSCRIBE:", currentChannel);
-
+                // Channel LIFECYCLE (low-frequency): join/ready/leave/start/finish.
+                // Tetap re-render Livewire penuh karena kondisi room memang berubah.
+                currentRoomChannel = `room.${room}`;
                 window.Echo
-                    .channel(currentChannel)
-                    .listen('.room.updated', (e) => {
-                        console.log("EVENT DITERIMA", e);
+                    .channel(currentRoomChannel)
+                    .listen('.room.updated', () => {
                         Livewire.dispatch('room-updated');
+                    });
+
+                // Channel RACE (high-frequency): posisi maskot lawan. Diterapkan
+                // LANGSUNG ke Alpine store TANPA round-trip Livewire -> zero delay.
+                currentRaceChannel = `race.${room}`;
+                window.Echo
+                    .channel(currentRaceChannel)
+                    .listen('.race.progress', (e) => {
+                        if (window.Alpine && window.Alpine.store('race')) {
+                            window.Alpine.store('race').apply(e.userId, e.progressData || {});
+                        }
+                    })
+                    .listen('.race.sudden_death', (e) => {
+                        // Semua klien menghitung sisa waktu dari timestamp akhir yang
+                        // SAMA (server) -> hitung mundur sudden death tersinkron.
+                        const endMs = new Date(e.endTimeIso).getTime();
+                        const remaining = Math.max(0, Math.ceil((endMs - Date.now()) / 1000));
+                        window.dispatchEvent(new CustomEvent('race-sudden-death', {
+                            detail: { remaining }
+                        }));
                     });
             });
 
             Livewire.on('leave-room', () => {
-                if (currentChannel) {
-                    window.Echo.leave(currentChannel);
-                    currentChannel = null;
-                }
+                leaveChannels();
             });
         </script>
     @endscript

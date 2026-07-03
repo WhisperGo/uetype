@@ -2,11 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Friendship;
-use App\Models\Matches;
-use App\Models\MatchParticipant;
-use App\Models\TypingResult;
-use App\Models\UserAchievement;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -95,6 +90,26 @@ class User extends Authenticatable
             'needed' => $ceil - $floor,               // EXP rentang level ini (= BASE × level)
             'next_level' => $level + 1,
         ];
+    }
+
+    /**
+     * Rumus EXP berbasis volume + bonus akurasi tipis. SATU sumber kebenaran yang
+     * dipakai mode solo (TypingEngine) DAN multiplayer (MultiplayerLobby) supaya
+     * keduanya konsisten. Mengakumulasi ke total_xp, menyimpan, dan mengembalikan
+     * jumlah EXP yang diperoleh.
+     *
+     * Basis volume (jumlah karakter benar) — SENGAJA bukan berbasis WPM: menghargai
+     * usaha/latihan, bukan bakat, dan tidak menghukum pengetik lambat.
+     */
+    public function addExp(int $correctChars, float $accuracy): int
+    {
+        $accuracyMultiplier = 0.5 + 0.5 * (max(0, min(100, $accuracy)) / 100);
+        $xpEarned = (int) round(max(0, $correctChars) * 0.1 * $accuracyMultiplier);
+
+        $this->total_xp += $xpEarned;
+        $this->save();
+
+        return $xpEarned;
     }
 
     public function typingResults(): HasMany
