@@ -94,13 +94,15 @@
 
                             <div class="my-1 border-t border-white/5"></div>
 
-                            <form method="POST" action="{{ route('logout') }}">
-                                @csrf
-                                <x-dropdown-link :href="route('logout')"
-                                    onclick="event.preventDefault(); this.closest('form').submit();">
-                                    {{ __('Sign Out') }}
-                                </x-dropdown-link>
-                            </form>
+                            <button type="button"
+                                x-on:click="$dispatch('open-modal', 'confirm-sign-out')"
+                                class="group flex w-full items-center gap-2 px-4 py-2 text-start text-sm leading-5 text-muted transition duration-150 ease-in-out hover:bg-elevated hover:text-foreground focus:bg-elevated focus:text-foreground focus:outline-none">
+                                <svg class="h-4 w-4 text-muted/70 transition group-hover:text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                                </svg>
+                                <span>{{ __('Keluar') }}</span>
+                            </button>
                         @else
                             <x-dropdown-link :href="route('login')">{{ __('Log In') }}</x-dropdown-link>
                             <x-dropdown-link :href="route('register')">{{ __('Register') }}</x-dropdown-link>
@@ -168,13 +170,15 @@
                     <x-responsive-nav-link :href="route('profile.edit')">{{ __('Profile') }}</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('achievements.index')">{{ __('Achievements') }}</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('friends.index')">{{ __('Friends List') }}</x-responsive-nav-link>
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-                        <x-responsive-nav-link :href="route('logout')"
-                            onclick="event.preventDefault(); this.closest('form').submit();">
-                            {{ __('Sign Out') }}
-                        </x-responsive-nav-link>
-                    </form>
+                    <button type="button"
+                        x-on:click="$dispatch('open-modal', 'confirm-sign-out'); open = false"
+                        class="group flex w-full items-center gap-2 border-l-4 border-transparent py-2 ps-3 pe-4 text-start text-base font-medium text-muted transition duration-150 ease-in-out hover:border-white/20 hover:bg-surface hover:text-foreground focus:border-white/20 focus:bg-surface focus:text-foreground focus:outline-none">
+                        <svg class="h-4 w-4 text-muted/70 transition group-hover:text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                        </svg>
+                        <span>{{ __('Keluar') }}</span>
+                    </button>
                 </div>
             @else
                 <div class="px-4">
@@ -187,4 +191,5 @@
             @endauth
         </div>
     </div>
+
 </nav>
