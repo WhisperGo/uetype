@@ -31,26 +31,6 @@
             <!-- Right side -->
             <div class="hidden sm:flex sm:items-center sm:gap-4 sm:ms-6">
                 @auth
-                    <!-- Quick stats pill -->
-                    <div
-                        class="flex items-center gap-3 px-3 py-1.5 rounded-full bg-surface border border-white/5 text-xs font-mono">
-                        <span class="flex items-center gap-1 text-foreground" title="Highest WPM">
-                            <svg class="w-3.5 h-3.5 text-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
-                            {{ rtrim(rtrim(number_format(Auth::user()->highest_wpm, 1), '0'), '.') }}
-                        </span>
-                        <span class="flex items-center gap-1 text-gold" title="Koin">
-                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"
-                                    fill="none" />
-                                <circle cx="10" cy="10" r="3.5" />
-                            </svg>
-                            {{ Auth::user()->coins }}
-                        </span>
-                    </div>
-
                     <!-- Trophy shortcut -> Leaderboard -->
                     <a href="{{ route('leaderboard') }}" title="{{ __('Leaderboard') }}"
                         class="p-2 rounded-lg border {{ request()->is('leaderboard') ? 'text-gold border-gold/40 bg-gold/10' : 'text-muted border-transparent hover:text-gold hover:border-gold/30 hover:bg-surface' }} focus:outline-none focus-visible:ring-1 focus-visible:ring-gold/40 transition">
