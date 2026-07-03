@@ -33,6 +33,8 @@ class TypingEngine extends Component
 
     public $textToType;
 
+    public int $typingSessionKey = 0;
+
     // ID baris `texts` yang sedang diketik. Terisi untuk mode quote (teks dari DB),
     // null untuk time/words (teks dirakit acak dari wordlist JSON, bukan dari satu baris texts).
     public $textId = null;
@@ -114,6 +116,8 @@ class TypingEngine extends Component
 
     public function generateText()
     {
+        $this->typingSessionKey++;
+
         if ($this->mainMode === 'quote') {
             $text = Text::where('mode', 'quote')->inRandomOrder()->first();
             $this->textToType = $text ? $text->content : 'Kutipan belum tersedia di database.';

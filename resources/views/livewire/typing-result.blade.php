@@ -121,7 +121,7 @@
                     @endif
                 @endauth
 
-                <a id="restartButton" href="/typing" wire:navigate
+                <a id="restartButton" href="/typing"
                     class="inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-sans font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition">
                     <span>main lagi</span>
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -242,7 +242,7 @@
 
                 <!-- Tombol aksi -->
                 <div class="flex items-stretch gap-3">
-                    <a id="restartButton" href="/typing" wire:navigate
+                    <a id="restartButton" href="/typing"
                         class="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-sans font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition"
                         title="{{ $isSurvival ? 'Main Lagi' : 'Tes Berikutnya' }}">
                         <span>{{ $isSurvival ? 'play again' : 'next test' }}</span>
@@ -251,7 +251,7 @@
                         </svg>
                     </a>
                     @unless ($isSurvival)
-                        <a href="/typing" wire:navigate
+                        <a href="/typing"
                             class="inline-flex items-center justify-center h-12 px-6 rounded-2xl bg-surface border border-white/5 text-foreground/80 hover:text-foreground hover:border-white/10 font-sans font-semibold text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-border transition"
                             title="Ulangi Tes">
                             retry
