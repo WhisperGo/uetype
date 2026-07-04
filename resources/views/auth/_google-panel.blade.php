@@ -7,15 +7,15 @@
         class="h-20 w-20 object-contain drop-shadow-[0_0_18px_rgba(var(--color-brand)/0.35)]">
 
     <p class="mt-4 font-mono text-[0.7rem] uppercase tracking-[0.35em] text-gold">
-        {{ $isRegister ? __('Buat akun') : __('Selamat datang') }}
+        {{ $isRegister ? __('auth.create_account') : __('auth.welcome') }}
     </p>
 
     <h1 class="mt-2 font-display text-h6 leading-tight text-foreground">
-        {{ __('Mulai') }} <span class="text-brand">{{ __('mengetik') }}</span>
+        {{ __('auth.headline_start') }} <span class="text-brand">{{ __('auth.headline_accent') }}</span>
     </h1>
 
     <p class="mt-3 max-w-xs font-mono text-sm leading-6 text-muted">
-        {{ __('Masuk untuk menyimpan progres dan bermain bersama teman.') }}
+        {{ __('auth.tagline') }}
     </p>
 </div>
 
@@ -32,14 +32,14 @@
             <path fill="#EA4335"
                 d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.38 0 3.31 3.64 1.32 7.51l4 3.15c.94-2.85 3.57-4.91 6.68-4.91z" />
         </svg>
-        {{ __('Lanjutkan dengan Google') }}
+        {{ __('auth.continue_google') }}
     </a>
 </div>
 
 <p class="mt-6 text-center text-x-small leading-5 text-muted">
-    {{ __('Dengan lanjut, kamu menyetujui') }}
+    {{ __('auth.privacy_prefix') }}
     <a href="{{ route('terms') }}" class="text-muted underline decoration-white/20 underline-offset-2 transition-colors hover:text-foreground">
-        {{ __('kebijakan privasi') }}
+        {{ __('auth.privacy_link') }}
     </a>
-    {{ __('UeType.') }}
+    {{ __('auth.privacy_suffix') }}
 </p>

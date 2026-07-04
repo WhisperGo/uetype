@@ -36,6 +36,16 @@ Route::middleware('auth')->group(function () {
     Volt::route('/leaderboard', 'leaderboard')->name('leaderboard');
 });
 
+Route::post('/locale', function () {
+    $locale = request('locale');
+
+    if (in_array($locale, ['id', 'en'], true)) {
+        session(['locale' => $locale]);
+    }
+
+    return back();
+})->name('locale.update');
+
 Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])->name('auth.google');
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
 

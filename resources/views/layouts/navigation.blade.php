@@ -13,15 +13,15 @@
                 <!-- Navigation Links -->
                 <div class="hidden sm:-my-px sm:ms-10 sm:flex sm:gap-1">
                     <x-nav-link href="{{ url('/typing') }}" :active="request()->is('typing')">
-                        {{ __('Solo') }}
+                        {{ __('nav.solo') }}
                     </x-nav-link>
                     <x-nav-link href="{{ url('/multiplayer') }}" :active="request()->is('multiplayer')">
-                        {{ __('Multiplayer') }}
+                        {{ __('nav.multiplayer') }}
                     </x-nav-link>
                     <span
                         class="inline-flex items-center gap-1.5 px-3 pt-1 text-sm font-medium leading-5 text-muted/50 cursor-not-allowed"
                         title="Segera hadir">
-                        {{ __('Klan') }}
+                        {{ __('nav.klan') }}
                         <span
                             class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
                     </span>
@@ -32,7 +32,7 @@
             <div class="hidden sm:flex sm:items-center sm:gap-4 sm:ms-6">
                 @auth
                     <!-- Trophy shortcut -> Leaderboard -->
-                    <a href="{{ route('leaderboard') }}" title="{{ __('Leaderboard') }}"
+                    <a href="{{ route('leaderboard') }}" title="{{ __('nav.leaderboard') }}"
                         class="p-2 rounded-lg border {{ request()->is('leaderboard') ? 'text-gold border-gold/40 bg-gold/10' : 'text-muted border-transparent hover:text-gold hover:border-gold/30 hover:bg-surface' }} focus:outline-none focus-visible:ring-1 focus-visible:ring-gold/40 transition">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -78,17 +78,17 @@
 
                     <x-slot name="content">
                         @auth
-                            <x-dropdown-link :href="route('profile.edit')">{{ __('Profile') }}</x-dropdown-link>
+                            <x-dropdown-link :href="route('profile.edit')">{{ __('nav.profile') }}</x-dropdown-link>
 
-                            <x-dropdown-link :href="route('achievements.index')">{{ __('Achievements') }}</x-dropdown-link>
+                            <x-dropdown-link :href="route('achievements.index')">{{ __('nav.achievements') }}</x-dropdown-link>
 
                             <span class="flex items-center justify-between w-full px-4 py-2 text-sm text-muted/50 cursor-not-allowed" title="Segera hadir">
-                                {{ __('User Stats') }}
+                                {{ __('nav.user_stats') }}
                                 <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
                             </span>
-                            <x-dropdown-link :href="route('friends.index')">{{ __('Friends List') }}</x-dropdown-link>
+                            <x-dropdown-link :href="route('friends.index')">{{ __('nav.friends') }}</x-dropdown-link>
                             <span class="flex items-center justify-between w-full px-4 py-2 text-sm text-muted/50 cursor-not-allowed" title="Segera hadir">
-                                {{ __('Settings') }}
+                                {{ __('nav.settings') }}
                                 <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
                             </span>
 
@@ -101,11 +101,11 @@
                                     <path stroke-linecap="round" stroke-linejoin="round"
                                         d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
                                 </svg>
-                                <span>{{ __('Keluar') }}</span>
+                                <span>{{ __('nav.logout') }}</span>
                             </button>
                         @else
-                            <x-dropdown-link :href="route('login')">{{ __('Log In') }}</x-dropdown-link>
-                            <x-dropdown-link :href="route('register')">{{ __('Register') }}</x-dropdown-link>
+                            <x-dropdown-link :href="route('login')">{{ __('nav.login') }}</x-dropdown-link>
+                            <x-dropdown-link :href="route('register')">{{ __('nav.register') }}</x-dropdown-link>
                         @endauth
                     </x-slot>
                 </x-dropdown>
@@ -131,18 +131,18 @@
     <div :class="{ 'block': open, 'hidden': !open }" class="hidden border-t sm:hidden border-white/5">
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link href="{{ url('/typing') }}"
-                :active="request()->is('typing')">{{ __('Solo') }}</x-responsive-nav-link>
+                :active="request()->is('typing')">{{ __('nav.solo') }}</x-responsive-nav-link>
             <x-responsive-nav-link href="{{ url('/multiplayer') }}"
-                :active="request()->is('multiplayer')">{{ __('Multiplayer') }}</x-responsive-nav-link>
+                :active="request()->is('multiplayer')">{{ __('nav.multiplayer') }}</x-responsive-nav-link>
             {{-- <span
                 class="flex items-center w-full gap-2 py-2 text-base font-medium cursor-not-allowed ps-3 pe-4 text-muted/50">
-                {{ __('Multiplayer') }}
+                {{ __('nav.multiplayer') }}
                 <span
                     class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
             </span> --}}
             <span
                 class="flex items-center w-full gap-2 py-2 text-base font-medium cursor-not-allowed ps-3 pe-4 text-muted/50">
-                {{ __('Klan') }}
+                {{ __('nav.klan') }}
                 <span
                     class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
             </span>
@@ -152,7 +152,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M8 21h8m-4-4v4m6.5-17H21v2a4 4 0 01-4 4m-11-6H3v2a4 4 0 004 4m1-9h8v5a5 5 0 01-10 0V3z" />
                     </svg>
-                    {{ __('Leaderboard') }}
+                    {{ __('nav.leaderboard') }}
                 </span>
             </x-responsive-nav-link>
         </div>
@@ -167,9 +167,9 @@
                     <div class="text-sm font-medium text-muted">{{ Auth::user()->email }}</div>
                 </div>
                 <div class="mt-3 space-y-1">
-                    <x-responsive-nav-link :href="route('profile.edit')">{{ __('Profile') }}</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('achievements.index')">{{ __('Achievements') }}</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('friends.index')">{{ __('Friends List') }}</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('profile.edit')">{{ __('nav.profile') }}</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('achievements.index')">{{ __('nav.achievements') }}</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('friends.index')">{{ __('nav.friends') }}</x-responsive-nav-link>
                     <button type="button"
                         x-on:click="$dispatch('open-modal', 'confirm-sign-out'); open = false"
                         class="group flex w-full items-center gap-2 border-l-4 border-transparent py-2 ps-3 pe-4 text-start text-base font-medium text-muted transition duration-150 ease-in-out hover:border-white/20 hover:bg-surface hover:text-foreground focus:border-white/20 focus:bg-surface focus:text-foreground focus:outline-none">
@@ -177,7 +177,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
                         </svg>
-                        <span>{{ __('Keluar') }}</span>
+                        <span>{{ __('nav.logout') }}</span>
                     </button>
                 </div>
             @else
@@ -185,8 +185,8 @@
                     <div class="text-base font-medium text-foreground">Tamu</div>
                 </div>
                 <div class="mt-3 space-y-1">
-                    <x-responsive-nav-link :href="route('login')">{{ __('Log In') }}</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('register')">{{ __('Register') }}</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('login')">{{ __('nav.login') }}</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('register')">{{ __('nav.register') }}</x-responsive-nav-link>
                 </div>
             @endauth
         </div>

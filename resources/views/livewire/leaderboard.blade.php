@@ -91,12 +91,12 @@ $userRank = computed(function () {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M8 21h8m-4-4v4m6.5-17H21v2a4 4 0 01-4 4m-11-6H3v2a4 4 0 004 4m1-9h8v5a5 5 0 01-10 0V3z" />
                 </svg>
-                papan peringkat
+                {{ __('leaderboard.title') }}
             </h1>
 
             <div class="flex gap-1 bg-surface border border-border p-1 rounded-xl text-xs">
-                <button wire:click="setTimeframe('all_time')" class="px-4 py-2 rounded-lg transition font-bold tracking-wider uppercase {{ $timeframe === 'all_time' ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">All-Time</button>
-                <button wire:click="setTimeframe('daily')" class="px-4 py-2 rounded-lg transition font-bold tracking-wider uppercase {{ $timeframe === 'daily' ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">Harian</button>
+                <button wire:click="setTimeframe('all_time')" class="px-4 py-2 rounded-lg transition font-bold tracking-wider uppercase {{ $timeframe === 'all_time' ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">{{ __('leaderboard.all_time') }}</button>
+                <button wire:click="setTimeframe('daily')" class="px-4 py-2 rounded-lg transition font-bold tracking-wider uppercase {{ $timeframe === 'daily' ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">{{ __('leaderboard.daily') }}</button>
             </div>
         </div>
 
@@ -105,7 +105,7 @@ $userRank = computed(function () {
             <div class="flex w-full gap-2 md:w-auto">
                 @foreach(['time', 'words', 'survival'] as $tab)
                     <button wire:click="setTab('{{ $tab }}')" class="flex-1 md:flex-none px-4 py-2 rounded-xl text-xs font-bold transition {{ $currentTab === $tab ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">
-                        {{ ucfirst($tab) }}
+                        {{ __("leaderboard.tab.{$tab}") }}
                     </button>
                 @endforeach
             </div>
@@ -122,14 +122,14 @@ $userRank = computed(function () {
                         <button wire:click="setConfig('{{ $w }}')" class="px-3 py-2 rounded-xl tabular-nums transition {{ $currentConfig === $w ? 'text-brand-bright bg-background border border-brand-bright/40' : 'hover:text-foreground' }}">{{ $w }}</button>
                     @endforeach
                 @elseif($currentTab === 'survival')
-                    <button class="px-4 py-2 rounded-xl text-brand-bright bg-background border border-brand-bright/30 cursor-default">Medium Mode</button>
+                    <button class="px-4 py-2 rounded-xl text-brand-bright bg-background border border-brand-bright/30 cursor-default">{{ __('leaderboard.survival_mode') }}</button>
                 @endif
             </div>
         </div>
 
         @auth
             <div class="mb-6 bg-surface/40 border border-border rounded-2xl p-4 flex justify-between items-center text-xs tracking-wider uppercase">
-                <span class="text-muted">Posisi Peringkat Kamu:</span>
+                <span class="text-muted">{{ __('leaderboard.your_rank') }}</span>
                 <span class="font-bold text-brand-bright text-base tabular-nums">#{{ $this->userRank }}</span>
             </div>
         @endauth
@@ -139,9 +139,9 @@ $userRank = computed(function () {
                 <thead>
                     <tr class="text-xs font-bold tracking-widest text-muted uppercase border-b border-border bg-background">
                         <th class="w-16 px-6 py-4 text-center">#</th>
-                        <th class="px-6 py-4">Nama Pemain</th>
-                        <th class="px-6 py-4 text-right">{{ $currentTab === 'survival' ? 'Durasi Bertahan' : 'Kecepatan (WPM)' }}</th>
-                        <th class="px-6 py-4 text-right">Akurasi</th>
+                        <th class="px-6 py-4">{{ __('leaderboard.player') }}</th>
+                        <th class="px-6 py-4 text-right">{{ $currentTab === 'survival' ? __('leaderboard.duration') : __('leaderboard.wpm') }}</th>
+                        <th class="px-6 py-4 text-right">{{ __('leaderboard.accuracy') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border text-foreground">
@@ -163,7 +163,7 @@ $userRank = computed(function () {
                     @empty
                         <tr>
                             <td colspan="4" class="py-16 text-center text-muted tracking-wide text-xs uppercase">
-                                Belum ada rekor data yang dicetak untuk kategori ini.
+                                {{ __('leaderboard.empty') }}
                             </td>
                         </tr>
                     @endforelse
