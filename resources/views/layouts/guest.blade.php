@@ -16,15 +16,17 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased text-foreground">
-        <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-background">
-            <div>
+        <div class="relative min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-background overflow-hidden">
+            <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(var(--color-brand)/0.14),transparent_70%)]"></div>
+
+            <div class="relative">
                 <a href="/" class="flex items-center gap-2 group">
                     <x-application-logo class="h-12 w-auto transition-transform group-hover:scale-105" />
                     <span class="font-sans text-2xl font-bold tracking-tight text-foreground">Ue<span class="text-brand">Type</span></span>
                 </a>
             </div>
 
-            <div class="w-full sm:max-w-md mt-6 px-6 py-6 bg-surface/80 backdrop-blur border border-white/10 shadow-glow overflow-hidden sm:rounded-2xl">
+            <div class="relative w-full sm:max-w-md mt-6 px-6 py-8 bg-surface/80 backdrop-blur border border-white/10 shadow-glow overflow-hidden sm:rounded-2xl">
                 {{ $slot }}
             </div>
         </div>

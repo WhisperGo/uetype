@@ -103,7 +103,7 @@ $userRank = computed(function () {
         <div class="bg-surface border border-border rounded-2xl p-2.5 flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
 
             <div class="flex w-full gap-2 md:w-auto">
-                @foreach(['time', 'words', 'quote', 'survival'] as $tab)
+                @foreach(['time', 'words', 'survival'] as $tab)
                     <button wire:click="setTab('{{ $tab }}')" class="flex-1 md:flex-none px-4 py-2 rounded-xl text-xs font-bold transition {{ $currentTab === $tab ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">
                         {{ ucfirst($tab) }}
                     </button>
@@ -120,10 +120,6 @@ $userRank = computed(function () {
                 @elseif($currentTab === 'words')
                     @foreach(['10', '25', '50', '100'] as $w)
                         <button wire:click="setConfig('{{ $w }}')" class="px-3 py-2 rounded-xl tabular-nums transition {{ $currentConfig === $w ? 'text-brand-bright bg-background border border-brand-bright/40' : 'hover:text-foreground' }}">{{ $w }}</button>
-                    @endforeach
-                @elseif($currentTab === 'quote')
-                    @foreach(['easy', 'medium', 'hard'] as $q)
-                        <button wire:click="setConfig('{{ $q }}')" class="px-3 py-2 rounded-xl capitalize transition {{ $currentConfig === $q ? 'text-brand-bright bg-background border border-brand-bright/40' : 'hover:text-foreground' }}">{{ $q }}</button>
                     @endforeach
                 @elseif($currentTab === 'survival')
                     <button class="px-4 py-2 rounded-xl text-brand-bright bg-background border border-brand-bright/30 cursor-default">Medium Mode</button>
