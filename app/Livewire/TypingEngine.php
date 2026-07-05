@@ -2,13 +2,16 @@
 
 namespace App\Livewire;
 
+use App\Enums\ClanWarStatus;
+use App\Models\ClanWarModeClaim;
 use App\Models\Text;
 use App\Models\TypingResult;
 use App\Services\AntiCheatService;
-use App\Support\TypingLanguage;
+use App\Services\ClanWarScorer;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 class TypingEngine extends Component
@@ -34,25 +37,105 @@ class TypingEngine extends Component
 
     public $textToType;
 
-    public string $contentLang = TypingLanguage::DEFAULT;
-
     public int $typingSessionKey = 0;
 
     // ID baris `texts` yang sedang diketik. Terisi untuk mode quote (teks dari DB),
     // null untuk time/words (teks dirakit acak dari wordlist JSON, bukan dari satu baris texts).
     public $textId = null;
 
+    // Clan War: id ClanWarModeClaim yang sedang dikerjakan (dari query string
+    // ?war_claim=). Kalau terisi & valid, mode dikunci ke mode/config klaim itu
+    // dan hasil ketik otomatis jadi war attempt. Null = sesi solo biasa.
+    #[Url(as: 'war_claim')]
+    public ?int $warClaimId = null;
+
+    // Detail mode klaim war (mode+config) supaya view bisa tampilkan banner.
+    // Null kalau tidak sedang war-lock.
+    public ?array $warLock = null;
+
     public function mount()
     {
-        // Pulihkan preferensi sebelumnya jika ada
-        if (session()->has('typing_preferences')) {
-            $prefs = session('typing_preferences');
-            $this->mainMode = $prefs['mode'] ?? 'time';
-            $this->subMode = $prefs['subMode'] ?? '30';
-            $this->contentLang = TypingLanguage::resolve($prefs['contentLang'] ?? null);
+        // Cek war-lock DULU: kalau ?war_claim= valid, mode dipaksa sesuai klaim
+        // dan preferensi session diabaikan. Kalau tak valid, warClaimId di-reset
+        // ke null dan halaman berperilaku sebagai sesi solo biasa (fail-safe).
+        $claim = $this->resolveWarClaim();
+
+        if ($claim) {
+            [$this->mainMode, $this->subMode] = $this->normalizeMode($claim->mode, $claim->mode_config);
+            $this->warLock = ['mode' => $this->mainMode, 'config' => $this->subMode];
+        } else {
+            $this->warClaimId = null;
+
+            // Pulihkan preferensi sebelumnya jika ada (hanya untuk sesi solo biasa).
+            if (session()->has('typing_preferences')) {
+                $prefs = session('typing_preferences');
+                $this->mainMode = $prefs['mode'] ?? 'time';
+                $this->subMode = $prefs['subMode'] ?? '30';
+            }
         }
 
         $this->generateText();
+    }
+
+    /**
+     * Ambil & validasi baris ClanWarModeClaim dari $warClaimId: harus milik
+     * clan AKTIF user saat ini, war-nya masih Ongoing, dan belum disubmit.
+     * Null kalau tak ada/tak valid -- sengaja tidak melempar error supaya
+     * query string yang usil hanya di-abaikan, bukan merusak halaman.
+     */
+    private function resolveWarClaim(): ?ClanWarModeClaim
+    {
+        if (! $this->warClaimId || ! Auth::check()) {
+            return null;
+        }
+
+        $claim = ClanWarModeClaim::with('war')->find($this->warClaimId);
+
+        if (! $claim || $claim->isSubmitted()) {
+            return null;
+        }
+
+        // War harus masih berjalan.
+        if (! $claim->war || $claim->war->status !== ClanWarStatus::Ongoing) {
+            return null;
+        }
+
+        // Klaim harus milik clan aktif user ini.
+        $myClan = Auth::user()->clan;
+        if (! $myClan || $myClan->id !== $claim->clan_id) {
+            return null;
+        }
+
+        return $claim;
+    }
+
+    /**
+     * Tautkan hasil ketik ke klaim war (kalau sesi ini war-lock & masih
+     * valid). Re-validasi ulang di sini (bukan cuma percaya $warClaimId dari
+     * client) & pakai update BERSYARAT `whereNull('typing_result_id')` supaya
+     * dua submit paralel tak bisa dua-duanya mengisi klaim yang sama
+     * (yang kedua meng-update 0 baris & tak berpengaruh). Dipanggil di dalam
+     * DB::transaction saveResult() memakai $typingResult yang baru dibuat.
+     */
+    private function attachToWarClaim(TypingResult $typingResult): void
+    {
+        $claim = $this->resolveWarClaim();
+
+        if (! $claim) {
+            return;
+        }
+
+        $points = ClanWarScorer::score($claim->mode, $claim->mode_config, $typingResult);
+
+        // Update bersyarat: hanya isi kalau masih belum tersubmit (idempoten,
+        // race-safe terhadap submit dobel dari tab lain).
+        ClanWarModeClaim::where('id', $claim->id)
+            ->whereNull('typing_result_id')
+            ->update([
+                'typing_result_id' => $typingResult->id,
+                'user_id' => Auth::id(),
+                'points' => $points,
+            ]);
     }
 
     // Validasi mode utama + sub-mode terhadap whitelist. Mengembalikan pasangan
@@ -83,6 +166,12 @@ class TypingEngine extends Component
     // Fungsi untuk mengganti mode dan ambil teks baru
     public function setMode($main, $sub)
     {
+        // War-lock: saat mengerjakan war attempt, mode TAK BOLEH diganti
+        // (tombol juga di-disable di view, ini gerbang server-side-nya).
+        if ($this->warClaimId !== null && $this->resolveWarClaim()) {
+            return;
+        }
+
         [$main, $sub] = $this->normalizeMode($main, $sub);
 
         $this->mainMode = $main;
@@ -92,34 +181,12 @@ class TypingEngine extends Component
         session()->put('typing_preferences', [
             'mode' => $main,
             'subMode' => $sub,
-            'contentLang' => $this->contentLang,
         ]);
         session()->save();
 
         $this->generateText();
 
         // Kirim event dengan detail teks baru, mode, dan sub-mode
-        $this->dispatch(
-            'mode-changed',
-            text: $this->textToType,
-            main: $this->mainMode,
-            sub: $this->subMode
-        );
-    }
-
-    public function setContentLang($lang)
-    {
-        $this->contentLang = TypingLanguage::resolve($lang);
-
-        session()->put('typing_preferences', [
-            'mode' => $this->mainMode,
-            'subMode' => $this->subMode,
-            'contentLang' => $this->contentLang,
-        ]);
-        session()->save();
-
-        $this->generateText();
-
         $this->dispatch(
             'mode-changed',
             text: $this->textToType,
@@ -145,15 +212,7 @@ class TypingEngine extends Component
         $this->typingSessionKey++;
 
         if ($this->mainMode === 'quote') {
-            $text = Text::where('mode', 'quote')
-                ->whereHas('language', fn ($q) => $q->where('code', $this->contentLang))
-                ->inRandomOrder()
-                ->first();
-
-            // Fallback: kalau belum ada kutipan untuk bahasa terpilih, ambil kutipan apa pun
-            // supaya layar mengetik tidak pernah kosong.
-            $text ??= Text::where('mode', 'quote')->inRandomOrder()->first();
-
+            $text = Text::where('mode', 'quote')->inRandomOrder()->first();
             $this->textToType = $text ? $text->content : 'Kutipan belum tersedia di database.';
             // Simpan ID quote agar hasil sesi bisa mereferensikan teks yang diketik.
             $this->textId = $text?->id;
@@ -161,9 +220,9 @@ class TypingEngine extends Component
             // Teks time/words dirakit acak dari JSON, tidak terikat ke satu baris texts.
             $this->textId = null;
 
-            // Mode time/words/survival merakit teks dari wordlist JSON sesuai bahasa
-            // konten yang dipilih user (terpisah dari bahasa UI).
-            $path = TypingLanguage::wordlistPath($this->contentLang);
+            // Mode time atau words menggunakan file JSON
+            // Secara default menggunakan english.json (bisa disesuaikan nanti dengan state bahasa)
+            $path = base_path('database/data/indonesian.json');
 
             if (File::exists($path)) {
                 $jsonString = File::get($path);
@@ -292,7 +351,7 @@ class TypingEngine extends Component
                 $xpEarned = $user->addExp($correctKeystrokes, $finalAccuracy);
 
                 // Satu sesi solo valid = satu baris di typing_results (requirement Database).
-                TypingResult::create([
+                $typingResult = TypingResult::create([
                     'user_id' => $user->id,
                     'text_id' => $this->textId, // terisi untuk quote, null untuk time/words
                     'mode' => $this->mainMode, // 'time' | 'words' | 'quote' | 'survival'
@@ -309,6 +368,12 @@ class TypingEngine extends Component
                     'xp_earned' => $xpEarned,
                     'ghost_data' => null, // diisi selektif oleh ghost mode nanti
                 ]);
+
+                // Clan War: kalau sesi ini mengerjakan klaim war, hubungkan hasil ke
+                // klaim & hitung poin. Attempt solo di atas TETAP tersimpan normal
+                // apa pun hasilnya -- ini cuma menautkannya ke war (fail-safe: kalau
+                // klaim ternyata tak valid lagi, hasil solo tetap ada, war tak terisi).
+                $this->attachToWarClaim($typingResult);
 
                 // Rekor WPM HANYA dari mode terukur-waktu/teks (time/words/quote). Survival
                 // sengaja DIKECUALIKAN: WPM-nya dicapai di bawah tekanan stamina (bukan apple-to-

@@ -9,9 +9,12 @@ use App\Events\ClanUpdated;
 use App\Models\Clan;
 use App\Models\ClanMember;
 use App\Models\ClanWar as ClanWarModel;
-use App\Models\TypingResult;
+use App\Models\ClanWarModeClaim;
+use App\Services\ClanWarModeCatalog;
 use App\Services\ClanWarResolver;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class ClanWar extends Component
@@ -112,11 +115,11 @@ class ClanWar extends Component
     }
 
     /**
-     * Kontribusi XP live per member clan sendiri selama war Ongoing --
-     * dihitung on-the-fly (tak disimpan permanen) supaya terasa "hidup"
-     * sebelum war ditutup.
+     * Grid 9 mode wajib untuk war Ongoing dari sudut pandang clan sendiri.
+     * Tiap entri: mode/config/ceiling + status ('open' | 'claimed' | 'done')
+     * plus baris klaim (siapa, poin) kalau ada.
      */
-    public function getMyClanBreakdownProperty()
+    public function getModeGridProperty()
     {
         $war = $this->myActiveWar;
 
@@ -124,19 +127,131 @@ class ClanWar extends Component
             return collect();
         }
 
-        return $this->myClan->activeMembers()->with('user')->get()
-            ->map(function (ClanMember $member) use ($war) {
-                $total = TypingResult::where('user_id', $member->user_id)
-                    ->whereBetween('created_at', [$war->started_at, now()])
-                    ->sum('xp_earned');
+        // Ambil semua klaim clan ini untuk war ini sekaligus (hindari N query).
+        $claims = ClanWarModeClaim::with('user')
+            ->where('clan_war_id', $war->id)
+            ->where('clan_id', $this->myClan->id)
+            ->get()
+            ->keyBy(fn (ClanWarModeClaim $c) => $c->mode.'|'.$c->mode_config);
 
-                return ['user' => $member->user, 'total' => (int) $total];
-            })
-            ->sortByDesc('total')
-            ->values();
+        return collect(ClanWarModeCatalog::MODES)->map(function (array $m) use ($claims) {
+            $claim = $claims->get($m['mode'].'|'.$m['config']);
+
+            $status = 'open';
+            if ($claim) {
+                $status = $claim->isSubmitted() ? 'done' : 'claimed';
+            }
+
+            return [
+                'mode' => $m['mode'],
+                'config' => $m['config'],
+                'ceiling' => $m['ceiling'],
+                'status' => $status,
+                'claim' => $claim,
+            ];
+        });
+    }
+
+    /**
+     * Total poin clan sendiri sejauh ini (hanya mode yang sudah disubmit).
+     */
+    public function getMyClanPointsProperty(): float
+    {
+        $war = $this->myActiveWar;
+
+        if (! $war || ! $this->myClan) {
+            return 0.0;
+        }
+
+        return (float) ClanWarModeClaim::where('clan_war_id', $war->id)
+            ->where('clan_id', $this->myClan->id)
+            ->whereNotNull('typing_result_id')
+            ->sum('points');
     }
 
     // ---- AKSI ----
+
+    /**
+     * Klaim salah satu dari 9 mode untuk clan sendiri, lalu arahkan ke
+     * typing engine dengan mode terkunci. Aman terhadap race: unique
+     * constraint DB jadi jaring pengaman terakhir kalau dua member klaim
+     * mode yang sama nyaris bersamaan.
+     */
+    public function claimMode(string $mode, string $config): void
+    {
+        $war = $this->myActiveWar;
+
+        if (! $war || $war->status !== ClanWarStatus::Ongoing || ! $this->myClan) {
+            return;
+        }
+
+        if (! ClanWarModeCatalog::isValidMode($mode, $config)) {
+            return;
+        }
+
+        try {
+            $claim = DB::transaction(function () use ($war, $mode, $config) {
+                // Cek dulu clan ini belum mengklaim slot ini.
+                $existing = ClanWarModeClaim::where('clan_war_id', $war->id)
+                    ->where('clan_id', $this->myClan->id)
+                    ->where('mode', $mode)
+                    ->where('mode_config', $config)
+                    ->first();
+
+                if ($existing) {
+                    return null;
+                }
+
+                return ClanWarModeClaim::create([
+                    'clan_war_id' => $war->id,
+                    'clan_id' => $this->myClan->id,
+                    'user_id' => Auth::id(),
+                    'mode' => $mode,
+                    'mode_config' => $config,
+                    'claimed_at' => now(),
+                ]);
+            });
+        } catch (QueryException $e) {
+            // Unique violation: member lain baru saja mengambil slot ini.
+            $claim = null;
+        }
+
+        if (! $claim) {
+            session()->flash('clan_war_claim_error', 'Mode ini baru saja diambil oleh member lain.');
+
+            return;
+        }
+
+        // Arahkan ke typing engine dengan mode terkunci ke klaim ini.
+        $this->redirect(route('typing', ['war_claim' => $claim->id]), navigate: true);
+    }
+
+    /**
+     * Batalkan klaim yang BELUM disubmit -- mode kembali kosong & bisa
+     * diklaim ulang. Pengklaim itu sendiri ATAU leader clan yang boleh.
+     */
+    public function cancelClaim(int $claimId): void
+    {
+        if (! $this->myClan) {
+            return;
+        }
+
+        $claim = ClanWarModeClaim::where('id', $claimId)
+            ->where('clan_id', $this->myClan->id)
+            ->whereNull('typing_result_id')
+            ->first();
+
+        if (! $claim) {
+            return;
+        }
+
+        // Hanya pengklaim atau leader yang boleh membatalkan.
+        if ($claim->user_id !== Auth::id() && ! $this->isLeader) {
+            return;
+        }
+
+        $claim->delete();
+    }
 
     public function challengeClan(int $opponentClanId): void
     {

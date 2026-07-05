@@ -46,6 +46,32 @@
                 </div>
             @endif
 
+            @if ($warLock)
+                {{-- WAR-LOCK: mode dikunci ke klaim Clan War. Kontrol mode disembunyikan
+                     total (bukan cuma di-disable) supaya tak ada jalur ganti mode; server
+                     juga menolak setMode() saat war-lock aktif (defense-in-depth). --}}
+                <div class="flex flex-col items-center gap-2 mb-2 transition-opacity duration-500"
+                    :class="isStarted ? 'opacity-0 pointer-events-none' : 'opacity-100'">
+                    <div class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold/10 border border-gold/40">
+                        <svg class="w-4 h-4 text-gold shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        <span class="text-small font-mono font-bold text-gold">
+                            Clan War ·
+                            @if ($warLock['mode'] === 'survival')
+                                Survival {{ ucfirst($warLock['config']) }}
+                            @elseif ($warLock['mode'] === 'time')
+                                Time {{ $warLock['config'] }}s
+                            @else
+                                Words {{ $warLock['config'] }}
+                            @endif
+                        </span>
+                    </div>
+                    <a href="{{ route('clan-war.index') }}" wire:navigate class="text-x-small font-mono text-muted hover:text-foreground transition">
+                        ← Batalkan &amp; kembali ke Clan War
+                    </a>
+                </div>
+            @else
             <!-- MODE CONTROL BAR (selaras Figma: Standard/Survival/Ghost → config → EN/ID) -->
             <!-- Saat mengetik, control bar di-fade DI TEMPAT (ruang tetap dipesan) supaya
                  area teks tidak melonjak ke atas. Sebelumnya pakai h-0/!mb-0 yang meng-collapse
@@ -149,6 +175,7 @@
                     @endforeach
                 </div>
             </div>
+            @endif
 
             <div x-cloak class="group mb-6 transition-opacity duration-500"
                 :class="!isStarted ? 'opacity-0' : (isFinished ? 'opacity-100' : 'opacity-60 hover:opacity-100')">
