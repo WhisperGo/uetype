@@ -51,15 +51,24 @@
                                 <span class="text-muted font-normal">[{{ $this->myClan->tag }}]</span>
                             @endif
                         </p>
-                        <p class="font-mono text-xs text-muted mt-0.5">{{ $this->myClanMembers->count() }} / {{ \App\Livewire\Clans::MAX_MEMBERS }} members</p>
+                        <p class="font-mono text-xs text-muted mt-0.5">
+                            {{ $this->myClanMembers->count() }} / {{ \App\Livewire\Clans::MAX_MEMBERS }} members
+                            · power <span class="text-gold font-bold">{{ number_format($this->myClan->power) }}</span>
+                        </p>
                     </div>
-                    @if ($this->myMembership->role->value !== 'leader')
-                        <button wire:click="leaveClan"
-                            wire:confirm="Keluar dari {{ $this->myClan->name }}?"
-                            class="px-4 py-1.5 font-mono text-xs text-red-400/80 border border-red-900/40 rounded-lg hover:bg-red-950/30 transition">
-                            Leave Clan
-                        </button>
-                    @endif
+                    <div class="flex items-center gap-3">
+                        <a href="{{ route('clan-war.index') }}" wire:navigate
+                            class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
+                            Clan War
+                        </a>
+                        @if ($this->myMembership->role->value !== 'leader')
+                            <button wire:click="leaveClan"
+                                wire:confirm="Keluar dari {{ $this->myClan->name }}?"
+                                class="px-4 py-1.5 font-mono text-xs text-red-400/80 border border-red-900/40 rounded-lg hover:bg-red-950/30 transition">
+                                Leave Clan
+                            </button>
+                        @endif
+                    </div>
                 </div>
             </div>
 
@@ -157,7 +166,10 @@
                                     <span class="text-muted font-normal">[{{ $row['clan']->tag }}]</span>
                                 @endif
                             </p>
-                            <p class="font-mono text-xs text-muted mt-0.5">{{ $row['clan']->members_count }} / {{ \App\Livewire\Clans::MAX_MEMBERS }} members</p>
+                            <p class="font-mono text-xs text-muted mt-0.5">
+                                {{ $row['clan']->members_count }} / {{ \App\Livewire\Clans::MAX_MEMBERS }} members
+                                · power {{ number_format($row['clan']->power) }}
+                            </p>
                         </div>
 
                         @switch($row['relation'])

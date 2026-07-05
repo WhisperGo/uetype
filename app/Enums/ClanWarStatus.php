@@ -4,7 +4,9 @@ namespace App\Enums;
 
 enum ClanWarStatus: string
 {
-    case Upcoming = 'upcoming';
+    case Pending = 'pending';
+    case Expired = 'expired';
     case Ongoing = 'ongoing';
     case Finished = 'finished';
+    case Declined = 'declined';
 }

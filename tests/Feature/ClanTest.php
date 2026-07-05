@@ -2,13 +2,9 @@
 
 use App\Enums\ClanMemberStatus;
 use App\Enums\ClanRole;
-use App\Enums\ClanWarStatus;
 use App\Livewire\Clans;
 use App\Models\Clan;
 use App\Models\ClanMember;
-use App\Models\ClanWar;
-use App\Models\ClanWarParticipant;
-use App\Models\TypingResult;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -135,62 +131,6 @@ it('lets a member leave but blocks the leader from leaving directly', function (
 
     Livewire::actingAs($leader)->test(Clans::class)->call('leaveClan');
     $this->assertDatabaseHas('clan_members', ['clan_id' => $clan->id, 'user_id' => $leader->id, 'status' => ClanMemberStatus::Active->value]);
-});
-
-it('sums xp_earned within the war window per clan when closing a war via the artisan command', function () {
-    $leaderA = User::factory()->create();
-    $leaderB = User::factory()->create();
-
-    $clanA = Clan::create(['name' => 'War Clan A', 'leader_id' => $leaderA->id]);
-    ClanMember::create(['clan_id' => $clanA->id, 'user_id' => $leaderA->id, 'role' => ClanRole::Leader, 'status' => ClanMemberStatus::Active]);
-
-    $clanB = Clan::create(['name' => 'War Clan B', 'leader_id' => $leaderB->id]);
-    ClanMember::create(['clan_id' => $clanB->id, 'user_id' => $leaderB->id, 'role' => ClanRole::Leader, 'status' => ClanMemberStatus::Active]);
-
-    $war = ClanWar::create([
-        'starts_at' => now()->subDays(3),
-        'ends_at' => now()->subDay(),
-        'status' => ClanWarStatus::Ongoing,
-    ]);
-    ClanWarParticipant::create(['clan_war_id' => $war->id, 'clan_id' => $clanA->id, 'total_contribution' => 0]);
-    ClanWarParticipant::create(['clan_war_id' => $war->id, 'clan_id' => $clanB->id, 'total_contribution' => 0]);
-
-    // Hasil DI DALAM jendela war untuk clan A.
-    TypingResult::create([
-        'user_id' => $leaderA->id, 'mode' => 'time', 'mode_config' => '30',
-        'net_wpm' => 80, 'raw_wpm' => 85, 'accuracy' => 95, 'correct_chars' => 300,
-        'incorrect_chars' => 5, 'duration_seconds' => 30, 'xp_earned' => 100,
-    ])->forceFill(['created_at' => now()->subDays(2)])->save();
-
-    // Hasil DI LUAR jendela war (sebelum war mulai) untuk clan A -- tak boleh terhitung.
-    TypingResult::create([
-        'user_id' => $leaderA->id, 'mode' => 'time', 'mode_config' => '30',
-        'net_wpm' => 80, 'raw_wpm' => 85, 'accuracy' => 95, 'correct_chars' => 300,
-        'incorrect_chars' => 5, 'duration_seconds' => 30, 'xp_earned' => 999,
-    ])->forceFill(['created_at' => now()->subDays(10)])->save();
-
-    // Hasil di dalam jendela untuk clan B, lebih kecil dari clan A.
-    TypingResult::create([
-        'user_id' => $leaderB->id, 'mode' => 'time', 'mode_config' => '30',
-        'net_wpm' => 60, 'raw_wpm' => 65, 'accuracy' => 90, 'correct_chars' => 200,
-        'incorrect_chars' => 10, 'duration_seconds' => 30, 'xp_earned' => 40,
-    ])->forceFill(['created_at' => now()->subDays(2)])->save();
-
-    $this->artisan('clan-war:start')->assertSuccessful();
-
-    $war->refresh();
-    expect($war->status)->toBe(ClanWarStatus::Finished);
-
-    $participantA = ClanWarParticipant::where('clan_war_id', $war->id)->where('clan_id', $clanA->id)->first();
-    $participantB = ClanWarParticipant::where('clan_war_id', $war->id)->where('clan_id', $clanB->id)->first();
-
-    expect($participantA->total_contribution)->toBe(100);
-    expect($participantA->placement)->toBe(1);
-    expect($participantB->total_contribution)->toBe(40);
-    expect($participantB->placement)->toBe(2);
-
-    // Command juga membuka war baru untuk semua clan yang ada.
-    $this->assertDatabaseHas('clan_wars', ['status' => ClanWarStatus::Ongoing->value]);
 });
 
 it('requires authentication to view the clans page', function () {

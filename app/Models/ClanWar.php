@@ -4,24 +4,38 @@ namespace App\Models;
 
 use App\Enums\ClanWarStatus;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ClanWar extends Model
 {
     protected $fillable = [
-        'starts_at',
-        'ends_at',
+        'challenger_clan_id',
+        'opponent_clan_id',
         'status',
+        'challenger_power_before',
+        'opponent_power_before',
+        'challenger_power_delta',
+        'opponent_power_delta',
+        'result',
+        'accept_deadline_at',
+        'started_at',
+        'ends_at',
     ];
 
     protected $casts = [
-        'starts_at' => 'datetime',
-        'ends_at' => 'datetime',
         'status' => ClanWarStatus::class,
+        'accept_deadline_at' => 'datetime',
+        'started_at' => 'datetime',
+        'ends_at' => 'datetime',
     ];
 
-    public function participants(): HasMany
+    public function challenger(): BelongsTo
     {
-        return $this->hasMany(ClanWarParticipant::class);
+        return $this->belongsTo(Clan::class, 'challenger_clan_id');
+    }
+
+    public function opponent(): BelongsTo
+    {
+        return $this->belongsTo(Clan::class, 'opponent_clan_id');
     }
 }
