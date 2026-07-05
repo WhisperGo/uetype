@@ -27,7 +27,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
 
     // Profil publik user lain (dibuka dari daftar teman / hasil pencarian).
-    Route::get('/users/{user}', [ProfileController::class, 'show'])->name('profile.show');
+    // Dirujuk lewat username, bukan ID, supaya ID user (dan jumlah total
+    // user terdaftar) tidak bisa dienumerasi dengan mengubah angka di URL.
+    Route::get('/users/{user:username}', [ProfileController::class, 'show'])->name('profile.show');
 
     Route::get('/settings', Settings::class)->name('settings');
 

@@ -52,6 +52,19 @@ it('requires authentication to view a public profile', function () {
         ->assertRedirect(route('login'));
 });
 
+it('builds the public profile url from the username, not the numeric id (anti-enumeration)', function () {
+    $me = User::factory()->create();
+    $other = User::factory()->create(['username' => 'targetplayer']);
+
+    // URL harus berisi username, tak ada jejak ID numerik yang bisa
+    // dienumerasi (misal /users/18 -> /users/19 -> ...).
+    expect(route('profile.show', $other))->toContain('/users/targetplayer')
+        ->not->toContain('/users/'.$other->id);
+
+    // Membuka lewat ID mentah harus GAGAL (404) -- ID bukan lagi jalur valid.
+    actingAs($me)->get('/users/'.$other->id)->assertNotFound();
+});
+
 it('sends a friend request via the friend button', function () {
     $me = User::factory()->create();
     $other = User::factory()->create();
