@@ -3,8 +3,8 @@
 
         {{-- Header --}}
         <div class="mb-6">
-            <h1 class="text-3xl font-mono font-bold text-foreground mb-1">Terms & Conditions</h1>
-            <p class="font-sans text-x-small text-muted">Last updated July 2026</p>
+            <h1 class="text-3xl font-mono font-bold text-foreground mb-1">{{ __('terms.title') }}</h1>
+            <p class="font-sans text-x-small text-muted">{{ __('terms.last_updated') }}</p>
         </div>
 
         {{-- Sections --}}

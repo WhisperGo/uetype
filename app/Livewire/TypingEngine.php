@@ -215,7 +215,7 @@ class TypingEngine extends Component
 
         // Sesi tidak valid: tolak. Jangan simpan, jangan beri EXP, jangan naikkan rekor.
         if (! $check['valid']) {
-            session()->flash('result_rejected', 'Hasil sesi ini ditolak oleh validasi server (tidak masuk akal) dan tidak disimpan.');
+            session()->flash('result_rejected', __('typing.result_rejected'));
 
             return $this->redirect(route('typing'), navigate: true);
         }

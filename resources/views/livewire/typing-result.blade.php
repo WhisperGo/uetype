@@ -8,13 +8,13 @@
             $mins = intdiv((int) $time, 60);
             $secs = (int) $time % 60;
             $heroValue = $isSurvival ? sprintf('%d:%02d', $mins, $secs) : $wpm;
-            $heroLabel = $isSurvival ? 'survived' : 'wpm';
+            $heroLabel = $isSurvival ? __('result.survived') : __('result.wpm');
 
             $modeLabel = match ($mode) {
-                'time' => 'Time · ' . $subMode . 's',
-                'words' => 'Words · ' . $subMode,
-                'quote' => 'Quote',
-                'survival' => 'Survival · ' . ucfirst($subMode),
+                'time' => __('result.mode.time', ['config' => $subMode]),
+                'words' => __('result.mode.words', ['config' => $subMode]),
+                'quote' => __('result.mode.quote'),
+                'survival' => __('result.mode.survival', ['config' => ucfirst($subMode)]),
                 default => ucfirst($mode) . ' · ' . $subMode,
             };
 
@@ -56,28 +56,28 @@
                 <div class="relative overflow-hidden rounded-3xl border border-border bg-surface/60 px-8 py-10 text-center">
                     <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-danger to-transparent opacity-70"></div>
 
-                    <p class="font-sans text-xs uppercase tracking-[0.35em] text-danger/80 mb-4">game over</p>
+                    <p class="font-sans text-xs uppercase tracking-[0.35em] text-danger/80 mb-4">{{ __('result.game_over') }}</p>
 
                     <div class="flex flex-col items-center gap-1">
                         <span class="font-display text-5xl md:text-6xl text-gold leading-none tabular-nums"
                             x-text="clock">{{ sprintf('%d:%02d', $mins, $secs) }}</span>
-                        <span class="font-sans text-xs uppercase tracking-[0.3em] text-muted mt-3">survived</span>
+                        <span class="font-sans text-xs uppercase tracking-[0.3em] text-muted mt-3">{{ __('result.survived') }}</span>
                     </div>
 
                     <div class="mt-6 flex items-center justify-center gap-2 text-x-small">
                         <span class="px-3 py-1 rounded-full border border-border text-muted uppercase tracking-[0.2em]">{{ ucfirst($subMode) }}</span>
-                        <span class="text-muted/70">stamina habis di {{ sprintf('%d:%02d', $mins, $secs) }}</span>
+                        <span class="text-muted/70">{{ __('result.stamina_depleted_at', ['time' => sprintf('%d:%02d', $mins, $secs)]) }}</span>
                     </div>
 
                     @if ($isSurvivalPersonalBest)
                         <p class="mt-6 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gold/10 border border-gold/40 text-gold font-mono text-sm">
-                            <span>★</span> new personal best
+                            <span>★</span> {{ __('result.new_personal_best') }}
                         </p>
                     @elseif ($pbSeconds !== null)
                         <p class="mt-6 font-mono text-sm text-muted tabular-nums">
-                            PB {{ sprintf('%d:%02d', $pbMins, $pbSecsPart) }}
+                            {{ __('result.pb', ['time' => sprintf('%d:%02d', $pbMins, $pbSecsPart)]) }}
                             @if ($survivalDelta > 0)
-                                <span class="text-muted/70">· kurang {{ $survivalDelta }}s lagi</span>
+                                <span class="text-muted/70">· {{ __('result.pb_short_by', ['seconds' => $survivalDelta]) }}</span>
                             @endif
                         </p>
                     @endif
@@ -86,10 +86,10 @@
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     @php
                         $survivalStats = [
-                            ['avg wpm', $wpm, 'text-foreground'],
-                            ['accuracy', $accuracy . '%', 'text-gold'],
-                            ['words', $wordsTyped, 'text-foreground'],
-                            ['drain events', $drainEventCount, 'text-danger'],
+                            [__('result.stat.avg_wpm'), $wpm, 'text-foreground'],
+                            [__('result.stat.accuracy'), $accuracy . '%', 'text-gold'],
+                            [__('result.stat.words'), $wordsTyped, 'text-foreground'],
+                            [__('result.stat.drain_events'), $drainEventCount, 'text-danger'],
                         ];
                     @endphp
                     @foreach ($survivalStats as [$label, $value, $tone])
@@ -105,7 +105,7 @@
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="flex flex-col gap-2">
-                                    <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">xp earned</span>
+                                    <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
                                     <span class="text-2xl font-bold font-mono text-brand-bright leading-none">+{{ $xpEarned }} XP</span>
                                 </div>
                                 <div class="text-right font-mono text-xs text-muted leading-relaxed">
@@ -123,7 +123,7 @@
 
                 <a id="restartButton" href="/typing"
                     class="inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-sans font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition">
-                    <span>main lagi</span>
+                    <span>{{ __('result.play_again') }}</span>
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
                     </svg>
@@ -146,19 +146,19 @@
                     </div>
                     @if ($isPersonalBest)
                         <p class="mt-3 flex items-center gap-1.5 text-sm text-gold font-mono">
-                            <span>✦</span> new personal best
+                            <span>✦</span> {{ __('result.new_personal_best') }}
                         </p>
                     @elseif (!is_null($recordDelta))
                         <p class="mt-3 font-mono text-sm text-muted tabular-nums">
-                            {{ $recordDelta >= 0 ? '+' : '' }}{{ $recordDelta }} <span class="text-muted/70">vs rekor {{ rtrim(rtrim(number_format($previousBest, 1), '0'), '.') }}</span>
+                            {{ $recordDelta >= 0 ? '+' : '' }}{{ $recordDelta }} <span class="text-muted/70">{{ __('result.vs_record', ['best' => rtrim(rtrim(number_format($previousBest, 1), '0'), '.')]) }}</span>
                         </p>
                     @endif
 
                     @if ($ghostResult)
                         <p class="mt-3 flex items-center gap-1.5 text-sm font-mono {{ $ghostResult['playerWon'] ? 'text-gold' : 'text-muted' }}">
                             <span>{{ $ghostResult['playerWon'] ? '✦' : '·' }}</span>
-                            {{ $ghostResult['playerWon'] ? 'beat the ghost' : 'lost to the ghost' }}
-                            <span class="text-muted/70">vs {{ $ghostResult['label'] }} ({{ rtrim(rtrim(number_format($ghostResult['wpm'], 1), '0'), '.') }} wpm)</span>
+                            {{ $ghostResult['playerWon'] ? __('result.beat_ghost') : __('result.lost_ghost') }}
+                            <span class="text-muted/70">{{ __('result.vs_ghost', ['label' => $ghostResult['label'], 'wpm' => rtrim(rtrim(number_format($ghostResult['wpm'], 1), '0'), '.')]) }}</span>
                         </p>
                     @endif
                 </div>
@@ -167,50 +167,50 @@
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     @if ($isSurvival)
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">avg wpm</span>
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.avg_wpm') }}</span>
                             <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $wpm }}</span>
                         </div>
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">accuracy</span>
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.accuracy') }}</span>
                             <span class="text-2xl text-gold font-bold font-mono leading-none tabular-nums">{{ $accuracy }}<span class="text-lg">%</span></span>
                         </div>
                         @if (!is_null($consistency))
                             <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                                <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">consistency</span>
+                                <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.consistency') }}</span>
                                 <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $consistency }}<span class="text-lg">%</span></span>
                             </div>
                         @endif
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">characters</span>
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.characters') }}</span>
                             <span class="text-2xl font-bold font-mono leading-none tabular-nums">
                                 <span class="text-foreground">{{ $correctKeystrokes }}</span><span class="text-muted"> / </span><span class="text-danger">{{ $incorrectKeystrokes }}</span>
                             </span>
                         </div>
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">difficulty</span>
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.difficulty') }}</span>
                             <span class="text-2xl text-foreground font-bold font-mono leading-none capitalize">{{ $subMode }}</span>
                         </div>
                     @else
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">raw wpm</span>
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.raw_wpm') }}</span>
                             <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $rawWpm }}</span>
                         </div>
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">accuracy</span>
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.accuracy') }}</span>
                             <span class="text-2xl text-gold font-bold font-mono leading-none tabular-nums">{{ $accuracy }}<span class="text-lg">%</span></span>
                         </div>
                         @if (!is_null($consistency))
                             <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                                <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">consistency</span>
+                                <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.consistency') }}</span>
                                 <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $consistency }}<span class="text-lg">%</span></span>
                             </div>
                         @endif
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">duration</span>
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.duration') }}</span>
                             <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ round($time, 1) }}<span class="text-lg text-muted">s</span></span>
                         </div>
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2 {{ is_null($consistency) ? 'col-span-2 sm:col-span-1' : '' }}">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">characters</span>
+                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.characters') }}</span>
                             <span class="text-2xl font-bold font-mono leading-none tabular-nums">
                                 <span class="text-foreground">{{ $correctKeystrokes }}</span><span class="text-muted"> / </span><span class="text-danger">{{ $incorrectKeystrokes }}</span>
                             </span>
@@ -224,7 +224,7 @@
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="flex flex-col gap-2">
-                                    <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">xp earned</span>
+                                    <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
                                     <span class="text-2xl font-bold font-mono text-brand leading-none">+{{ $xpEarned }} XP</span>
                                 </div>
                                 <div class="text-right font-mono text-xs text-muted leading-relaxed">
@@ -244,8 +244,8 @@
                 <div class="flex items-stretch gap-3">
                     <a id="restartButton" href="/typing"
                         class="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-sans font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition"
-                        title="{{ $isSurvival ? 'Main Lagi' : 'Tes Berikutnya' }}">
-                        <span>{{ $isSurvival ? 'play again' : 'next test' }}</span>
+                        title="{{ $isSurvival ? __('result.play_again_title') : __('result.next_test_title') }}">
+                        <span>{{ $isSurvival ? __('result.play_again') : __('result.next_test') }}</span>
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
                         </svg>
@@ -253,8 +253,8 @@
                     @unless ($isSurvival)
                         <a href="/typing"
                             class="inline-flex items-center justify-center h-12 px-6 rounded-2xl bg-surface border border-white/5 text-foreground/80 hover:text-foreground hover:border-white/10 font-sans font-semibold text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-border transition"
-                            title="Ulangi Tes">
-                            retry
+                            title="{{ __('result.retry_title') }}">
+                            {{ __('result.retry') }}
                         </a>
                     @endunless
                 </div>
@@ -262,7 +262,7 @@
 
             <!-- ===== KOLOM KANAN: chart ===== -->
             <div class="bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6">
-                <h3 class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-3">{{ $isSurvival ? 'stamina' : 'performance' }}</h3>
+                <h3 class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-3">{{ $isSurvival ? __('result.chart_stamina') : __('result.chart_performance') }}</h3>
                 <div class="w-full h-72 lg:h-96" wire:ignore>
                     <canvas id="wpmChart"></canvas>
                 </div>
@@ -379,8 +379,7 @@
 
         <div
             class="mt-8 bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6 flex flex-col items-center gap-2">
-            <h3 class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-4 self-start">heatmap kesalahan
-            </h3>
+            <h3 class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-4 self-start">{{ __('result.error_heatmap') }}</h3>
             <div class="flex flex-col gap-2 md:gap-3">
                 @foreach ($keyboard as $rowIndex => $row)
                     <div class="flex justify-center gap-2 md:gap-3" style="margin-left: {{ $rowIndex * 1.5 }}rem;">
@@ -400,7 +399,7 @@
                                 @if ($missCount > 0)
                                     <div
                                         class="absolute -top-10 bg-surface text-danger px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg border border-danger/50">
-                                        {{ $missCount }} salah
+                                        {{ __('result.miss_count', ['count' => $missCount]) }}
                                     </div>
                                 @endif
                             </div>

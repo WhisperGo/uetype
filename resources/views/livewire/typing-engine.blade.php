@@ -56,38 +56,38 @@
 
                 <!-- Row 1: Mode utama (segment) -->
                 <div class="inline-flex items-stretch gap-0.5 p-[3px] rounded-lg bg-surface border border-border"
-                    role="group" aria-label="Pilih mode utama">
-                    <button type="button" aria-label="Mode Standard"
+                    role="group" aria-label="{{ __('typing.aria.pick_main_mode') }}">
+                    <button type="button" aria-label="{{ __('typing.aria.mode_standard') }}"
                         :aria-pressed="['time','words','quote'].includes(currentMain)"
                         @click.prevent="if(!['time','words','quote'].includes(currentMain)){ currentMain='time'; currentSub='30'; $wire.setMode('time','30'); } $el.blur()"
                         class="px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                        :class="['time','words','quote'].includes(currentMain) ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">Standard</button>
+                        :class="['time','words','quote'].includes(currentMain) ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">{{ __('typing.standard') }}</button>
 
-                    <button type="button" aria-label="Mode Survival"
+                    <button type="button" aria-label="{{ __('typing.aria.mode_survival') }}"
                         :aria-pressed="currentMain === 'survival'"
                         @click.prevent="currentMain='survival'; currentSub='medium'; $wire.setMode('survival','medium'); $el.blur()"
                         class="px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                        :class="currentMain === 'survival' ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">Survival</button>
+                        :class="currentMain === 'survival' ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">{{ __('typing.survival') }}</button>
 
-                    <button type="button" aria-label="Mode Ghost"
+                    <button type="button" aria-label="{{ __('typing.aria.mode_ghost') }}"
                         @click.prevent="$dispatch('open-modal', 'ghost-picker'); $el.blur()"
                         class="px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand inline-flex items-center gap-1.5"
                         :class="ghostActive ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">
-                        Ghost
+                        {{ __('typing.ghost') }}
                         <template x-if="ghostActive">
-                            <span class="text-[0.6rem] font-sans normal-case tracking-normal opacity-80" x-text="'vs ' + ghostLabel"></span>
+                            <span class="text-[0.6rem] font-sans normal-case tracking-normal opacity-80" x-text="@js(__('typing.ghost_vs', ['label' => ''])) + ghostLabel"></span>
                         </template>
                     </button>
                 </div>
 
                 <!-- Row 2: Config (Standard → Time/Words/Quote + durasi; Survival → difficulty) -->
                 <div class="flex items-center gap-1.5 min-h-[34px] text-small font-mono"
-                    role="group" aria-label="Konfigurasi mode">
+                    role="group" aria-label="{{ __('typing.aria.mode_config') }}">
                     <!-- STANDARD: pemilih tipe + sub-konfigurasi -->
                     <template x-if="['time','words','quote'].includes(currentMain)">
                         <div class="flex items-center gap-1.5">
-                            @foreach (['time' => 'Time', 'words' => 'Words', 'quote' => 'Quote'] as $type => $label)
-                                <button type="button" aria-label="Tipe {{ $label }}"
+                            @foreach (['time' => __('typing.type_time'), 'words' => __('typing.type_words'), 'quote' => __('typing.type_quote')] as $type => $label)
+                                <button type="button" aria-label="{{ __('typing.aria.type', ['label' => $label]) }}"
                                     :aria-pressed="currentMain === '{{ $type }}'"
                                     @click.prevent="currentMain='{{ $type }}'; currentSub='{{ $type === 'time' ? '15' : ($type === 'words' ? '25' : 'medium') }}'; $wire.setMode('{{ $type }}', currentSub); $el.blur()"
                                     class="px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-brand"
@@ -99,7 +99,7 @@
                             <template x-if="currentMain === 'time'">
                                 <div class="flex gap-1.5">
                                     @foreach (['15', '30', '60', '120'] as $t)
-                                        <button type="button" aria-label="Durasi {{ $t }} detik"
+                                        <button type="button" aria-label="{{ __('typing.aria.duration_seconds', ['seconds' => $t]) }}"
                                             :aria-pressed="currentSub == '{{ $t }}'"
                                             @click.prevent="currentSub='{{ $t }}'; $wire.setMode('time','{{ $t }}'); $el.blur()"
                                             class="px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-gold"
@@ -110,7 +110,7 @@
                             <template x-if="currentMain === 'words'">
                                 <div class="flex gap-1.5">
                                     @foreach (['10', '25', '50', '100'] as $w)
-                                        <button type="button" aria-label="{{ $w }} kata"
+                                        <button type="button" aria-label="{{ __('typing.aria.words_count', ['count' => $w]) }}"
                                             :aria-pressed="currentSub == '{{ $w }}'"
                                             @click.prevent="currentSub='{{ $w }}'; $wire.setMode('words','{{ $w }}'); $el.blur()"
                                             class="px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-gold"
@@ -119,7 +119,7 @@
                                 </div>
                             </template>
                             <template x-if="currentMain === 'quote'">
-                                <span class="px-2.5 py-1 text-muted italic text-x-small">kutipan acak</span>
+                                <span class="px-2.5 py-1 text-muted italic text-x-small">{{ __('typing.random_quote') }}</span>
                             </template>
                         </div>
                     </template>
@@ -128,7 +128,7 @@
                     <template x-if="currentMain === 'survival'">
                         <div class="flex gap-1.5">
                             @foreach (['easy', 'medium', 'hard'] as $d)
-                                <button type="button" aria-label="Tingkat {{ $d }}"
+                                <button type="button" aria-label="{{ __('typing.aria.difficulty', ['level' => $d]) }}"
                                     :aria-pressed="currentSub == '{{ $d }}'"
                                     @click.prevent="currentSub='{{ $d }}'; $wire.setMode('survival','{{ $d }}'); $el.blur()"
                                     class="px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none capitalize hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-gold"
@@ -140,8 +140,8 @@
 
                 <!-- Row 3: Language switch (EN/ID) — tampil sesuai Figma, ID aktif; belum fungsional -->
                 <div class="inline-flex items-stretch gap-0.5 p-[3px] rounded-lg bg-surface border border-border"
-                    role="group" aria-label="Pilih bahasa (segera hadir)">
-                    <span aria-disabled="true" title="Segera hadir"
+                    role="group" aria-label="{{ __('typing.aria.pick_language') }}">
+                    <span aria-disabled="true" title="{{ __('typing.coming_soon') }}"
                         class="px-[16px] py-[5px] rounded-md text-small font-mono font-bold text-muted/50 cursor-not-allowed">EN</span>
                     <span aria-pressed="true"
                         class="px-[16px] py-[5px] rounded-md text-small font-mono font-bold bg-brand text-foreground">ID</span>
@@ -160,19 +160,19 @@
                             }"
                             aria-live="polite" x-text="currentMain === 'time' ? timer : timer + 's'">0</span>
                         <span class="text-x-small uppercase tracking-wide text-muted mt-2"
-                            x-text="currentMain === 'time' ? 'left' : 'time'">time</span>
+                            x-text="currentMain === 'time' ? @js(__('typing.stat_left')) : @js(__('typing.stat_time'))">{{ __('typing.stat_time') }}</span>
                     </div>
 
                     <div class="flex flex-col">
                         <span class="text-2xl text-muted font-mono font-bold tabular-nums leading-none" x-text="wpm">0</span>
-                        <span class="text-x-small uppercase tracking-wide text-muted mt-1.5">wpm</span>
+                        <span class="text-x-small uppercase tracking-wide text-muted mt-1.5">{{ __('typing.stat_wpm') }}</span>
                     </div>
 
                     <div class="flex flex-col">
                         <span class="text-2xl text-muted font-mono font-bold tabular-nums leading-none">
                             <span x-text="accuracy">0</span>%
                         </span>
-                        <span class="text-x-small uppercase tracking-wide text-muted mt-1.5">acc</span>
+                        <span class="text-x-small uppercase tracking-wide text-muted mt-1.5">{{ __('typing.stat_acc') }}</span>
                     </div>
                 </div>
 
@@ -187,7 +187,7 @@
 
                     <template x-if="currentMain === 'survival'">
                         <div class="flex items-center gap-3">
-                            <span class="font-display text-[0.55rem] uppercase tracking-[0.15em] text-muted shrink-0">stamina</span>
+                            <span class="font-display text-[0.55rem] uppercase tracking-[0.15em] text-muted shrink-0">{{ __('typing.stamina') }}</span>
                             <div class="relative flex-1 flex gap-[3px] p-[3px] bg-surface/80 border border-border/60"
                                 :class="(staminaPct < 25 && isStarted && !isFinished) ? 'animate-[pulse_0.7s_ease-in-out_infinite]' : ''">
                                 <template x-for="cell in staminaCells" :key="cell">
@@ -297,9 +297,9 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    <span class="font-sans text-xs uppercase tracking-widest">restart</span>
+                    <span class="font-sans text-xs uppercase tracking-widest">{{ __('typing.restart') }}</span>
                     <kbd class="font-sans text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">tab</kbd>
-                    <span class="font-sans text-[0.6rem] text-muted">then</span>
+                    <span class="font-sans text-[0.6rem] text-muted">{{ __('typing.then') }}</span>
                     <kbd class="font-sans text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">enter</kbd>
                 </button>
             </div>

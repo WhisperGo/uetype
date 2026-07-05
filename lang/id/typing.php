@@ -21,6 +21,7 @@ return [
     'then' => 'lalu',
 
     'coming_soon' => 'Segera hadir',
+    'result_rejected' => 'Hasil sesi ini ditolak oleh validasi server (tidak masuk akal) dan tidak disimpan.',
 
     'aria' => [
         'pick_main_mode' => 'Pilih mode utama',

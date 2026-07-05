@@ -21,6 +21,7 @@ return [
     'then' => 'then',
 
     'coming_soon' => 'Coming soon',
+    'result_rejected' => 'This session was rejected by server validation (implausible) and was not saved.',
 
     'aria' => [
         'pick_main_mode' => 'Pick main mode',
