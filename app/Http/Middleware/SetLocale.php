@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Locale;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
@@ -9,15 +10,12 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SetLocale
 {
-    private const SUPPORTED = ['id', 'en'];
-
-    private const DEFAULT = 'id';
-
     public function handle(Request $request, Closure $next): Response
     {
-        $locale = $request->session()->get('locale');
+        $locale = $request->user()?->preferences['locale']
+            ?? $request->session()->get('locale');
 
-        App::setLocale(\in_array($locale, self::SUPPORTED, true) ? $locale : self::DEFAULT);
+        App::setLocale(Locale::resolve($locale));
 
         return $next($request);
     }

@@ -112,6 +112,14 @@ class User extends Authenticatable
         return $xpEarned;
     }
 
+    public function setPreference(string $key, mixed $value): void
+    {
+        $preferences = $this->preferences ?? [];
+        $preferences[$key] = $value;
+        $this->preferences = $preferences;
+        $this->save();
+    }
+
     public function typingResults(): HasMany
     {
         return $this->hasMany(TypingResult::class);

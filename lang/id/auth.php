@@ -20,5 +20,9 @@ return [
         'placeholder' => 'contoh: ksatria_ketik',
         'cancel' => 'Batal',
         'finish' => 'Selesaikan',
+        'taken' => 'Nama pengguna ini sudah dipakai, cari nama lain!',
+        'format' => 'Nama pengguna hanya boleh berisi huruf, angka, strip, dan garis bawah.',
     ],
+
+    'google_failed' => 'Gagal autentikasi via Google.',
 ];

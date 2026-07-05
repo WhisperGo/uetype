@@ -74,11 +74,6 @@
                             class="px-1 py-3 font-sans text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
                         Statistik
                     </button>
-                    <button @click="activeTab = 'settings'"
-                            :class="activeTab === 'settings' ? 'border-brand-bright text-brand-bright' : 'border-transparent text-muted hover:text-foreground'"
-                            class="px-1 py-3 font-sans text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
-                        Pengaturan Akun
-                    </button>
                     <button @click="activeTab = 'BestRecords'"
                             :class="activeTab === 'BestRecords' ? 'border-brand-bright text-brand-bright' : 'border-transparent text-muted hover:text-foreground'"
                             class="px-1 py-3 font-sans text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
@@ -167,19 +162,6 @@
                     @else
                         <p class="font-mono text-sm text-muted">Belum ada riwayat mengetik. <a href="{{ url('/typing') }}" class="text-brand-bright hover:underline">Mulai tes pertamamu →</a></p>
                     @endif
-                </div>
-            </div>
-
-            <!-- ===== SETTINGS TAB ===== -->
-            <div x-show="activeTab === 'settings'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" style="display: none;" class="space-y-6">
-                <div class="p-6 border sm:p-8 bg-surface/60 border-white/5 rounded-2xl">
-                    <div class="max-w-xl">@include('profile.partials.update-profile-information-form')</div>
-                </div>
-                <div class="p-6 border sm:p-8 bg-surface/60 border-white/5 rounded-2xl">
-                    <div class="max-w-xl">@include('profile.partials.update-password-form')</div>
-                </div>
-                <div class="p-6 border sm:p-8 bg-surface/60 border-white/5 rounded-2xl">
-                    <div class="max-w-xl">@include('profile.partials.delete-user-form')</div>
                 </div>
             </div>
 

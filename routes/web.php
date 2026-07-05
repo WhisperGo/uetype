@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\AchievementController;
 use App\Http\Controllers\GoogleAuthController;
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\ProfileController;
 use App\Livewire\About;
 use App\Livewire\Friends;
+use App\Livewire\Settings;
 use App\Livewire\Terms;
 use App\Livewire\TypingEngine;
 use App\Livewire\TypingResult;
@@ -21,8 +23,8 @@ Route::get('/dashboard', function () {
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    Route::get('/settings', Settings::class)->name('settings');
 
     Route::get('/achievements', [AchievementController::class, 'index'])->name('achievements.index');
 
@@ -36,15 +38,7 @@ Route::middleware('auth')->group(function () {
     Volt::route('/leaderboard', 'leaderboard')->name('leaderboard');
 });
 
-Route::post('/locale', function () {
-    $locale = request('locale');
-
-    if (in_array($locale, ['id', 'en'], true)) {
-        session(['locale' => $locale]);
-    }
-
-    return back();
-})->name('locale.update');
+Route::post('/locale', LocaleController::class)->name('locale.update');
 
 Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])->name('auth.google');
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);

@@ -87,10 +87,7 @@
                                 <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
                             </span>
                             <x-dropdown-link :href="route('friends.index')">{{ __('nav.friends') }}</x-dropdown-link>
-                            <span class="flex items-center justify-between w-full px-4 py-2 text-sm text-muted/50 cursor-not-allowed" title="Segera hadir">
-                                {{ __('nav.settings') }}
-                                <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
-                            </span>
+                            <x-dropdown-link :href="route('settings')">{{ __('nav.settings') }}</x-dropdown-link>
 
                             <div class="my-1 border-t border-white/5"></div>
 
@@ -106,6 +103,22 @@
                         @else
                             <x-dropdown-link :href="route('login')">{{ __('nav.login') }}</x-dropdown-link>
                             <x-dropdown-link :href="route('register')">{{ __('nav.register') }}</x-dropdown-link>
+
+                            <div class="my-1 border-t border-white/5"></div>
+                            <p class="px-4 pt-1 pb-1 text-[0.6rem] font-sans uppercase tracking-wider text-muted/60">{{ __('settings.language.label') }}</p>
+                            @foreach (App\Support\Locale::labels() as $code => $label)
+                                <form method="POST" action="{{ route('locale.update') }}">
+                                    @csrf
+                                    <input type="hidden" name="locale" value="{{ $code }}">
+                                    <button type="submit"
+                                        class="flex items-center justify-between w-full px-4 py-2 text-sm text-start transition {{ app()->getLocale() === $code ? 'text-brand-bright' : 'text-muted hover:bg-elevated hover:text-foreground' }}">
+                                        {{ $label }}
+                                        @if (app()->getLocale() === $code)
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                        @endif
+                                    </button>
+                                </form>
+                            @endforeach
                         @endauth
                     </x-slot>
                 </x-dropdown>
@@ -170,6 +183,7 @@
                     <x-responsive-nav-link :href="route('profile.edit')">{{ __('nav.profile') }}</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('achievements.index')">{{ __('nav.achievements') }}</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('friends.index')">{{ __('nav.friends') }}</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('settings')">{{ __('nav.settings') }}</x-responsive-nav-link>
                     <button type="button"
                         x-on:click="$dispatch('open-modal', 'confirm-sign-out'); open = false"
                         class="group flex w-full items-center gap-2 border-l-4 border-transparent py-2 ps-3 pe-4 text-start text-base font-medium text-muted transition duration-150 ease-in-out hover:border-white/20 hover:bg-surface hover:text-foreground focus:border-white/20 focus:bg-surface focus:text-foreground focus:outline-none">
@@ -187,6 +201,21 @@
                 <div class="mt-3 space-y-1">
                     <x-responsive-nav-link :href="route('login')">{{ __('nav.login') }}</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('register')">{{ __('nav.register') }}</x-responsive-nav-link>
+                </div>
+                <div class="px-4 mt-4">
+                    <p class="text-[0.6rem] font-sans uppercase tracking-wider text-muted/60 mb-1">{{ __('settings.language.label') }}</p>
+                    <div class="flex gap-2">
+                        @foreach (App\Support\Locale::labels() as $code => $label)
+                            <form method="POST" action="{{ route('locale.update') }}" class="flex-1">
+                                @csrf
+                                <input type="hidden" name="locale" value="{{ $code }}">
+                                <button type="submit"
+                                    class="w-full px-3 py-2 font-mono text-xs text-center transition border rounded-lg {{ app()->getLocale() === $code ? 'border-brand bg-brand/10 text-foreground' : 'border-white/10 text-muted hover:text-foreground' }}">
+                                    {{ strtoupper($code) }}
+                                </button>
+                            </form>
+                        @endforeach
+                    </div>
                 </div>
             @endauth
         </div>
