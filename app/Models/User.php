@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ClanMemberStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -169,5 +170,38 @@ class User extends Authenticatable
                 $q->where('requester_id', $otherId)->where('addressee_id', $this->id);
             })
             ->first();
+    }
+
+    /**
+     * Baris keanggotaan clan AKTIF milik user ini (bukan yang masih pending).
+     * Tak ada kolom clan_id di tabel users -- keanggotaan diturunkan lewat
+     * pivot clan_members, mengikuti pola currentRoom() di atas.
+     */
+    public function clanMembership(): ?ClanMember
+    {
+        return ClanMember::where('user_id', $this->id)
+            ->where('status', ClanMemberStatus::Active)
+            ->first();
+    }
+
+    /**
+     * Accessor (BUKAN relasi) supaya $user->clan di profile view mengembalikan
+     * clan aktif user ini. Harus lewat accessor, bukan method clan(): Eloquent
+     * memperlakukan $user->clan sebagai magic-property lookup yang jatuh ke
+     * __call('clan', []) kalau ada method bernama sama, lalu memvalidasi hasilnya
+     * HARUS instance Relation -- jadi method biasa akan meledak di sini.
+     */
+    public function getClanAttribute(): ?Clan
+    {
+        return $this->clanMembership()?->clan;
+    }
+
+    /**
+     * Accessor supaya $user->clan_role dipakai apa adanya di profile view
+     * tanpa kolom tersimpan -- diturunkan dari role pada clan_members.
+     */
+    public function getClanRoleAttribute(): ?string
+    {
+        return $this->clanMembership()?->role?->value;
     }
 }

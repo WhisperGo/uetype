@@ -18,13 +18,9 @@
                     <x-nav-link href="{{ url('/multiplayer') }}" :active="request()->is('multiplayer')">
                         {{ __('nav.multiplayer') }}
                     </x-nav-link>
-                    <span
-                        class="inline-flex items-center gap-1.5 px-3 pt-1 text-sm font-medium leading-5 text-muted/50 cursor-not-allowed"
-                        title="Segera hadir">
+                    <x-nav-link href="{{ route('clans.index') }}" :active="request()->routeIs('clans.index', 'clan-war.index')">
                         {{ __('nav.klan') }}
-                        <span
-                            class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
-                    </span>
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -153,12 +149,8 @@
                 <span
                     class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
             </span> --}}
-            <span
-                class="flex items-center w-full gap-2 py-2 text-base font-medium cursor-not-allowed ps-3 pe-4 text-muted/50">
-                {{ __('nav.klan') }}
-                <span
-                    class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
-            </span>
+            <x-responsive-nav-link href="{{ route('clans.index') }}"
+                :active="request()->routeIs('clans.index', 'clan-war.index')">{{ __('nav.klan') }}</x-responsive-nav-link>
             <x-responsive-nav-link href="{{ url('/leaderboard') }}" :active="request()->is('leaderboard')">
                 <span class="flex items-center gap-2">
                     <svg class="w-4 h-4 text-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

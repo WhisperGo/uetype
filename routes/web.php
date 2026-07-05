@@ -5,6 +5,8 @@ use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\ProfileController;
 use App\Livewire\About;
+use App\Livewire\Clans;
+use App\Livewire\ClanWar;
 use App\Livewire\Friends;
 use App\Livewire\Settings;
 use App\Livewire\Terms;
@@ -32,6 +34,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/achievements', [AchievementController::class, 'index'])->name('achievements.index');
 
     Route::get('/friends', Friends::class)->name('friends.index');
+
+    Route::get('/clans', Clans::class)->name('clans.index');
+    Route::get('/clan-war', ClanWar::class)->name('clan-war.index');
 
     Route::get('/typing', TypingEngine::class)->name('typing');
     Route::get('/result', TypingResult::class)->name('typing.result');
