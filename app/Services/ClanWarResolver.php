@@ -3,16 +3,14 @@
 namespace App\Services;
 
 use App\Enums\ClanWarStatus;
-use App\Models\Clan;
 use App\Models\ClanWar;
-use App\Models\TypingResult;
-use Carbon\CarbonInterface;
+use App\Models\ClanWarModeClaim;
 
 /**
  * Menutup Clan War yang sudah waktunya diselesaikan: tantangan Pending yang
  * lewat batas accept 1 jam jadi Expired, dan war Ongoing yang sudah lewat
- * ends_at (3 hari) dihitung hasilnya (menang/seri/kalah dari akumulasi
- * xp_earned) lalu power kedua clan diupdate lewat EloCalculator.
+ * ends_at (3 hari) dihitung hasilnya (menang/seri/kalah dari akumulasi POIN
+ * mode-klaim kedua clan) lalu power kedua clan diupdate lewat EloCalculator.
  *
  * Dipanggil on-the-fly dari App\Livewire\ClanWar::mount() -- war siapa pun
  * yang sudah lewat waktu otomatis tertutup begitu ada yang membuka halaman
@@ -41,13 +39,13 @@ class ClanWarResolver
             ->get();
 
         foreach ($due as $war) {
-            $xpChallenger = $this->clanXp($war->challenger_clan_id, $war->started_at, $war->ends_at);
-            $xpOpponent = $this->clanXp($war->opponent_clan_id, $war->started_at, $war->ends_at);
+            $pointsChallenger = $this->clanWarPoints($war->id, $war->challenger_clan_id);
+            $pointsOpponent = $this->clanWarPoints($war->id, $war->opponent_clan_id);
 
-            if ($xpChallenger > $xpOpponent) {
+            if ($pointsChallenger > $pointsOpponent) {
                 $scoreChallenger = 1.0;
                 $result = 'win';
-            } elseif ($xpChallenger < $xpOpponent) {
+            } elseif ($pointsChallenger < $pointsOpponent) {
                 $scoreChallenger = 0.0;
                 $result = 'loss';
             } else {
@@ -73,12 +71,16 @@ class ClanWarResolver
         }
     }
 
-    private function clanXp(int $clanId, CarbonInterface $start, CarbonInterface $end): int
+    /**
+     * Total poin war sebuah clan: jumlah `points` dari klaim mode yang SUDAH
+     * disubmit (typing_result_id terisi). Klaim yang cuma terkunci tapi tak
+     * pernah dikerjakan sampai war berakhir bernilai 0 (tak terhitung).
+     */
+    private function clanWarPoints(int $clanWarId, int $clanId): float
     {
-        $memberIds = Clan::find($clanId)->activeMembers()->pluck('user_id');
-
-        return (int) TypingResult::whereIn('user_id', $memberIds)
-            ->whereBetween('created_at', [$start, $end])
-            ->sum('xp_earned');
+        return (float) ClanWarModeClaim::where('clan_war_id', $clanWarId)
+            ->where('clan_id', $clanId)
+            ->whereNotNull('typing_result_id')
+            ->sum('points');
     }
 }

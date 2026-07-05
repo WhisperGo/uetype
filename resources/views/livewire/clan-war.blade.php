@@ -69,30 +69,79 @@
                 $opponent = $war->challenger_clan_id === $this->myClan->id ? $war->opponent : $war->challenger;
             @endphp
             <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl mb-6">
-                <p class="font-mono text-xs uppercase tracking-widest text-muted mb-2">War Ongoing</p>
-                <p class="font-mono text-sm text-foreground">
-                    vs <span class="font-bold">{{ $opponent->name }}</span>
-                    (power {{ number_format($opponent->power) }})
-                </p>
-                <p class="font-mono text-xs text-muted mt-1">
-                    Berakhir {{ $war->ends_at->translatedFormat('d M Y H:i') }}
-                </p>
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                        <p class="font-mono text-xs uppercase tracking-widest text-muted mb-2">War Ongoing</p>
+                        <p class="font-mono text-sm text-foreground">
+                            vs <span class="font-bold">{{ $opponent->name }}</span>
+                            (power {{ number_format($opponent->power) }})
+                        </p>
+                        <p class="font-mono text-xs text-muted mt-1">
+                            Berakhir {{ $war->ends_at->translatedFormat('d M Y H:i') }}
+                        </p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-mono text-xs uppercase tracking-widest text-muted">Your Points</p>
+                        <p class="font-mono text-3xl font-bold text-gold tabular-nums">{{ rtrim(rtrim(number_format($this->myClanPoints, 1), '0'), '.') }}</p>
+                    </div>
+                </div>
             </div>
 
-            @if ($this->myClanBreakdown->count() > 0)
-                <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">Your Clan's Contributors (live)</p>
-                <div class="space-y-3 mb-8">
-                    @foreach ($this->myClanBreakdown as $row)
-                        <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl">
-                            <x-friend-avatar :user="$row['user']" />
-                            <div class="flex-1 min-w-0">
-                                <p class="font-mono text-sm font-bold text-foreground truncate">{{ $row['user']->username }}</p>
-                            </div>
-                            <span class="font-mono text-sm font-bold text-gold tabular-nums">{{ number_format($row['total']) }} XP</span>
-                        </div>
-                    @endforeach
-                </div>
+            @if (session('clan_war_claim_error'))
+                <p class="font-mono text-xs text-red-400 mb-4">{{ session('clan_war_claim_error') }}</p>
             @endif
+
+            <p class="font-mono text-xs uppercase tracking-widest text-muted mb-1">War Modes</p>
+            <p class="font-mono text-xs text-muted mb-3">Klaim mode kosong lalu kerjakan. Tiap mode hanya bisa dikerjakan sekali oleh clan-mu.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+                @foreach ($this->modeGrid as $slot)
+                    @php
+                        $labelMode = $slot['mode'] === 'survival' ? 'Survival' : ($slot['mode'] === 'time' ? 'Time' : 'Words');
+                        $labelConfig = $slot['mode'] === 'survival' ? ucfirst($slot['config']) : ($slot['mode'] === 'time' ? $slot['config'].'s' : $slot['config'].' kata');
+                    @endphp
+                    <div class="p-4 border rounded-2xl flex flex-col gap-3
+                        {{ $slot['status'] === 'done' ? 'bg-gold/5 border-gold/30' : 'bg-surface/40 border-white/5' }}"
+                        wire:key="slot-{{ $slot['mode'] }}-{{ $slot['config'] }}">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <p class="font-mono text-sm font-bold text-foreground truncate">{{ $labelMode }} · {{ $labelConfig }}</p>
+                                <p class="font-mono text-[0.65rem] text-muted mt-0.5">maks {{ $slot['ceiling'] }} poin</p>
+                            </div>
+                            @if ($slot['status'] === 'done')
+                                <span class="font-mono text-sm font-bold text-gold tabular-nums shrink-0">{{ rtrim(rtrim(number_format($slot['claim']->points, 1), '0'), '.') }}</span>
+                            @endif
+                        </div>
+
+                        @switch($slot['status'])
+                            @case('open')
+                                <button wire:click="claimMode('{{ $slot['mode'] }}', '{{ $slot['config'] }}')"
+                                    class="w-full px-3 py-2 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
+                                    Claim &amp; Play
+                                </button>
+                                @break
+
+                            @case('claimed')
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="font-mono text-[0.7rem] text-muted truncate">diklaim {{ $slot['claim']->user->username }}</span>
+                                    @if ($slot['claim']->user_id === auth()->id())
+                                        <a href="{{ route('typing', ['war_claim' => $slot['claim']->id]) }}" wire:navigate
+                                            class="px-2.5 py-1 font-mono text-[0.7rem] font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition shrink-0">Play</a>
+                                    @endif
+                                </div>
+                                @if ($slot['claim']->user_id === auth()->id() || $this->isLeader)
+                                    <button wire:click="cancelClaim({{ $slot['claim']->id }})"
+                                        class="w-full px-3 py-1.5 font-mono text-[0.7rem] text-red-400/80 border border-red-900/40 rounded-lg hover:bg-red-950/30 transition">
+                                        Cancel Claim
+                                    </button>
+                                @endif
+                                @break
+
+                            @default
+                                <span class="font-mono text-[0.7rem] text-muted truncate">✓ {{ $slot['claim']->user->username }}</span>
+                        @endswitch
+                    </div>
+                @endforeach
+            </div>
 
         {{-- ================= BEBAS: BISA MENANTANG (khusus leader) ================= --}}
         @elseif ($this->isLeader)

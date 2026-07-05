@@ -7,6 +7,7 @@ use App\Livewire\ClanWar;
 use App\Models\Clan;
 use App\Models\ClanMember;
 use App\Models\ClanWar as ClanWarModel;
+use App\Models\ClanWarModeClaim;
 use App\Models\TypingResult;
 use App\Models\User;
 use App\Services\EloCalculator;
@@ -19,6 +20,30 @@ function makeClanWithLeader(string $name, int $power = 1000): array
     ClanMember::create(['clan_id' => $clan->id, 'user_id' => $leader->id, 'role' => ClanRole::Leader, 'status' => ClanMemberStatus::Active]);
 
     return [$leader, $clan];
+}
+
+/**
+ * Bikin klaim mode war yang SUDAH disubmit dengan poin tertentu (langsung set
+ * points, tak lewat typing engine) -- untuk menguji resolver berbasis poin.
+ */
+function submitWarClaim(ClanWarModel $war, Clan $clan, User $user, string $mode, string $config, float $points): ClanWarModeClaim
+{
+    $result = TypingResult::create([
+        'user_id' => $user->id, 'mode' => $mode, 'mode_config' => $config,
+        'net_wpm' => 80, 'raw_wpm' => 85, 'accuracy' => 95, 'correct_chars' => 300,
+        'incorrect_chars' => 5, 'duration_seconds' => 30, 'xp_earned' => 100,
+    ]);
+
+    return ClanWarModeClaim::create([
+        'clan_war_id' => $war->id,
+        'clan_id' => $clan->id,
+        'user_id' => $user->id,
+        'mode' => $mode,
+        'mode_config' => $config,
+        'typing_result_id' => $result->id,
+        'points' => $points,
+        'claimed_at' => now(),
+    ]);
 }
 
 it('lets a leader challenge another free clan, creating a pending war', function () {
@@ -134,18 +159,9 @@ it('resolves a finished war on-the-fly, applying Elo deltas asymmetric to power 
         'ends_at' => now()->subMinute(),
     ]);
 
-    // Clan A (lebih kuat) menang telak atas clan B (lebih lemah).
-    TypingResult::create([
-        'user_id' => $leaderA->id, 'mode' => 'time', 'mode_config' => '30',
-        'net_wpm' => 80, 'raw_wpm' => 85, 'accuracy' => 95, 'correct_chars' => 300,
-        'incorrect_chars' => 5, 'duration_seconds' => 30, 'xp_earned' => 200,
-    ])->forceFill(['created_at' => now()->subDays(2)])->save();
-
-    TypingResult::create([
-        'user_id' => $leaderB->id, 'mode' => 'time', 'mode_config' => '30',
-        'net_wpm' => 40, 'raw_wpm' => 45, 'accuracy' => 80, 'correct_chars' => 50,
-        'incorrect_chars' => 20, 'duration_seconds' => 30, 'xp_earned' => 20,
-    ])->forceFill(['created_at' => now()->subDays(2)])->save();
+    // Clan A menang telak (poin klaim mode lebih tinggi) atas clan B.
+    submitWarClaim($war, $clanA, $leaderA, 'time', '30', 80.0);
+    submitWarClaim($war, $clanB, $leaderB, 'time', '30', 10.0);
 
     [$expectedDeltaA, $expectedDeltaB] = EloCalculator::calculate(1500, 1300, 1.0);
 
@@ -182,18 +198,9 @@ it('resolves a draw with power-asymmetric deltas that still sum to zero', functi
         'ends_at' => now()->subMinute(),
     ]);
 
-    // Kontribusi XP sama persis -> draw.
-    TypingResult::create([
-        'user_id' => $leaderA->id, 'mode' => 'time', 'mode_config' => '30',
-        'net_wpm' => 80, 'raw_wpm' => 85, 'accuracy' => 95, 'correct_chars' => 300,
-        'incorrect_chars' => 5, 'duration_seconds' => 30, 'xp_earned' => 100,
-    ])->forceFill(['created_at' => now()->subDays(2)])->save();
-
-    TypingResult::create([
-        'user_id' => $leaderB->id, 'mode' => 'time', 'mode_config' => '30',
-        'net_wpm' => 80, 'raw_wpm' => 85, 'accuracy' => 95, 'correct_chars' => 300,
-        'incorrect_chars' => 5, 'duration_seconds' => 30, 'xp_earned' => 100,
-    ])->forceFill(['created_at' => now()->subDays(2)])->save();
+    // Poin klaim mode sama persis -> draw.
+    submitWarClaim($war, $clanA, $leaderA, 'time', '30', 80.0);
+    submitWarClaim($war, $clanB, $leaderB, 'time', '30', 80.0);
 
     Livewire::actingAs($leaderA)->test(ClanWar::class);
 
