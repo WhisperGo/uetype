@@ -61,7 +61,7 @@
                                     <span class="text-xs text-muted leading-tight">lv. {{ Auth::user()->levelData()['level'] }}</span>
                                 </span>
                             @else
-                                <span class="font-medium text-sm text-foreground px-1">Tamu</span>
+                                <span class="font-medium text-sm text-foreground px-1">{{ __('common.guest') }}</span>
                             @endauth
 
                             <svg class="w-4 h-4 fill-current text-muted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
@@ -78,9 +78,9 @@
 
                             <x-dropdown-link :href="route('achievements.index')">{{ __('nav.achievements') }}</x-dropdown-link>
 
-                            <span class="flex items-center justify-between w-full px-4 py-2 text-sm text-muted/50 cursor-not-allowed" title="Segera hadir">
+                            <span class="flex items-center justify-between w-full px-4 py-2 text-sm text-muted/50 cursor-not-allowed" title="{{ __('common.coming_soon') }}">
                                 {{ __('nav.user_stats') }}
-                                <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
+                                <span class="text-[0.6rem] font-sans uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">{{ __('common.soon') }}</span>
                             </span>
                             <x-dropdown-link :href="route('friends.index')">{{ __('nav.friends') }}</x-dropdown-link>
                             <x-dropdown-link :href="route('settings')">{{ __('nav.settings') }}</x-dropdown-link>
@@ -188,7 +188,7 @@
                 </div>
             @else
                 <div class="px-4">
-                    <div class="text-base font-medium text-foreground">Tamu</div>
+                    <div class="text-base font-medium text-foreground">{{ __('common.guest') }}</div>
                 </div>
                 <div class="mt-3 space-y-1">
                     <x-responsive-nav-link :href="route('login')">{{ __('nav.login') }}</x-responsive-nav-link>

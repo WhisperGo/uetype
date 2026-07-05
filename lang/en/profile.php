@@ -1,9 +1,10 @@
 <?php
 
 return [
-    'title' => 'Profile',
+    'header' => 'Profile',
     'joined' => 'Joined :date',
     'level' => 'Level :level',
+    'clan_role_member' => 'member',
     'elo' => 'ELO',
     'ranking' => 'Ranking',
 
@@ -38,17 +39,17 @@ return [
         'time_mode' => 'Time Mode',
         'time_desc' => 'Records by test time duration',
         'time_empty' => 'No records for time mode yet.',
-        'seconds' => ':config Seconds',
+        'seconds' => 'Seconds',
 
         'words_mode' => 'Words Mode',
         'words_desc' => 'Records by target word count',
         'words_empty' => 'No records for words mode yet.',
-        'words' => ':config Words',
+        'words' => 'Words',
 
         'survival_mode' => 'Survival Mode',
         'survival_desc' => 'Longest survival duration without running out of life',
         'survival_empty' => 'No records for survival mode yet.',
-        'difficulty' => ':config Difficulty',
+        'difficulty' => 'Difficulty',
 
         'quote_mode' => 'Quote Mode',
         'quote_desc' => 'Records for typing full quotes',

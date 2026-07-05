@@ -56,7 +56,7 @@ class GoogleAuthController extends Controller
             return redirect()->route('auth.google.choose-username');
 
         } catch (\Exception $e) {
-            return redirect('/login')->with('error', 'Gagal autentikasi via Google.');
+            return redirect('/login')->with('error', __('auth.google_failed'));
         }
     }
 
@@ -108,8 +108,8 @@ class GoogleAuthController extends Controller
                 'unique:users,username'
             ],
         ], [
-            'username.unique' => 'Nama pengguna ini sudah dipakai, cari nama lain!',
-            'username.alpha_dash' => 'Nama pengguna hanya boleh berisi huruf, angka, strip, dan garis bawah.',
+            'username.unique' => __('auth.username.taken'),
+            'username.alpha_dash' => __('auth.username.format'),
         ]);
 
         // 3. Buat user baru di database secara aman
