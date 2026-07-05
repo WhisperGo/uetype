@@ -175,7 +175,11 @@ class Friends extends Component
             ->map(function (Friendship $f) use ($me) {
                 $friend = $f->requester_id === $me ? $f->addressee : $f->requester;
 
-                return ['friendship_id' => $f->id, 'user' => $friend];
+                return [
+                    'friendship_id' => $f->id,
+                    'user' => $friend,
+                    'online' => $friend?->isOnline() ?? false,
+                ];
             })
             ->filter(fn ($row) => $row['user'] !== null)
             ->values();

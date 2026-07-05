@@ -41,10 +41,18 @@
                 @foreach ($this->friendsList as $row)
                     <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl hover:border-white/10 transition group">
                         <a href="{{ route('profile.show', $row['user']) }}" wire:navigate class="flex items-center gap-4 flex-1 min-w-0">
-                            <x-friend-avatar :user="$row['user']" />
+                            <x-friend-avatar :user="$row['user']" :online="$row['online']" />
                             <div class="flex-1 min-w-0">
                                 <p class="font-mono text-sm font-bold text-foreground truncate group-hover:text-gold transition-colors">{{ $row['user']->username }}</p>
-                                <p class="font-mono text-xs text-muted mt-0.5">{{ __('friends.level', ['level' => $row['user']->levelData()['level']]) }}</p>
+                                @if ($row['online'])
+                                    <p class="font-mono text-xs mt-0.5 flex items-center gap-1.5 text-green-400">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>{{ __('friends.online') }}
+                                    </p>
+                                @elseif ($row['user']->last_seen_at)
+                                    <p class="font-mono text-xs text-muted mt-0.5">{{ __('friends.last_seen', ['time' => $row['user']->last_seen_at->diffForHumans()]) }}</p>
+                                @else
+                                    <p class="font-mono text-xs text-muted mt-0.5">{{ __('friends.level', ['level' => $row['user']->levelData()['level']]) }}</p>
+                                @endif
                             </div>
                         </a>
                         <button wire:click="removeFriend({{ $row['friendship_id'] }})"

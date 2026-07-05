@@ -118,6 +118,13 @@
                                         this.push(e.notification);
                                     }
                                 });
+
+                                // Status online/offline teman: tanpa toast, hanya menyegarkan
+                                // daftar teman supaya titik status menyala/padam real-time.
+                                channel.stopListening('.presence.updated');
+                                channel.listen('.presence.updated', () => {
+                                    window.dispatchEvent(new CustomEvent('friendship-updated-remote'));
+                                });
                             },
                             push(n) {
                                 const id = ++this._seq;
@@ -202,6 +209,47 @@
                             },
                         }));
                     });
+                }
+            </script>
+            {{-- ===== HEARTBEAT PRESENCE =====
+                 Ping ringan ke /heartbeat tiap ~30 detik menandai user masih
+                 online (last_seen_at diperbarui). Server menyiarkan ke teman
+                 hanya saat transisi offline->online, jadi ping ini murah.
+                 Dijeda saat tab tersembunyi (hemat) & langsung ping lagi saat
+                 tab kembali terlihat supaya status cepat pulih. --}}
+            <script>
+                if (!window.__presenceHeartbeatRegistered) {
+                    window.__presenceHeartbeatRegistered = true;
+                    (function () {
+                        const url = '{{ route('presence.heartbeat') }}';
+                        const token = document.querySelector('meta[name="csrf-token"]')?.content;
+                        const INTERVAL = 30000; // 30s; ambang online server 60s
+                        let timer = null;
+
+                        const ping = () => {
+                            if (document.hidden || !token) return;
+                            fetch(url, {
+                                method: 'POST',
+                                headers: { 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
+                                keepalive: true,
+                            }).catch(() => {}); // diamkan error jaringan; ping berikutnya coba lagi
+                        };
+
+                        const start = () => {
+                            if (timer) return;
+                            ping();
+                            timer = setInterval(ping, INTERVAL);
+                        };
+                        const stop = () => {
+                            if (timer) { clearInterval(timer); timer = null; }
+                        };
+
+                        document.addEventListener('visibilitychange', () => {
+                            document.hidden ? stop() : start();
+                        });
+
+                        start();
+                    })();
                 }
             </script>
         @endauth

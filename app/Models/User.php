@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\ClanMemberStatus;
+use App\Enums\FriendshipStatus;
+use App\Events\PresenceUpdated;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -21,6 +23,7 @@ class User extends Authenticatable
         'total_xp',
         'is_admin',
         'preferences',
+        'last_seen_at',
     ];
 
     protected $hidden = [
@@ -33,6 +36,7 @@ class User extends Authenticatable
             'highest_wpm' => 'decimal:2',
             'is_admin' => 'boolean',
             'preferences' => 'array',
+            'last_seen_at' => 'datetime',
         ];
     }
 
@@ -170,6 +174,74 @@ class User extends Authenticatable
                 $q->where('requester_id', $otherId)->where('addressee_id', $this->id);
             })
             ->first();
+    }
+
+    /**
+     * Ambang (detik) di mana user masih dianggap online. Heartbeat klien
+     * dikirim tiap ~30 detik; ambang 60 detik memberi toleransi satu heartbeat
+     * yang terlewat sebelum dianggap offline. Konstanta yang mudah di-tuning.
+     */
+    public const ONLINE_THRESHOLD_SECONDS = 60;
+
+    /**
+     * Apakah user dianggap online sekarang: last_seen_at ada DAN masih dalam
+     * ambang. Diturunkan murni dari timestamp — tak ada flag boolean tersimpan
+     * yang bisa "nyangkut" true saat browser tertutup tanpa event offline.
+     */
+    public function isOnline(): bool
+    {
+        return $this->last_seen_at !== null
+            && $this->last_seen_at->gt(now()->subSeconds(self::ONLINE_THRESHOLD_SECONDS));
+    }
+
+    /**
+     * Catat bahwa user ini aktif barusan (dipanggil dari endpoint heartbeat).
+     * Jika ini transisi offline->online, siarkan PresenceUpdated ke semua teman
+     * agar titik status di daftar teman mereka menyala real-time. Heartbeat
+     * lanjutan (saat sudah online) hanya meng-update timestamp tanpa broadcast,
+     * mencegah banjir pesan WebSocket tiap ~30 detik.
+     */
+    public function touchPresence(): void
+    {
+        $wasOnline = $this->isOnline();
+
+        $this->forceFill(['last_seen_at' => now()])->save();
+
+        if (! $wasOnline) {
+            $this->broadcastPresenceToFriends();
+        }
+    }
+
+    /**
+     * Tandai user offline segera (dipanggil saat logout) dengan mengosongkan
+     * last_seen_at, lalu siarkan agar teman langsung melihat status offline
+     * tanpa menunggu ambang kedaluwarsa.
+     */
+    public function markOffline(): void
+    {
+        $wasOnline = $this->isOnline();
+
+        $this->forceFill(['last_seen_at' => null])->save();
+
+        if ($wasOnline) {
+            $this->broadcastPresenceToFriends();
+        }
+    }
+
+    /**
+     * Siarkan perubahan status ke channel friends.{id} milik SETIAP teman
+     * (status accepted). Menumpang infrastruktur toast/refresh yang sudah ada.
+     */
+    private function broadcastPresenceToFriends(): void
+    {
+        Friendship::query()
+            ->where('status', FriendshipStatus::Accepted)
+            ->where(fn ($q) => $q->where('requester_id', $this->id)->orWhere('addressee_id', $this->id))
+            ->get()
+            ->each(function (Friendship $f) {
+                $friendId = $f->requester_id === $this->id ? $f->addressee_id : $f->requester_id;
+                broadcast(new PresenceUpdated($friendId));
+            });
     }
 
     /**

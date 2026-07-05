@@ -3,6 +3,7 @@
 use App\Http\Controllers\AchievementController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\PresenceController;
 use App\Http\Controllers\ProfileController;
 use App\Livewire\About;
 use App\Livewire\ClanLeaderboard;
@@ -34,6 +35,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/users/{user:username}', [ProfileController::class, 'show'])->name('profile.show');
 
     Route::get('/settings', Settings::class)->name('settings');
+
+    // Heartbeat presence: klien ping berkala supaya last_seen_at tetap segar
+    // (deteksi online/offline di daftar teman).
+    Route::post('/heartbeat', [PresenceController::class, 'heartbeat'])->name('presence.heartbeat');
 
     Route::get('/achievements', [AchievementController::class, 'index'])->name('achievements.index');
 

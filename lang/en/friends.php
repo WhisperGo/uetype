@@ -10,6 +10,9 @@ return [
     ],
 
     'level' => 'level :level',
+    'online' => 'Online',
+    'offline' => 'Offline',
+    'last_seen' => 'last seen :time',
     'view_profile' => 'View :name\'s profile',
     'remove' => 'Remove',
     'confirm_remove' => 'Remove :name from your friends list?',

@@ -36,6 +36,10 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        // Tandai offline SEBELUM logout (mumpung user masih ada di guard),
+        // supaya teman langsung melihat status offline tanpa menunggu ambang.
+        Auth::user()?->markOffline();
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();
