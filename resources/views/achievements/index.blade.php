@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-sans text-xl font-semibold tracking-tight text-foreground">
-            {{ __('Achievements') }}
+            {{ __('achievements.header') }}
         </h2>
     </x-slot>
 
@@ -22,15 +22,15 @@
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
-                Profile
+                {{ __('achievements.back_to_profile') }}
             </a>
 
             <!-- Heading + progress -->
             <div class="space-y-3">
                 <div>
-                    <h1 class="font-sans text-3xl font-bold text-foreground">Achievements</h1>
+                    <h1 class="font-sans text-3xl font-bold text-foreground">{{ __('achievements.header') }}</h1>
                     <p class="mt-1 font-mono text-sm text-muted">
-                        {{ $earnedCount }} / {{ $total }} unlocked
+                        {{ __('achievements.unlocked_count', ['count' => $earnedCount, 'total' => $total]) }}
                     </p>
                 </div>
                 <div class="h-2 overflow-hidden rounded-full bg-white/5">
@@ -48,7 +48,7 @@
                             ? 'bg-brand-bright text-background border-brand-bright'
                             : 'bg-surface/60 text-muted border-white/10 hover:text-foreground hover:border-white/20'"
                         class="px-4 py-1.5 rounded-lg border font-sans text-xs font-semibold transition-colors">
-                        {{ $cat['label'] }}
+                        {{ __('achievements.categories.'.$cat['key']) }}
                     </button>
                 @endforeach
             </div>
@@ -75,20 +75,20 @@
 
                         <!-- Text -->
                         <div class="min-w-0">
-                            <h3 class="font-sans text-sm font-bold text-foreground truncate">{{ $a['title'] }}</h3>
-                            <p class="mt-0.5 font-mono text-xs text-muted truncate">{{ $a['description'] }}</p>
+                            <h3 class="font-sans text-sm font-bold text-foreground truncate">{{ __('achievements.defs.'.$a['key'].'.title') }}</h3>
+                            <p class="mt-0.5 font-mono text-xs text-muted truncate">{{ __('achievements.defs.'.$a['key'].'.description') }}</p>
                             @if ($a['earned'])
                                 <p class="mt-1 flex items-center gap-1 font-mono text-[0.7rem] text-gold">
                                     <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                                     </svg>
-                                    Earned
+                                    {{ __('achievements.earned') }}
                                     @if ($a['unlocked_at'])
                                         <span class="text-muted/70">· {{ $a['unlocked_at']->translatedFormat('d M Y') }}</span>
                                     @endif
                                 </p>
                             @else
-                                <p class="mt-1 font-mono text-[0.7rem] text-muted/60">Locked</p>
+                                <p class="mt-1 font-mono text-[0.7rem] text-muted/60">{{ __('achievements.locked') }}</p>
                             @endif
                         </div>
                     </div>

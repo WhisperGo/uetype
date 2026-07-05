@@ -113,7 +113,7 @@ class MultiplayerLobby extends Component
         $code = strtoupper(implode('', $this->joinCodeInput));
 
         if (strlen($code) !== 6) {
-            session()->flash('error', 'Kode harus 6 digit lengkap!');
+            session()->flash('error', __('multiplayer.error_code_length'));
 
             return;
         }
@@ -121,13 +121,13 @@ class MultiplayerLobby extends Component
         $room = Room::where('code', $code)->where('status', 'waiting')->first();
 
         if (! $room) {
-            session()->flash('error', 'Kamar tidak ditemukan atau game sudah dimulai.');
+            session()->flash('error', __('multiplayer.error_room_not_found'));
 
             return;
         }
 
         if ($room->members()->count() >= 5) {
-            session()->flash('error', 'Kamar sudah penuh! Maksimal 5 pemain.');
+            session()->flash('error', __('multiplayer.error_room_full'));
 
             return;
         }

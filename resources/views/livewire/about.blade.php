@@ -11,23 +11,20 @@
 
         {{-- Header --}}
         <div class="mb-10">
-            <h1 class="text-3xl font-mono font-bold text-foreground mb-2">About uetype</h1>
+            <h1 class="text-3xl font-mono font-bold text-foreground mb-2">{{ __('about.title') }}</h1>
             <p class="font-sans text-small text-muted">
-                A gamified typing speed app - race, level up, and sharpen your keystrokes.
+                {{ __('about.tagline') }}
             </p>
         </div>
 
         {{-- What is uetype --}}
         <div class="mb-10">
             <h2 class="text-x-small font-sans uppercase tracking-[0.25em] text-muted mb-3">
-                What is uetype
+                {{ __('about.what_is') }}
             </h2>
             <div class="rounded-xl border border-border bg-surface/60 px-5 py-4">
                 <p class="font-sans text-small text-muted leading-relaxed">
-                    uetype is a web-based typing application that turns practice into play.
-                    Beyond standard typing tests, it offers Survival, Ghost, and real-time
-                    Multiplayer modes, with a level system and leaderboards to keep every
-                    session rewarding.
+                    {{ __('about.what_is_body') }}
                 </p>
             </div>
         </div>
@@ -35,7 +32,7 @@
         {{-- The team --}}
         <div class="mb-10">
             <h2 class="text-x-small font-sans uppercase tracking-[0.25em] text-muted mb-3">
-                The team
+                {{ __('about.team') }}
             </h2>
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 @foreach ($team as $member)
@@ -50,7 +47,7 @@
                     <div
                         class="flex flex-col items-center text-center rounded-xl border border-border bg-surface/60 px-4 py-6 transition-colors duration-150 hover:border-brand/40">
                         @if ($hasPhoto)
-                            <img src="{{ asset($photoPath) }}" alt="Foto {{ $member['name'] }}"
+                            <img src="{{ asset($photoPath) }}" alt="{{ $member['name'] }}"
                                 class="w-12 h-12 rounded-full object-cover border border-brand/40 mb-3"
                                 onerror="this.replaceWith(Object.assign(document.createElement('div'), {className: this.className.replace('object-cover', '') + ' bg-gradient-to-br from-brand/50 to-background flex items-center justify-center text-x-small font-bold text-foreground', textContent: '{{ $initial }}'}))">
                         @else
@@ -73,7 +70,7 @@
         {{-- Built with --}}
         <div class="mb-10">
             <h2 class="text-x-small font-sans uppercase tracking-[0.25em] text-muted mb-3">
-                Built with
+                {{ __('about.built_with') }}
             </h2>
             <div class="flex flex-wrap gap-2">
                 @foreach ($stack as $tech)
@@ -86,7 +83,7 @@
         </div>
 
         <p class="font-sans text-x-small text-muted/70">
-            uetype is a student project built for learning purposes.
+            {{ __('about.disclaimer') }}
         </p>
     </div>
 </div>
