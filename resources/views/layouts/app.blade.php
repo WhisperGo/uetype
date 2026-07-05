@@ -157,9 +157,9 @@
                         </div>
                         <div class="min-w-0 flex-1">
                             <p class="font-mono text-xs uppercase tracking-wider text-muted"
-                                x-text="t.type === 'accepted' ? 'Clan request accepted' : 'Clan update'"></p>
+                                x-text="t.type === 'accepted' ? 'Clan request accepted' : (t.type === 'war-result' ? 'Clan War result' : 'Clan update')"></p>
                             <p class="mt-0.5 font-mono text-sm text-foreground break-words" x-text="t.message"></p>
-                            <a href="{{ route('clans.index') }}" class="mt-1.5 inline-block font-mono text-xs text-brand-bright hover:underline">View →</a>
+                            <a :href="t.type === 'war-result' ? '{{ route('clan-war.index') }}' : '{{ route('clans.index') }}'" class="mt-1.5 inline-block font-mono text-xs text-brand-bright hover:underline">View →</a>
                         </div>
                         <button @click="dismiss(t.id)" class="text-muted hover:text-foreground shrink-0" aria-label="Dismiss">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>

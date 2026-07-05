@@ -61,6 +61,10 @@
                             class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
                             Clan War
                         </a>
+                        <a href="{{ route('clan-leaderboard.index') }}" wire:navigate
+                            class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                            Leaderboard
+                        </a>
                         @if ($this->myMembership->role->value !== 'leader')
                             <button wire:click="leaveClan"
                                 wire:confirm="Keluar dari {{ $this->myClan->name }}?"
@@ -128,7 +132,7 @@
                 <img src="/icon/uetype_mascot.png" alt="" class="w-16 h-16 opacity-30 mb-4">
                 <p class="font-mono text-sm font-bold text-foreground">You're not in a clan yet</p>
                 <p class="font-mono text-xs text-muted mt-1">Browse existing clans or create your own</p>
-                <div class="flex gap-3 mt-5">
+                <div class="flex flex-wrap items-center justify-center gap-3 mt-5">
                     <button wire:click="setTab('browse')"
                         class="px-5 py-2 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
                         Browse Clans
@@ -137,6 +141,10 @@
                         class="px-5 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
                         Create Clan
                     </button>
+                    <a href="{{ route('clan-leaderboard.index') }}" wire:navigate
+                        class="px-5 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                        Leaderboard
+                    </a>
                 </div>
             </div>
         @endif
@@ -158,9 +166,9 @@
         @if ($this->browseClans->count() > 0)
             <div class="space-y-3">
                 @foreach ($this->browseClans as $row)
-                    <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl" wire:key="clan-{{ $row['clan']->id }}">
-                        <div class="flex-1 min-w-0">
-                            <p class="font-mono text-sm font-bold text-foreground truncate">
+                    <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl group" wire:key="clan-{{ $row['clan']->id }}">
+                        <a href="{{ route('clans.show', $row['clan']) }}" wire:navigate class="flex-1 min-w-0">
+                            <p class="font-mono text-sm font-bold text-foreground truncate group-hover:text-gold transition-colors">
                                 {{ $row['clan']->name }}
                                 @if ($row['clan']->tag)
                                     <span class="text-muted font-normal">[{{ $row['clan']->tag }}]</span>
@@ -170,7 +178,7 @@
                                 {{ $row['clan']->members_count }} / {{ \App\Livewire\Clans::MAX_MEMBERS }} members
                                 · power {{ number_format($row['clan']->power) }}
                             </p>
-                        </div>
+                        </a>
 
                         @switch($row['relation'])
                             @case('member')

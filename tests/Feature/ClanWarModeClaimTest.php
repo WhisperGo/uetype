@@ -257,3 +257,59 @@ it('ignores unsubmitted claims (points null) when resolving', function () {
     // Clan A 0 poin (klaim tak disubmit) vs clan B 20 -> clan A (challenger) kalah.
     expect($war->result)->toBe('loss');
 });
+
+/**
+ * Submit SEMUA 9 mode untuk sebuah clan (poin sama semua, cukup untuk uji
+ * penutupan) -- dipakai menguji early finish.
+ */
+function submitAllModesForClan(ClanWarModel $war, Clan $clan, User $user, float $pointsEach = 10.0): void
+{
+    foreach (ClanWarModeCatalog::MODES as $m) {
+        $result = TypingResult::create([
+            'user_id' => $user->id, 'mode' => $m['mode'], 'mode_config' => $m['config'],
+            'net_wpm' => 80, 'raw_wpm' => 85, 'accuracy' => 95, 'correct_chars' => 100,
+            'incorrect_chars' => 2, 'duration_seconds' => 20, 'xp_earned' => 40,
+        ]);
+        ClanWarModeClaim::create([
+            'clan_war_id' => $war->id, 'clan_id' => $clan->id, 'user_id' => $user->id,
+            'mode' => $m['mode'], 'mode_config' => $m['config'],
+            'typing_result_id' => $result->id, 'points' => $pointsEach, 'claimed_at' => now(),
+        ]);
+    }
+}
+
+it('finishes the war early once BOTH clans have completed all 9 modes, before ends_at', function () {
+    [$leaderA, $clanA, $leaderB, $clanB, $war] = warBetweenTwoClans();
+
+    // ends_at masih 3 hari ke depan (dari helper) -- belum lewat waktu.
+    expect($war->ends_at->isFuture())->toBeTrue();
+
+    // Clan A unggul tiap mode, kedua clan selesaikan seluruh 9 mode.
+    submitAllModesForClan($war, $clanA, $leaderA, 15.0);
+    submitAllModesForClan($war, $clanB, $leaderB, 10.0);
+
+    // Sekadar membuka halaman memicu resolusi on-the-fly.
+    Livewire::actingAs($leaderA)->test(ClanWar::class);
+
+    $war->refresh();
+    expect($war->status)->toBe(ClanWarStatus::Finished);
+    expect($war->result)->toBe('win'); // clan A (challenger) 135 vs clan B 90.
+
+    // Kedua clan kini bebas berperang lagi (tak ada war aktif).
+    expect($clanA->fresh()->activeWar())->toBeNull();
+    expect($clanB->fresh()->activeWar())->toBeNull();
+});
+
+it('does NOT finish early when only one clan has completed all 9 modes', function () {
+    [$leaderA, $clanA, $leaderB, $clanB, $war] = warBetweenTwoClans();
+
+    // Hanya clan A selesai semua; clan B belum -> war tetap berjalan sampai ends_at.
+    submitAllModesForClan($war, $clanA, $leaderA, 10.0);
+
+    Livewire::actingAs($leaderA)->test(ClanWar::class);
+
+    $war->refresh();
+    expect($war->status)->toBe(ClanWarStatus::Ongoing);
+    // Clan A masih terikat war, belum bisa menantang clan lain.
+    expect($clanA->fresh()->activeWar())->not->toBeNull();
+});

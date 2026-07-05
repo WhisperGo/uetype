@@ -3,19 +3,22 @@
 namespace App\Services;
 
 use App\Enums\ClanWarStatus;
+use App\Events\ClanUpdated;
 use App\Models\ClanWar;
 use App\Models\ClanWarModeClaim;
 
 /**
  * Menutup Clan War yang sudah waktunya diselesaikan: tantangan Pending yang
- * lewat batas accept 1 jam jadi Expired, dan war Ongoing yang sudah lewat
- * ends_at (3 hari) dihitung hasilnya (menang/seri/kalah dari akumulasi POIN
- * mode-klaim kedua clan) lalu power kedua clan diupdate lewat EloCalculator.
+ * lewat batas accept 1 jam jadi Expired, dan war Ongoing yang SELESAI --
+ * baik karena lewat ends_at (3 hari) MAUPUN karena kedua clan sudah
+ * menyelesaikan seluruh 9 mode lebih cepat (early finish). Hasilnya dihitung
+ * dari akumulasi POIN mode-klaim kedua clan lalu power diupdate lewat
+ * EloCalculator.
  *
- * Dipanggil on-the-fly dari App\Livewire\ClanWar::mount() -- war siapa pun
- * yang sudah lewat waktu otomatis tertutup begitu ada yang membuka halaman
- * Clan War, tanpa perlu command/scheduler terjadwal. Command
- * `clan-war:resolve` memanggil method yang sama untuk pemakaian manual.
+ * Dipanggil on-the-fly dari App\Livewire\ClanWar::mount() -- war yang sudah
+ * selesai otomatis tertutup begitu ada yang membuka halaman Clan War, tanpa
+ * perlu command/scheduler terjadwal. Command `clan-war:resolve` memanggil
+ * method yang sama untuk pemakaian manual.
  */
 class ClanWarResolver
 {
@@ -34,11 +37,15 @@ class ClanWarResolver
 
     private function resolveFinishedWars(): void
     {
-        $due = ClanWar::where('status', ClanWarStatus::Ongoing)
-            ->where('ends_at', '<=', now())
-            ->get();
+        // Ambil SEMUA war Ongoing, lalu tutup yang sudah lewat waktu ATAU yang
+        // kedua clannya sudah menyelesaikan seluruh 9 mode (early finish).
+        $ongoing = ClanWar::where('status', ClanWarStatus::Ongoing)->get();
 
-        foreach ($due as $war) {
+        foreach ($ongoing as $war) {
+            if (! $war->ends_at?->isPast() && ! $this->bothClansFinishedAllModes($war)) {
+                continue;
+            }
+
             $pointsChallenger = $this->clanWarPoints($war->id, $war->challenger_clan_id);
             $pointsOpponent = $this->clanWarPoints($war->id, $war->opponent_clan_id);
 
@@ -68,7 +75,67 @@ class ClanWarResolver
                 'challenger_power_delta' => $deltaChallenger,
                 'opponent_power_delta' => $deltaOpponent,
             ]);
+
+            $this->notifyResult($war, $result, $deltaChallenger, $deltaOpponent);
         }
+    }
+
+    /**
+     * Beri tahu KEDUA leader hasil war lewat toast real-time (channel
+     * clan.{leaderId}) begitu war ditutup -- entah karena waktu habis maupun
+     * early finish. Sudut pandang masing-masing dibalik dengan benar
+     * (menang challenger = kalah opponent).
+     */
+    private function notifyResult(ClanWar $war, string $result, int $deltaChallenger, int $deltaOpponent): void
+    {
+        $label = fn (string $r) => match ($r) {
+            'win' => 'Clan-mu MENANG Clan War',
+            'loss' => 'Clan-mu KALAH Clan War',
+            default => 'Clan War berakhir SERI',
+        };
+
+        $opponentResult = match ($result) {
+            'win' => 'loss',
+            'loss' => 'win',
+            default => 'draw',
+        };
+
+        broadcast(new ClanUpdated($war->challenger->leader_id, [
+            'type' => 'war-result',
+            'message' => $label($result).' vs '.$war->opponent->name.' ('.$this->signed($deltaChallenger).' power)',
+        ]));
+
+        broadcast(new ClanUpdated($war->opponent->leader_id, [
+            'type' => 'war-result',
+            'message' => $label($opponentResult).' vs '.$war->challenger->name.' ('.$this->signed($deltaOpponent).' power)',
+        ]));
+    }
+
+    private function signed(int $n): string
+    {
+        return ($n >= 0 ? '+' : '').$n;
+    }
+
+    /**
+     * War dianggap "beres lebih cepat" kalau KEDUA clan sudah menyelesaikan
+     * (submit) seluruh 9 mode -- tak ada lagi yang bisa dikerjakan, jadi tak
+     * perlu menunggu ends_at. Karena tiap klaim tersubmit itu unik per
+     * (mode, config) untuk clan, cukup hitung jumlah klaim tersubmit = 9.
+     */
+    private function bothClansFinishedAllModes(ClanWar $war): bool
+    {
+        $target = count(ClanWarModeCatalog::MODES);
+
+        return $this->submittedCount($war->id, $war->challenger_clan_id) >= $target
+            && $this->submittedCount($war->id, $war->opponent_clan_id) >= $target;
+    }
+
+    private function submittedCount(int $clanWarId, int $clanId): int
+    {
+        return ClanWarModeClaim::where('clan_war_id', $clanWarId)
+            ->where('clan_id', $clanId)
+            ->whereNotNull('typing_result_id')
+            ->count();
     }
 
     /**

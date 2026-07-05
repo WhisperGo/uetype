@@ -1,0 +1,55 @@
+<?php
+
+namespace App\Livewire;
+
+use App\Enums\ClanWarStatus;
+use App\Models\Clan;
+use App\Models\ClanWar as ClanWarModel;
+use Illuminate\Support\Facades\Auth;
+use Livewire\Component;
+
+class ClanLeaderboard extends Component
+{
+    /**
+     * Peringkat semua clan berdasarkan power (Elo) tertinggi, lengkap dengan
+     * jumlah member aktif & jumlah kemenangan war. Read-only.
+     */
+    public function getRankingProperty()
+    {
+        $clans = Clan::withCount('activeMembers as members_count')
+            ->orderByDesc('power')
+            ->orderBy('name')
+            ->get();
+
+        // Hitung jumlah war yang dimenangkan tiap clan (challenger menang =
+        // result 'win'; opponent menang = result 'loss') dalam satu query set.
+        $finished = ClanWarModel::where('status', ClanWarStatus::Finished)->get();
+
+        $wins = [];
+        foreach ($finished as $war) {
+            if ($war->result === 'win') {
+                $wins[$war->challenger_clan_id] = ($wins[$war->challenger_clan_id] ?? 0) + 1;
+            } elseif ($war->result === 'loss') {
+                $wins[$war->opponent_clan_id] = ($wins[$war->opponent_clan_id] ?? 0) + 1;
+            }
+        }
+
+        return $clans->map(fn (Clan $clan) => [
+            'clan' => $clan,
+            'wins' => $wins[$clan->id] ?? 0,
+        ]);
+    }
+
+    /**
+     * Id clan aktif user saat ini (untuk menyorot baris clan-nya).
+     */
+    public function getMyClanIdProperty(): ?int
+    {
+        return Auth::user()?->clan?->id;
+    }
+
+    public function render()
+    {
+        return view('livewire.clan-leaderboard')->layout('layouts.app');
+    }
+}

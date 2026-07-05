@@ -128,7 +128,9 @@ class ClanWar extends Component
         }
 
         // Ambil semua klaim clan ini untuk war ini sekaligus (hindari N query).
-        $claims = ClanWarModeClaim::with('user')
+        // typingResult di-eager-load supaya kartu mode yang sudah selesai bisa
+        // menampilkan hasil ketik asli (WPM/akurasi/durasi) di balik poinnya.
+        $claims = ClanWarModeClaim::with(['user', 'typingResult'])
             ->where('clan_war_id', $war->id)
             ->where('clan_id', $this->myClan->id)
             ->get()

@@ -2,11 +2,16 @@
 
     <div class="flex items-center justify-between mb-2">
         <h1 class="font-display text-2xl tracking-wide text-foreground">CLAN WAR</h1>
-        @if ($this->myClan)
-            <a href="{{ route('clans.index') }}" wire:navigate class="font-mono text-xs text-muted hover:text-foreground transition">
-                ← Back to Clan
+        <div class="flex items-center gap-4">
+            <a href="{{ route('clan-leaderboard.index') }}" wire:navigate class="font-mono text-xs text-muted hover:text-foreground transition">
+                Leaderboard
             </a>
-        @endif
+            @if ($this->myClan)
+                <a href="{{ route('clans.index') }}" wire:navigate class="font-mono text-xs text-muted hover:text-foreground transition">
+                    ← Back to Clan
+                </a>
+            @endif
+        </div>
     </div>
 
     @if (! $this->myClan)
@@ -137,7 +142,21 @@
                                 @break
 
                             @default
-                                <span class="font-mono text-[0.7rem] text-muted truncate">✓ {{ $slot['claim']->user->username }}</span>
+                                {{-- Sudah selesai: tampilkan pengerja + HASIL KETIK ASLI di balik poinnya. --}}
+                                @php $tr = $slot['claim']->typingResult; @endphp
+                                <div class="flex flex-col gap-1.5">
+                                    <span class="font-mono text-[0.7rem] text-muted truncate">✓ {{ $slot['claim']->user->username }}</span>
+                                    @if ($tr)
+                                        <div class="flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[0.65rem] text-muted border-t border-white/5 pt-1.5">
+                                            @if ($slot['mode'] === 'survival')
+                                                <span>bertahan <span class="text-foreground font-bold">{{ rtrim(rtrim(number_format($tr->duration_seconds, 1), '0'), '.') }}s</span></span>
+                                            @else
+                                                <span>wpm <span class="text-foreground font-bold">{{ rtrim(rtrim(number_format($tr->net_wpm, 1), '0'), '.') }}</span></span>
+                                            @endif
+                                            <span>akurasi <span class="text-foreground font-bold">{{ rtrim(rtrim(number_format($tr->accuracy, 1), '0'), '.') }}%</span></span>
+                                        </div>
+                                    @endif
+                                </div>
                         @endswitch
                     </div>
                 @endforeach

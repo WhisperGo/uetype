@@ -46,4 +46,45 @@ class Clan extends Model
             ->whereIn('status', [ClanWarStatus::Pending, ClanWarStatus::Ongoing])
             ->first();
     }
+
+    /**
+     * Riwayat war SELESAI yang melibatkan clan ini (dua arah), terbaru dulu.
+     * Dipakai oleh halaman detail clan & ringkasan history di halaman war.
+     */
+    public function finishedWars(int $limit = 20)
+    {
+        return ClanWar::with(['challenger', 'opponent'])
+            ->where(function ($q) {
+                $q->where('challenger_clan_id', $this->id)
+                    ->orWhere('opponent_clan_id', $this->id);
+            })
+            ->where('status', ClanWarStatus::Finished)
+            ->latest('updated_at')
+            ->take($limit)
+            ->get();
+    }
+
+    /**
+     * Ubah sebuah baris ClanWar menjadi ringkasan dari SUDUT PANDANG clan ini:
+     * hasil (win/draw/loss), lawan, dan delta power. Menjaga logika
+     * "balik hasil kalau kita opponent" di satu tempat.
+     *
+     * @return array{result: string, opponent: Clan, delta: int}
+     */
+    public function warSummary(ClanWar $war): array
+    {
+        $isChallenger = $war->challenger_clan_id === $this->id;
+        $opponent = $isChallenger ? $war->opponent : $war->challenger;
+        $delta = $isChallenger ? $war->challenger_power_delta : $war->opponent_power_delta;
+
+        if ($war->result === 'draw') {
+            $result = 'draw';
+        } elseif ($isChallenger) {
+            $result = $war->result;
+        } else {
+            $result = $war->result === 'win' ? 'loss' : 'win';
+        }
+
+        return ['result' => $result, 'opponent' => $opponent, 'delta' => (int) $delta];
+    }
 }
