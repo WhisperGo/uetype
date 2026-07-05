@@ -46,8 +46,11 @@
                             <p class="font-sans text-lg font-bold text-foreground">{{ auth()->user()->username }}</p>
                             @if (auth()->user()->google_id)
                                 <span class="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-md bg-white/5 text-muted text-xs font-mono">
-                                    <svg class="w-3 h-3" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.24 1.4-1.7 4.1-5.5 4.1-3.3 0-6-2.7-6-6.1s2.7-6.1 6-6.1c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.9 2.6 14.7 1.6 12 1.6 6.7 1.6 2.5 5.9 2.5 12s4.2 10.4 9.5 10.4c5.5 0 9.1-3.9 9.1-9.3 0-.6-.06-1.1-.15-1.6H12z"/>
+                                    <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.53-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-8.17z" />
+                                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.11 0-5.74-2.11-6.68-4.96H1.32v3.15C3.31 20.36 7.38 24 12 24z" />
+                                        <path fill="#FBBC05" d="M5.32 14.24A7.16 7.16 0 0 1 5 12c0-.79.13-1.57.32-2.34V6.51H1.32A11.94 11.94 0 0 0 0 12c0 1.92.45 3.74 1.32 5.39l4-3.15z" />
+                                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.38 0 3.31 3.64 1.32 7.51l4 3.15c.94-2.85 3.57-4.91 6.68-4.91z" />
                                     </svg>
                                     {{ __('settings.account.connected_google') }}
                                 </span>
