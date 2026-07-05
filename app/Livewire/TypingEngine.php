@@ -8,6 +8,7 @@ use App\Models\Text;
 use App\Models\TypingResult;
 use App\Services\AntiCheatService;
 use App\Services\ClanWarScorer;
+use App\Support\TypingLanguage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -36,6 +37,8 @@ class TypingEngine extends Component
     ];
 
     public $textToType;
+
+    public string $contentLang = TypingLanguage::DEFAULT;
 
     public int $typingSessionKey = 0;
 
@@ -72,6 +75,12 @@ class TypingEngine extends Component
                 $this->mainMode = $prefs['mode'] ?? 'time';
                 $this->subMode = $prefs['subMode'] ?? '30';
             }
+        }
+
+        // Bahasa konten yang diketik dipulihkan terpisah dari war-lock: war hanya
+        // mengunci mode/config, bukan bahasa kata/kutipan yang diketik.
+        if (session()->has('typing_preferences')) {
+            $this->contentLang = TypingLanguage::resolve(session('typing_preferences')['contentLang'] ?? null);
         }
 
         $this->generateText();
@@ -181,12 +190,36 @@ class TypingEngine extends Component
         session()->put('typing_preferences', [
             'mode' => $main,
             'subMode' => $sub,
+            'contentLang' => $this->contentLang,
         ]);
         session()->save();
 
         $this->generateText();
 
         // Kirim event dengan detail teks baru, mode, dan sub-mode
+        $this->dispatch(
+            'mode-changed',
+            text: $this->textToType,
+            main: $this->mainMode,
+            sub: $this->subMode
+        );
+    }
+
+    // Ganti bahasa KONTEN yang diketik (kata/kutipan), terpisah dari bahasa UI.
+    // Boleh dilakukan kapan saja, termasuk saat war-lock (tak mengubah mode/skor).
+    public function setContentLang($lang)
+    {
+        $this->contentLang = TypingLanguage::resolve($lang);
+
+        session()->put('typing_preferences', [
+            'mode' => $this->mainMode,
+            'subMode' => $this->subMode,
+            'contentLang' => $this->contentLang,
+        ]);
+        session()->save();
+
+        $this->generateText();
+
         $this->dispatch(
             'mode-changed',
             text: $this->textToType,
@@ -212,7 +245,15 @@ class TypingEngine extends Component
         $this->typingSessionKey++;
 
         if ($this->mainMode === 'quote') {
-            $text = Text::where('mode', 'quote')->inRandomOrder()->first();
+            $text = Text::where('mode', 'quote')
+                ->whereHas('language', fn ($q) => $q->where('code', $this->contentLang))
+                ->inRandomOrder()
+                ->first();
+
+            // Fallback: kalau belum ada kutipan untuk bahasa terpilih, ambil kutipan apa pun
+            // supaya layar mengetik tidak pernah kosong.
+            $text ??= Text::where('mode', 'quote')->inRandomOrder()->first();
+
             $this->textToType = $text ? $text->content : 'Kutipan belum tersedia di database.';
             // Simpan ID quote agar hasil sesi bisa mereferensikan teks yang diketik.
             $this->textId = $text?->id;
@@ -220,9 +261,9 @@ class TypingEngine extends Component
             // Teks time/words dirakit acak dari JSON, tidak terikat ke satu baris texts.
             $this->textId = null;
 
-            // Mode time atau words menggunakan file JSON
-            // Secara default menggunakan english.json (bisa disesuaikan nanti dengan state bahasa)
-            $path = base_path('database/data/indonesian.json');
+            // Mode time/words/survival merakit teks dari wordlist JSON sesuai bahasa
+            // konten yang dipilih user (terpisah dari bahasa UI).
+            $path = TypingLanguage::wordlistPath($this->contentLang);
 
             if (File::exists($path)) {
                 $jsonString = File::get($path);
