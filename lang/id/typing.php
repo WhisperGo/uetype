@@ -20,7 +20,6 @@ return [
     'restart' => 'ulangi',
     'then' => 'lalu',
 
-    'coming_soon' => 'Segera hadir',
     'result_rejected' => 'Hasil sesi ini ditolak oleh validasi server (tidak masuk akal) dan tidak disimpan.',
 
     'aria' => [
@@ -33,6 +32,6 @@ return [
         'duration_seconds' => 'Durasi :seconds detik',
         'words_count' => ':count kata',
         'difficulty' => 'Tingkat :level',
-        'pick_language' => 'Pilih bahasa (segera hadir)',
+        'pick_content_language' => 'Pilih bahasa ketikan',
     ],
 ];

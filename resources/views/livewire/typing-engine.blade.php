@@ -138,13 +138,15 @@
                     </template>
                 </div>
 
-                <!-- Row 3: Language switch (EN/ID) — tampil sesuai Figma, ID aktif; belum fungsional -->
+                <!-- Row 3: Language switch (EN/ID) — memilih bahasa KONTEN yang diketik (bukan bahasa UI) -->
                 <div class="inline-flex items-stretch gap-0.5 p-[3px] rounded-lg bg-surface border border-border"
-                    role="group" aria-label="{{ __('typing.aria.pick_language') }}">
-                    <span aria-disabled="true" title="{{ __('typing.coming_soon') }}"
-                        class="px-[16px] py-[5px] rounded-md text-small font-mono font-bold text-muted/50 cursor-not-allowed">EN</span>
-                    <span aria-pressed="true"
-                        class="px-[16px] py-[5px] rounded-md text-small font-mono font-bold bg-brand text-foreground">ID</span>
+                    role="group" aria-label="{{ __('typing.aria.pick_content_language') }}">
+                    @foreach (['en' => 'EN', 'id' => 'ID'] as $code => $label)
+                        <button type="button" aria-label="{{ $label }}"
+                            :aria-pressed="'{{ $code }}' === @js($contentLang)"
+                            @click.prevent="$wire.setContentLang('{{ $code }}'); $el.blur()"
+                            class="px-[16px] py-[5px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand {{ $contentLang === $code ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground' }}">{{ $label }}</button>
+                    @endforeach
                 </div>
             </div>
 

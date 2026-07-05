@@ -20,7 +20,6 @@ return [
     'restart' => 'restart',
     'then' => 'then',
 
-    'coming_soon' => 'Coming soon',
     'result_rejected' => 'This session was rejected by server validation (implausible) and was not saved.',
 
     'aria' => [
@@ -33,6 +32,6 @@ return [
         'duration_seconds' => ':seconds second duration',
         'words_count' => ':count words',
         'difficulty' => ':level difficulty',
-        'pick_language' => 'Pick language (coming soon)',
+        'pick_content_language' => 'Pick typing language',
     ],
 ];
