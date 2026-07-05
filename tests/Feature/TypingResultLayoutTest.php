@@ -7,6 +7,8 @@ use function Pest\Laravel\actingAs;
 it('keeps the original survival game-over card layout (separate from solo 2-column layout)', function () {
     $user = User::factory()->create();
 
+    app()->setLocale('en');
+
     session(['typing_result' => [
         'wpm' => 28.63, 'rawWpm' => 30, 'accuracy' => 48.39, 'time' => 6,
         'mode' => 'survival', 'subMode' => 'hard', 'score' => 3,
@@ -23,13 +25,15 @@ it('keeps the original survival game-over card layout (separate from solo 2-colu
 
     $response->assertOk()
         ->assertSee('game over')
-        ->assertSee('main lagi')
+        ->assertSee('play again')
         ->assertSee('drain events')
-        ->assertDontSee('heatmap kesalahan'); // heatmap hanya untuk cabang non-survival
+        ->assertDontSee('error heatmap'); // heatmap hanya untuk cabang non-survival
 });
 
 it('keeps the normal time-mode layout unchanged (performance chart + heatmap + ghost field)', function () {
     $user = User::factory()->create();
+
+    app()->setLocale('en');
 
     session(['typing_result' => [
         'wpm' => 85.0, 'rawWpm' => 90, 'accuracy' => 96.5, 'time' => 30,
@@ -50,7 +54,7 @@ it('keeps the normal time-mode layout unchanged (performance chart + heatmap + g
         ->assertSee('raw wpm')
         ->assertSee('duration')
         ->assertSee('new personal best')
-        ->assertSee('heatmap kesalahan')
+        ->assertSee('error heatmap')
         ->assertSee('beat the ghost')
         ->assertDontSee('game over')
         ->assertDontSee('drain events');
