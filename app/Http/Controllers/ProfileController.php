@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\TypingResult;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
@@ -15,8 +16,34 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
-        $user = $request->user();
+        return view('profile.edit', $this->profilePayload($request->user()));
+    }
 
+    /**
+     * Profil PUBLIK milik user lain (dibuka lewat daftar teman / pencarian).
+     * Hanya menampilkan data yang layak publik — TANPA field privat seperti
+     * email, koin, atau total XP. Kalau seseorang membuka profilnya sendiri
+     * lewat rute ini, arahkan ke halaman /profile miliknya yang penuh.
+     */
+    public function show(Request $request, User $user): View
+    {
+        if ($request->user() && $request->user()->id === $user->id) {
+            return $this->edit($request);
+        }
+
+        return view('profile.show', $this->profilePayload($user, public: true));
+    }
+
+    /**
+     * Rakit data agregat sebuah profil dari hasil ketik tersimpan (semua sudah
+     * tervalidasi server). Dipakai bersama oleh profil sendiri & profil publik
+     * supaya angkanya konsisten; $public menentukan field privat disertakan
+     * atau tidak.
+     *
+     * @return array<string, mixed>
+     */
+    private function profilePayload(User $user, bool $public = false): array
+    {
         $recentMatches = TypingResult::where('user_id', $user->id)
             ->latest('created_at')
             ->take(8)
@@ -51,12 +78,13 @@ class ProfileController extends Controller
         $progress = (clone $base)->latest('created_at')->take(20)->get()->reverse()->values();
         $wpmProgress = $progress->pluck('net_wpm')->map(fn ($v) => (float) $v)->all();
 
-        return view('profile.edit', [
+        return [
             'user' => $user,
             'recentMatches' => $recentMatches,
             'stats' => $stats,
             'bestRecords' => $bestRecords,
             'wpmProgress' => $wpmProgress,
-        ]);
+            'isPublic' => $public,
+        ];
     }
 }

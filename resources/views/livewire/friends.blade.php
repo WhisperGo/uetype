@@ -40,19 +40,23 @@
             <div class="space-y-3">
                 @foreach ($this->friendsList as $row)
                     <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl hover:border-white/10 transition group">
-                        <x-friend-avatar :user="$row['user']" />
-                        <div class="flex-1 min-w-0">
-                            <p class="font-mono text-sm font-bold text-foreground truncate">{{ $row['user']->username }}</p>
-                            <p class="font-mono text-xs text-muted mt-0.5">level {{ $row['user']->levelData()['level'] }}</p>
-                        </div>
+                        <a href="{{ route('profile.show', $row['user']) }}" wire:navigate class="flex items-center gap-4 flex-1 min-w-0">
+                            <x-friend-avatar :user="$row['user']" />
+                            <div class="flex-1 min-w-0">
+                                <p class="font-mono text-sm font-bold text-foreground truncate group-hover:text-gold transition-colors">{{ $row['user']->username }}</p>
+                                <p class="font-mono text-xs text-muted mt-0.5">level {{ $row['user']->levelData()['level'] }}</p>
+                            </div>
+                        </a>
                         <button wire:click="removeFriend({{ $row['friendship_id'] }})"
                             wire:confirm="Hapus {{ $row['user']->username }} dari daftar teman?"
                             class="opacity-0 group-hover:opacity-100 px-3 py-1.5 font-mono text-xs text-red-400/80 border border-red-900/40 rounded-lg hover:bg-red-950/30 transition">
                             Remove
                         </button>
-                        <svg class="w-4 h-4 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
+                        <a href="{{ route('profile.show', $row['user']) }}" wire:navigate class="text-muted hover:text-foreground transition shrink-0" aria-label="Lihat profil {{ $row['user']->username }}">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </a>
                     </div>
                 @endforeach
             </div>
@@ -85,12 +89,14 @@
                 <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">Incoming ({{ $this->incomingRequests->count() }})</p>
                 <div class="space-y-3 mb-8">
                     @foreach ($this->incomingRequests as $req)
-                        <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl" wire:key="in-{{ $req->id }}">
-                            <x-friend-avatar :user="$req->requester" />
-                            <div class="flex-1 min-w-0">
-                                <p class="font-mono text-sm font-bold text-foreground truncate">{{ $req->requester->username }}</p>
-                                <p class="font-mono text-xs text-muted mt-0.5">level {{ $req->requester->levelData()['level'] }}</p>
-                            </div>
+                        <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl group" wire:key="in-{{ $req->id }}">
+                            <a href="{{ route('profile.show', $req->requester) }}" wire:navigate class="flex items-center gap-4 flex-1 min-w-0">
+                                <x-friend-avatar :user="$req->requester" />
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-mono text-sm font-bold text-foreground truncate group-hover:text-gold transition-colors">{{ $req->requester->username }}</p>
+                                    <p class="font-mono text-xs text-muted mt-0.5">level {{ $req->requester->levelData()['level'] }}</p>
+                                </div>
+                            </a>
                             <button wire:click="acceptRequest({{ $req->id }})"
                                 class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
                                 Accept
@@ -109,12 +115,14 @@
                 <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">Sent ({{ $this->sentRequests->count() }})</p>
                 <div class="space-y-3">
                     @foreach ($this->sentRequests as $req)
-                        <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl" wire:key="sent-{{ $req->id }}">
-                            <x-friend-avatar :user="$req->addressee" />
-                            <div class="flex-1 min-w-0">
-                                <p class="font-mono text-sm font-bold text-foreground truncate">{{ $req->addressee->username }}</p>
-                                <p class="font-mono text-xs text-muted mt-0.5">level {{ $req->addressee->levelData()['level'] }}</p>
-                            </div>
+                        <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl group" wire:key="sent-{{ $req->id }}">
+                            <a href="{{ route('profile.show', $req->addressee) }}" wire:navigate class="flex items-center gap-4 flex-1 min-w-0">
+                                <x-friend-avatar :user="$req->addressee" />
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-mono text-sm font-bold text-foreground truncate group-hover:text-gold transition-colors">{{ $req->addressee->username }}</p>
+                                    <p class="font-mono text-xs text-muted mt-0.5">level {{ $req->addressee->levelData()['level'] }}</p>
+                                </div>
+                            </a>
                             <span class="font-mono text-xs text-muted">Pending</span>
                             <button wire:click="cancelRequest({{ $req->id }})"
                                 class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
@@ -145,12 +153,14 @@
             @if ($this->searchResults->count() > 0)
                 <div class="space-y-3">
                     @foreach ($this->searchResults as $row)
-                        <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl" wire:key="find-{{ $row['user']->id }}">
-                            <x-friend-avatar :user="$row['user']" />
-                            <div class="flex-1 min-w-0">
-                                <p class="font-mono text-sm font-bold text-foreground truncate">{{ $row['user']->username }}</p>
-                                <p class="font-mono text-xs text-muted mt-0.5">level {{ $row['user']->levelData()['level'] }}</p>
-                            </div>
+                        <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl group" wire:key="find-{{ $row['user']->id }}">
+                            <a href="{{ route('profile.show', $row['user']) }}" wire:navigate class="flex items-center gap-4 flex-1 min-w-0">
+                                <x-friend-avatar :user="$row['user']" />
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-mono text-sm font-bold text-foreground truncate group-hover:text-gold transition-colors">{{ $row['user']->username }}</p>
+                                    <p class="font-mono text-xs text-muted mt-0.5">level {{ $row['user']->levelData()['level'] }}</p>
+                                </div>
+                            </a>
 
                             @switch($row['relation'])
                                 @case('friends')

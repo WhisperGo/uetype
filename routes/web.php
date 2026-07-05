@@ -24,6 +24,9 @@ Route::get('/dashboard', function () {
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
 
+    // Profil publik user lain (dibuka dari daftar teman / hasil pencarian).
+    Route::get('/users/{user}', [ProfileController::class, 'show'])->name('profile.show');
+
     Route::get('/settings', Settings::class)->name('settings');
 
     Route::get('/achievements', [AchievementController::class, 'index'])->name('achievements.index');
