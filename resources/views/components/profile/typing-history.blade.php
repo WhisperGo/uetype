@@ -96,7 +96,7 @@ new class extends Component
                     @forelse ($history as $result)
                         <tr class="border-t border-white/5 hover:bg-white/5 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap text-muted">
-                                {{ $result->created_at->format('d M Y, H:i') }}
+                                @localtime($result->created_at, 'd M Y, H:i')
                             </td>
                             <td class="px-6 py-4">
                                 <span class="bg-brand/15 text-brand-bright text-xs font-sans font-medium px-2.5 py-0.5 rounded capitalize">

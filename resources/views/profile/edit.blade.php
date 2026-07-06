@@ -46,7 +46,7 @@
                         </div>
                         <p class="mt-1 font-mono text-sm text-muted">{{ $user->email }}</p>
                         <p class="mt-1 text-xs text-muted">
-                            {{ __('profile.joined', ['date' => optional($user->joined_at ?? $user->created_at)->translatedFormat('d F Y')]) }}
+                            {{ __('profile.joined', ['date' => \App\Support\AppTime::format($user->joined_at ?? $user->created_at, 'd F Y')]) }}
                         </p>
                         <div class="max-w-xs mt-3">
                             <div class="flex justify-between text-[0.65rem] text-muted font-mono mb-1">
@@ -148,7 +148,7 @@
                                 <tbody class="font-mono text-sm">
                                     @foreach($recentMatches as $p)
                                     <tr class="border-t border-white/5">
-                                        <td class="py-2.5 text-muted">{{ $p->created_at ? $p->created_at->format('d M Y H:i') : '-' }}</td>
+                                        <td class="py-2.5 text-muted">@localtime($p->created_at, 'd M Y H:i')</td>
                                         <td class="py-2.5 text-foreground capitalize">
                                             {{ $p->mode?->value ?? 'practice' }}
                                         </td>

@@ -84,7 +84,7 @@
                                     </svg>
                                     {{ __('achievements.earned') }}
                                     @if ($a['unlocked_at'])
-                                        <span class="text-muted/70">· {{ $a['unlocked_at']->translatedFormat('d M Y') }}</span>
+                                        <span class="text-muted/70">· @localtime($a['unlocked_at'], 'd M Y')</span>
                                     @endif
                                 </p>
                             @else

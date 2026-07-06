@@ -60,7 +60,7 @@
                             vs
                             <a href="{{ route('clans.show', $row['opponent']) }}" wire:navigate class="hover:text-gold transition-colors">{{ $row['opponent']->name }}</a>
                         </p>
-                        <p class="font-mono text-[0.65rem] text-muted mt-0.5">{{ $row['war']->updated_at->translatedFormat('d M Y') }}</p>
+                        <p class="font-mono text-[0.65rem] text-muted mt-0.5">@localtime($row['war']->updated_at, 'd M Y')</p>
                     </div>
                     <span class="font-mono text-sm font-bold tabular-nums shrink-0 {{ $row['delta'] >= 0 ? 'text-gold' : 'text-red-400/80' }}">
                         {{ $row['delta'] >= 0 ? '+' : '' }}{{ $row['delta'] }} <span class="text-[0.6rem] text-muted font-normal">power</span>

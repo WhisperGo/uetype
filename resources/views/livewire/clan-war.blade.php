@@ -39,7 +39,7 @@
                     (power {{ number_format($war->challenger->power) }}) menantang clan-mu.
                 </p>
                 <p class="font-mono text-xs text-muted mt-1">
-                    Harus direspons sebelum {{ $war->accept_deadline_at->translatedFormat('d M Y H:i') }}
+                    Harus direspons sebelum @localtime($war->accept_deadline_at, 'd M Y H:i')
                 </p>
                 <div class="flex gap-3 mt-4">
                     <button wire:click="acceptChallenge({{ $war->id }})"
@@ -63,7 +63,7 @@
                     (power {{ number_format($war->opponent->power) }}) merespons tantanganmu.
                 </p>
                 <p class="font-mono text-xs text-muted mt-1">
-                    Hangus otomatis {{ $war->accept_deadline_at->translatedFormat('d M Y H:i') }} kalau tidak direspons
+                    Hangus otomatis @localtime($war->accept_deadline_at, 'd M Y H:i') kalau tidak direspons
                 </p>
             </div>
 
@@ -82,7 +82,7 @@
                             (power {{ number_format($opponent->power) }})
                         </p>
                         <p class="font-mono text-xs text-muted mt-1">
-                            Berakhir {{ $war->ends_at->translatedFormat('d M Y H:i') }}
+                            Berakhir @localtime($war->ends_at, 'd M Y H:i')
                         </p>
                     </div>
                     <div class="text-right">
