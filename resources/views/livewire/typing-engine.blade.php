@@ -6,6 +6,7 @@
         ...typingGame(@js($textToType))
     }"
         @keydown.window="
+            syncCapsLock($event);
             if($event.key === 'Tab') {
                 $event.preventDefault();
                 // Tombol restart tidak ada saat war-lock (dinonaktifkan) -> guard null.
@@ -14,6 +15,7 @@
                 handleInput($event);
             }
         "
+        @keyup.window="syncCapsLock($event)"
         x-on:ghost-selected.window="window.__uetypeGhostSelection = { active: true, wpm: $event.detail.wpm, label: $event.detail.label }; ghostActive = true; ghostWpm = $event.detail.wpm; ghostLabel = $event.detail.label; ghostCharIndex = 0; ghostFinished = false; ghostFinishTime = null; $nextTick(() => { const pos = getCharPosition(0); if (pos) { ghostCursorLeft = pos.left; ghostCursorTop = pos.top; } if (isStarted) startGhostAnimationLoop(); })"
         x-on:ghost-cleared.window="window.__uetypeGhostSelection = null; ghostActive = false; ghostWpm = 0; ghostLabel = ''; stopGhostAnimationLoop();">
 
@@ -239,6 +241,18 @@
                 </div>
             </div>
 
+            <div class="relative">
+            <div x-cloak x-show="capsLockOn && currentMain !== 'quote'" x-transition.opacity
+                class="absolute bottom-full left-0 right-0 flex justify-center mb-2 pointer-events-none"
+                role="status" aria-live="polite">
+                <div class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold/10 border border-gold/40">
+                    <svg class="w-4 h-4 text-gold shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <span class="text-small font-mono font-bold text-gold">{{ __('typing.caps_lock') }}</span>
+                </div>
+            </div>
+
             <!-- Kontainer 3 Baris -->
             <div class="relative overflow-hidden text-3xl leading-relaxed tracking-tight select-none outline-none"
                 style="max-height: 4.875em;">
@@ -317,6 +331,7 @@
                         </div>
                     @endforeach
                 </div>
+            </div>
             </div>
 
             <div class="mt-12 flex justify-center">
@@ -410,6 +425,8 @@
                 ghostFinishTime: null,
                 _ghostRafId: null,
 
+                capsLockOn: false,
+
                 isTyping: false,
                 typingTimeout: null,
                 totalKeystrokes: 0,
@@ -440,6 +457,12 @@
                     this.drainFlash = true;
                     clearTimeout(this.drainFlashTimeout);
                     this.drainFlashTimeout = setTimeout(() => { this.drainFlash = false; }, 250);
+                },
+
+                syncCapsLock(e) {
+                    if (typeof e.getModifierState === 'function') {
+                        this.capsLockOn = e.getModifierState('CapsLock');
+                    }
                 },
 
                 init() {
