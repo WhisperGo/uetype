@@ -6,7 +6,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title>{{ config('app.name', 'UEType') }}</title>
-        <link rel="icon" type="image/png" href="{{ asset('images/favicon/favicon-uetype.png') }}">
+        @include('partials.favicon')
 
         <!-- Fonts: Space Grotesk untuk UI, JetBrains Mono untuk aksen -->
         <link rel="preconnect" href="https://fonts.googleapis.com">
