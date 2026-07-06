@@ -21,6 +21,8 @@ return [
     'then' => 'lalu',
     'war_locked_restart' => 'ulangi dikunci (clan war)',
 
+    'caps_lock' => 'Caps Lock aktif',
+
     'result_rejected' => 'Hasil sesi ini ditolak oleh validasi server (tidak masuk akal) dan tidak disimpan.',
 
     'aria' => [
