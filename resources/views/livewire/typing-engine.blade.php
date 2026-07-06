@@ -920,6 +920,7 @@
 
                 handleInput(e) {
                     if (this.isFinished) return;
+                    if (e.ctrlKey || e.metaKey) return;
                     if (e.key === ' ') e.preventDefault();
                     if (e.key.length > 1 && e.key !== 'Backspace') return;
 
