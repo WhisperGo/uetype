@@ -3,6 +3,7 @@
 use App\Enums\ClanMemberStatus;
 use App\Enums\ClanRole;
 use App\Enums\ClanWarStatus;
+use App\Events\ClanUpdated;
 use App\Livewire\ClanWar;
 use App\Models\Clan;
 use App\Models\ClanMember;
@@ -11,6 +12,7 @@ use App\Models\ClanWarModeClaim;
 use App\Models\TypingResult;
 use App\Models\User;
 use App\Services\EloCalculator;
+use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
 
 function makeClanWithLeader(string $name, int $power = 1000): array
@@ -59,6 +61,59 @@ it('lets a leader challenge another free clan, creating a pending war', function
         'opponent_clan_id' => $clanB->id,
         'status' => ClanWarStatus::Pending->value,
     ]);
+});
+
+it('toasts the opponent leader when a war is challenged', function () {
+    Event::fake([ClanUpdated::class]);
+    [$leaderA] = makeClanWithLeader('Clan A');
+    [$leaderB, $clanB] = makeClanWithLeader('Clan B');
+
+    Livewire::actingAs($leaderA)->test(ClanWar::class)->call('challengeClan', $clanB->id);
+
+    Event::assertDispatched(ClanUpdated::class, function ($e) use ($leaderB) {
+        return $e->userId === $leaderB->id
+            && $e->notification['type'] === 'war-challenge';
+    });
+});
+
+it('toasts the challenger leader when a war is accepted', function () {
+    Event::fake([ClanUpdated::class]);
+    [$leaderA, $clanA] = makeClanWithLeader('Clan A');
+    [$leaderB, $clanB] = makeClanWithLeader('Clan B');
+
+    $war = ClanWarModel::create([
+        'challenger_clan_id' => $clanA->id, 'opponent_clan_id' => $clanB->id,
+        'status' => ClanWarStatus::Pending, 'accept_deadline_at' => now()->addHour(),
+    ]);
+
+    Livewire::actingAs($leaderB)->test(ClanWar::class)->call('acceptChallenge', $war->id);
+
+    Event::assertDispatched(ClanUpdated::class, function ($e) use ($leaderA) {
+        return $e->userId === $leaderA->id
+            && $e->notification['type'] === 'war-accepted';
+    });
+});
+
+it('toasts the challenger leader when a war is declined', function () {
+    Event::fake([ClanUpdated::class]);
+    [$leaderA, $clanA] = makeClanWithLeader('Clan A');
+    [$leaderB, $clanB] = makeClanWithLeader('Clan B');
+
+    $war = ClanWarModel::create([
+        'challenger_clan_id' => $clanA->id, 'opponent_clan_id' => $clanB->id,
+        'status' => ClanWarStatus::Pending, 'accept_deadline_at' => now()->addHour(),
+    ]);
+
+    Livewire::actingAs($leaderB)->test(ClanWar::class)->call('declineChallenge', $war->id);
+
+    $war->refresh();
+    expect($war->status)->toBe(ClanWarStatus::Declined);
+
+    Event::assertDispatched(ClanUpdated::class, function ($e) use ($leaderA) {
+        return $e->userId === $leaderA->id
+            && $e->notification !== null
+            && $e->notification['type'] === 'war-declined';
+    });
 });
 
 it('does not let a non-leader of the opponent clan accept or decline a challenge (trust boundary)', function () {

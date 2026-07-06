@@ -155,19 +155,39 @@
                         x-transition:leave-end="opacity-0 translate-x-4"
                         class="pointer-events-auto flex items-start gap-3 p-4 rounded-2xl border shadow-lg bg-surface border-white/10 backdrop-blur">
                         <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                            :class="t.type === 'accepted' ? 'bg-gold/15 text-gold' : 'bg-brand/15 text-brand-bright'">
-                            <template x-if="t.type === 'accepted'">
+                            :class="{
+                                'bg-gold/15 text-gold': t.type === 'accepted' || t.type === 'war-accepted',
+                                'bg-danger/15 text-danger': t.type === 'war-declined',
+                                'bg-brand/15 text-brand-bright': t.type !== 'accepted' && t.type !== 'war-accepted' && t.type !== 'war-declined',
+                            }">
+                            {{-- Diterima (gabung clan / war): centang --}}
+                            <template x-if="t.type === 'accepted' || t.type === 'war-accepted'">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
                             </template>
-                            <template x-if="t.type !== 'accepted'">
+                            {{-- Ditolak: silang --}}
+                            <template x-if="t.type === 'war-declined'">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </template>
+                            {{-- Tantangan war masuk: pedang menyilang --}}
+                            <template x-if="t.type === 'war-challenge'">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2" /></svg>
+                            </template>
+                            {{-- Lainnya (permintaan gabung clan / update umum): ikon grup --}}
+                            <template x-if="t.type !== 'accepted' && t.type !== 'war-accepted' && t.type !== 'war-declined' && t.type !== 'war-challenge'">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-1a4 4 0 00-3-3.87M9 20H4v-1a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-1a4 4 0 10-4-4" /></svg>
                             </template>
                         </div>
                         <div class="min-w-0 flex-1">
                             <p class="font-mono text-xs uppercase tracking-wider text-muted"
-                                x-text="t.type === 'accepted' ? 'Clan request accepted' : (t.type === 'war-result' ? 'Clan War result' : 'Clan update')"></p>
+                                x-text="{
+                                    'accepted': 'Clan request accepted',
+                                    'war-result': 'Clan War result',
+                                    'war-challenge': 'Clan War challenge',
+                                    'war-accepted': 'Clan War accepted',
+                                    'war-declined': 'Clan War declined',
+                                }[t.type] || 'Clan update'"></p>
                             <p class="mt-0.5 font-mono text-sm text-foreground break-words" x-text="t.message"></p>
-                            <a :href="t.type === 'war-result' ? '{{ route('clan-war.index') }}' : '{{ route('clans.index') }}'" class="mt-1.5 inline-block font-mono text-xs text-brand-bright hover:underline">View →</a>
+                            <a :href="['war-result', 'war-challenge', 'war-accepted', 'war-declined'].includes(t.type) ? '{{ route('clan-war.index') }}' : '{{ route('clans.index') }}'" class="mt-1.5 inline-block font-mono text-xs text-brand-bright hover:underline">View →</a>
                         </div>
                         <button @click="dismiss(t.id)" class="text-muted hover:text-foreground shrink-0" aria-label="Dismiss">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
