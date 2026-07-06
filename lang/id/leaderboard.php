@@ -11,7 +11,12 @@ return [
         'survival' => 'Survival',
     ],
 
-    'survival_mode' => 'Mode Medium',
+    'difficulty' => [
+        'easy' => 'Mudah',
+        'medium' => 'Sedang',
+        'hard' => 'Sulit',
+    ],
+
     'your_rank' => 'Posisi Peringkat Kamu:',
     'unranked' => 'Belum Berperingkat',
 
@@ -21,4 +26,13 @@ return [
     'accuracy' => 'Akurasi',
 
     'empty' => 'Belum ada rekor data yang dicetak untuk kategori ini.',
+
+    'you' => 'Kamu',
+    'actions' => 'Aksi',
+    'view_profile' => 'Lihat Profil',
+    'add_friend' => 'Tambah Teman',
+    'request_sent' => 'Permintaan Terkirim',
+    'respond' => 'Tanggapi',
+    'friends_label' => 'Berteman',
+    'challenge_ghost' => 'Lawan Ghost',
 ];

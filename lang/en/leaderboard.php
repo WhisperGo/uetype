@@ -11,7 +11,12 @@ return [
         'survival' => 'Survival',
     ],
 
-    'survival_mode' => 'Medium Mode',
+    'difficulty' => [
+        'easy' => 'Easy',
+        'medium' => 'Medium',
+        'hard' => 'Hard',
+    ],
+
     'your_rank' => 'Your Rank:',
     'unranked' => 'Unranked',
 
@@ -21,4 +26,13 @@ return [
     'accuracy' => 'Accuracy',
 
     'empty' => 'No records have been set for this category yet.',
+
+    'you' => 'You',
+    'actions' => 'Actions',
+    'view_profile' => 'View Profile',
+    'add_friend' => 'Add Friend',
+    'request_sent' => 'Request Sent',
+    'respond' => 'Respond',
+    'friends_label' => 'Friends',
+    'challenge_ghost' => 'Race Ghost',
 ];

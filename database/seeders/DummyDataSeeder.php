@@ -31,7 +31,7 @@ class DummyDataSeeder extends Seeder
         $modes = [
             ['mode' => 'time', 'configs' => ['15', '30', '60', '120']],
             ['mode' => 'words', 'configs' => ['10', '25', '50', '100']],
-            ['mode' => 'survival', 'configs' => ['medium']]
+            ['mode' => 'survival', 'configs' => ['easy', 'medium', 'hard']]
         ];
 
         // 2. Generasikan Riwayat Typing Results untuk setiap user

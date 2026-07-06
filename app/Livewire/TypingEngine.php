@@ -57,6 +57,18 @@ class TypingEngine extends Component
     // Null kalau tidak sedang war-lock.
     public ?array $warLock = null;
 
+    // Ghost deep-link dari leaderboard: ?ghost=<user_id>&mode=<time|words>&config=<sub>.
+    // Kalau terisi & valid, lawan ghost dipasang otomatis saat load dengan WPM
+    // yang DITURUNKAN ULANG dari DB (bukan dari client) — sejalan dgn GhostPicker.
+    #[Url(as: 'ghost')]
+    public ?int $ghostUserId = null;
+
+    #[Url(as: 'mode')]
+    public ?string $ghostMode = null;
+
+    #[Url(as: 'config')]
+    public ?string $ghostConfig = null;
+
     public function mount()
     {
         // Cek war-lock DULU: kalau ?war_claim= valid, mode dipaksa sesuai klaim
@@ -84,7 +96,69 @@ class TypingEngine extends Component
             $this->contentLang = TypingLanguage::resolve(session('typing_preferences')['contentLang'] ?? null);
         }
 
+        // Ghost deep-link (dari leaderboard). Diproses SETELAH war-lock supaya war
+        // tetap menang; hanya berlaku untuk sesi solo biasa & mode time/words.
+        if (! $this->warLock) {
+            $this->resolveGhostDeepLink();
+        }
+
         $this->generateText();
+    }
+
+    /**
+     * Pasang lawan ghost dari query string ?ghost=&mode=&config= (dibuka dari
+     * baris leaderboard). Mode diselaraskan lewat normalizeMode; WPM lawan
+     * SELALU diturunkan ulang dari DB di sini (bukan dari client), pola sama
+     * dengan GhostPicker::selectOpponent('leaderboard'). Ghost hanya berlaku
+     * untuk time/words. Param liar / user tanpa rekor di mode itu diabaikan
+     * (halaman jadi sesi solo biasa, fail-safe seperti war_claim).
+     */
+    private function resolveGhostDeepLink(): void
+    {
+        if (! $this->ghostUserId || ! Auth::check()) {
+            $this->clearGhostDeepLinkParams();
+
+            return;
+        }
+
+        if (! in_array($this->ghostMode, ['time', 'words'], true)) {
+            $this->clearGhostDeepLinkParams();
+
+            return;
+        }
+
+        [$main, $sub] = $this->normalizeMode($this->ghostMode, $this->ghostConfig);
+
+        $best = TypingResult::where('user_id', $this->ghostUserId)
+            ->where('mode', $main)
+            ->where('mode_config', $sub)
+            ->max('net_wpm');
+
+        if ($best === null || (float) $best <= 0) {
+            $this->clearGhostDeepLinkParams();
+
+            return;
+        }
+
+        $this->mainMode = $main;
+        $this->subMode = $sub;
+
+        $label = \App\Models\User::find($this->ghostUserId)?->username ?? 'Leaderboard';
+
+        $this->dispatch('ghost-selected', type: 'leaderboard', wpm: (float) $best, label: $label);
+
+        $this->clearGhostDeepLinkParams();
+    }
+
+    /**
+     * Kosongkan param ghost supaya tak nyangkut di URL/state Livewire setelah
+     * diproses (mencegah refresh/navigate memasang ulang atau URL jadi kotor).
+     */
+    private function clearGhostDeepLinkParams(): void
+    {
+        $this->ghostUserId = null;
+        $this->ghostMode = null;
+        $this->ghostConfig = null;
     }
 
     /**
