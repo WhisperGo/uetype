@@ -10,7 +10,7 @@ function wordlistWords(string $file): array
 {
     $data = json_decode(file_get_contents(base_path('database/data/'.$file)), true);
 
-    return $data['words'];
+    return array_map('mb_strtolower', $data['words']);
 }
 
 test('switching content language to id draws words from the indonesian wordlist', function () {
@@ -37,6 +37,19 @@ test('switching content language to en draws words from the english wordlist', f
 
     expect($component->get('contentLang'))->toBe('en');
     expect(wordlistWords('english.json'))->toContain($words[0]);
+});
+
+test('english words mode never contains uppercase letters', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $component = Livewire::test(TypingEngine::class)
+        ->call('setContentLang', 'en')
+        ->call('setMode', 'words', '100');
+
+    $text = $component->get('textToType');
+
+    expect($text)->toBe(mb_strtolower($text));
 });
 
 test('an unsupported content language falls back to english', function () {

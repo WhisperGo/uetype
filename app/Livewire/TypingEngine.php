@@ -322,7 +322,7 @@ class TypingEngine extends Component
                         $selectedWords = array_merge($selectedWords, array_slice($wordsArray, 0, $needed));
                     }
 
-                    $this->textToType = implode(' ', $selectedWords);
+                    $this->textToType = mb_strtolower(implode(' ', $selectedWords));
                 } else {
                     $this->textToType = 'error: struktur file json tidak valid';
                 }
