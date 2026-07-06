@@ -918,9 +918,53 @@
                     });
                 },
 
+                deleteOneStep() {
+                    if (this.currentIndex <= 0) return false;
+
+                    const bounds = this.wordBounds[this.currentWordIndex];
+
+                    if (this.extraChars[this.currentWordIndex] && this.extraChars[this.currentWordIndex].length > 0) {
+                        this.extraChars[this.currentWordIndex].pop();
+                        this.schedulePositionUpdate();
+                        return true;
+                    }
+
+                    if (this.currentIndex === bounds.start) {
+                        if (this.currentWordIndex > 0) {
+                            let prevWordIdx = this.currentWordIndex - 1;
+                            if (this.wordHasError(prevWordIdx)) {
+                                this.currentWordIndex--;
+
+                                this.uncommitWord(this.currentWordIndex);
+                                this.markWordDirty();
+
+                                let prevBounds = this.wordBounds[this.currentWordIndex];
+                                let jumpIndex = prevBounds.space;
+
+                                this.inputResults[jumpIndex] = null;
+
+                                while (jumpIndex > prevBounds.start && this.inputResults[jumpIndex - 1] === 'skipped') {
+                                    jumpIndex--;
+                                    this.inputResults[jumpIndex] = null;
+                                }
+
+                                this.currentIndex = jumpIndex;
+                                this.schedulePositionUpdate();
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+
+                    this.currentIndex--;
+                    this.inputResults[this.currentIndex] = null;
+                    this.schedulePositionUpdate();
+                    return true;
+                },
+
                 handleInput(e) {
                     if (this.isFinished) return;
-                    if (e.ctrlKey || e.metaKey) return;
+                    if ((e.ctrlKey || e.metaKey) && e.key !== 'Backspace') return;
                     if (e.key === ' ') e.preventDefault();
                     if (e.key.length > 1 && e.key !== 'Backspace') return;
 
@@ -973,55 +1017,21 @@
                     let bounds = this.wordBounds[this.currentWordIndex];
 
                     if (e.key === 'Backspace') {
-                        if (this.currentIndex > 0) {
-                            // Jika sedang di spasi, dan ada extra chars, hapus satu ekstra hurufnya
-                            if (this.extraChars[this.currentWordIndex] && this.extraChars[this.currentWordIndex].length >
-                                0) {
-                                this.extraChars[this.currentWordIndex].pop();
-                                this.schedulePositionUpdate();
-                                return;
+                        if (e.ctrlKey || e.metaKey) {
+                            const startWord = this.currentWordIndex;
+                            let guard = 0;
+                            while (this.currentIndex > 0 && guard++ < 500) {
+                                const atWordStart = this.currentIndex === this.wordBounds[this.currentWordIndex].start;
+                                const moved = this.deleteOneStep();
+                                if (!moved) break;
+                                if (this.currentWordIndex !== startWord) break;
+                                if (atWordStart) break;
                             }
-
-                            // Jika kursor berada di awal kata saat ini
-                            if (this.currentIndex === bounds.start) {
-                                // Boleh mundur ke kata sebelumnya JIKA ada error di kata tersebut
-                                if (this.currentWordIndex > 0) {
-                                    let prevWordIdx = this.currentWordIndex - 1;
-                                    if (this.wordHasError(prevWordIdx)) {
-                                        this.currentWordIndex--;
-
-                                        // Survival: kita kembali masuk ke kata ini untuk koreksi.
-                                        // Batalkan penilaian commit-nya agar tidak dihitung dua kali;
-                                        // kata akan dinilai ulang saat di-commit kembali nanti.
-                                        // currentWordDirty di-set true: kata yang sempat punya error
-                                        // tetap "kotor" walau dikoreksi (koreksi tak memberi kekebalan).
-                                        this.uncommitWord(this.currentWordIndex);
-                                        this.markWordDirty();
-
-                                        let prevBounds = this.wordBounds[this.currentWordIndex];
-                                        let jumpIndex = prevBounds.space;
-
-                                        // Hapus status pada spasi
-                                        this.inputResults[jumpIndex] = null;
-
-                                        // Bersihkan status 'skipped' dan lompat mundur melewati huruf-huruf yang tidak pernah diketik
-                                        while(jumpIndex > prevBounds.start && this.inputResults[jumpIndex - 1] === 'skipped') {
-                                            jumpIndex--;
-                                            this.inputResults[jumpIndex] = null;
-                                        }
-
-                                        this.currentIndex = jumpIndex;
-                                        this.schedulePositionUpdate();
-                                    }
-                                }
-                                return;
-                            }
-
-                            // Backspace normal di dalam kata
-                            this.currentIndex--;
-                            this.inputResults[this.currentIndex] = null;
                             this.schedulePositionUpdate();
+                            return;
                         }
+
+                        this.deleteOneStep();
                         return;
                     }
 
