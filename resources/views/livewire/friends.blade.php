@@ -70,7 +70,7 @@
             </div>
         @else
             <div class="flex flex-col items-center justify-center py-24 text-center select-none">
-                <img src="/icon/uetype_mascot.png" alt="" class="w-16 h-16 opacity-30 mb-4">
+                <img src="/icon/uetype_mascot.png" alt="" class="w-16 opacity-30 mb-4">
                 <p class="font-mono text-sm font-bold text-foreground">{{ __('friends.empty_friends_title') }}</p>
                 <p class="font-mono text-xs text-muted mt-1">{{ __('friends.empty_friends_body') }}</p>
                 <button wire:click="setTab('find')"
