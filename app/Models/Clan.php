@@ -13,9 +13,57 @@ class Clan extends Model
     protected $fillable = [
         'name',
         'tag',
+        'emblem',
+        'emblem_color',
+        'description',
         'leader_id',
         'power',
     ];
+
+    /**
+     * Power (rating Elo) mulai dari 1000. Level clan diturunkan MURNI dari power —
+     * tak ada kolom level tersimpan, jadi tak pernah out-of-sync. Tiap POWER_PER_LEVEL
+     * poti power menaikkan satu level; BASE_POWER = level 1.
+     */
+    public const BASE_POWER = 1000;
+
+    public const POWER_PER_LEVEL = 100;
+
+    public static function levelFromPower(int $power): int
+    {
+        $level = (int) floor(($power - self::BASE_POWER) / self::POWER_PER_LEVEL) + 1;
+
+        return max(1, $level);
+    }
+
+    public static function powerToReachLevel(int $level): int
+    {
+        return self::BASE_POWER + (max(1, $level) - 1) * self::POWER_PER_LEVEL;
+    }
+
+    /**
+     * Data level untuk presentasi (level, progres di level ini, dan berapa power
+     * yang dibutuhkan untuk naik). Meniru pola User::levelData(): satu sumber
+     * kebenaran, dipakai header show / kartu my-clan / baris leaderboard.
+     *
+     * @return array{level:int, power:int, progress:int, needed:int, next_level:int}
+     */
+    public function levelData(): array
+    {
+        $power = (int) ($this->power ?? self::BASE_POWER);
+        $level = self::levelFromPower($power);
+
+        $floor = self::powerToReachLevel($level);
+        $ceil = self::powerToReachLevel($level + 1);
+
+        return [
+            'level' => $level,
+            'power' => $power,
+            'progress' => max(0, $power - $floor),
+            'needed' => $ceil - $floor,
+            'next_level' => $level + 1,
+        ];
+    }
 
     public function leader(): BelongsTo
     {

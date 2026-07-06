@@ -1,4 +1,5 @@
-<div class="max-w-5xl px-4 mx-auto py-10 sm:px-6 lg:px-8">
+<div class="py-10">
+    <x-page-container>
 
     <h1 class="font-display text-fluid-title tracking-wide text-foreground mb-4">CLAN</h1>
 
@@ -42,21 +43,31 @@
     {{-- ===================================================================== --}}
     @if ($tab === 'my-clan')
         @if ($this->myClan)
-            <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl mb-6">
-                <div class="flex items-center justify-between flex-wrap gap-3">
-                    <div>
-                        <p class="font-mono text-lg font-bold text-foreground">
+            @php $lvl = $this->myClan->levelData(); @endphp
+            {{-- HERO CARD --}}
+            <div class="relative overflow-hidden p-5 sm:p-6 border bg-surface/70 border-white/10 rounded-3xl mb-6">
+                <div class="pointer-events-none absolute -top-16 -right-16 w-56 h-56 rounded-full bg-gold/5 blur-2xl"></div>
+                <div class="relative flex flex-col sm:flex-row sm:items-center gap-5">
+                    <x-clan-emblem :clan="$this->myClan" size="lg" />
+
+                    <div class="flex-1 min-w-0">
+                        <p class="font-mono text-xl font-bold text-foreground leading-tight">
                             {{ $this->myClan->name }}
-                            @if ($this->myClan->tag)
-                                <span class="text-muted font-normal">[{{ $this->myClan->tag }}]</span>
-                            @endif
+                            @if ($this->myClan->tag)<span class="text-muted font-normal">[{{ $this->myClan->tag }}]</span>@endif
                         </p>
-                        <p class="font-mono text-xs text-muted mt-0.5">
-                            {{ $this->myClanMembers->count() }} / {{ \App\Livewire\Clans::MAX_MEMBERS }} members
-                            · power <span class="text-gold font-bold">{{ number_format($this->myClan->power) }}</span>
-                        </p>
+                        @if ($this->myClan->description)
+                            <p class="font-mono text-xs text-muted mt-1 max-w-md">{{ $this->myClan->description }}</p>
+                        @endif
+                        <div class="flex flex-wrap items-center gap-2 mt-2.5">
+                            <span class="px-2.5 py-1 font-mono text-xs font-bold text-gold border border-gold/40 rounded-lg">Lv {{ $lvl['level'] }}</span>
+                            <span class="font-mono text-xs text-muted">
+                                {{ $this->myClanMembers->count() }} / {{ \App\Livewire\Clans::MAX_MEMBERS }} members
+                                · power <span class="text-gold font-bold">{{ number_format($this->myClan->power) }}</span>
+                            </span>
+                        </div>
                     </div>
-                    <div class="flex items-center gap-3">
+
+                    <div class="flex flex-wrap items-center gap-2 shrink-0">
                         <a href="{{ route('clan-war.index') }}" wire:navigate
                             class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
                             Clan War
@@ -72,6 +83,18 @@
                                 Leave Clan
                             </button>
                         @endif
+                    </div>
+                </div>
+
+                {{-- Bar progres level --}}
+                <div class="relative mt-5">
+                    <div class="flex justify-between font-mono text-[0.6rem] uppercase tracking-wider text-muted mb-1.5">
+                        <span>Lv {{ $lvl['level'] }}</span>
+                        <span>{{ $lvl['progress'] }} / {{ $lvl['needed'] }} power</span>
+                        <span>Lv {{ $lvl['next_level'] }}</span>
+                    </div>
+                    <div class="h-2 w-full rounded-full bg-white/5 overflow-hidden">
+                        <div class="h-full rounded-full bg-gold transition-all" style="width: {{ $lvl['needed'] > 0 ? min(100, round($lvl['progress'] / $lvl['needed'] * 100)) : 0 }}%"></div>
                     </div>
                 </div>
             </div>
@@ -107,7 +130,7 @@
             <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">Members ({{ $this->myClanMembers->count() }})</p>
             <div class="space-y-3">
                 @foreach ($this->myClanMembers as $member)
-                    <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl group" wire:key="member-{{ $member->id }}">
+                    <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl group hover:border-white/10 transition {{ $member->role->value === 'leader' ? 'ring-1 ring-gold/20' : '' }}" wire:key="member-{{ $member->id }}">
                         <a href="{{ route('profile.show', $member->user) }}" wire:navigate class="flex items-center gap-4 flex-1 min-w-0">
                             <x-friend-avatar :user="$member->user" />
                             <div class="flex-1 min-w-0">
@@ -116,7 +139,10 @@
                             </div>
                         </a>
                         @if ($member->role->value === 'leader')
-                            <span class="px-3 py-1 font-mono text-xs font-bold text-gold border border-gold/40 rounded-lg">Leader</span>
+                            <span class="px-3 py-1 font-mono text-xs font-bold text-gold border border-gold/40 rounded-lg inline-flex items-center gap-1.5 shrink-0">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M4 8l3.5 3L12 5l4.5 6L20 8l-1.5 10h-13L4 8z" /></svg>
+                                Leader
+                            </span>
                         @elseif ($this->myMembership->role->value === 'leader')
                             <button wire:click="kickMember({{ $member->id }})"
                                 wire:confirm="Keluarkan {{ $member->user->username }} dari clan?"
@@ -166,30 +192,32 @@
         @if ($this->browseClans->count() > 0)
             <div class="space-y-3">
                 @foreach ($this->browseClans as $row)
-                    <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl group" wire:key="clan-{{ $row['clan']->id }}">
-                        <a href="{{ route('clans.show', $row['clan']) }}" wire:navigate class="flex-1 min-w-0">
-                            <p class="font-mono text-sm font-bold text-foreground truncate group-hover:text-gold transition-colors">
-                                {{ $row['clan']->name }}
-                                @if ($row['clan']->tag)
-                                    <span class="text-muted font-normal">[{{ $row['clan']->tag }}]</span>
-                                @endif
-                            </p>
-                            <p class="font-mono text-xs text-muted mt-0.5">
-                                {{ $row['clan']->members_count }} / {{ \App\Livewire\Clans::MAX_MEMBERS }} members
-                                · power {{ number_format($row['clan']->power) }}
-                            </p>
+                    <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl group hover:border-white/10 transition" wire:key="clan-{{ $row['clan']->id }}">
+                        <a href="{{ route('clans.show', $row['clan']) }}" wire:navigate class="flex items-center gap-4 flex-1 min-w-0">
+                            <x-clan-emblem :clan="$row['clan']" size="sm" />
+                            <div class="flex-1 min-w-0">
+                                <p class="font-mono text-sm font-bold text-foreground truncate group-hover:text-gold transition-colors">
+                                    {{ $row['clan']->name }}
+                                    @if ($row['clan']->tag)<span class="text-muted font-normal">[{{ $row['clan']->tag }}]</span>@endif
+                                </p>
+                                <p class="font-mono text-xs text-muted mt-0.5">
+                                    Lv {{ $row['clan']->levelData()['level'] }}
+                                    · {{ $row['clan']->members_count }} / {{ \App\Livewire\Clans::MAX_MEMBERS }} members
+                                    · power {{ number_format($row['clan']->power) }}
+                                </p>
+                            </div>
                         </a>
 
                         @switch($row['relation'])
                             @case('member')
-                                <span class="px-4 py-1.5 font-mono text-xs font-bold text-gold border border-gold/40 rounded-lg">Joined</span>
+                                <span class="px-4 py-1.5 font-mono text-xs font-bold text-gold border border-gold/40 rounded-lg shrink-0">Joined</span>
                                 @break
                             @case('pending')
-                                <span class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg">Request Sent</span>
+                                <span class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg shrink-0">Request Sent</span>
                                 @break
                             @default
                                 <button wire:click="sendJoinRequest({{ $row['clan']->id }})"
-                                    class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
+                                    class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition shrink-0">
                                     + Join
                                 </button>
                         @endswitch
@@ -205,25 +233,75 @@
     {{-- TAB: CREATE CLAN --}}
     {{-- ===================================================================== --}}
     @if ($tab === 'create')
-        <form wire:submit.prevent="createClan" class="max-w-md space-y-4">
+        <form wire:submit.prevent="createClan" class="max-w-lg space-y-5">
+            {{-- Preview + identitas --}}
+            <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl">
+                <x-clan-emblem :clan="(object) ['name' => $newName ?: '?', 'emblem' => $newEmblem, 'emblem_color' => $newEmblemColor]" size="lg" />
+                <div class="min-w-0">
+                    <p class="font-mono text-sm font-bold text-foreground truncate">{{ $newName ?: 'Clan name' }}
+                        @if (trim($newTag) !== '')<span class="text-muted font-normal">[{{ $newTag }}]</span>@endif
+                    </p>
+                    <p class="font-mono text-xs text-muted mt-0.5 truncate">{{ $newDescription ?: 'Your clan preview' }}</p>
+                </div>
+            </div>
+
             <div>
                 <label class="font-mono text-xs uppercase tracking-widest text-muted">Clan Name</label>
-                <input type="text" wire:model="newName" maxlength="40"
+                <input type="text" wire:model.live="newName" maxlength="40"
                     placeholder="e.g. Speed Demons"
                     class="w-full mt-1.5 px-4 py-3 bg-surface/40 border border-white/10 rounded-xl font-mono text-sm text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
-                @error('newName')
-                    <p class="font-mono text-xs text-red-400 mt-1.5">{{ $message }}</p>
-                @enderror
+                @error('newName')<p class="font-mono text-xs text-red-400 mt-1.5">{{ $message }}</p>@enderror
             </div>
+
             <div>
                 <label class="font-mono text-xs uppercase tracking-widest text-muted">Tag (optional)</label>
-                <input type="text" wire:model="newTag" maxlength="6"
+                <input type="text" wire:model.live="newTag" maxlength="6"
                     placeholder="e.g. SPD"
                     class="w-full mt-1.5 px-4 py-3 bg-surface/40 border border-white/10 rounded-xl font-mono text-sm text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
-                @error('newTag')
-                    <p class="font-mono text-xs text-red-400 mt-1.5">{{ $message }}</p>
-                @enderror
+                @error('newTag')<p class="font-mono text-xs text-red-400 mt-1.5">{{ $message }}</p>@enderror
             </div>
+
+            <div>
+                <label class="font-mono text-xs uppercase tracking-widest text-muted">Description (optional)</label>
+                <textarea wire:model.live="newDescription" maxlength="160" rows="2"
+                    placeholder="What is your clan about?"
+                    class="w-full mt-1.5 px-4 py-3 bg-surface/40 border border-white/10 rounded-xl font-mono text-sm text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition resize-none"></textarea>
+                @error('newDescription')<p class="font-mono text-xs text-red-400 mt-1.5">{{ $message }}</p>@enderror
+            </div>
+
+            {{-- Pemilih emblem --}}
+            <div>
+                <label class="font-mono text-xs uppercase tracking-widest text-muted">Emblem</label>
+                <div class="mt-2 grid grid-cols-8 gap-2">
+                    @foreach (\App\Support\ClanEmblem::icons() as $key => $path)
+                        <button type="button" wire:click="$set('newEmblem', '{{ $key }}')"
+                            aria-label="{{ $key }}"
+                            @class([
+                                'aspect-square flex items-center justify-center rounded-lg border transition',
+                                'border-gold bg-gold/15 text-gold' => $newEmblem === $key,
+                                'border-white/10 text-muted hover:text-foreground hover:border-white/20' => $newEmblem !== $key,
+                            ])>
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="{{ $path }}" /></svg>
+                        </button>
+                    @endforeach
+                </div>
+                @error('newEmblem')<p class="font-mono text-xs text-red-400 mt-1.5">{{ $message }}</p>@enderror
+            </div>
+
+            {{-- Pemilih warna --}}
+            <div>
+                <label class="font-mono text-xs uppercase tracking-widest text-muted">Accent Color</label>
+                <div class="mt-2 flex flex-wrap gap-2.5">
+                    @foreach (\App\Support\ClanEmblem::colors() as $key => $hex)
+                        <button type="button" wire:click="$set('newEmblemColor', '{{ $key }}')"
+                            aria-label="{{ $key }}"
+                            class="w-8 h-8 rounded-full border-2 transition {{ $newEmblemColor === $key ? 'ring-2 ring-offset-2 ring-offset-background ring-white/60 border-white/60' : 'border-white/10 hover:border-white/30' }}"
+                            style="background-color: {{ $hex }};"></button>
+                    @endforeach
+                </div>
+                @error('newEmblemColor')<p class="font-mono text-xs text-red-400 mt-1.5">{{ $message }}</p>@enderror
+            </div>
+
             <button type="submit"
                 class="px-5 py-2.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
                 Create Clan
@@ -231,11 +309,7 @@
         </form>
     @endif
 
-    {{-- ===== REAL-TIME =====
-         Subscription Echo ke clan.{id} DIPEGANG oleh toast global di layout
-         (satu-satunya subscriber, agar tak dobel). Halaman ini cukup mendengar
-         event window 'clan-updated-remote' yang diteruskan toast lalu
-         menyegarkan datanya. --}}
+    {{-- ===== REAL-TIME ===== --}}
     @script
         <script>
             const onRemote = () => $wire.dispatch('clan-updated');
@@ -246,4 +320,5 @@
             }, { once: true });
         </script>
     @endscript
+    </x-page-container>
 </div>

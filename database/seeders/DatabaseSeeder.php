@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
         // User dummy + hasil typing untuk testing (login via /dev-login di env lokal).
         if (app()->environment('local')) {
             $this->call(DummyUserSeeder::class);
+            $this->call(DummyClanSeeder::class);
         }
     }
 }

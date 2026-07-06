@@ -7,7 +7,9 @@ use App\Enums\ClanRole;
 use App\Events\ClanUpdated;
 use App\Models\Clan;
 use App\Models\ClanMember;
+use App\Support\ClanEmblem;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -26,6 +28,12 @@ class Clans extends Component
     public string $newName = '';
 
     public string $newTag = '';
+
+    public string $newEmblem = ClanEmblem::DEFAULT_ICON;
+
+    public string $newEmblemColor = ClanEmblem::DEFAULT_COLOR;
+
+    public string $newDescription = '';
 
     public function mount(): void
     {
@@ -62,15 +70,22 @@ class Clans extends Component
 
         $name = trim($this->newName);
         $tag = trim($this->newTag) ?: null;
+        $description = trim($this->newDescription) ?: null;
 
         $this->validate([
             'newName' => ['required', 'string', 'min:3', 'max:40', 'unique:clans,name'],
             'newTag' => ['nullable', 'string', 'max:6'],
+            'newEmblem' => ['required', 'string', Rule::in(ClanEmblem::iconKeys())],
+            'newEmblemColor' => ['required', 'string', Rule::in(ClanEmblem::colorKeys())],
+            'newDescription' => ['nullable', 'string', 'max:160'],
         ], [], ['newName' => 'nama clan', 'newTag' => 'tag clan']);
 
         $clan = Clan::create([
             'name' => $name,
             'tag' => $tag,
+            'emblem' => $this->newEmblem,
+            'emblem_color' => $this->newEmblemColor,
+            'description' => $description,
             'leader_id' => Auth::id(),
         ]);
 
@@ -85,6 +100,9 @@ class Clans extends Component
 
         $this->newName = '';
         $this->newTag = '';
+        $this->newDescription = '';
+        $this->newEmblem = ClanEmblem::DEFAULT_ICON;
+        $this->newEmblemColor = ClanEmblem::DEFAULT_COLOR;
         $this->tab = 'my-clan';
     }
 
