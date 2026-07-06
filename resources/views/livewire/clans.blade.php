@@ -1,6 +1,6 @@
 <div class="max-w-5xl px-4 mx-auto py-10 sm:px-6 lg:px-8">
 
-    <h1 class="font-display text-2xl tracking-wide text-foreground mb-4">CLAN</h1>
+    <h1 class="font-display text-fluid-title tracking-wide text-foreground mb-4">CLAN</h1>
 
     <!-- ===== TABS ===== -->
     <div class="border-b border-white/10 mb-6">

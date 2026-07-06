@@ -1,7 +1,7 @@
 <div class="max-w-5xl px-4 mx-auto py-10 sm:px-6 lg:px-8">
 
-    <div class="flex items-center justify-between mb-6">
-        <h1 class="font-display text-2xl tracking-wide text-foreground">CLAN LEADERBOARD</h1>
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <h1 class="font-display text-fluid-title tracking-wide text-foreground">CLAN LEADERBOARD</h1>
         <a href="{{ route('clans.index') }}" wire:navigate class="font-mono text-xs text-muted hover:text-foreground transition">
             ← Back to Clan
         </a>

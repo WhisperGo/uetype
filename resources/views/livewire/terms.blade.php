@@ -1,9 +1,9 @@
 <div class="text-muted font-mono">
-    <div class="max-w-5xl mx-auto px-4 pt-10 pb-16">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-16">
 
         {{-- Header --}}
         <div class="mb-6">
-            <h1 class="text-3xl font-mono font-bold text-foreground mb-1">{{ __('terms.title') }}</h1>
+            <h1 class="text-fluid-title font-mono font-bold text-foreground mb-1">{{ __('terms.title') }}</h1>
             <p class="font-sans text-x-small text-muted">{{ __('terms.last_updated') }}</p>
         </div>
 

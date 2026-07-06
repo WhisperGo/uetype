@@ -68,7 +68,7 @@
                     </div>
                     <div class="pt-4 text-center border-t sm:text-right shrink-0 sm:border-t-0 sm:border-l border-white/10 sm:pt-0 sm:pl-6">
                         <p class="text-xs uppercase tracking-[0.2em] text-muted font-sans">ELO</p>
-                        <p class="mt-1 font-mono text-4xl font-bold leading-none text-gold">{{ $user->elo_rating ?? 0 }}</p>
+                        <p class="mt-1 font-mono text-3xl sm:text-4xl font-bold leading-none text-gold">{{ $user->elo_rating ?? 0 }}</p>
                         <p class="mt-1 text-xs text-muted">Ranking</p>
                     </div>
                 </div>

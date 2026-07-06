@@ -94,7 +94,7 @@
                 class="p-6 border bg-typing-surface/40 border-white/5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
                     <span class="text-xs font-mono tracking-widest text-typing-muted uppercase">{{ __('multiplayer.room_code_share') }}</span>
-                    <h2 class="text-4xl font-mono font-black tracking-[0.3em] text-white mt-1">
+                    <h2 class="text-fluid-title font-mono font-black tracking-[0.3em] text-white mt-1">
                         {{ $this->roomData->code }}</h2>
                 </div>
                 <button
@@ -161,7 +161,7 @@
                 </div>
             </div>
 
-            <div class="pt-6 border-t border-white/5 flex gap-4">
+            <div class="pt-6 border-t border-white/5 flex flex-wrap gap-3 sm:gap-4">
                 @if ($this->isHost)
                     <button wire:click="startRace" @disabled(!$this->allReady)
                         class="px-6 py-3 font-sans text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->allReady ? 'bg-[#cbb38a] hover:bg-[#bfa57a] text-black shadow-md' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5' }}">
@@ -232,7 +232,7 @@
             <template x-if="!raceStarted && !suddenDeathActive">
                 <div class="fixed inset-0 bg-typing-bg/95 flex flex-col items-center justify-center z-50 select-none">
                     <span class="font-mono text-xs uppercase tracking-[0.4em] text-typing-muted mb-4">{{ __('multiplayer.race_starting') }}</span>
-                    <div class="text-8xl font-sans font-black tracking-wider text-[#cbb38a] scale-110 transition-all duration-300"
+                    <div class="text-fluid-hero font-sans font-black tracking-wider text-[#cbb38a] scale-110 transition-all duration-300"
                         x-text="countdown"></div>
                 </div>
             </template>
@@ -361,7 +361,7 @@
 
             <!-- HEADER MATCH RESULT -->
             <div class="flex flex-col space-y-1">
-                <h1 class="text-4xl font-mono font-black text-[#cbb38a] tracking-wider uppercase">{{ __('multiplayer.match_result') }}</h1>
+                <h1 class="text-fluid-title font-mono font-black text-[#cbb38a] tracking-wider uppercase">{{ __('multiplayer.match_result') }}</h1>
                 @php
                     $myRank = $this->leaderboardData->search(fn($m) => $m->user_id === Auth::id()) + 1;
                     $suffix = match ($myRank) {
@@ -425,7 +425,7 @@
                         </div>
                     @endif
                     <div
-                        class="w-full h-32 bg-[#cbb38a] rounded-2xl flex items-center justify-center font-sans font-black text-5xl text-black shadow-lg">
+                        class="w-full h-32 bg-[#cbb38a] rounded-2xl flex items-center justify-center font-sans font-black text-3xl sm:text-5xl text-black shadow-lg">
                         1
                     </div>
                 </div>
@@ -458,16 +458,16 @@
             <div class="space-y-3">
                 <span class="text-[11px] font-mono uppercase tracking-[0.25em] text-typing-muted block mb-1">{{ __('multiplayer.full_results') }}</span>
                 <div
-                    class="w-full border border-white/5 rounded-2xl overflow-hidden bg-typing-surface/10 backdrop-blur-sm">
+                    class="w-full border border-white/5 rounded-2xl overflow-x-auto bg-typing-surface/10 backdrop-blur-sm">
                     <table class="w-full text-left font-mono text-sm border-collapse">
                         <thead>
                             <tr
                                 class="border-b border-white/5 bg-black/20 text-xs text-typing-muted uppercase tracking-wider">
-                                <th class="py-3.5 px-5 font-medium">{{ __('multiplayer.th_place') }}</th>
-                                <th class="py-3.5 px-5 font-medium">{{ __('multiplayer.th_player') }}</th>
-                                <th class="py-3.5 px-5 font-medium">{{ __('multiplayer.th_wpm') }}</th>
-                                <th class="py-3.5 px-5 font-medium">{{ __('multiplayer.th_accuracy') }}</th>
-                                <th class="py-3.5 px-5 font-medium">{{ __('multiplayer.th_time') }}</th>
+                                <th class="py-3.5 px-3 sm:px-5 font-medium">{{ __('multiplayer.th_place') }}</th>
+                                <th class="py-3.5 px-3 sm:px-5 font-medium">{{ __('multiplayer.th_player') }}</th>
+                                <th class="py-3.5 px-3 sm:px-5 font-medium">{{ __('multiplayer.th_wpm') }}</th>
+                                <th class="py-3.5 px-3 sm:px-5 font-medium">{{ __('multiplayer.th_accuracy') }}</th>
+                                <th class="py-3.5 px-3 sm:px-5 font-medium">{{ __('multiplayer.th_time') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-white/[0.03]">
@@ -484,7 +484,7 @@
                                 @endphp
                                 <tr
                                     class="transition duration-150 {{ $isMe ? 'bg-blue-950/40 text-white font-bold' : 'text-typing-muted hover:bg-white/[0.01]' }}">
-                                    <td class="py-4 px-5 font-bold text-white">{{ $pos }}{{ $suffix }}
+                                    <td class="py-4 px-3 sm:px-5 font-bold text-white">{{ $pos }}{{ $suffix }}
                                     </td>
                                     <td class="py-4 px-5">
                                         <div class="flex items-center gap-2">
@@ -495,7 +495,7 @@
                                             @endif
                                         </div>
                                     </td>
-                                    <td class="py-4 px-5 text-[#cbb38a] font-bold">{{ $rank->wpm }} wpm</td>
+                                    <td class="py-4 px-3 sm:px-5 text-[#cbb38a] font-bold">{{ $rank->wpm }} wpm</td>
                                     <td class="py-4 px-5">{{ $rank->accuracy ?? 97.0 }}%</td>
                                     <td class="py-4 px-5">
                                         @if ($rank->finished_time_seconds && $rank->finished_time_seconds != 999)
@@ -540,7 +540,7 @@
             @endif
 
             <!-- AKSI BUTTON MENU BAWAH -->
-            <div class="pt-2 flex gap-4">
+            <div class="pt-2 flex flex-wrap gap-3 sm:gap-4">
                 @if ($this->isHost)
                     <button wire:click="playAgain"
                         class="px-6 py-3 bg-[#cbb38a] hover:bg-[#bfa57a] text-black font-sans text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 shadow-md">

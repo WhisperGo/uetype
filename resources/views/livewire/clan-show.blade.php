@@ -11,7 +11,7 @@
     <div class="p-6 border bg-surface/70 border-white/10 rounded-3xl mb-8">
         <div class="flex items-center justify-between flex-wrap gap-4">
             <div>
-                <h1 class="font-display text-2xl tracking-wide text-foreground">
+                <h1 class="font-display text-fluid-title tracking-wide text-foreground">
                     {{ $clan->name }}
                     @if ($clan->tag)
                         <span class="text-muted text-lg">[{{ $clan->tag }}]</span>
@@ -20,7 +20,7 @@
                 <p class="font-mono text-xs text-muted mt-1">{{ $this->members->count() }} members</p>
             </div>
             <div class="text-right">
-                <p class="font-mono text-4xl font-bold leading-none text-gold tabular-nums">{{ number_format($clan->power) }}</p>
+                <p class="font-mono text-3xl sm:text-4xl font-bold leading-none text-gold tabular-nums">{{ number_format($clan->power) }}</p>
                 <p class="font-mono text-[0.6rem] uppercase tracking-wider text-muted mt-1">power</p>
             </div>
         </div>

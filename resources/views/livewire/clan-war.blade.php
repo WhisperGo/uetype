@@ -1,7 +1,7 @@
 <div class="max-w-5xl px-4 mx-auto py-10 sm:px-6 lg:px-8">
 
-    <div class="flex items-center justify-between mb-2">
-        <h1 class="font-display text-2xl tracking-wide text-foreground">CLAN WAR</h1>
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+        <h1 class="font-display text-fluid-title tracking-wide text-foreground">CLAN WAR</h1>
         <div class="flex items-center gap-4">
             <a href="{{ route('clan-leaderboard.index') }}" wire:navigate class="font-mono text-xs text-muted hover:text-foreground transition">
                 Leaderboard
@@ -87,7 +87,7 @@
                     </div>
                     <div class="text-right">
                         <p class="font-mono text-xs uppercase tracking-widest text-muted">Your Points</p>
-                        <p class="font-mono text-3xl font-bold text-gold tabular-nums">{{ rtrim(rtrim(number_format($this->myClanPoints, 1), '0'), '.') }}</p>
+                        <p class="font-mono text-2xl sm:text-3xl font-bold text-gold tabular-nums">{{ rtrim(rtrim(number_format($this->myClanPoints, 1), '0'), '.') }}</p>
                     </div>
                 </div>
             </div>

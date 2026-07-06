@@ -7,11 +7,11 @@
     langsung konten saja.
 --}}
 <div class="text-muted font-mono">
-    <div class="max-w-5xl mx-auto px-4 pt-10 pb-16">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-16">
 
         {{-- Header --}}
         <div class="mb-10">
-            <h1 class="text-3xl font-mono font-bold text-foreground mb-2">{{ __('about.title') }}</h1>
+            <h1 class="text-fluid-title font-mono font-bold text-foreground mb-2">{{ __('about.title') }}</h1>
             <p class="font-sans text-small text-muted">
                 {{ __('about.tagline') }}
             </p>
