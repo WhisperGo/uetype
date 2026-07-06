@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-sans font-semibold text-xl text-foreground tracking-tight leading-tight">
+        <h2 class="font-mono font-semibold text-xl text-foreground tracking-tight leading-tight">
             {{ __('Dasbor') }}
         </h2>
     </x-slot>

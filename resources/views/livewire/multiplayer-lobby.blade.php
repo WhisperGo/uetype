@@ -15,10 +15,10 @@
                 <div class="w-20 h-20 mb-6 flex items-center justify-center text-4xl transition duration-300">
                     <img src="/icon/uetype_mascot.png" alt="{{ __('multiplayer.create_room') }}">
                 </div>
-                <h3 class="text-xl font-sans font-bold tracking-wider text-typing-text mb-2 uppercase">{{ __('multiplayer.create_room') }}</h3>
+                <h3 class="text-xl font-mono font-bold tracking-wider text-typing-text mb-2 uppercase">{{ __('multiplayer.create_room') }}</h3>
                 <p class="text-sm text-typing-muted max-w-xs mb-8">{{ __('multiplayer.create_room_desc') }}</p>
                 <button wire:click="createRoom"
-                    class="px-6 py-3 bg-[#cbb38a] hover:bg-[#bfa57a] text-black font-sans font-bold uppercase tracking-wider rounded-xl transition duration-200 shadow-md">
+                    class="px-6 py-3 bg-[#cbb38a] hover:bg-[#bfa57a] text-black font-mono font-bold uppercase tracking-wider rounded-xl transition duration-200 shadow-md">
                     {{ __('multiplayer.create_room') }}
                 </button>
             </div>
@@ -27,7 +27,7 @@
                 class="hidden md:flex absolute inset-y-0 left-1/2 -translate-x-1/2 items-center justify-center pointer-events-none">
                 <div class="w-[1px] h-full bg-white/10 relative flex items-center justify-center">
                     <div
-                        class="absolute w-12 h-12 rounded-full border-2 border-[#cbb38a] bg-typing-bg flex items-center justify-center font-sans text-xs font-bold tracking-wider text-typing-text shadow-xl">
+                        class="absolute w-12 h-12 rounded-full border-2 border-[#cbb38a] bg-typing-bg flex items-center justify-center font-mono text-xs font-bold tracking-wider text-typing-text shadow-xl">
                         {{ __('multiplayer.or') }}
                     </div>
                 </div>
@@ -38,7 +38,7 @@
                 <div class="w-20 h-20 mb-6 flex items-center justify-center text-4xl transition duration-300">
                     <img src="/icon/uetype_mascot.png" alt="{{ __('multiplayer.join_room') }}">
                 </div>
-                <h3 class="text-xl font-sans font-bold tracking-wider text-typing-text mb-2 uppercase">{{ __('multiplayer.join_room') }}</h3>
+                <h3 class="text-xl font-mono font-bold tracking-wider text-typing-text mb-2 uppercase">{{ __('multiplayer.join_room') }}</h3>
                 <p class="text-sm text-typing-muted max-w-xs mb-6">{{ __('multiplayer.join_room_desc') }}</p>
 
                 <div class="flex gap-2 mb-6">
@@ -50,7 +50,7 @@
                 </div>
 
                 <button wire:click="joinRoom"
-                    class="px-8 py-3 border border-white/10 text-typing-text hover:bg-white/5 font-sans font-semibold uppercase tracking-wider rounded-xl transition duration-200">
+                    class="px-8 py-3 border border-white/10 text-typing-text hover:bg-white/5 font-mono font-semibold uppercase tracking-wider rounded-xl transition duration-200">
                     {{ __('multiplayer.join_room') }}
                 </button>
             </div>
@@ -99,7 +99,7 @@
                 </div>
                 <button
                     onclick="navigator.clipboard.writeText('{{ $this->roomData->code }}'); alert(@js(__('multiplayer.code_copied')))"
-                    class="px-5 py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 font-sans text-xs font-bold uppercase tracking-wider rounded-xl transition">
+                    class="px-5 py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 font-mono text-xs font-bold uppercase tracking-wider rounded-xl transition">
                     {{ __('multiplayer.copy_code') }}
                 </button>
             </div>
@@ -128,7 +128,7 @@
                                     @endif
                                 </div>
                                 <span
-                                    class="font-sans text-sm font-bold truncate max-w-[100px]">{{ $member->user->username }}</span>
+                                    class="font-mono text-sm font-bold truncate max-w-[100px]">{{ $member->user->username }}</span>
                                 <div class="mt-3 w-full">
                                     @if ($member->user_id === $this->roomData->host_id)
                                         <span
@@ -164,7 +164,7 @@
             <div class="pt-6 border-t border-white/5 flex flex-wrap gap-3 sm:gap-4">
                 @if ($this->isHost)
                     <button wire:click="startRace" @disabled(!$this->allReady)
-                        class="px-6 py-3 font-sans text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->allReady ? 'bg-[#cbb38a] hover:bg-[#bfa57a] text-black shadow-md' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5' }}">
+                        class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->allReady ? 'bg-[#cbb38a] hover:bg-[#bfa57a] text-black shadow-md' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5' }}">
                         {{ __('multiplayer.start_race') }}
                     </button>
                     @if (!$this->allReady)
@@ -172,13 +172,13 @@
                     @endif
                 @else
                     <button wire:click="toggleReady"
-                        class="px-6 py-3 font-sans text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-[#cbb38a] hover:bg-[#bfa57a] text-black' }}">
+                        class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-[#cbb38a] hover:bg-[#bfa57a] text-black' }}">
                         {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? __('multiplayer.im_not_ready') : __('multiplayer.im_ready') }}
                     </button>
                 @endif
 
                 <button wire:click="leaveRoom"
-                    class="px-6 py-3 bg-transparent border border-white/10 text-typing-muted hover:text-typing-text hover:bg-white/5 font-sans text-sm font-bold uppercase tracking-wider rounded-xl transition">
+                    class="px-6 py-3 bg-transparent border border-white/10 text-typing-muted hover:text-typing-text hover:bg-white/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition">
                     {{ __('multiplayer.leave_room') }}
                 </button>
             </div>
@@ -232,7 +232,7 @@
             <template x-if="!raceStarted && !suddenDeathActive">
                 <div class="fixed inset-0 bg-typing-bg/95 flex flex-col items-center justify-center z-50 select-none">
                     <span class="font-mono text-xs uppercase tracking-[0.4em] text-typing-muted mb-4">{{ __('multiplayer.race_starting') }}</span>
-                    <div class="text-fluid-hero font-sans font-black tracking-wider text-[#cbb38a] scale-110 transition-all duration-300"
+                    <div class="text-fluid-hero font-mono font-black tracking-wider text-[#cbb38a] scale-110 transition-all duration-300"
                         x-text="countdown"></div>
                 </div>
             </template>
@@ -347,7 +347,7 @@
 
                 <div class="pt-4 flex justify-end">
                     <button wire:click="leaveRoom"
-                        class="px-5 py-2.5 bg-red-950/20 border border-red-900/30 text-red-400 hover:bg-red-950/40 font-sans text-xs font-bold uppercase tracking-wider rounded-xl transition">
+                        class="px-5 py-2.5 bg-red-950/20 border border-red-900/30 text-red-400 hover:bg-red-950/40 font-mono text-xs font-bold uppercase tracking-wider rounded-xl transition">
                         {{ __('multiplayer.give_up') }}
                     </button>
                 </div>
@@ -405,7 +405,7 @@
                         </div>
                     @endif
                     <div
-                        class="w-full h-20 bg-transparent border-2 border-white/10 rounded-2xl flex items-center justify-center font-sans font-black text-3xl text-white/30">
+                        class="w-full h-20 bg-transparent border-2 border-white/10 rounded-2xl flex items-center justify-center font-mono font-black text-3xl text-white/30">
                         2
                     </div>
                 </div>
@@ -427,7 +427,7 @@
                         </div>
                     @endif
                     <div
-                        class="w-full h-32 bg-[#cbb38a] rounded-2xl flex items-center justify-center font-sans font-black text-3xl sm:text-5xl text-black shadow-lg">
+                        class="w-full h-32 bg-[#cbb38a] rounded-2xl flex items-center justify-center font-mono font-black text-3xl sm:text-5xl text-black shadow-lg">
                         1
                     </div>
                 </div>
@@ -449,7 +449,7 @@
                         </div>
                     @endif
                     <div
-                        class="w-full h-16 bg-transparent border-2 border-[#cbb38a]/20 rounded-2xl flex items-center justify-center font-sans font-black text-2xl text-[#cbb38a]/30">
+                        class="w-full h-16 bg-transparent border-2 border-[#cbb38a]/20 rounded-2xl flex items-center justify-center font-mono font-black text-2xl text-[#cbb38a]/30">
                         3
                     </div>
                 </div>
@@ -545,12 +545,12 @@
             <div class="pt-2 flex flex-wrap gap-3 sm:gap-4">
                 @if ($this->isHost)
                     <button wire:click="playAgain"
-                        class="px-6 py-3 bg-[#cbb38a] hover:bg-[#bfa57a] text-black font-sans text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 shadow-md">
+                        class="px-6 py-3 bg-[#cbb38a] hover:bg-[#bfa57a] text-black font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 shadow-md">
                         {{ __('multiplayer.play_again') }}
                     </button>
                 @endif
                 <button wire:click="leaveRoom"
-                    class="px-6 py-3 bg-transparent border border-white/10 text-typing-muted hover:text-typing-text hover:bg-white/5 font-sans text-sm font-bold uppercase tracking-wider rounded-xl transition">
+                    class="px-6 py-3 bg-transparent border border-white/10 text-typing-muted hover:text-typing-text hover:bg-white/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition">
                     {{ __('multiplayer.leave_room') }}
                 </button>
             </div>

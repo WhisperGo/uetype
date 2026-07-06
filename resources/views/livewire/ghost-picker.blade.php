@@ -2,7 +2,7 @@
     <x-modal name="ghost-picker" maxWidth="md" focusable>
         <div class="p-6 space-y-5">
             <div class="flex items-center justify-between">
-                <h3 class="font-sans text-lg font-bold text-foreground">{{ __('ghost.title') }}</h3>
+                <h3 class="font-mono text-lg font-bold text-foreground">{{ __('ghost.title') }}</h3>
                 <button type="button" x-on:click="$dispatch('close-modal', 'ghost-picker')"
                     class="text-muted hover:text-foreground transition-colors" aria-label="{{ __('ghost.close') }}">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

@@ -9,11 +9,11 @@
     <title>{{ config('app.name', 'UEType') }}</title>
     @include('partials.favicon')
 
-    <!-- Fonts: Space Grotesk untuk UI/heading, JetBrains Mono untuk area mengetik -->
+    <!-- Fonts: JetBrains Mono untuk semua teks readable; Pixelify Sans & Press Start 2P untuk aksen game -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Pixelify+Sans:wght@400..700&family=Press+Start+2P&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Pixelify+Sans:wght@400..700&family=Press+Start+2P&display=swap"
         rel="stylesheet">
 
     <!-- Scripts -->
@@ -22,7 +22,7 @@
     @livewireScripts
 </head>
 
-<body class="font-sans antialiased text-foreground bg-background selection:bg-brand selection:text-foreground">
+<body class="font-mono antialiased text-foreground bg-background selection:bg-brand selection:text-foreground">
     <div class="min-h-screen flex flex-col bg-background">
         @include('layouts.navigation')
 

@@ -12,18 +12,18 @@
         {{-- Header --}}
         <div class="mb-10">
             <h1 class="text-fluid-title font-mono font-bold text-foreground mb-2">{{ __('about.title') }}</h1>
-            <p class="font-sans text-small text-muted">
+            <p class="font-mono text-small text-muted">
                 {{ __('about.tagline') }}
             </p>
         </div>
 
         {{-- What is uetype --}}
         <div class="mb-10">
-            <h2 class="text-x-small font-sans uppercase tracking-[0.25em] text-muted mb-3">
+            <h2 class="text-x-small font-mono uppercase tracking-[0.25em] text-muted mb-3">
                 {{ __('about.what_is') }}
             </h2>
             <div class="rounded-xl border border-border bg-surface/60 px-5 py-4">
-                <p class="font-sans text-small text-muted leading-relaxed">
+                <p class="font-mono text-small text-muted leading-relaxed">
                     {{ __('about.what_is_body') }}
                 </p>
             </div>
@@ -31,7 +31,7 @@
 
         {{-- The team --}}
         <div class="mb-10">
-            <h2 class="text-x-small font-sans uppercase tracking-[0.25em] text-muted mb-3">
+            <h2 class="text-x-small font-mono uppercase tracking-[0.25em] text-muted mb-3">
                 {{ __('about.team') }}
             </h2>
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -56,10 +56,10 @@
                                 {{ $initial }}
                             </div>
                         @endif
-                        <span class="font-sans text-small text-foreground font-bold">
+                        <span class="font-mono text-small text-foreground font-bold">
                             {{ $member['name'] }}
                         </span>
-                        <span class="font-sans text-x-small text-muted mt-1">
+                        <span class="font-mono text-x-small text-muted mt-1">
                             {{ $member['role'] }}
                         </span>
                     </div>
@@ -69,20 +69,20 @@
 
         {{-- Built with --}}
         <div class="mb-10">
-            <h2 class="text-x-small font-sans uppercase tracking-[0.25em] text-muted mb-3">
+            <h2 class="text-x-small font-mono uppercase tracking-[0.25em] text-muted mb-3">
                 {{ __('about.built_with') }}
             </h2>
             <div class="flex flex-wrap gap-2">
                 @foreach ($stack as $tech)
                     <span
-                        class="px-3 py-1.5 rounded-full border border-border bg-surface text-x-small font-sans text-muted">
+                        class="px-3 py-1.5 rounded-full border border-border bg-surface text-x-small font-mono text-muted">
                         {{ $tech }}
                     </span>
                 @endforeach
             </div>
         </div>
 
-        <p class="font-sans text-x-small text-muted/70">
+        <p class="font-mono text-x-small text-muted/70">
             {{ __('about.disclaimer') }}
         </p>
     </div>

@@ -45,7 +45,7 @@ new class extends Component
 <section class="space-y-6">
     <header class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-            <h2 class="font-sans text-lg font-semibold text-foreground">
+            <h2 class="font-mono text-lg font-semibold text-foreground">
                 {{ __('history.title') }}
             </h2>
             <p class="mt-1 text-sm text-muted">
@@ -53,7 +53,7 @@ new class extends Component
             </p>
         </div>
         <div>
-            <select wire:model.live="filterMode" class="bg-background/60 border-white/10 text-foreground focus:border-brand focus:ring-brand rounded-lg shadow-sm font-sans text-sm">
+            <select wire:model.live="filterMode" class="bg-background/60 border-white/10 text-foreground focus:border-brand focus:ring-brand rounded-lg shadow-sm font-mono text-sm">
                 <option value="all">{{ __('history.filter_all') }}</option>
                 <option value="time">Time</option>
                 <option value="words">Words</option>
@@ -66,15 +66,15 @@ new class extends Component
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div class="bg-surface/40 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-            <span class="text-xs font-sans font-semibold text-muted uppercase tracking-[0.15em]">{{ __('history.total_tests') }}</span>
+            <span class="text-xs font-mono font-semibold text-muted uppercase tracking-[0.15em]">{{ __('history.total_tests') }}</span>
             <span class="text-2xl sm:text-3xl font-bold font-mono text-brand-bright tabular-nums mt-2">{{ $totalMatches }}</span>
         </div>
         <div class="bg-surface/40 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-            <span class="text-xs font-sans font-semibold text-muted uppercase tracking-[0.15em]">{{ __('history.avg_wpm') }}</span>
+            <span class="text-xs font-mono font-semibold text-muted uppercase tracking-[0.15em]">{{ __('history.avg_wpm') }}</span>
             <span class="text-2xl sm:text-3xl font-bold font-mono text-gold mt-2">{{ $averageWpm }}</span>
         </div>
         <div class="bg-surface/40 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-            <span class="text-xs font-sans font-semibold text-muted uppercase tracking-[0.15em]">{{ __('history.avg_accuracy') }}</span>
+            <span class="text-xs font-mono font-semibold text-muted uppercase tracking-[0.15em]">{{ __('history.avg_accuracy') }}</span>
             <span class="text-2xl sm:text-3xl font-bold font-mono text-gold mt-2">{{ $averageAccuracy }}%</span>
         </div>
     </div>
@@ -82,7 +82,7 @@ new class extends Component
     <div class="overflow-hidden bg-surface/40 border border-white/5 rounded-2xl">
         <div class="overflow-x-auto">
             <table class="w-full text-sm text-left">
-                <thead class="text-xs text-muted uppercase tracking-wider font-sans bg-white/5">
+                <thead class="text-xs text-muted uppercase tracking-wider font-mono bg-white/5">
                     <tr>
                         <th scope="col" class="px-3 sm:px-6 py-3 font-semibold">{{ __('history.th_date') }}</th>
                         <th scope="col" class="px-3 sm:px-6 py-3 font-semibold">{{ __('history.th_mode') }}</th>
@@ -99,7 +99,7 @@ new class extends Component
                                 @localtime($result->created_at, 'd M Y, H:i')
                             </td>
                             <td class="px-3 sm:px-6 py-4">
-                                <span class="bg-brand/15 text-brand-bright text-xs font-sans font-medium px-2.5 py-0.5 rounded capitalize">
+                                <span class="bg-brand/15 text-brand-bright text-xs font-mono font-medium px-2.5 py-0.5 rounded capitalize">
                                     {{ ucfirst($result->mode?->value ?? '-') }}{{ $result->mode_config ? ' '.$result->mode_config : '' }}
                                 </span>
                             </td>
@@ -118,7 +118,7 @@ new class extends Component
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-muted font-sans">
+                            <td colspan="6" class="px-6 py-8 text-center text-muted font-mono">
                                 {{ __('history.empty') }}
                             </td>
                         </tr>

@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-sans text-xl font-semibold tracking-tight text-foreground">
+        <h2 class="font-mono text-xl font-semibold tracking-tight text-foreground">
             {{ __('profile.header') }}
         </h2>
     </x-slot>
@@ -36,7 +36,7 @@
 
                     <div class="flex-1">
                         <div class="flex flex-wrap items-center gap-3">
-                            <h1 class="font-sans text-2xl font-bold text-foreground">{{ $user->username }}</h1>
+                            <h1 class="font-mono text-2xl font-bold text-foreground">{{ $user->username }}</h1>
                             @if($user->clan)
                                 <span class="px-2 py-0.5 rounded-md bg-brand/15 text-brand-bright text-xs font-mono font-semibold">
                                     [{{ $user->clan->tag }}] {{ ucfirst($user->clan_role ?? __('profile.clan_role_member')) }}
@@ -59,7 +59,7 @@
                         </div>
                     </div>
                     <div class="pt-4 text-center border-t sm:text-right shrink-0 sm:border-t-0 sm:border-l border-white/10 sm:pt-0 sm:pl-6">
-                        <p class="text-xs uppercase tracking-[0.2em] text-muted font-sans">{{ __('profile.elo') }}</p>
+                        <p class="text-xs uppercase tracking-[0.2em] text-muted font-mono">{{ __('profile.elo') }}</p>
                         <p class="mt-1 font-mono text-3xl sm:text-4xl font-bold leading-none text-gold">{{ $user->elo_rating ?? 0 }}</p>
                         <p class="mt-1 text-xs text-muted">{{ __('profile.ranking') }}</p>
                     </div>
@@ -71,12 +71,12 @@
                 <nav class="flex gap-6 -mb-px" aria-label="Tabs">
                     <button @click="activeTab = 'stats'"
                             :class="activeTab === 'stats' ? 'border-brand-bright text-brand-bright' : 'border-transparent text-muted hover:text-foreground'"
-                            class="px-1 py-3 font-sans text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
+                            class="px-1 py-3 font-mono text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
                         {{ __('profile.tab.stats') }}
                     </button>
                     <button @click="activeTab = 'BestRecords'"
                             :class="activeTab === 'BestRecords' ? 'border-brand-bright text-brand-bright' : 'border-transparent text-muted hover:text-foreground'"
-                            class="px-1 py-3 font-sans text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
+                            class="px-1 py-3 font-mono text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
                         {{ __('profile.tab.best_records') }}
                     </button>
                 </nav>
@@ -96,7 +96,7 @@
                     @endphp
                     @foreach($cards as $card)
                         <div class="p-5 border bg-surface/60 border-white/5 rounded-2xl">
-                            <p class="text-xs uppercase tracking-[0.15em] text-muted font-sans mb-1">{{ $card['label'] }}</p>
+                            <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ $card['label'] }}</p>
                             <p class="text-3xl font-bold font-mono tabular-nums {{ $card['accent'] }}">{{ $card['value'] }}</p>
                         </div>
                     @endforeach
@@ -104,25 +104,25 @@
 
                 <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-sans mb-1">{{ __('profile.card.total_time') }}</p>
+                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ __('profile.card.total_time') }}</p>
                         <p class="font-mono text-2xl font-bold text-foreground tabular-nums">{{ $timeLabel }}</p>
                     </div>
                     <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-sans mb-1">XP</p>
+                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">XP</p>
                         <p class="font-mono text-2xl font-bold text-gold tabular-nums">{{ $user->total_xp ?? 0 }}</p>
                     </div>
                     <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-sans mb-1">{{ __('profile.card.coins') }}</p>
+                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ __('profile.card.coins') }}</p>
                         <p class="font-mono text-2xl font-bold text-gold tabular-nums">{{ $user->coins ?? 0 }}</p>
                     </div>
                     <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-sans mb-1">{{ __('profile.card.best_wpm') }}</p>
+                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ __('profile.card.best_wpm') }}</p>
                         <p class="font-mono text-2xl font-bold text-brand-bright tabular-nums">{{ $stats['best_wpm'] }}</p>
                     </div>
                 </div>
 
                 <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl sm:p-6">
-                    <h3 class="mb-4 font-sans text-sm font-semibold text-foreground">{{ __('profile.wpm_progress') }}</h3>
+                    <h3 class="mb-4 font-mono text-sm font-semibold text-foreground">{{ __('profile.wpm_progress') }}</h3>
                     @if(count($wpmProgress) >= 2)
                         <div class="w-full h-48" wire:ignore>
                             <canvas id="profileWpmChart"></canvas>
@@ -133,12 +133,12 @@
                 </div>
 
                 <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl sm:p-6">
-                    <h3 class="mb-4 font-sans text-sm font-semibold text-foreground">{{ __('profile.recent_matches') }}</h3>
+                    <h3 class="mb-4 font-mono text-sm font-semibold text-foreground">{{ __('profile.recent_matches') }}</h3>
                     @if(isset($recentMatches) && $recentMatches->count() > 0)
                         <div class="overflow-x-auto">
                             <table class="w-full text-left">
                                 <thead>
-                                    <tr class="font-sans text-xs tracking-wider uppercase text-muted">
+                                    <tr class="font-mono text-xs tracking-wider uppercase text-muted">
                                         <th class="pb-3 font-semibold">{{ __('profile.th_date') }}</th>
                                         <th class="pb-3 font-semibold">{{ __('profile.th_mode') }}</th>
                                         <th class="pb-3 font-semibold text-right">{{ __('profile.th_wpm') }}</th>
@@ -182,7 +182,7 @@
 
                 <div class="overflow-hidden border bg-surface/40 border-white/5 rounded-2xl">
                     <button @click="openMode = (openMode === 'time' ? '' : 'time')"
-                            class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
+                            class="flex items-center justify-between w-full p-5 font-mono text-left transition-colors hover:bg-white/5">
                         <div class="flex items-center gap-3">
                             <span class="text-xl">⏱️</span>
                             <div>
@@ -213,7 +213,7 @@
 
                 <div class="overflow-hidden border bg-surface/40 border-white/5 rounded-2xl">
                     <button @click="openMode = (openMode === 'words' ? '' : 'words')"
-                            class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
+                            class="flex items-center justify-between w-full p-5 font-mono text-left transition-colors hover:bg-white/5">
                         <div class="flex items-center gap-3">
                             <span class="text-xl">🔤</span>
                             <div>
@@ -244,7 +244,7 @@
 
                 <div class="overflow-hidden border bg-surface/40 border-white/5 rounded-2xl">
                     <button @click="openMode = (openMode === 'survival' ? '' : 'survival')"
-                            class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
+                            class="flex items-center justify-between w-full p-5 font-mono text-left transition-colors hover:bg-white/5">
                         <div class="flex items-center gap-3">
                             <span class="text-xl">❤️</span>
                             <div>
@@ -276,7 +276,7 @@
                 @if($quoteRecords->count() > 0)
                 <div class="overflow-hidden border bg-surface/40 border-white/5 rounded-2xl">
                     <button @click="openMode = (openMode === 'quote' ? '' : 'quote')"
-                            class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
+                            class="flex items-center justify-between w-full p-5 font-mono text-left transition-colors hover:bg-white/5">
                         <div class="flex items-center gap-3">
                             <span class="text-xl">💬</span>
                             <div>

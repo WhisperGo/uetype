@@ -4,7 +4,7 @@
             <a href="{{ route('friends.index') }}" class="text-muted hover:text-foreground transition" aria-label="{{ __('Kembali') }}">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
             </a>
-            <h2 class="font-sans text-xl font-semibold tracking-tight text-foreground">
+            <h2 class="font-mono text-xl font-semibold tracking-tight text-foreground">
                 {{ __('Profil Pemain') }}
             </h2>
         </div>
@@ -39,7 +39,7 @@
 
                     <div class="flex-1">
                         <div class="flex flex-wrap items-center gap-3">
-                            <h1 class="font-sans text-2xl font-bold text-foreground">{{ $user->username }}</h1>
+                            <h1 class="font-mono text-2xl font-bold text-foreground">{{ $user->username }}</h1>
                             @if($user->clan)
                                 <span class="px-2 py-0.5 rounded-md bg-brand/15 text-brand-bright text-xs font-mono font-semibold">
                                     [{{ $user->clan->tag }}] {{ ucfirst($user->clan_role ?? 'member') }}
@@ -67,7 +67,7 @@
                         </div>
                     </div>
                     <div class="pt-4 text-center border-t sm:text-right shrink-0 sm:border-t-0 sm:border-l border-white/10 sm:pt-0 sm:pl-6">
-                        <p class="text-xs uppercase tracking-[0.2em] text-muted font-sans">ELO</p>
+                        <p class="text-xs uppercase tracking-[0.2em] text-muted font-mono">ELO</p>
                         <p class="mt-1 font-mono text-3xl sm:text-4xl font-bold leading-none text-gold">{{ $user->elo_rating ?? 0 }}</p>
                         <p class="mt-1 text-xs text-muted">Ranking</p>
                     </div>
@@ -79,12 +79,12 @@
                 <nav class="flex gap-6 -mb-px" aria-label="Tabs">
                     <button @click="activeTab = 'stats'"
                             :class="activeTab === 'stats' ? 'border-brand-bright text-brand-bright' : 'border-transparent text-muted hover:text-foreground'"
-                            class="px-1 py-3 font-sans text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
+                            class="px-1 py-3 font-mono text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
                         Statistik
                     </button>
                     <button @click="activeTab = 'BestRecords'"
                             :class="activeTab === 'BestRecords' ? 'border-brand-bright text-brand-bright' : 'border-transparent text-muted hover:text-foreground'"
-                            class="px-1 py-3 font-sans text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
+                            class="px-1 py-3 font-mono text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
                         Rekor Terbaik
                     </button>
                 </nav>
@@ -105,7 +105,7 @@
                     @endphp
                     @foreach($cards as $card)
                         <div class="p-5 border bg-surface/60 border-white/5 rounded-2xl">
-                            <p class="text-xs uppercase tracking-[0.15em] text-muted font-sans mb-1">{{ $card['label'] }}</p>
+                            <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ $card['label'] }}</p>
                             <p class="text-3xl font-bold font-mono tabular-nums {{ $card['accent'] }}">{{ $card['value'] }}</p>
                         </div>
                     @endforeach
@@ -113,21 +113,21 @@
 
                 <div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
                     <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-sans mb-1">Total Waktu</p>
+                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">Total Waktu</p>
                         <p class="font-mono text-2xl font-bold text-foreground tabular-nums">{{ $timeLabel }}</p>
                     </div>
                     <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-sans mb-1">Level</p>
+                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">Level</p>
                         <p class="font-mono text-2xl font-bold text-gold tabular-nums">{{ $stats['level'] }}</p>
                     </div>
                     <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-sans mb-1">Best WPM</p>
+                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">Best WPM</p>
                         <p class="font-mono text-2xl font-bold text-brand-bright tabular-nums">{{ $stats['best_wpm'] }}</p>
                     </div>
                 </div>
 
                 <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl sm:p-6">
-                    <h3 class="mb-4 font-sans text-sm font-semibold text-foreground">Progres WPM (tes terakhir)</h3>
+                    <h3 class="mb-4 font-mono text-sm font-semibold text-foreground">Progres WPM (tes terakhir)</h3>
                     @if(count($wpmProgress) >= 2)
                         <div class="w-full h-48" wire:ignore>
                             <canvas id="profileWpmChart"></canvas>
@@ -138,12 +138,12 @@
                 </div>
 
                 <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl sm:p-6">
-                    <h3 class="mb-4 font-sans text-sm font-semibold text-foreground">Riwayat Pertandingan Terakhir</h3>
+                    <h3 class="mb-4 font-mono text-sm font-semibold text-foreground">Riwayat Pertandingan Terakhir</h3>
                     @if(isset($recentMatches) && $recentMatches->count() > 0)
                         <div class="overflow-x-auto">
                             <table class="w-full text-left">
                                 <thead>
-                                    <tr class="font-sans text-xs tracking-wider uppercase text-muted">
+                                    <tr class="font-mono text-xs tracking-wider uppercase text-muted">
                                         <th class="pb-3 font-semibold">Tanggal</th>
                                         <th class="pb-3 font-semibold">Mode</th>
                                         <th class="pb-3 font-semibold text-right">WPM</th>
@@ -187,7 +187,7 @@
 
                 <div class="overflow-hidden border bg-surface/40 border-white/5 rounded-2xl">
                     <button @click="openMode = (openMode === 'time' ? '' : 'time')"
-                            class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
+                            class="flex items-center justify-between w-full p-5 font-mono text-left transition-colors hover:bg-white/5">
                         <div class="flex items-center gap-3">
                             <span class="text-xl">⏱️</span>
                             <div>
@@ -218,7 +218,7 @@
 
                 <div class="overflow-hidden border bg-surface/40 border-white/5 rounded-2xl">
                     <button @click="openMode = (openMode === 'words' ? '' : 'words')"
-                            class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
+                            class="flex items-center justify-between w-full p-5 font-mono text-left transition-colors hover:bg-white/5">
                         <div class="flex items-center gap-3">
                             <span class="text-xl">🔤</span>
                             <div>
@@ -249,7 +249,7 @@
 
                 <div class="overflow-hidden border bg-surface/40 border-white/5 rounded-2xl">
                     <button @click="openMode = (openMode === 'survival' ? '' : 'survival')"
-                            class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
+                            class="flex items-center justify-between w-full p-5 font-mono text-left transition-colors hover:bg-white/5">
                         <div class="flex items-center gap-3">
                             <span class="text-xl">❤️</span>
                             <div>
@@ -281,7 +281,7 @@
                 @if($quoteRecords->count() > 0)
                 <div class="overflow-hidden border bg-surface/40 border-white/5 rounded-2xl">
                     <button @click="openMode = (openMode === 'quote' ? '' : 'quote')"
-                            class="flex items-center justify-between w-full p-5 font-sans text-left transition-colors hover:bg-white/5">
+                            class="flex items-center justify-between w-full p-5 font-mono text-left transition-colors hover:bg-white/5">
                         <div class="flex items-center gap-3">
                             <span class="text-xl">💬</span>
                             <div>

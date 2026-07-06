@@ -21,7 +21,7 @@
 
 <div class="mt-8">
     <a href="{{ route('auth.google') }}"
-        class="group flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-surface px-4 py-3.5 font-sans text-sm font-semibold text-foreground transition duration-200 hover:border-white/20 hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+        class="group flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-surface px-4 py-3.5 font-mono text-sm font-semibold text-foreground transition duration-200 hover:border-white/20 hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" viewBox="0 0 24 24">
             <path fill="#4285F4"
                 d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.53-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-8.17z" />

@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-sans text-xl font-semibold tracking-tight text-foreground">
+        <h2 class="font-mono text-xl font-semibold tracking-tight text-foreground">
             {{ __('achievements.header') }}
         </h2>
     </x-slot>
@@ -28,7 +28,7 @@
             <!-- Heading + progress -->
             <div class="space-y-3">
                 <div>
-                    <h1 class="font-sans text-fluid-title font-bold text-foreground">{{ __('achievements.header') }}</h1>
+                    <h1 class="font-mono text-fluid-title font-bold text-foreground">{{ __('achievements.header') }}</h1>
                     <p class="mt-1 font-mono text-sm text-muted">
                         {{ __('achievements.unlocked_count', ['count' => $earnedCount, 'total' => $total]) }}
                     </p>
@@ -47,7 +47,7 @@
                         :class="filter === '{{ $cat['key'] }}'
                             ? 'bg-brand-bright text-background border-brand-bright'
                             : 'bg-surface/60 text-muted border-white/10 hover:text-foreground hover:border-white/20'"
-                        class="px-4 py-1.5 rounded-lg border font-sans text-xs font-semibold transition-colors">
+                        class="px-4 py-1.5 rounded-lg border font-mono text-xs font-semibold transition-colors">
                         {{ __('achievements.categories.'.$cat['key']) }}
                     </button>
                 @endforeach
@@ -75,7 +75,7 @@
 
                         <!-- Text -->
                         <div class="min-w-0">
-                            <h3 class="font-sans text-sm font-bold text-foreground truncate">{{ __('achievements.defs.'.$a['key'].'.title') }}</h3>
+                            <h3 class="font-mono text-sm font-bold text-foreground truncate">{{ __('achievements.defs.'.$a['key'].'.title') }}</h3>
                             <p class="mt-0.5 font-mono text-xs text-muted truncate">{{ __('achievements.defs.'.$a['key'].'.description') }}</p>
                             @if ($a['earned'])
                                 <p class="mt-1 flex items-center gap-1 font-mono text-[0.7rem] text-gold">

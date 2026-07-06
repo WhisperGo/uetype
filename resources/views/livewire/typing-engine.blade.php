@@ -45,7 +45,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
                     </svg>
-                    <span class="font-sans">{{ session('result_rejected') }}</span>
+                    <span class="font-mono">{{ session('result_rejected') }}</span>
                 </div>
             @endif
 
@@ -104,7 +104,7 @@
                         :class="ghostActive ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">
                         {{ __('typing.ghost') }}
                         <template x-if="ghostActive">
-                            <span class="text-[0.6rem] font-sans normal-case tracking-normal opacity-80" x-text="@js(__('typing.ghost_vs', ['label' => ''])) + ghostLabel"></span>
+                            <span class="text-[0.6rem] font-mono normal-case tracking-normal opacity-80" x-text="@js(__('typing.ghost_vs', ['label' => ''])) + ghostLabel"></span>
                         </template>
                     </button>
                 </div>
@@ -345,7 +345,7 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                             </svg>
-                            <span class="font-sans text-xs uppercase tracking-widest">{{ __('typing.war_locked_restart') }}</span>
+                            <span class="font-mono text-xs uppercase tracking-widest">{{ __('typing.war_locked_restart') }}</span>
                         </div>
                     </div>
                 @else
@@ -356,10 +356,10 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
-                        <span class="font-sans text-xs uppercase tracking-widest">{{ __('typing.restart') }}</span>
-                        <kbd class="font-sans text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">tab</kbd>
-                        <span class="font-sans text-[0.6rem] text-muted">{{ __('typing.then') }}</span>
-                        <kbd class="font-sans text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">enter</kbd>
+                        <span class="font-mono text-xs uppercase tracking-widest">{{ __('typing.restart') }}</span>
+                        <kbd class="font-mono text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">tab</kbd>
+                        <span class="font-mono text-[0.6rem] text-muted">{{ __('typing.then') }}</span>
+                        <kbd class="font-mono text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">enter</kbd>
                     </button>
                 @endif
             </div>

@@ -56,12 +56,12 @@
                 <div class="relative overflow-hidden rounded-3xl border border-border bg-surface/60 px-8 py-10 text-center">
                     <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-danger to-transparent opacity-70"></div>
 
-                    <p class="font-sans text-xs uppercase tracking-[0.35em] text-danger/80 mb-4">{{ __('result.game_over') }}</p>
+                    <p class="font-mono text-xs uppercase tracking-[0.35em] text-danger/80 mb-4">{{ __('result.game_over') }}</p>
 
                     <div class="flex flex-col items-center gap-1">
                         <span class="font-display text-fluid-hero text-gold leading-none tabular-nums"
                             x-text="clock">{{ sprintf('%d:%02d', $mins, $secs) }}</span>
-                        <span class="font-sans text-xs uppercase tracking-[0.3em] text-muted mt-3">{{ __('result.survived') }}</span>
+                        <span class="font-mono text-xs uppercase tracking-[0.3em] text-muted mt-3">{{ __('result.survived') }}</span>
                     </div>
 
                     <div class="mt-6 flex items-center justify-center gap-2 text-x-small">
@@ -94,7 +94,7 @@
                     @endphp
                     @foreach ($survivalStats as [$label, $value, $tone])
                         <div class="rounded-2xl bg-surface/70 border border-white/5 p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ $label }}</span>
+                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ $label }}</span>
                             <span class="text-xl sm:text-2xl font-bold font-mono leading-none tabular-nums {{ $tone }}">{{ $value }}</span>
                         </div>
                     @endforeach
@@ -105,7 +105,7 @@
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="flex flex-col gap-2">
-                                    <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
+                                    <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
                                     <span class="text-xl sm:text-2xl font-bold font-mono text-brand-bright leading-none">+{{ $xpEarned }} XP</span>
                                 </div>
                                 <div class="text-right font-mono text-xs text-muted leading-relaxed">
@@ -122,7 +122,7 @@
                 @endauth
 
                 <a id="restartButton" href="/typing"
-                    class="inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-sans font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition">
+                    class="inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-mono font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition">
                     <span>{{ __('result.play_again') }}</span>
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
@@ -142,7 +142,7 @@
                     <p class="font-mono text-xs uppercase tracking-[0.2em] text-muted mb-2">{{ $modeLabel }}</p>
                     <div class="flex items-end gap-3">
                         <span class="font-display text-fluid-hero text-gold leading-none tabular-nums">{{ $heroValue }}</span>
-                        <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted pb-1.5">{{ $heroLabel }}</span>
+                        <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted pb-1.5">{{ $heroLabel }}</span>
                     </div>
                     @if ($isPersonalBest)
                         <p class="mt-3 flex items-center gap-1.5 text-sm text-gold font-mono">
@@ -167,50 +167,50 @@
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     @if ($isSurvival)
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.avg_wpm') }}</span>
+                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.avg_wpm') }}</span>
                             <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $wpm }}</span>
                         </div>
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.accuracy') }}</span>
+                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.accuracy') }}</span>
                             <span class="text-xl sm:text-2xl text-gold font-bold font-mono leading-none tabular-nums">{{ $accuracy }}<span class="text-lg">%</span></span>
                         </div>
                         @if (!is_null($consistency))
                             <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                                <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.consistency') }}</span>
+                                <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.consistency') }}</span>
                                 <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $consistency }}<span class="text-lg">%</span></span>
                             </div>
                         @endif
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.characters') }}</span>
+                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.characters') }}</span>
                             <span class="text-xl sm:text-2xl font-bold font-mono leading-none tabular-nums">
                                 <span class="text-foreground">{{ $correctKeystrokes }}</span><span class="text-muted"> / </span><span class="text-danger">{{ $incorrectKeystrokes }}</span>
                             </span>
                         </div>
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.difficulty') }}</span>
+                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.difficulty') }}</span>
                             <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none capitalize">{{ $subMode }}</span>
                         </div>
                     @else
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.raw_wpm') }}</span>
+                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.raw_wpm') }}</span>
                             <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $rawWpm }}</span>
                         </div>
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.accuracy') }}</span>
+                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.accuracy') }}</span>
                             <span class="text-xl sm:text-2xl text-gold font-bold font-mono leading-none tabular-nums">{{ $accuracy }}<span class="text-lg">%</span></span>
                         </div>
                         @if (!is_null($consistency))
                             <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                                <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.consistency') }}</span>
+                                <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.consistency') }}</span>
                                 <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $consistency }}<span class="text-lg">%</span></span>
                             </div>
                         @endif
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.duration') }}</span>
+                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.duration') }}</span>
                             <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ round($time, 1) }}<span class="text-lg text-muted">s</span></span>
                         </div>
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2 {{ is_null($consistency) ? 'col-span-2 sm:col-span-1' : '' }}">
-                            <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.characters') }}</span>
+                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.characters') }}</span>
                             <span class="text-xl sm:text-2xl font-bold font-mono leading-none tabular-nums">
                                 <span class="text-foreground">{{ $correctKeystrokes }}</span><span class="text-muted"> / </span><span class="text-danger">{{ $incorrectKeystrokes }}</span>
                             </span>
@@ -224,7 +224,7 @@
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="flex flex-col gap-2">
-                                    <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
+                                    <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
                                     <span class="text-xl sm:text-2xl font-bold font-mono text-brand leading-none">+{{ $xpEarned }} XP</span>
                                 </div>
                                 <div class="text-right font-mono text-xs text-muted leading-relaxed">
@@ -243,7 +243,7 @@
                 <!-- Tombol aksi -->
                 <div class="flex items-stretch gap-3">
                     <a id="restartButton" href="/typing"
-                        class="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-sans font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition"
+                        class="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-mono font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition"
                         title="{{ $isSurvival ? __('result.play_again_title') : __('result.next_test_title') }}">
                         <span>{{ $isSurvival ? __('result.play_again') : __('result.next_test') }}</span>
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -252,7 +252,7 @@
                     </a>
                     @unless ($isSurvival)
                         <a href="/typing"
-                            class="inline-flex items-center justify-center h-12 px-6 rounded-2xl bg-surface border border-white/5 text-foreground/80 hover:text-foreground hover:border-white/10 font-sans font-semibold text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-border transition"
+                            class="inline-flex items-center justify-center h-12 px-6 rounded-2xl bg-surface border border-white/5 text-foreground/80 hover:text-foreground hover:border-white/10 font-mono font-semibold text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-border transition"
                             title="{{ __('result.retry_title') }}">
                             {{ __('result.retry') }}
                         </a>
@@ -262,7 +262,7 @@
 
             <!-- ===== KOLOM KANAN: chart ===== -->
             <div class="bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6">
-                <h3 class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-3">{{ $isSurvival ? __('result.chart_stamina') : __('result.chart_performance') }}</h3>
+                <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-muted mb-3">{{ $isSurvival ? __('result.chart_stamina') : __('result.chart_performance') }}</h3>
                 <div class="w-full h-72 lg:h-96" wire:ignore>
                     <canvas id="wpmChart"></canvas>
                 </div>
@@ -379,7 +379,7 @@
 
         <div
             class="mt-8 bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6 flex flex-col items-center gap-2">
-            <h3 class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-4 self-start">{{ __('result.error_heatmap') }}</h3>
+            <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-muted mb-4 self-start">{{ __('result.error_heatmap') }}</h3>
             <div class="w-full overflow-x-auto">
             <div class="flex flex-col gap-2 md:gap-3 w-max mx-auto">
                 @foreach ($keyboard as $rowIndex => $row)

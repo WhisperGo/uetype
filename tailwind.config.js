@@ -62,7 +62,7 @@ export default {
             },
 
             fontFamily: {
-                sans: ['"Space Grotesk"', ...defaultTheme.fontFamily.sans],
+                sans: ['"JetBrains Mono"', ...defaultTheme.fontFamily.mono],
                 mono: ['"JetBrains Mono"', ...defaultTheme.fontFamily.mono],
                 pixel: ['"Pixelify Sans"', ...defaultTheme.fontFamily.sans],
                 display: ['"Press Start 2P"', ...defaultTheme.fontFamily.mono],
