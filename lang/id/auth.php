@@ -18,6 +18,7 @@ return [
         'subtitle' => 'Nama ini akan tampil di profil dan papan skor UETYPE.',
         'label' => 'Nama pengguna',
         'placeholder' => 'contoh: ksatria_ketik',
+        'hint' => 'Minimal 3 karakter - hanya huruf, angka, strip, dan garis bawah.',
         'cancel' => 'Batal',
         'finish' => 'Selesaikan',
         'taken' => 'Nama pengguna ini sudah dipakai, cari nama lain!',

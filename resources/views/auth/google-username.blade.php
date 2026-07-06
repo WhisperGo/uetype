@@ -22,7 +22,9 @@
         <div>
             <x-input-label for="username" :value="__('auth.username.label')" />
             <x-text-input id="username" class="block mt-1 w-full font-mono" type="text" name="username"
-                :value="old('username')" required autofocus autocomplete="off" :placeholder="__('auth.username.placeholder')" />
+                :value="old('username')" required autofocus autocomplete="off" minlength="3" maxlength="20"
+                :placeholder="__('auth.username.placeholder')" />
+            <p class="mt-2 font-mono text-xs text-muted">{{ __('auth.username.hint') }}</p>
             <x-input-error :messages="$errors->get('username')" class="mt-2" />
         </div>
 

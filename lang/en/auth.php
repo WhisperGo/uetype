@@ -18,6 +18,7 @@ return [
         'subtitle' => 'This name will appear on your UETYPE profile and leaderboards.',
         'label' => 'Username',
         'placeholder' => 'e.g. typing_knight',
+        'hint' => 'At least 3 characters - letters, numbers, dashes, and underscores only.',
         'cancel' => 'Cancel',
         'finish' => 'Finish',
         'taken' => 'That username is already taken, pick another one!',
