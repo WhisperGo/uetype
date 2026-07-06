@@ -318,7 +318,9 @@
                     <template x-for="(word, wIdx) in words" :key="wIdx">
                         <span
                             :class="{
-                                'text-emerald-400': wIdx < currentWordIndex,
+                                'text-emerald-400': wIdx < currentWordIndex && !wordHadError[wIdx],
+                                'text-amber-500/80 underline underline-offset-4 decoration-2 decoration-amber-500/50': wIdx <
+                                    currentWordIndex && wordHadError[wIdx],
                                 'text-red-400 bg-red-950/40 ring-1 ring-red-500/30 px-1 rounded underline underline-offset-4 decoration-2': wIdx ===
                                     currentWordIndex && hasError,
                                 'text-white font-bold ring-1 ring-white/10 bg-white/5 px-1 rounded': wIdx ===
@@ -621,6 +623,11 @@
                     totalKeystrokes: 0,
                     totalMistakes: 0,
                     prevTypedLength: 0,
+                    // Index = urutan kata, true kalau kata itu dilewati dengan salah/belum
+                    // lengkap (space ditekan tanpa exact match). Dipakai visual saja --
+                    // menandai kata yang SUDAH terlewati tapi sempat salah, beda dari kata
+                    // yang benar (hijau) supaya pemain bisa lihat sepintas riwayat errornya.
+                    wordHadError: [],
 
                     // Progress & WPM pemain LOKAL, reaktif -> dibaca oleh lane maskot
                     // sendiri (self) di view. Diperbarui tiap checkInput().
@@ -892,23 +899,66 @@
                         }, delay);
                     },
 
+                    // Permisif seperti Solo (typing-engine.blade.php): spasi SELALU
+                    // memindahkan ke kata berikutnya, tak pernah mengunci pemain di
+                    // kata yang salah/belum lengkap. Sisa huruf yang salah/belum
+                    // diketik dicatat sebagai mistake (mempengaruhi akurasi), tapi
+                    // progres tetap jalan -- filosofi: jangan blokir, cukup catat.
                     handleSpace(e) {
                         if (this.lockedByTimeout || this.isFinished || !this.raceStarted) return;
 
                         let targetWord = this.words[this.currentWordIndex];
 
-                        // Lock on error: hanya pindah kata jika cocok persis.
-                        if (this.typedText === targetWord) {
+                        // Cegah spam spasi di kata kosong (sejalan dgn guard Solo):
+                        // jangan biarkan "melompat" kata tanpa mengetik apa pun.
+                        if (this.typedText.length === 0) {
                             e.preventDefault();
-                            this.correctCharsFromPastWords += targetWord.length + 1;
-                            this.currentWordIndex++;
-                            this.typedText = '';
-                            this.hasError = false;
-                            this.prevTypedLength = 0;
-                            this.checkInput();
-                        } else {
-                            e.preventDefault();
+                            return;
                         }
+
+                        e.preventDefault();
+
+                        const isExactMatch = this.typedText === targetWord;
+                        this.wordHadError[this.currentWordIndex] = !isExactMatch;
+
+                        if (!isExactMatch) {
+                            // Huruf di ekor kata yang belum "dibayar" sebagai keystroke
+                            // (belum diketik sama sekali) dihitung sbg mistake tambahan.
+                            // Mismatch pada huruf yang SUDAH diketik sudah dihitung saat
+                            // checkInput() -- tak dobel-hitung di sini.
+                            const missingCount = Math.max(0, targetWord.length - this.typedText.length);
+                            this.totalKeystrokes += missingCount;
+                            this.totalMistakes += missingCount;
+                        }
+
+                        this.correctCharsFromPastWords += targetWord.length + 1;
+                        this.currentWordIndex++;
+                        this.typedText = '';
+                        this.hasError = false;
+                        this.prevTypedLength = 0;
+
+                        // Kata terakhir: dulu hanya selesai lewat checkInput() saat huruf
+                        // terakhir pas persis (tak akan pernah terpicu kalau kata terakhir
+                        // salah/belum lengkap) -- sekarang finish juga bisa lewat spasi.
+                        if (this.currentWordIndex >= this.words.length) {
+                            this.isFinished = true;
+                            this.progressPercent = 100;
+
+                            const accuracyPercent = this.totalKeystrokes > 0
+                                ? Math.round(((this.totalKeystrokes - this.totalMistakes) / this.totalKeystrokes) * 100)
+                                : 100;
+                            const timePassedMinutes = (Date.now() - this.startTime) / 60000;
+                            const liveWpm = timePassedMinutes > 0
+                                ? Math.floor((this.correctCharsFromPastWords / 5) / timePassedMinutes)
+                                : 0;
+                            this.liveWpm = liveWpm;
+
+                            this.publishLocal(100, liveWpm, true);
+                            this.emitProgress(100, liveWpm, accuracyPercent, true);
+                            return;
+                        }
+
+                        this.checkInput();
                     },
                 }));
             };
