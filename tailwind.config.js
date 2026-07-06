@@ -79,6 +79,11 @@ export default {
                 body: ['16px', { lineHeight: '1' }],
                 small: ['13.33px', { lineHeight: '1' }],
                 'x-small': ['11.11px', { lineHeight: '1' }],
+
+                'fluid-type': ['clamp(1.375rem, 1.1rem + 1.4vw, 1.875rem)', { lineHeight: '1.6' }],
+                'fluid-title': ['clamp(1.5rem, 1.2rem + 1.5vw, 2rem)', { lineHeight: '1.15' }],
+                'fluid-timer': ['clamp(2.25rem, 1.5rem + 3.75vw, 3rem)', { lineHeight: '1' }],
+                'fluid-hero': ['clamp(2.75rem, 1.5rem + 6.25vw, 4.5rem)', { lineHeight: '1' }],
             },
 
             boxShadow: {

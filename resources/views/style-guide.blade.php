@@ -154,6 +154,55 @@
         </div>
     </section>
 
+    {{-- Responsive --}}
+    <section class="space-y-8">
+        <h2 class="font-pixel text-h5 text-foreground">Responsive</h2>
+        <p class="text-muted text-small">Acuan tunggal untuk penyesuaian layar. Mobile-first: kelas dasar = mobile, dinaikkan lewat breakpoint.</p>
+
+        <div class="space-y-3">
+            <h3 class="text-small uppercase tracking-[0.2em] text-muted">Breakpoint</h3>
+            <div class="overflow-x-auto rounded-xl border border-border/40 bg-surface">
+                <table class="w-full text-left text-small">
+                    <thead class="text-x-small uppercase tracking-[0.15em] text-muted border-b border-border/40">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold">Prefix</th>
+                            <th class="px-4 py-3 font-semibold">Min width</th>
+                            <th class="px-4 py-3 font-semibold">Target</th>
+                        </tr>
+                    </thead>
+                    <tbody class="font-mono text-foreground">
+                        @foreach ([['sm', '640px', 'HP lanskap / tablet kecil'], ['md', '768px', 'Tablet potrait'], ['lg', '1024px', 'Tablet lanskap / laptop'], ['xl', '1280px', 'Desktop'], ['2xl', '1536px', 'Layar besar']] as [$prefix, $min, $target])
+                            <tr class="border-t border-border/30">
+                                <td class="px-4 py-2.5 text-gold">{{ $prefix }}:</td>
+                                <td class="px-4 py-2.5 text-muted">{{ $min }}</td>
+                                <td class="px-4 py-2.5 text-muted">{{ $target }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="space-y-3">
+            <h3 class="text-small uppercase tracking-[0.2em] text-muted">Tipografi fluid (clamp)</h3>
+            <p class="text-muted text-x-small">Untuk teks kunci yang harus menyesuaikan lebar layar dengan mulus (tanpa loncatan breakpoint). Teks sekunder tetap pakai skala token (h1–x-small).</p>
+            <div class="space-y-4 rounded-xl border border-border/40 bg-surface p-6">
+                @foreach ([['text-fluid-hero', 'Hero — WPM hasil, countdown'], ['text-fluid-timer', 'Angka besar — timer'], ['text-fluid-title', 'Judul halaman (h1)'], ['text-fluid-type', 'Area kata yang diketik']] as [$cls, $desc])
+                    <div class="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-4">
+                        <span class="w-40 shrink-0 font-mono text-x-small text-muted">{{ $cls }}</span>
+                        <span class="{{ $cls }} font-mono text-foreground truncate">UeType</span>
+                        <span class="font-mono text-x-small text-muted/70">{{ $desc }}</span>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+        <div class="space-y-3">
+            <h3 class="text-small uppercase tracking-[0.2em] text-muted">Container standar</h3>
+            <p class="text-muted text-x-small">Gunakan <span class="font-mono text-foreground">&lt;x-page-container&gt;</span> untuk halaman list/konten. Default <span class="font-mono text-foreground">max-w-5xl</span> + padding <span class="font-mono text-foreground">px-4 sm:px-6 lg:px-8</span>. Override lebar via <span class="font-mono text-foreground">width="max-w-4xl"</span>.</p>
+        </div>
+    </section>
+
     <footer class="pt-8 border-t border-border/40 text-x-small text-muted">
         UeType Design System · tema default "moonlight".
     </footer>
