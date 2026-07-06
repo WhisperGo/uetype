@@ -59,7 +59,7 @@
                     <p class="font-sans text-xs uppercase tracking-[0.35em] text-danger/80 mb-4">{{ __('result.game_over') }}</p>
 
                     <div class="flex flex-col items-center gap-1">
-                        <span class="font-display text-5xl md:text-6xl text-gold leading-none tabular-nums"
+                        <span class="font-display text-fluid-hero text-gold leading-none tabular-nums"
                             x-text="clock">{{ sprintf('%d:%02d', $mins, $secs) }}</span>
                         <span class="font-sans text-xs uppercase tracking-[0.3em] text-muted mt-3">{{ __('result.survived') }}</span>
                     </div>
@@ -95,7 +95,7 @@
                     @foreach ($survivalStats as [$label, $value, $tone])
                         <div class="rounded-2xl bg-surface/70 border border-white/5 p-4 flex flex-col gap-2">
                             <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ $label }}</span>
-                            <span class="text-2xl font-bold font-mono leading-none tabular-nums {{ $tone }}">{{ $value }}</span>
+                            <span class="text-xl sm:text-2xl font-bold font-mono leading-none tabular-nums {{ $tone }}">{{ $value }}</span>
                         </div>
                     @endforeach
                 </div>
@@ -106,7 +106,7 @@
                             <div class="flex items-start justify-between mb-3">
                                 <div class="flex flex-col gap-2">
                                     <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
-                                    <span class="text-2xl font-bold font-mono text-brand-bright leading-none">+{{ $xpEarned }} XP</span>
+                                    <span class="text-xl sm:text-2xl font-bold font-mono text-brand-bright leading-none">+{{ $xpEarned }} XP</span>
                                 </div>
                                 <div class="text-right font-mono text-xs text-muted leading-relaxed">
                                     <div>{{ number_format($levelData['progress']) }} / {{ number_format($levelData['needed']) }} XP</div>
@@ -141,7 +141,7 @@
                 <div>
                     <p class="font-mono text-xs uppercase tracking-[0.2em] text-muted mb-2">{{ $modeLabel }}</p>
                     <div class="flex items-end gap-3">
-                        <span class="font-display text-6xl md:text-7xl text-gold leading-none tabular-nums">{{ $heroValue }}</span>
+                        <span class="font-display text-fluid-hero text-gold leading-none tabular-nums">{{ $heroValue }}</span>
                         <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted pb-1.5">{{ $heroLabel }}</span>
                     </div>
                     @if ($isPersonalBest)
@@ -168,50 +168,50 @@
                     @if ($isSurvival)
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
                             <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.avg_wpm') }}</span>
-                            <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $wpm }}</span>
+                            <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $wpm }}</span>
                         </div>
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
                             <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.accuracy') }}</span>
-                            <span class="text-2xl text-gold font-bold font-mono leading-none tabular-nums">{{ $accuracy }}<span class="text-lg">%</span></span>
+                            <span class="text-xl sm:text-2xl text-gold font-bold font-mono leading-none tabular-nums">{{ $accuracy }}<span class="text-lg">%</span></span>
                         </div>
                         @if (!is_null($consistency))
                             <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
                                 <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.consistency') }}</span>
-                                <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $consistency }}<span class="text-lg">%</span></span>
+                                <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $consistency }}<span class="text-lg">%</span></span>
                             </div>
                         @endif
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
                             <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.characters') }}</span>
-                            <span class="text-2xl font-bold font-mono leading-none tabular-nums">
+                            <span class="text-xl sm:text-2xl font-bold font-mono leading-none tabular-nums">
                                 <span class="text-foreground">{{ $correctKeystrokes }}</span><span class="text-muted"> / </span><span class="text-danger">{{ $incorrectKeystrokes }}</span>
                             </span>
                         </div>
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
                             <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.difficulty') }}</span>
-                            <span class="text-2xl text-foreground font-bold font-mono leading-none capitalize">{{ $subMode }}</span>
+                            <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none capitalize">{{ $subMode }}</span>
                         </div>
                     @else
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
                             <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.raw_wpm') }}</span>
-                            <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $rawWpm }}</span>
+                            <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $rawWpm }}</span>
                         </div>
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
                             <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.accuracy') }}</span>
-                            <span class="text-2xl text-gold font-bold font-mono leading-none tabular-nums">{{ $accuracy }}<span class="text-lg">%</span></span>
+                            <span class="text-xl sm:text-2xl text-gold font-bold font-mono leading-none tabular-nums">{{ $accuracy }}<span class="text-lg">%</span></span>
                         </div>
                         @if (!is_null($consistency))
                             <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
                                 <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.consistency') }}</span>
-                                <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $consistency }}<span class="text-lg">%</span></span>
+                                <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $consistency }}<span class="text-lg">%</span></span>
                             </div>
                         @endif
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
                             <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.duration') }}</span>
-                            <span class="text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ round($time, 1) }}<span class="text-lg text-muted">s</span></span>
+                            <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ round($time, 1) }}<span class="text-lg text-muted">s</span></span>
                         </div>
                         <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2 {{ is_null($consistency) ? 'col-span-2 sm:col-span-1' : '' }}">
                             <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.characters') }}</span>
-                            <span class="text-2xl font-bold font-mono leading-none tabular-nums">
+                            <span class="text-xl sm:text-2xl font-bold font-mono leading-none tabular-nums">
                                 <span class="text-foreground">{{ $correctKeystrokes }}</span><span class="text-muted"> / </span><span class="text-danger">{{ $incorrectKeystrokes }}</span>
                             </span>
                         </div>
@@ -225,7 +225,7 @@
                             <div class="flex items-start justify-between mb-3">
                                 <div class="flex flex-col gap-2">
                                     <span class="font-sans text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
-                                    <span class="text-2xl font-bold font-mono text-brand leading-none">+{{ $xpEarned }} XP</span>
+                                    <span class="text-xl sm:text-2xl font-bold font-mono text-brand leading-none">+{{ $xpEarned }} XP</span>
                                 </div>
                                 <div class="text-right font-mono text-xs text-muted leading-relaxed">
                                     <div>{{ number_format($levelData['progress']) }} / {{ number_format($levelData['needed']) }} XP</div>
@@ -380,7 +380,8 @@
         <div
             class="mt-8 bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6 flex flex-col items-center gap-2">
             <h3 class="font-sans text-xs uppercase tracking-[0.2em] text-muted mb-4 self-start">{{ __('result.error_heatmap') }}</h3>
-            <div class="flex flex-col gap-2 md:gap-3">
+            <div class="w-full overflow-x-auto">
+            <div class="flex flex-col gap-2 md:gap-3 w-max mx-auto">
                 @foreach ($keyboard as $rowIndex => $row)
                     <div class="flex justify-center gap-2 md:gap-3" style="margin-left: {{ $rowIndex * 1.5 }}rem;">
                         @foreach ($row as $key)
@@ -406,6 +407,7 @@
                         @endforeach
                     </div>
                 @endforeach
+            </div>
             </div>
         </div>
 
