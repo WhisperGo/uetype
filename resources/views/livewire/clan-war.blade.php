@@ -16,7 +16,7 @@
 
     @if (! $this->myClan)
         <div class="flex flex-col items-center justify-center py-24 text-center select-none">
-            <img src="/icon/uetype_mascot.png" alt="" class="w-16 h-16 opacity-30 mb-4">
+            <img src="/icon/uetype_mascot.png" alt="" class="w-16 opacity-30 mb-4">
             <p class="font-mono text-sm font-bold text-foreground">Join a clan first</p>
             <p class="font-mono text-xs text-muted mt-1">Clan War hanya bisa diikuti kalau kamu sudah tergabung di sebuah clan</p>
             <a href="{{ route('clans.index') }}" wire:navigate
