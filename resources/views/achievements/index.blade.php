@@ -54,7 +54,7 @@
             </div>
 
             <!-- Achievement grid -->
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 @foreach ($achievements as $a)
                     <div x-show="visible('{{ $a['category'] }}')" x-transition.opacity
                         class="flex items-center gap-4 p-4 border rounded-2xl transition
