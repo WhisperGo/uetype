@@ -232,6 +232,7 @@
                     });
                 }
             </script>
+
             {{-- ===== HEARTBEAT PRESENCE =====
                  Ping ringan ke /heartbeat tiap ~30 detik menandai user masih
                  online (last_seen_at diperbarui). Server menyiarkan ke teman

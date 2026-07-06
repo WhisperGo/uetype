@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ClanMemberStatus;
 use App\Enums\FriendshipStatus;
 use App\Events\PresenceUpdated;
+use App\Support\SafeBroadcast;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -240,7 +241,7 @@ class User extends Authenticatable
             ->get()
             ->each(function (Friendship $f) {
                 $friendId = $f->requester_id === $this->id ? $f->addressee_id : $f->requester_id;
-                broadcast(new PresenceUpdated($friendId));
+                SafeBroadcast::run(fn () => broadcast(new PresenceUpdated($friendId)));
             });
     }
 

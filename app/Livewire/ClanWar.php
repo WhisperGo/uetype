@@ -12,6 +12,7 @@ use App\Models\ClanWar as ClanWarModel;
 use App\Models\ClanWarModeClaim;
 use App\Services\ClanWarModeCatalog;
 use App\Services\ClanWarResolver;
+use App\Support\SafeBroadcast;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -338,7 +339,7 @@ class ClanWar extends Component
 
     private function notify(int $otherUserId, ?array $notification = null): void
     {
-        broadcast(new ClanUpdated($otherUserId, $notification));
+        SafeBroadcast::run(fn () => broadcast(new ClanUpdated($otherUserId, $notification)));
     }
 
     public function render()
