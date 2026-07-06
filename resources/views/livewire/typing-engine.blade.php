@@ -36,7 +36,7 @@
                 })()
             };`"></div>
 
-        <div class="max-w-5xl mx-auto px-4 pt-10 pb-16">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10 pb-12 sm:pb-16">
 
             @if (session('result_rejected'))
                 <div
@@ -89,18 +89,18 @@
                     <button type="button" aria-label="{{ __('typing.aria.mode_standard') }}"
                         :aria-pressed="['time','words','quote'].includes(currentMain)"
                         @click.prevent="if(!['time','words','quote'].includes(currentMain)){ currentMain='time'; currentSub='30'; $wire.setMode('time','30'); } $el.blur()"
-                        class="px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        class="px-3 sm:px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand"
                         :class="['time','words','quote'].includes(currentMain) ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">{{ __('typing.standard') }}</button>
 
                     <button type="button" aria-label="{{ __('typing.aria.mode_survival') }}"
                         :aria-pressed="currentMain === 'survival'"
                         @click.prevent="currentMain='survival'; currentSub='medium'; $wire.setMode('survival','medium'); $el.blur()"
-                        class="px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        class="px-3 sm:px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand"
                         :class="currentMain === 'survival' ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">{{ __('typing.survival') }}</button>
 
                     <button type="button" aria-label="{{ __('typing.aria.mode_ghost') }}"
                         @click.prevent="$dispatch('open-modal', 'ghost-picker'); $el.blur()"
-                        class="px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand inline-flex items-center gap-1.5"
+                        class="px-3 sm:px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand inline-flex items-center gap-1.5"
                         :class="ghostActive ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">
                         {{ __('typing.ghost') }}
                         <template x-if="ghostActive">
@@ -110,16 +110,16 @@
                 </div>
 
                 <!-- Row 2: Config (Standard → Time/Words/Quote + durasi; Survival → difficulty) -->
-                <div class="flex items-center gap-1.5 min-h-[34px] text-small font-mono"
+                <div class="flex flex-wrap items-center justify-center gap-1.5 min-h-[34px] text-small font-mono"
                     role="group" aria-label="{{ __('typing.aria.mode_config') }}">
                     <!-- STANDARD: pemilih tipe + sub-konfigurasi -->
                     <template x-if="['time','words','quote'].includes(currentMain)">
-                        <div class="flex items-center gap-1.5">
+                        <div class="flex flex-wrap items-center justify-center gap-1.5">
                             @foreach (['time' => __('typing.type_time'), 'words' => __('typing.type_words'), 'quote' => __('typing.type_quote')] as $type => $label)
                                 <button type="button" aria-label="{{ __('typing.aria.type', ['label' => $label]) }}"
                                     :aria-pressed="currentMain === '{{ $type }}'"
                                     @click.prevent="currentMain='{{ $type }}'; currentSub='{{ $type === 'time' ? '15' : ($type === 'words' ? '25' : 'medium') }}'; $wire.setMode('{{ $type }}', currentSub); $el.blur()"
-                                    class="px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-brand"
+                                    class="px-3 sm:px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-brand"
                                     :class="currentMain === '{{ $type }}' ? 'bg-elevated border-border text-foreground font-bold' : 'border-border text-muted hover:text-foreground'">{{ $label }}</button>
                             @endforeach
 
@@ -131,7 +131,7 @@
                                         <button type="button" aria-label="{{ __('typing.aria.duration_seconds', ['seconds' => $t]) }}"
                                             :aria-pressed="currentSub == '{{ $t }}'"
                                             @click.prevent="currentSub='{{ $t }}'; $wire.setMode('time','{{ $t }}'); $el.blur()"
-                                            class="px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-gold"
+                                            class="px-3 sm:px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-gold"
                                             :class="currentSub == '{{ $t }}' ? 'bg-gold border-gold text-background font-bold' : 'border-border text-muted hover:text-foreground'">{{ $t }}s</button>
                                     @endforeach
                                 </div>
@@ -142,7 +142,7 @@
                                         <button type="button" aria-label="{{ __('typing.aria.words_count', ['count' => $w]) }}"
                                             :aria-pressed="currentSub == '{{ $w }}'"
                                             @click.prevent="currentSub='{{ $w }}'; $wire.setMode('words','{{ $w }}'); $el.blur()"
-                                            class="px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-gold"
+                                            class="px-3 sm:px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-gold"
                                             :class="currentSub == '{{ $w }}' ? 'bg-gold border-gold text-background font-bold' : 'border-border text-muted hover:text-foreground'">{{ $w }}</button>
                                     @endforeach
                                 </div>
@@ -160,7 +160,7 @@
                                 <button type="button" aria-label="{{ __('typing.aria.difficulty', ['level' => $d]) }}"
                                     :aria-pressed="currentSub == '{{ $d }}'"
                                     @click.prevent="currentSub='{{ $d }}'; $wire.setMode('survival','{{ $d }}'); $el.blur()"
-                                    class="px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none capitalize hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-gold"
+                                    class="px-3 sm:px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none capitalize hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-gold"
                                     :class="currentSub == '{{ $d }}' ? 'bg-gold border-gold text-background font-bold' : 'border-border text-muted hover:text-foreground'">{{ $d }}</button>
                             @endforeach
                         </div>
@@ -182,9 +182,9 @@
 
             <div x-cloak class="group mb-6 transition-opacity duration-500"
                 :class="!isStarted ? 'opacity-0' : (isFinished ? 'opacity-100' : 'opacity-60 hover:opacity-100')">
-                <div class="flex items-start gap-10">
+                <div class="flex items-start gap-4 sm:gap-8 lg:gap-10">
                     <div class="flex flex-col">
-                        <span class="text-5xl font-mono font-bold tabular-nums leading-none transition-colors duration-300"
+                        <span class="text-fluid-timer font-mono font-bold tabular-nums leading-none transition-colors duration-300"
                             :class="{
                                 'text-danger': (currentMain === 'time' && timer < 5 && isStarted) || (currentMain === 'survival' && staminaPct < 25 && isStarted && !isFinished),
                                 'text-gold': !((currentMain === 'time' && timer < 5 && isStarted) || (currentMain === 'survival' && staminaPct < 25 && isStarted && !isFinished)),
@@ -196,12 +196,12 @@
                     </div>
 
                     <div class="flex flex-col">
-                        <span class="text-2xl text-muted font-mono font-bold tabular-nums leading-none" x-text="wpm">0</span>
+                        <span class="text-xl sm:text-2xl text-muted font-mono font-bold tabular-nums leading-none" x-text="wpm">0</span>
                         <span class="text-x-small uppercase tracking-wide text-muted mt-1.5">{{ __('typing.stat_wpm') }}</span>
                     </div>
 
                     <div class="flex flex-col">
-                        <span class="text-2xl text-muted font-mono font-bold tabular-nums leading-none">
+                        <span class="text-xl sm:text-2xl text-muted font-mono font-bold tabular-nums leading-none">
                             <span x-text="accuracy">0</span>%
                         </span>
                         <span class="text-x-small uppercase tracking-wide text-muted mt-1.5">{{ __('typing.stat_acc') }}</span>
@@ -254,7 +254,7 @@
             </div>
 
             <!-- Kontainer 3 Baris -->
-            <div class="relative overflow-hidden text-3xl leading-relaxed tracking-tight select-none outline-none"
+            <div class="relative overflow-hidden text-fluid-type tracking-tight select-none outline-none"
                 style="max-height: 4.875em;">
 
                 <!-- SINGLE SMOOTH CURSOR -->
