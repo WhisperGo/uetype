@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Enums\ClanWarStatus;
+use App\Models\ClanWarFixedText;
 use App\Models\ClanWarModeClaim;
 use App\Models\Text;
 use App\Models\TypingResult;
@@ -230,6 +231,15 @@ class TypingEngine extends Component
 
     public function restart()
     {
+        // War-lock: saat mengerjakan war attempt, teks TAK BOLEH di-reroll.
+        // Ini menutup celah "refresh sampai dapat kata pendek" untuk KETIGA
+        // mode war (time/words/survival). Tombol juga di-disable di view; ini
+        // gerbang server-side-nya (client tak dipercaya). Filosofi: sekali
+        // klaim, satu kesempatan -- tak ada mengintip lalu mengulang.
+        if ($this->warClaimId !== null && $this->resolveWarClaim()) {
+            return;
+        }
+
         $this->generateText(); // Ambil teks baru berdasarkan mainMode & subMode yang ada
 
         $this->dispatch(
@@ -243,6 +253,27 @@ class TypingEngine extends Component
     public function generateText()
     {
         $this->typingSessionKey++;
+
+        // Clan War, mode Words: pakai teks TETAP (identik untuk semua pemain di
+        // config yang sama, di war/clan mana pun) alih-alih merakit acak. Ini
+        // kunci keadilan -- tak ada yang bisa reroll dapat kata pendek, dan
+        // clan A vs clan B benar-benar mengetik teks yang sama. Time & Survival
+        // war tidak diberi teks tetap (teksnya cuma buffer yang dipotong durasi/
+        // kematian), cukup restart-nya yang sudah diblokir.
+        if ($this->warClaimId !== null && $this->resolveWarClaim()) {
+            if ($this->mainMode === 'words') {
+                $fixed = ClanWarFixedText::forWords($this->subMode);
+
+                // Fallback ke generate biasa hanya kalau baris tetap tak ada
+                // (mis. wordlist absen saat migrasi) -- layar tak pernah kosong.
+                if ($fixed !== null) {
+                    $this->textId = null;
+                    $this->textToType = $fixed;
+
+                    return;
+                }
+            }
+        }
 
         if ($this->mainMode === 'quote') {
             $text = Text::where('mode', 'quote')

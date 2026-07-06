@@ -19,6 +19,7 @@ return [
 
     'restart' => 'ulangi',
     'then' => 'lalu',
+    'war_locked_restart' => 'ulangi dikunci (clan war)',
 
     'result_rejected' => 'Hasil sesi ini ditolak oleh validasi server (tidak masuk akal) dan tidak disimpan.',
 

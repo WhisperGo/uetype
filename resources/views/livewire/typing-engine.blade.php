@@ -8,7 +8,8 @@
         @keydown.window="
             if($event.key === 'Tab') {
                 $event.preventDefault();
-                document.getElementById('restartButton').focus();
+                // Tombol restart tidak ada saat war-lock (dinonaktifkan) -> guard null.
+                document.getElementById('restartButton')?.focus();
             } else if (document.activeElement.tagName !== 'BUTTON') {
                 handleInput($event);
             }
@@ -319,18 +320,33 @@
             </div>
 
             <div class="mt-12 flex justify-center">
-                <button id="restartButton" @click.prevent="$wire.restart(); $el.blur()"
-                    class="flex items-center gap-2 text-muted hover:text-foreground focus-visible:text-foreground focus-visible:ring-1 focus-visible:ring-border focus:bg-surface/60 transition-all transform hover:scale-105 outline-none px-4 py-2 rounded-xl hover:bg-surface/60">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span class="font-sans text-xs uppercase tracking-widest">{{ __('typing.restart') }}</span>
-                    <kbd class="font-sans text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">tab</kbd>
-                    <span class="font-sans text-[0.6rem] text-muted">{{ __('typing.then') }}</span>
-                    <kbd class="font-sans text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">enter</kbd>
-                </button>
+                {{-- Saat war-lock aktif, restart dinonaktifkan: satu klaim = satu
+                     kesempatan, tak ada reroll teks. Gerbang sesungguhnya ada di
+                     server (TypingEngine::restart()); ini tampilan disabled-nya. --}}
+                @if ($warLock)
+                    <div class="flex flex-col items-center gap-1.5 select-none">
+                        <div class="flex items-center gap-2 text-muted/40 px-4 py-2 rounded-xl cursor-not-allowed"
+                            title="{{ __('typing.war_locked_restart') }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            <span class="font-sans text-xs uppercase tracking-widest">{{ __('typing.war_locked_restart') }}</span>
+                        </div>
+                    </div>
+                @else
+                    <button id="restartButton" @click.prevent="$wire.restart(); $el.blur()"
+                        class="flex items-center gap-2 text-muted hover:text-foreground focus-visible:text-foreground focus-visible:ring-1 focus-visible:ring-border focus:bg-surface/60 transition-all transform hover:scale-105 outline-none px-4 py-2 rounded-xl hover:bg-surface/60">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span class="font-sans text-xs uppercase tracking-widest">{{ __('typing.restart') }}</span>
+                        <kbd class="font-sans text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">tab</kbd>
+                        <span class="font-sans text-[0.6rem] text-muted">{{ __('typing.then') }}</span>
+                        <kbd class="font-sans text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">enter</kbd>
+                    </button>
+                @endif
             </div>
         </div>
     </div>

@@ -19,6 +19,7 @@ return [
 
     'restart' => 'restart',
     'then' => 'then',
+    'war_locked_restart' => 'restart locked (clan war)',
 
     'result_rejected' => 'This session was rejected by server validation (implausible) and was not saved.',
 
