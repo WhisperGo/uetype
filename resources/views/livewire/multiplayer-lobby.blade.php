@@ -69,7 +69,7 @@
                         }
                     }">
                     @foreach (range(0, 5) as $index)
-                        <input type="text" wire:model="joinCodeInput.{{ $index }}" maxlength="1"
+                        <input type="text" maxlength="1" wire:key="join-box-{{ $index }}"
                             class="w-12 h-14 text-center font-mono text-xl font-bold uppercase bg-typing-bg border border-white/10 rounded-xl focus:border-typing-accent focus:ring-0 text-typing-text"
                             x-on:paste="distribute($event)"
                             x-on:input="$el.value = $el.value.toUpperCase()"
@@ -78,7 +78,7 @@
                     @endforeach
                 </div>
 
-                <button wire:click="joinRoom"
+                <button type="button" x-on:click="syncBoxes(); $wire.joinRoom()"
                     class="px-8 py-3 border border-white/10 text-typing-text hover:bg-white/5 font-mono font-semibold uppercase tracking-wider rounded-xl transition duration-200">
                     {{ __('multiplayer.join_room') }}
                 </button>
