@@ -41,10 +41,25 @@
                 <h3 class="text-xl font-mono font-bold tracking-wider text-typing-text mb-2 uppercase">{{ __('multiplayer.join_room') }}</h3>
                 <p class="text-sm text-typing-muted max-w-xs mb-6">{{ __('multiplayer.join_room_desc') }}</p>
 
-                <div class="flex gap-2 mb-6">
+                <div class="flex gap-2 mb-6"
+                    x-data="{
+                        distribute(event) {
+                            event.preventDefault();
+                            const raw = (event.clipboardData || window.clipboardData).getData('text');
+                            const chars = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6).split('');
+                            const code = Array.from({ length: 6 }, (_, i) => chars[i] ?? '');
+                            $wire.set('joinCodeInput', code);
+                            const boxes = $el.querySelectorAll('input');
+                            boxes.forEach((box, i) => { box.value = code[i]; });
+                            const lastFilled = Math.min(chars.length, 6) - 1;
+                            (boxes[lastFilled] ?? boxes[0])?.focus();
+                        }
+                    }">
                     @foreach (range(0, 5) as $index)
                         <input type="text" wire:model="joinCodeInput.{{ $index }}" maxlength="1"
                             class="w-12 h-14 text-center font-mono text-xl font-bold uppercase bg-typing-bg border border-white/10 rounded-xl focus:border-typing-accent focus:ring-0 text-typing-text"
+                            x-on:paste="distribute($event)"
+                            x-on:input="$el.value = $el.value.toUpperCase()"
                             x-on:keyup="if($el.value.length == 1 && {{ $index }} < 5) { $el.nextElementSibling.focus() } else if($el.value.length == 0 && {{ $index }} > 0) { $el.previousElementSibling.focus() }" />
                     @endforeach
                 </div>

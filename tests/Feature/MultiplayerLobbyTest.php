@@ -34,6 +34,37 @@ describe('multiplayer lobby', function () {
             ->assertSee('Players');
     });
 
+    it('joins a room from the join-code array the paste handler populates', function () {
+        // Handler paste menulis seluruh array joinCodeInput via $wire.set; ini
+        // menegaskan kontrak itu: array 6-elemen -> joinRoom() memasukkan user.
+        Event::fake([RoomUpdated::class]);
+
+        $host = User::factory()->create();
+        $joiner = User::factory()->create();
+
+        $room = Room::create([
+            'code' => 'XYZ789',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create([
+            'room_id' => $room->id,
+            'user_id' => $host->id,
+            'is_ready' => false,
+        ]);
+
+        Livewire::actingAs($joiner)->test(MultiplayerLobby::class)
+            ->set('joinCodeInput', ['X', 'Y', 'Z', '7', '8', '9'])
+            ->call('joinRoom')
+            ->assertSet('step', 'waiting');
+
+        $this->assertDatabaseHas('room_members', [
+            'room_id' => $room->id,
+            'user_id' => $joiner->id,
+        ]);
+    });
+
     it('records the real elapsed time from race start when a player finishes', function () {
         // Broadcast di-fake supaya updateRaceProgress() tak mencoba konek Reverb asli.
         Event::fake([RaceProgressUpdated::class, RoomUpdated::class, SuddenDeathTriggered::class]);
