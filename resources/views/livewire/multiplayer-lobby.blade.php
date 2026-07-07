@@ -43,16 +43,29 @@
 
                 <div class="flex gap-2 mb-6"
                     x-data="{
+                        syncBoxes() {
+                            const boxes = [...$el.querySelectorAll('input')];
+                            $wire.set('joinCodeInput', boxes.map(box => box.value));
+                        },
                         distribute(event) {
                             event.preventDefault();
                             const raw = (event.clipboardData || window.clipboardData).getData('text');
                             const chars = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6).split('');
                             const code = Array.from({ length: 6 }, (_, i) => chars[i] ?? '');
-                            $wire.set('joinCodeInput', code);
-                            const boxes = $el.querySelectorAll('input');
+                            const boxes = [...$el.querySelectorAll('input')];
                             boxes.forEach((box, i) => { box.value = code[i]; });
+                            $wire.set('joinCodeInput', code);
                             const lastFilled = Math.min(chars.length, 6) - 1;
                             (boxes[lastFilled] ?? boxes[0])?.focus();
+                        },
+                        backspace(event) {
+                            if (event.target.value.length !== 0) { return; }
+                            const prev = event.target.previousElementSibling;
+                            if (!prev) { return; }
+                            event.preventDefault();
+                            prev.value = '';
+                            prev.focus();
+                            this.syncBoxes();
                         }
                     }">
                     @foreach (range(0, 5) as $index)
@@ -60,7 +73,8 @@
                             class="w-12 h-14 text-center font-mono text-xl font-bold uppercase bg-typing-bg border border-white/10 rounded-xl focus:border-typing-accent focus:ring-0 text-typing-text"
                             x-on:paste="distribute($event)"
                             x-on:input="$el.value = $el.value.toUpperCase()"
-                            x-on:keyup="if($el.value.length == 1 && {{ $index }} < 5) { $el.nextElementSibling.focus() } else if($el.value.length == 0 && {{ $index }} > 0) { $el.previousElementSibling.focus() }" />
+                            x-on:keydown.backspace="backspace($event)"
+                            x-on:keyup="if($event.key !== 'Backspace' && $el.value.length == 1 && {{ $index }} < 5) { $el.nextElementSibling.focus() }" />
                     @endforeach
                 </div>
 
