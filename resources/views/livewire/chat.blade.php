@@ -189,15 +189,32 @@
                                     {{-- Menu aksi per-pesan (muncul saat hover). Tak muncul untuk
                                          pesan yang sudah dihapus-untuk-semua. --}}
                                     @unless ($deleted)
-                                        <div x-data="{ open: false }" @click.outside="open = false" class="relative shrink-0">
-                                            <button @click="open = !open"
+                                        <div x-data="{
+                                                open: false,
+                                                up: false,
+                                                toggle() {
+                                                    if (this.open) { this.open = false; return; }
+                                                    // Tentukan arah buka menu dari ruang tersisa di dalam kotak chat:
+                                                    // kalau ruang di BAWAH tombol cukup, buka ke bawah (default,
+                                                    // supaya pesan pertama/paling atas tak menembus header);
+                                                    // kalau mepet ke dasar, baru buka ke atas.
+                                                    const box = document.getElementById('chat-messages');
+                                                    const btn = this.$refs.trigger.getBoundingClientRect();
+                                                    const area = box.getBoundingClientRect();
+                                                    const spaceBelow = area.bottom - btn.bottom;
+                                                    this.up = spaceBelow < 180; // tinggi menu ± 3 item
+                                                    this.open = true;
+                                                },
+                                            }" @click.outside="open = false" class="relative shrink-0">
+                                            <button x-ref="trigger" @click="toggle()"
                                                 :class="open ? 'bg-gold text-background' : 'bg-white/10 text-foreground hover:bg-gold hover:text-background'"
                                                 class="p-1.5 rounded-full border border-white/10 shadow-sm transition"
                                                 aria-label="{{ __('chat.message_actions') }}">
                                                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" /></svg>
                                             </button>
                                             <div x-show="open" x-cloak x-transition
-                                                class="absolute z-20 {{ $mine ? 'right-0' : 'left-0' }} bottom-full mb-1 w-48 py-1 bg-surface border border-white/10 rounded-xl shadow-lg overflow-hidden">
+                                                :class="up ? 'bottom-full mb-1' : 'top-full mt-1'"
+                                                class="absolute z-30 {{ $mine ? 'right-0' : 'left-0' }} w-48 py-1 bg-surface border border-white/10 rounded-xl shadow-lg overflow-hidden">
                                                 @if ($canEdit)
                                                     <button wire:click="startEdit({{ $message->id }})" @click="open = false"
                                                         class="w-full flex items-center gap-2.5 text-left px-3 py-2 font-mono text-xs font-semibold text-gold hover:bg-gold/10 transition">
