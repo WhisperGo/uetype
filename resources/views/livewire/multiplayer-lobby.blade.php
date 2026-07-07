@@ -503,7 +503,8 @@
                                         @if ($rank->finished_time_seconds && $rank->finished_time_seconds != 999)
                                             {{ sprintf('%02d:%02d', floor($rank->finished_time_seconds / 60), $rank->finished_time_seconds % 60) }}
                                         @else
-                                            <span class="text-red-400/70 text-xs">01:24</span>
+                                            {{-- Pemain tak selesai (DNF): jangan tampilkan waktu palsu. --}}
+                                            <span class="text-red-400/70 text-xs">DNF</span>
                                         @endif
                                     </td>
                                 </tr>

@@ -287,8 +287,14 @@ class MultiplayerLobby extends Component
         if ($progressPercent >= 100) {
             $justFinished = true;
 
-            // absolute: true -> cegah hasil negatif (Carbon 3 default-nya signed diff)
-            $updateData['finished_time_seconds'] = $room->updated_at->diffInSeconds(now(), true);
+            // Durasi tempuh ASLI = sekarang - kapan race benar-benar mulai
+            // (race_starts_at, titik countdown 3-2-1 selesai). BUG lama memakai
+            // $room->updated_at yang berubah tiap update baris room, jadi angkanya
+            // acak & kecil (2s/5s), bukan lama mengetik sebenarnya. Fallback ke
+            // updated_at hanya kalau race_starts_at entah kenapa kosong (jaga-jaga).
+            // absolute: true -> cegah hasil negatif (Carbon 3 default-nya signed diff).
+            $raceStart = $room->race_starts_at ?? $room->updated_at;
+            $updateData['finished_time_seconds'] = (int) round($raceStart->diffInSeconds(now(), true));
 
             $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
                 ->whereNotNull('finished_time_seconds')
