@@ -6,10 +6,13 @@ use App\Enums\ClanMemberStatus;
 use App\Enums\FriendshipStatus;
 use App\Events\ClanMessageSent;
 use App\Events\DirectMessageSent;
+use App\Events\MessageDeleted;
+use App\Events\MessageEdited;
 use App\Models\ClanMember;
 use App\Models\Friendship;
 use App\Models\Message;
 use App\Models\MessageClear;
+use App\Models\MessageDelete;
 use App\Models\User;
 use App\Support\SafeBroadcast;
 use Carbon\Carbon;
@@ -43,6 +46,11 @@ class Chat extends Component
     public string $clearScope = 'all'; // 'all' | 'days'
 
     public int $clearDays = 7;
+
+    // Edit inline: id pesan yang sedang diedit (null = tak ada) + draftnya.
+    public ?int $editingId = null;
+
+    public string $editBody = '';
 
     /**
      * Dipanggil oleh listener Echo saat channel chat.{me}/clan-chat.{clanId}
@@ -154,6 +162,90 @@ class Chat extends Component
         SafeBroadcast::run(fn () => broadcast(new ClanMessageSent($message->load('sender'))));
     }
 
+    // ---- AKSI: EDIT & DELETE PESAN ----
+
+    /**
+     * Buka form edit inline untuk sebuah pesan (hanya jika boleh: pengirim,
+     * belum dihapus-untuk-semua, masih dalam jendela edit).
+     */
+    public function startEdit(int $messageId): void
+    {
+        $message = Message::find($messageId);
+
+        if (! $message || ! $message->canBeEditedBy(Auth::id())) {
+            return;
+        }
+
+        $this->editingId = $message->id;
+        $this->editBody = $message->body;
+    }
+
+    public function cancelEdit(): void
+    {
+        $this->editingId = null;
+        $this->editBody = '';
+    }
+
+    public function saveEdit(): void
+    {
+        $message = Message::find($this->editingId);
+
+        if (! $message || ! $message->canBeEditedBy(Auth::id())) {
+            $this->cancelEdit();
+
+            return;
+        }
+
+        $body = trim($this->editBody);
+
+        if ($body === '' || mb_strlen($body) > 2000) {
+            return;
+        }
+
+        $message->update([
+            'body' => $body,
+            'edited_at' => now(),
+        ]);
+
+        $this->cancelEdit();
+
+        SafeBroadcast::run(fn () => broadcast(new MessageEdited($message)));
+    }
+
+    /**
+     * "Delete for everyone": ganti isi jadi placeholder untuk SEMUA orang.
+     * Hanya pengirim, dan hanya jika belum dihapus.
+     */
+    public function deleteForEveryone(int $messageId): void
+    {
+        $message = Message::find($messageId);
+
+        if (! $message || ! $message->canBeDeletedForEveryoneBy(Auth::id())) {
+            return;
+        }
+
+        $message->update([
+            'deleted_for_everyone_at' => now(),
+        ]);
+
+        SafeBroadcast::run(fn () => broadcast(new MessageDeleted($message)));
+    }
+
+    /**
+     * "Delete for me": sembunyikan pesan HANYA dari user ini; tetap ada untuk
+     * orang lain. Berlaku untuk pesan siapa pun yang bisa dilihat user ini.
+     */
+    public function deleteForMe(int $messageId): void
+    {
+        $message = Message::find($messageId);
+
+        if (! $message || ! $this->canSeeMessage($message)) {
+            return;
+        }
+
+        MessageDelete::hide(Auth::id(), $message->id);
+    }
+
     // ---- AKSI: CLEAR CHAT ----
 
     public function openClearModal(): void
@@ -191,6 +283,22 @@ class Chat extends Component
         $friendship = Auth::user()->friendshipWith($otherId);
 
         return $friendship?->status === FriendshipStatus::Accepted;
+    }
+
+    /**
+     * Apakah user saat ini berhak melihat (dan karenanya "delete for me")
+     * pesan tertentu: pesan DM yang melibatkan dirinya, atau pesan clan dari
+     * clan tempat ia jadi anggota aktif.
+     */
+    private function canSeeMessage(Message $message): bool
+    {
+        $me = Auth::id();
+
+        if ($message->isClanMessage()) {
+            return $this->myClan && $message->clan_id === $this->myClan->id;
+        }
+
+        return $message->sender_id === $me || $message->recipient_id === $me;
     }
 
     private function markDmAsRead(int $friendId): void

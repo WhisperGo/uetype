@@ -138,17 +138,91 @@
                 @endif
 
                 @forelse ($this->messages as $message)
-                    @php $mine = $message->sender_id === auth()->id(); @endphp
-                    <div class="flex {{ $mine ? 'justify-end' : 'justify-start' }}" wire:key="msg-{{ $message->id }}">
+                    @php
+                        $mine = $message->sender_id === auth()->id();
+                        $deleted = $message->isDeletedForEveryone();
+                        $editing = $editingId === $message->id;
+                        $canEdit = $mine && $message->canBeEditedBy(auth()->id());
+                        $canDeleteEveryone = $mine && $message->canBeDeletedForEveryoneBy(auth()->id());
+                    @endphp
+                    <div class="flex {{ $mine ? 'justify-end' : 'justify-start' }} group/msg" wire:key="msg-{{ $message->id }}">
                         <div class="max-w-[75%] {{ $mine ? '' : 'flex flex-col items-start' }}">
                             @if ($activeMode === 'clan' && ! $mine)
                                 <p class="font-mono text-[0.65rem] text-muted mb-1 px-1">{{ $message->sender->username }}</p>
                             @endif
-                            <div class="px-4 py-2.5 rounded-2xl font-mono text-sm break-words
-                                {{ $mine ? 'bg-gold text-background rounded-br-md' : 'bg-white/5 text-foreground rounded-bl-md' }}">
-                                {{ $message->body }}
-                                <p class="text-[0.6rem] mt-1 opacity-60">{{ $message->created_at->format('H:i') }}</p>
-                            </div>
+
+                            @if ($editing)
+                                {{-- Form edit inline --}}
+                                <form wire:submit.prevent="saveEdit" class="flex items-center gap-2">
+                                    <input type="text" wire:model="editBody" maxlength="2000" autocomplete="off"
+                                        x-init="$nextTick(() => $el.focus())"
+                                        @keydown.escape="$wire.cancelEdit()"
+                                        class="px-3 py-2 bg-surface border border-gold/40 rounded-xl font-mono text-sm text-foreground focus:border-gold focus:ring-0 min-w-[12rem]">
+                                    <button type="submit" class="text-gold hover:text-gold/80 shrink-0" aria-label="{{ __('chat.edit_save') }}" title="{{ __('chat.edit_save') }}">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                    </button>
+                                    <button type="button" wire:click="cancelEdit" class="text-muted hover:text-foreground shrink-0" aria-label="{{ __('chat.edit_cancel') }}" title="{{ __('chat.edit_cancel') }}">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </form>
+                            @else
+                                <div class="flex items-end gap-1.5 {{ $mine ? 'flex-row-reverse' : '' }}">
+                                    <div class="px-4 py-2.5 rounded-2xl font-mono text-sm break-words
+                                        {{ $mine ? 'bg-gold text-background rounded-br-md' : 'bg-white/5 text-foreground rounded-bl-md' }}
+                                        {{ $deleted ? 'opacity-60 italic' : '' }}">
+                                        @if ($deleted)
+                                            <span class="flex items-center gap-1.5">
+                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                                                {{ __('chat.deleted_placeholder') }}
+                                            </span>
+                                        @else
+                                            {{ $message->body }}
+                                        @endif
+                                        <p class="text-[0.6rem] mt-1 opacity-60">
+                                            {{ $message->created_at->format('H:i') }}
+                                            @if (! $deleted && $message->isEdited())
+                                                · {{ __('chat.edited') }}
+                                            @endif
+                                        </p>
+                                    </div>
+
+                                    {{-- Menu aksi per-pesan (muncul saat hover). Tak muncul untuk
+                                         pesan yang sudah dihapus-untuk-semua. --}}
+                                    @unless ($deleted)
+                                        <div x-data="{ open: false }" @click.outside="open = false" class="relative shrink-0">
+                                            <button @click="open = !open"
+                                                :class="open ? 'bg-gold text-background' : 'bg-white/10 text-foreground hover:bg-gold hover:text-background'"
+                                                class="p-1.5 rounded-full border border-white/10 shadow-sm transition"
+                                                aria-label="{{ __('chat.message_actions') }}">
+                                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" /></svg>
+                                            </button>
+                                            <div x-show="open" x-cloak x-transition
+                                                class="absolute z-20 {{ $mine ? 'right-0' : 'left-0' }} bottom-full mb-1 w-48 py-1 bg-surface border border-white/10 rounded-xl shadow-lg overflow-hidden">
+                                                @if ($canEdit)
+                                                    <button wire:click="startEdit({{ $message->id }})" @click="open = false"
+                                                        class="w-full flex items-center gap-2.5 text-left px-3 py-2 font-mono text-xs font-semibold text-gold hover:bg-gold/10 transition">
+                                                        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                        {{ __('chat.edit') }}
+                                                    </button>
+                                                @endif
+                                                <button wire:click="deleteForMe({{ $message->id }})" @click="open = false"
+                                                    class="w-full flex items-center gap-2.5 text-left px-3 py-2 font-mono text-xs font-semibold text-amber-400 hover:bg-amber-400/10 transition">
+                                                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0L21 21" /></svg>
+                                                    {{ __('chat.delete_for_me') }}
+                                                </button>
+                                                @if ($canDeleteEveryone)
+                                                    <button wire:click="deleteForEveryone({{ $message->id }})"
+                                                        wire:confirm="{{ __('chat.confirm_delete_everyone') }}" @click="open = false"
+                                                        class="w-full flex items-center gap-2.5 text-left px-3 py-2 font-mono text-xs font-semibold text-red-400 hover:bg-red-400/10 transition">
+                                                        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" /></svg>
+                                                        {{ __('chat.delete_for_everyone') }}
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endunless
+                                </div>
+                            @endif
                         </div>
                     </div>
                 @empty
@@ -157,13 +231,25 @@
             </div>
 
             {{-- Input --}}
-            <form wire:submit.prevent="sendMessage" class="flex items-center gap-3 p-4 border-t border-white/5 shrink-0">
-                <input type="text" wire:model="body" maxlength="2000" autocomplete="off"
+            {{-- Tombol enable/disable dihitung di CLIENT via Alpine (bukan
+                 @disabled server-side) supaya berubah seketika saat mengetik,
+                 tanpa menunggu round-trip Livewire. wire:model.live tetap
+                 dipakai agar $body server ikut sinkron untuk validasi. --}}
+            {{-- draft = @entangle('body') (BUKAN .live) supaya server tetap
+                 sumber kebenaran $body: Livewire men-sync input ke $body
+                 sebelum menjalankan sendMessage, lalu sendMessage yang
+                 mengosongkan $body dan entangle memantulkannya balik ke draft.
+                 Optimistic append TIDAK menyentuh draft, jadi $body tak pernah
+                 keburu kosong saat action jalan. --}}
+            <form wire:submit.prevent="sendMessage" x-data="{ draft: @entangle('body') }"
+                @submit="if (draft.trim() !== '') { window.chatAppendOutgoing(draft.trim()); }"
+                class="flex items-center gap-3 p-4 border-t border-white/5 shrink-0">
+                <input type="text" x-model="draft" maxlength="2000" autocomplete="off"
                     placeholder="{{ __('chat.placeholder') }}"
                     class="flex-1 px-4 py-2.5 bg-surface/40 border border-white/10 rounded-2xl font-mono text-sm text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
                 <button type="submit"
                     class="px-5 py-2.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition disabled:opacity-40"
-                    @disabled(trim($body) === '')>
+                    x-bind:disabled="draft.trim() === ''">
                     {{ __('chat.send') }}
                 </button>
             </form>
@@ -212,11 +298,89 @@
          menyegarkan datanya. --}}
     @script
         <script>
-            const onRemote = () => $wire.dispatch('message-received');
+            const meId = {{ auth()->id() }};
+
+            // Escape teks pesan sebelum dimasukkan ke DOM (payload dari WebSocket
+            // = input user lain, jangan pernah dianggap HTML aman).
+            const esc = (s) => { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; };
+
+            // Apakah pesan yang masuk termasuk percakapan yang SEDANG dibuka?
+            const belongsToOpenConversation = (d) => {
+                if (d.kind === 'dm') {
+                    // DM masuk dari lawan bicara: relevan kalau mode dm & pengirim = lawan yang dibuka.
+                    return $wire.activeMode === 'dm' && $wire.withUsername === d.senderUsername;
+                }
+                if (d.kind === 'clan') {
+                    return $wire.activeMode === 'clan';
+                }
+                return false;
+            };
+
+            // Tempel bubble pesan LANGSUNG ke DOM dari payload WebSocket, tanpa
+            // menunggu render server. Livewire lalu rekonsiliasi di belakang
+            // layar; karena id (wire:key) sama, node ini tak akan terduplikasi.
+            const appendBubble = (d) => {
+                const list = document.getElementById('chat-messages');
+                if (!list) return;
+                if (document.querySelector(`[wire\\:key="msg-${d.messageId}"]`)) return; // sudah ada
+
+                const showName = d.kind === 'clan' && d.senderId !== meId;
+                const wrap = document.createElement('div');
+                wrap.className = 'flex justify-start';
+                wrap.setAttribute('wire:key', `msg-${d.messageId}`);
+                wrap.innerHTML =
+                    '<div class="max-w-[75%] flex flex-col items-start">' +
+                        (showName ? `<p class="font-mono text-[0.65rem] text-muted mb-1 px-1">${esc(d.senderUsername)}</p>` : '') +
+                        '<div class="px-4 py-2.5 rounded-2xl font-mono text-sm break-words bg-white/5 text-foreground rounded-bl-md">' +
+                            esc(d.body) +
+                            '<p class="text-[0.6rem] mt-1 opacity-60">' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) + '</p>' +
+                        '</div>' +
+                    '</div>';
+                list.appendChild(wrap);
+                requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
+            };
+
+            // Pesan KELUAR (milik sendiri) ditampilkan seketika saat submit,
+            // sebelum server merespons. Tak diberi wire:key -- ditandai
+            // data-optimistic; saat Livewire morph membawa bubble asli (dengan
+            // id DB), node sementara ini otomatis tergantikan (tanpa duplikat).
+            window.chatAppendOutgoing = (body) => {
+                const list = document.getElementById('chat-messages');
+                if (!list) return;
+                const wrap = document.createElement('div');
+                wrap.className = 'flex justify-end';
+                wrap.setAttribute('data-optimistic', '1');
+                wrap.innerHTML =
+                    '<div class="max-w-[75%]">' +
+                        '<div class="px-4 py-2.5 rounded-2xl font-mono text-sm break-words bg-gold text-background rounded-br-md opacity-70">' +
+                            esc(body) +
+                            '<p class="text-[0.6rem] mt-1 opacity-60">' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) + '</p>' +
+                        '</div>' +
+                    '</div>';
+                list.appendChild(wrap);
+                requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
+            };
+
+            const onRemote = (ev) => {
+                const d = ev.detail;
+                // Optimistic: kalau pesan untuk percakapan yang sedang dibuka,
+                // tampilkan seketika supaya tak terasa delay.
+                if (d && belongsToOpenConversation(d)) {
+                    appendBubble(d);
+                }
+                // Tetap sinkronkan state otoritatif (read receipt, dedup, dsb).
+                $wire.dispatch('message-received');
+            };
             window.addEventListener('message-received-remote', onRemote);
+
+            // Edit/hapus pesan dari sisi lain: cukup minta Livewire re-render
+            // supaya bubble memperbarui isinya / jadi placeholder / label edited.
+            const onMutated = () => $wire.dispatch('message-received');
+            window.addEventListener('message-mutated-remote', onMutated);
 
             document.addEventListener('livewire:navigating', () => {
                 window.removeEventListener('message-received-remote', onRemote);
+                window.removeEventListener('message-mutated-remote', onMutated);
             }, { once: true });
 
             // Auto-scroll ke pesan terbaru saat jendela obrolan pertama kali

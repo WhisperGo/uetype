@@ -7,16 +7,23 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Message extends Model
 {
+    // Batas waktu edit pesan setelah dikirim (menit).
+    public const EDIT_WINDOW_MINUTES = 30;
+
     protected $fillable = [
         'sender_id',
         'recipient_id',
         'clan_id',
         'body',
         'read_at',
+        'edited_at',
+        'deleted_for_everyone_at',
     ];
 
     protected $casts = [
         'read_at' => 'datetime',
+        'edited_at' => 'datetime',
+        'deleted_for_everyone_at' => 'datetime',
     ];
 
     public function sender(): BelongsTo
@@ -37,6 +44,35 @@ class Message extends Model
     public function isClanMessage(): bool
     {
         return $this->clan_id !== null;
+    }
+
+    public function isEdited(): bool
+    {
+        return $this->edited_at !== null;
+    }
+
+    public function isDeletedForEveryone(): bool
+    {
+        return $this->deleted_for_everyone_at !== null;
+    }
+
+    /**
+     * Boleh diedit hanya oleh pengirim, jika belum dihapus-untuk-semua, dan
+     * masih dalam jendela EDIT_WINDOW_MINUTES menit sejak dikirim.
+     */
+    public function canBeEditedBy(int $userId): bool
+    {
+        return $this->sender_id === $userId
+            && ! $this->isDeletedForEveryone()
+            && $this->created_at->gt(now()->subMinutes(self::EDIT_WINDOW_MINUTES));
+    }
+
+    /**
+     * "Delete for everyone" hanya boleh oleh pengirim & belum dihapus.
+     */
+    public function canBeDeletedForEveryoneBy(int $userId): bool
+    {
+        return $this->sender_id === $userId && ! $this->isDeletedForEveryone();
     }
 
     /**
@@ -70,6 +106,15 @@ class Message extends Model
      */
     public function scopeVisibleTo($query, int $userId, ?int $otherUserId = null, ?int $clanId = null)
     {
+        // "Delete for me" per-pesan: sembunyikan pesan yang user ini hapus
+        // untuk dirinya sendiri (tetap ada untuk orang lain).
+        $query->whereNotExists(function ($sub) use ($userId) {
+            $sub->selectRaw('1')
+                ->from('message_deletes')
+                ->whereColumn('message_deletes.message_id', 'messages.id')
+                ->where('message_deletes.user_id', $userId);
+        });
+
         $clearedBefore = MessageClear::query()
             ->where('user_id', $userId)
             ->when($otherUserId, fn ($q) => $q->where('other_user_id', $otherUserId))

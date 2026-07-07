@@ -42,4 +42,15 @@ return [
     'clear_cancel' => 'Batal',
 
     'members' => ':count anggota',
+
+    // Edit & hapus pesan
+    'edited' => 'diedit',
+    'message_actions' => 'Aksi pesan',
+    'edit' => 'Edit',
+    'edit_save' => 'Simpan',
+    'edit_cancel' => 'Batal',
+    'delete_for_everyone' => 'Hapus untuk semua',
+    'delete_for_me' => 'Hapus untuk saya',
+    'confirm_delete_everyone' => 'Hapus pesan ini untuk semua orang? Tindakan ini tak bisa dibatalkan.',
+    'deleted_placeholder' => 'Pesan ini telah dihapus',
 ];

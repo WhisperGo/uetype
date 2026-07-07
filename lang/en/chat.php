@@ -42,4 +42,15 @@ return [
     'clear_cancel' => 'Cancel',
 
     'members' => ':count members',
+
+    // Edit & delete pesan
+    'edited' => 'edited',
+    'message_actions' => 'Message actions',
+    'edit' => 'Edit',
+    'edit_save' => 'Save',
+    'edit_cancel' => 'Cancel',
+    'delete_for_everyone' => 'Delete for everyone',
+    'delete_for_me' => 'Delete for me',
+    'confirm_delete_everyone' => 'Delete this message for everyone? This cannot be undone.',
+    'deleted_placeholder' => 'This message was deleted',
 ];

@@ -5,6 +5,8 @@ use App\Enums\ClanRole;
 use App\Enums\FriendshipStatus;
 use App\Events\ClanMessageSent;
 use App\Events\DirectMessageSent;
+use App\Events\MessageDeleted;
+use App\Events\MessageEdited;
 use App\Livewire\Chat;
 use App\Models\Clan;
 use App\Models\ClanMember;
@@ -305,4 +307,140 @@ it('lets a user clear chat again to push the cleared_before threshold forward', 
 
     $messages = Livewire::actingAs($me)->test(Chat::class)->call('openDm', $friend->username)->get('messages');
     expect($messages)->toHaveCount(0);
+});
+
+// ---- EDIT ----
+
+it('lets the sender edit their own message and marks it edited + broadcasts', function () {
+    Event::fake([MessageEdited::class]);
+    [$me, $friend] = makeAcceptedFriends();
+
+    $msg = Message::create(['sender_id' => $me->id, 'recipient_id' => $friend->id, 'body' => 'Halo']);
+
+    Livewire::actingAs($me)->test(Chat::class)
+        ->call('openDm', $friend->username)
+        ->call('startEdit', $msg->id)
+        ->assertSet('editingId', $msg->id)
+        ->set('editBody', 'Halo (revisi)')
+        ->call('saveEdit')
+        ->assertSet('editingId', null);
+
+    $msg->refresh();
+    expect($msg->body)->toBe('Halo (revisi)');
+    expect($msg->isEdited())->toBeTrue();
+
+    Event::assertDispatched(MessageEdited::class);
+});
+
+it('does not let a non-sender edit a message', function () {
+    [$me, $friend] = makeAcceptedFriends();
+
+    $msg = Message::create(['sender_id' => $friend->id, 'recipient_id' => $me->id, 'body' => 'punya teman']);
+
+    Livewire::actingAs($me)->test(Chat::class)
+        ->call('openDm', $friend->username)
+        ->call('startEdit', $msg->id)
+        ->assertSet('editingId', null); // ditolak, form tak terbuka
+
+    expect($msg->fresh()->isEdited())->toBeFalse();
+});
+
+it('does not let the sender edit a message past the 30-minute window', function () {
+    [$me, $friend] = makeAcceptedFriends();
+
+    $msg = Message::create(['sender_id' => $me->id, 'recipient_id' => $friend->id, 'body' => 'pesan lama']);
+    $msg->forceFill(['created_at' => now()->subMinutes(31)])->save();
+
+    Livewire::actingAs($me)->test(Chat::class)
+        ->call('openDm', $friend->username)
+        ->call('startEdit', $msg->id)
+        ->assertSet('editingId', null);
+});
+
+// ---- DELETE FOR EVERYONE ----
+
+it('lets the sender delete a message for everyone, replacing it with a placeholder for all', function () {
+    Event::fake([MessageDeleted::class]);
+    [$me, $friend] = makeAcceptedFriends();
+
+    $msg = Message::create(['sender_id' => $me->id, 'recipient_id' => $friend->id, 'body' => 'Hi']);
+
+    Livewire::actingAs($me)->test(Chat::class)
+        ->call('openDm', $friend->username)
+        ->call('deleteForEveryone', $msg->id);
+
+    $msg->refresh();
+    expect($msg->isDeletedForEveryone())->toBeTrue();
+
+    // Baris tetap ada (jadi placeholder), tak dihapus dari DB.
+    $this->assertDatabaseHas('messages', ['id' => $msg->id]);
+
+    // Terlihat sebagai "deleted" untuk KEDUA sisi (masih ada di daftar, tapi ditandai).
+    $friendMessages = Livewire::actingAs($friend)->test(Chat::class)->call('openDm', $me->username)->get('messages');
+    expect($friendMessages)->toHaveCount(1);
+    expect($friendMessages->first()->isDeletedForEveryone())->toBeTrue();
+
+    Event::assertDispatched(MessageDeleted::class);
+});
+
+it('does not let a non-sender delete a message for everyone', function () {
+    [$me, $friend] = makeAcceptedFriends();
+
+    $msg = Message::create(['sender_id' => $friend->id, 'recipient_id' => $me->id, 'body' => 'punya teman']);
+
+    Livewire::actingAs($me)->test(Chat::class)
+        ->call('openDm', $friend->username)
+        ->call('deleteForEveryone', $msg->id);
+
+    expect($msg->fresh()->isDeletedForEveryone())->toBeFalse();
+});
+
+// ---- DELETE FOR ME ----
+
+it('hides a message for the deleting user only, keeping it for the other participant', function () {
+    [$me, $friend] = makeAcceptedFriends();
+
+    $msg = Message::create(['sender_id' => $me->id, 'recipient_id' => $friend->id, 'body' => 'Hi']);
+
+    Livewire::actingAs($me)->test(Chat::class)
+        ->call('openDm', $friend->username)
+        ->call('deleteForMe', $msg->id);
+
+    $this->assertDatabaseHas('message_deletes', ['user_id' => $me->id, 'message_id' => $msg->id]);
+    // Baris pesan asli TIDAK dihapus.
+    $this->assertDatabaseHas('messages', ['id' => $msg->id]);
+
+    $myMessages = Livewire::actingAs($me)->test(Chat::class)->call('openDm', $friend->username)->get('messages');
+    $friendMessages = Livewire::actingAs($friend)->test(Chat::class)->call('openDm', $me->username)->get('messages');
+
+    expect($myMessages)->toHaveCount(0);   // hilang untukku
+    expect($friendMessages)->toHaveCount(1); // tetap untuk teman
+});
+
+it('lets a clan member delete a clan message for themselves only', function () {
+    [$clan, [$leader, $member]] = makeClanWithMembers(2);
+
+    $msg = Message::create(['sender_id' => $leader->id, 'clan_id' => $clan->id, 'body' => 'halo clan']);
+
+    Livewire::actingAs($member)->test(Chat::class)
+        ->call('openClanChat')
+        ->call('deleteForMe', $msg->id);
+
+    $memberMessages = Livewire::actingAs($member)->test(Chat::class)->call('openClanChat')->get('messages');
+    $leaderMessages = Livewire::actingAs($leader)->test(Chat::class)->call('openClanChat')->get('messages');
+
+    expect($memberMessages)->toHaveCount(0);
+    expect($leaderMessages)->toHaveCount(1);
+});
+
+it('does not let a non-participant delete-for-me a message they cannot see', function () {
+    [$me, $friend] = makeAcceptedFriends();
+    $stranger = User::factory()->create();
+
+    $msg = Message::create(['sender_id' => $me->id, 'recipient_id' => $friend->id, 'body' => 'rahasia']);
+
+    Livewire::actingAs($stranger)->test(Chat::class)
+        ->call('deleteForMe', $msg->id);
+
+    $this->assertDatabaseMissing('message_deletes', ['user_id' => $stranger->id, 'message_id' => $msg->id]);
 });

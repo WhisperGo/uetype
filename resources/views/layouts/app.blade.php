@@ -277,9 +277,23 @@
                                 const dmChannel = window.Echo.channel(`chat.{{ Auth::id() }}`);
                                 dmChannel.stopListening('.dm.sent');
                                 dmChannel.listen('.dm.sent', (e) => {
-                                    window.dispatchEvent(new CustomEvent('message-received-remote'));
-                                    if (e && e.body && e.senderUsername) this.push(e);
+                                    // Teruskan payload lengkap supaya halaman chat bisa
+                                    // menampilkan pesan SEKETIKA (optimistic, tanpa round-trip).
+                                    window.dispatchEvent(new CustomEvent('message-received-remote', {
+                                        detail: { ...e, kind: 'dm' },
+                                    }));
+                                    // Toast hanya kalau user TIDAK sedang membuka percakapan
+                                    // dengan pengirim ini (kalau sedang dibuka, pesan sudah terlihat).
+                                    if (e && e.body && e.senderUsername
+                                        && !this.isViewingDm(e.senderUsername)) {
+                                        this.push(e);
+                                    }
                                 });
+                                // Edit/hapus pesan DM -> cukup picu refresh (jarang, tak perlu optimistic).
+                                dmChannel.stopListening('.message.edited');
+                                dmChannel.listen('.message.edited', () => window.dispatchEvent(new CustomEvent('message-mutated-remote')));
+                                dmChannel.stopListening('.message.deleted');
+                                dmChannel.listen('.message.deleted', () => window.dispatchEvent(new CustomEvent('message-mutated-remote')));
 
                                 @if (Auth::user()->clan)
                                     // Clan chat: channel per-clan clan-chat.{clanId} -- SEMUA
@@ -287,13 +301,33 @@
                                     const clanChannel = window.Echo.channel(`clan-chat.{{ Auth::user()->clan->id }}`);
                                     clanChannel.stopListening('.clan-message.sent');
                                     clanChannel.listen('.clan-message.sent', (e) => {
-                                        window.dispatchEvent(new CustomEvent('message-received-remote'));
-                                        // Jangan toast pesan dari diri sendiri (baru saja dikirim, sudah terlihat).
-                                        if (e && e.body && e.senderUsername && e.senderId !== {{ Auth::id() }}) {
+                                        window.dispatchEvent(new CustomEvent('message-received-remote', {
+                                            detail: { ...e, kind: 'clan' },
+                                        }));
+                                        // Jangan toast pesan dari diri sendiri, DAN jangan toast
+                                        // kalau user sedang membuka chat clan (sudah terlihat).
+                                        if (e && e.body && e.senderUsername
+                                            && e.senderId !== {{ Auth::id() }}
+                                            && !this.isViewingClan()) {
                                             this.push(e);
                                         }
                                     });
+                                    clanChannel.stopListening('.message.edited');
+                                    clanChannel.listen('.message.edited', () => window.dispatchEvent(new CustomEvent('message-mutated-remote')));
+                                    clanChannel.stopListening('.message.deleted');
+                                    clanChannel.listen('.message.deleted', () => window.dispatchEvent(new CustomEvent('message-mutated-remote')));
                                 @endif
+                            },
+                            // Cek dari URL apakah user sedang membuka percakapan tertentu,
+                            // supaya toast tak muncul untuk chat yang sedang ditonton.
+                            isViewingDm(username) {
+                                if (!location.pathname.endsWith('/chat')) return false;
+                                const p = new URLSearchParams(location.search);
+                                return p.get('mode') === 'dm' && p.get('with') === username;
+                            },
+                            isViewingClan() {
+                                if (!location.pathname.endsWith('/chat')) return false;
+                                return new URLSearchParams(location.search).get('mode') === 'clan';
                             },
                             push(n) {
                                 const id = ++this._seq;
