@@ -55,6 +55,10 @@
                                 @endif
                             </div>
                         </a>
+                        <a href="{{ route('chat.index', ['mode' => 'dm', 'with' => $row['user']->username]) }}" wire:navigate
+                            class="px-3 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition shrink-0">
+                            {{ __('friends.chat') }}
+                        </a>
                         <button wire:click="removeFriend({{ $row['friendship_id'] }})"
                             wire:confirm="{{ __('friends.confirm_remove', ['name' => $row['user']->username]) }}"
                             class="opacity-0 group-hover:opacity-100 px-3 py-1.5 font-mono text-xs text-red-400/80 border border-red-900/40 rounded-lg hover:bg-red-950/30 transition">

@@ -9,6 +9,7 @@ return [
     'achievements' => 'Pencapaian',
     'user_stats' => 'Statistik',
     'friends' => 'Daftar Teman',
+    'chat' => 'Chat',
     'settings' => 'Pengaturan',
     'soon' => 'segera',
     'login' => 'Masuk',

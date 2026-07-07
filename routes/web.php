@@ -6,6 +6,7 @@ use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PresenceController;
 use App\Http\Controllers\ProfileController;
 use App\Livewire\About;
+use App\Livewire\Chat;
 use App\Livewire\ClanLeaderboard;
 use App\Livewire\Clans;
 use App\Livewire\ClanShow;
@@ -43,6 +44,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/achievements', [AchievementController::class, 'index'])->name('achievements.index');
 
     Route::get('/friends', Friends::class)->name('friends.index');
+    Route::get('/chat', Chat::class)->name('chat.index');
 
     Route::get('/clans', Clans::class)->name('clans.index');
     Route::get('/clan-war', ClanWar::class)->name('clan-war.index');

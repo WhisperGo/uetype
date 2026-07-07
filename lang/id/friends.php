@@ -14,6 +14,7 @@ return [
     'offline' => 'Offline',
     'last_seen' => 'terakhir dilihat :time',
     'view_profile' => 'Lihat profil :name',
+    'chat' => 'Chat',
     'remove' => 'Hapus',
     'confirm_remove' => 'Hapus :name dari daftar temanmu?',
 

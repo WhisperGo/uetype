@@ -83,6 +83,7 @@
                                 <span class="text-[0.6rem] font-mono uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">{{ __('common.soon') }}</span>
                             </span>
                             <x-dropdown-link :href="route('friends.index')">{{ __('nav.friends') }}</x-dropdown-link>
+                            <x-dropdown-link :href="route('chat.index')">{{ __('nav.chat') }}</x-dropdown-link>
                             <x-dropdown-link :href="route('settings')">{{ __('nav.settings') }}</x-dropdown-link>
 
                             <div class="my-1 border-t border-white/5"></div>
@@ -181,6 +182,7 @@
                         <span class="text-[0.6rem] font-mono uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">{{ __('common.soon') }}</span>
                     </span>
                     <x-responsive-nav-link :href="route('friends.index')">{{ __('nav.friends') }}</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('chat.index')">{{ __('nav.chat') }}</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('settings')">{{ __('nav.settings') }}</x-responsive-nav-link>
                     <button type="button"
                         x-on:click="$dispatch('open-modal', 'confirm-sign-out'); open = false"

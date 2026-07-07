@@ -14,6 +14,7 @@ return [
     'offline' => 'Offline',
     'last_seen' => 'last seen :time',
     'view_profile' => 'View :name\'s profile',
+    'chat' => 'Chat',
     'remove' => 'Remove',
     'confirm_remove' => 'Remove :name from your friends list?',
 

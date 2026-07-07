@@ -9,6 +9,7 @@ return [
     'achievements' => 'Achievements',
     'user_stats' => 'Stats',
     'friends' => 'Friends',
+    'chat' => 'Chat',
     'settings' => 'Settings',
     'soon' => 'soon',
     'login' => 'Sign In',

@@ -1,0 +1,354 @@
+<?php
+
+namespace App\Livewire;
+
+use App\Enums\ClanMemberStatus;
+use App\Enums\FriendshipStatus;
+use App\Events\ClanMessageSent;
+use App\Events\DirectMessageSent;
+use App\Models\ClanMember;
+use App\Models\Friendship;
+use App\Models\Message;
+use App\Models\MessageClear;
+use App\Models\User;
+use App\Support\SafeBroadcast;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
+use Livewire\Component;
+
+class Chat extends Component
+{
+    public const PAGE_SIZE = 30;
+
+    // Mode percakapan aktif: 'dm' (chat teman) atau 'clan' (chat clan). Null =
+    // tampilan daftar percakapan (inbox) saja, belum ada obrolan terbuka.
+    #[Url(as: 'mode')]
+    public ?string $activeMode = null;
+
+    // Username teman yang percakapannya sedang dibuka (mode 'dm').
+    #[Url(as: 'with')]
+    public ?string $withUsername = null;
+
+    public string $body = '';
+
+    // Berapa pesan lama (di luar batch awal) yang sudah dimuat lewat "load
+    // more" -- offset paginasi manual supaya scroll-ke-atas terasa natural.
+    public int $loadedOlder = 0;
+
+    // Kontrol modal "Clear Chat" (pilihan cakupan: semua / lebih lama dari N hari).
+    public bool $showClearModal = false;
+
+    public string $clearScope = 'all'; // 'all' | 'days'
+
+    public int $clearDays = 7;
+
+    /**
+     * Dipanggil oleh listener Echo saat channel chat.{me}/clan-chat.{clanId}
+     * menerima event pesan baru. Livewire otomatis re-render sehingga inbox
+     * & jendela obrolan aktif selalu terkini secara real-time.
+     */
+    #[On('message-received')]
+    public function refreshChat(): void
+    {
+        // Body kosong: pemanggilan action apa pun memicu re-render, dan semua
+        // data di render() adalah computed property yang di-query ulang.
+    }
+
+    // ---- AKSI: NAVIGASI ----
+
+    public function openDm(string $username): void
+    {
+        $friend = User::where('username', $username)->first();
+
+        if (! $friend || ! $this->isAcceptedFriend($friend->id)) {
+            return;
+        }
+
+        $this->activeMode = 'dm';
+        $this->withUsername = $username;
+        $this->loadedOlder = 0;
+        $this->body = '';
+
+        $this->markDmAsRead($friend->id);
+    }
+
+    public function openClanChat(): void
+    {
+        if (! $this->myClan) {
+            return;
+        }
+
+        $this->activeMode = 'clan';
+        $this->withUsername = null;
+        $this->loadedOlder = 0;
+        $this->body = '';
+    }
+
+    public function closeConversation(): void
+    {
+        $this->activeMode = null;
+        $this->withUsername = null;
+        $this->body = '';
+        $this->loadedOlder = 0;
+    }
+
+    public function loadOlder(): void
+    {
+        $this->loadedOlder += self::PAGE_SIZE;
+    }
+
+    // ---- AKSI: KIRIM PESAN ----
+
+    public function sendMessage(): void
+    {
+        $body = trim($this->body);
+
+        if ($body === '' || mb_strlen($body) > 2000) {
+            return;
+        }
+
+        if ($this->activeMode === 'dm') {
+            $this->sendDm($body);
+        } elseif ($this->activeMode === 'clan') {
+            $this->sendClanMessage($body);
+        }
+    }
+
+    private function sendDm(string $body): void
+    {
+        $friend = $this->activeFriend;
+
+        if (! $friend || ! $this->isAcceptedFriend($friend->id)) {
+            return;
+        }
+
+        $message = Message::create([
+            'sender_id' => Auth::id(),
+            'recipient_id' => $friend->id,
+            'body' => $body,
+        ]);
+
+        $this->body = '';
+
+        SafeBroadcast::run(fn () => broadcast(new DirectMessageSent($message->load('sender'))));
+    }
+
+    private function sendClanMessage(string $body): void
+    {
+        $clan = $this->myClan;
+
+        if (! $clan) {
+            return;
+        }
+
+        $message = Message::create([
+            'sender_id' => Auth::id(),
+            'clan_id' => $clan->id,
+            'body' => $body,
+        ]);
+
+        $this->body = '';
+
+        SafeBroadcast::run(fn () => broadcast(new ClanMessageSent($message->load('sender'))));
+    }
+
+    // ---- AKSI: CLEAR CHAT ----
+
+    public function openClearModal(): void
+    {
+        $this->clearScope = 'all';
+        $this->clearDays = 7;
+        $this->showClearModal = true;
+    }
+
+    public function confirmClear(): void
+    {
+        $before = $this->clearScope === 'days'
+            ? now()->subDays(max(1, $this->clearDays))
+            : now();
+
+        if ($this->activeMode === 'dm' && $this->activeFriend) {
+            MessageClear::clearDm(Auth::id(), $this->activeFriend->id, $before);
+        } elseif ($this->activeMode === 'clan' && $this->myClan) {
+            MessageClear::clearClan(Auth::id(), $this->myClan->id, $before);
+        }
+
+        $this->showClearModal = false;
+        $this->loadedOlder = 0;
+    }
+
+    // ---- GERBANG KEAMANAN ----
+
+    /**
+     * Hanya boleh chat dengan user yang berteman DAN status pertemanannya
+     * accepted -- dicek ulang server-side di SETIAP aksi, tak percaya query
+     * string.
+     */
+    private function isAcceptedFriend(int $otherId): bool
+    {
+        $friendship = Auth::user()->friendshipWith($otherId);
+
+        return $friendship?->status === FriendshipStatus::Accepted;
+    }
+
+    private function markDmAsRead(int $friendId): void
+    {
+        Message::where('sender_id', $friendId)
+            ->where('recipient_id', Auth::id())
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+    }
+
+    // ---- DATA (computed) ----
+
+    public function getMyMembershipProperty(): ?ClanMember
+    {
+        return ClanMember::with('clan')
+            ->where('user_id', Auth::id())
+            ->where('status', ClanMemberStatus::Active)
+            ->first();
+    }
+
+    public function getMyClanProperty()
+    {
+        return $this->myMembership?->clan;
+    }
+
+    /**
+     * Teman yang sedang dibuka percakapannya (null kalau belum ada yang
+     * dipilih atau username di query string tak valid/bukan teman).
+     */
+    public function getActiveFriendProperty(): ?User
+    {
+        if ($this->activeMode !== 'dm' || ! $this->withUsername) {
+            return null;
+        }
+
+        $friend = User::where('username', $this->withUsername)->first();
+
+        if (! $friend || ! $this->isAcceptedFriend($friend->id)) {
+            return null;
+        }
+
+        return $friend;
+    }
+
+    /**
+     * Riwayat pesan percakapan aktif (DM atau clan, tergantung activeMode),
+     * sudah disaring lewat visibleTo() supaya pesan yang di-clear oleh user
+     * ini tak muncul lagi -- TAPI tetap ada di DB untuk lawan bicara/anggota
+     * clan lain. Terbaru dulu lalu dibalik supaya tampil lama->baru di layar.
+     */
+    public function getMessagesProperty()
+    {
+        $take = self::PAGE_SIZE + $this->loadedOlder;
+
+        if ($this->activeMode === 'dm') {
+            $friend = $this->activeFriend;
+            if (! $friend) {
+                return collect();
+            }
+
+            return Message::between(Auth::id(), $friend->id)
+                ->visibleTo(Auth::id(), otherUserId: $friend->id)
+                ->latest('id')
+                ->take($take)
+                ->get()
+                ->sortBy('id')
+                ->values();
+        }
+
+        if ($this->activeMode === 'clan') {
+            $clan = $this->myClan;
+            if (! $clan) {
+                return collect();
+            }
+
+            return Message::inClan($clan->id)
+                ->visibleTo(Auth::id(), clanId: $clan->id)
+                ->with('sender')
+                ->latest('id')
+                ->take($take)
+                ->get()
+                ->sortBy('id')
+                ->values();
+        }
+
+        return collect();
+    }
+
+    public function getHasMoreOlderProperty(): bool
+    {
+        $total = 0;
+
+        if ($this->activeMode === 'dm' && $this->activeFriend) {
+            $total = Message::between(Auth::id(), $this->activeFriend->id)
+                ->visibleTo(Auth::id(), otherUserId: $this->activeFriend->id)
+                ->count();
+        } elseif ($this->activeMode === 'clan' && $this->myClan) {
+            $total = Message::inClan($this->myClan->id)
+                ->visibleTo(Auth::id(), clanId: $this->myClan->id)
+                ->count();
+        }
+
+        return $total > (self::PAGE_SIZE + $this->loadedOlder);
+    }
+
+    /**
+     * Daftar percakapan DM (inbox): satu baris per teman yang PERNAH ditukar
+     * pesan, diurutkan berdasarkan pesan terakhir. Hanya dari teman yang
+     * MASIH berstatus accepted -- kalau pertemanan diputus, riwayat pesan
+     * lama tetap ada di DB tapi tak lagi muncul di inbox (bukan dihapus).
+     */
+    public function getConversationsProperty()
+    {
+        $me = Auth::id();
+
+        $friendIds = Friendship::query()
+            ->where('status', FriendshipStatus::Accepted)
+            ->where(fn ($q) => $q->where('requester_id', $me)->orWhere('addressee_id', $me))
+            ->get()
+            ->map(fn (Friendship $f) => $f->requester_id === $me ? $f->addressee_id : $f->requester_id);
+
+        if ($friendIds->isEmpty()) {
+            return collect();
+        }
+
+        return User::query()
+            ->whereIn('id', $friendIds)
+            ->get()
+            ->map(function (User $friend) use ($me) {
+                $lastMessage = Message::between($me, $friend->id)
+                    ->visibleTo($me, otherUserId: $friend->id)
+                    ->latest('id')
+                    ->first();
+
+                $unreadCount = Message::where('sender_id', $friend->id)
+                    ->where('recipient_id', $me)
+                    ->whereNull('read_at')
+                    ->count();
+
+                return [
+                    'user' => $friend,
+                    'lastMessage' => $lastMessage,
+                    'unreadCount' => $unreadCount,
+                    'online' => $friend->isOnline(),
+                ];
+            })
+            // Percakapan tanpa pesan sama sekali ditaruh di bawah (belum pernah ngobrol).
+            ->sortByDesc(fn ($row) => $row['lastMessage']?->created_at ?? Carbon::createFromTimestamp(0))
+            ->values();
+    }
+
+    public function getTotalUnreadProperty(): int
+    {
+        return Message::where('recipient_id', Auth::id())->whereNull('read_at')->count();
+    }
+
+    public function render()
+    {
+        return view('livewire.chat')->layout('layouts.app');
+    }
+}
