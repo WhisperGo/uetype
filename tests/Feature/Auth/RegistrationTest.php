@@ -1,8 +1,8 @@
 <?php
 
-test('registration screen can be rendered', function () {
+test('the registration route redirects to the unified sign-in page', function () {
     $response = $this->get('/register');
 
-    $response->assertStatus(200);
+    $response->assertRedirect(route('login'));
 });
 

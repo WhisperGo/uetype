@@ -99,7 +99,6 @@
                             </button>
                         @else
                             <x-dropdown-link :href="route('login')">{{ __('nav.login') }}</x-dropdown-link>
-                            <x-dropdown-link :href="route('register')">{{ __('nav.register') }}</x-dropdown-link>
 
                             <div class="my-1 border-t border-white/5"></div>
                             <p class="px-4 pt-1 pb-1 text-[0.6rem] font-mono uppercase tracking-wider text-muted/60">{{ __('settings.language.label') }}</p>
@@ -200,7 +199,6 @@
                 </div>
                 <div class="mt-3 space-y-1">
                     <x-responsive-nav-link :href="route('login')">{{ __('nav.login') }}</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('register')">{{ __('nav.register') }}</x-responsive-nav-link>
                 </div>
                 <div class="px-4 mt-4">
                     <p class="text-[0.6rem] font-mono uppercase tracking-wider text-muted/60 mb-1">{{ __('settings.language.label') }}</p>
