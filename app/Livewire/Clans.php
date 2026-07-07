@@ -8,7 +8,6 @@ use App\Events\ClanUpdated;
 use App\Models\Clan;
 use App\Models\ClanMember;
 use App\Support\ClanEmblem;
-use App\Support\SafeBroadcast;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
@@ -225,7 +224,7 @@ class Clans extends Component
 
     private function notify(int $otherUserId, ?array $notification = null): void
     {
-        SafeBroadcast::run(fn () => broadcast(new ClanUpdated($otherUserId, $notification)));
+        broadcast(new ClanUpdated($otherUserId, $notification));
     }
 
     // ---- DATA (computed) ----

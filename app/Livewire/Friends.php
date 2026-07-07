@@ -6,7 +6,6 @@ use App\Enums\FriendshipStatus;
 use App\Events\FriendshipUpdated;
 use App\Models\Friendship;
 use App\Models\User;
-use App\Support\SafeBroadcast;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -159,7 +158,7 @@ class Friends extends Component
      */
     private function notify(int $otherUserId, ?array $notification = null): void
     {
-        SafeBroadcast::run(fn () => broadcast(new FriendshipUpdated($otherUserId, $notification)));
+        broadcast(new FriendshipUpdated($otherUserId, $notification));
     }
 
     // ---- DATA (computed) ----

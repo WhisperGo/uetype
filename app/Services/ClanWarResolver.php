@@ -6,7 +6,6 @@ use App\Enums\ClanWarStatus;
 use App\Events\ClanUpdated;
 use App\Models\ClanWar;
 use App\Models\ClanWarModeClaim;
-use App\Support\SafeBroadcast;
 
 /**
  * Menutup Clan War yang sudah waktunya diselesaikan: tantangan Pending yang
@@ -101,15 +100,15 @@ class ClanWarResolver
             default => 'draw',
         };
 
-        SafeBroadcast::run(fn () => broadcast(new ClanUpdated($war->challenger->leader_id, [
+        broadcast(new ClanUpdated($war->challenger->leader_id, [
             'type' => 'war-result',
             'message' => $label($result).' vs '.$war->opponent->name.' ('.$this->signed($deltaChallenger).' power)',
-        ])));
+        ]));
 
-        SafeBroadcast::run(fn () => broadcast(new ClanUpdated($war->opponent->leader_id, [
+        broadcast(new ClanUpdated($war->opponent->leader_id, [
             'type' => 'war-result',
             'message' => $label($opponentResult).' vs '.$war->challenger->name.' ('.$this->signed($deltaOpponent).' power)',
-        ])));
+        ]));
     }
 
     private function signed(int $n): string

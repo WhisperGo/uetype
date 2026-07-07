@@ -1,9 +1,13 @@
 <?php
 
+use App\Events\RaceProgressUpdated;
+use App\Events\RoomUpdated;
+use App\Events\SuddenDeathTriggered;
 use App\Livewire\MultiplayerLobby;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Models\User;
+use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
 
 describe('multiplayer lobby', function () {
@@ -31,6 +35,9 @@ describe('multiplayer lobby', function () {
     });
 
     it('records the real elapsed time from race start when a player finishes', function () {
+        // Broadcast di-fake supaya updateRaceProgress() tak mencoba konek Reverb asli.
+        Event::fake([RaceProgressUpdated::class, RoomUpdated::class, SuddenDeathTriggered::class]);
+
         $user = User::factory()->create();
 
         // Race dimulai 30 detik yang lalu (race_starts_at di masa lalu), bukan baru saja.

@@ -7,7 +7,6 @@ use App\Events\RoomUpdated;
 use App\Events\SuddenDeathTriggered;
 use App\Models\Room;
 use App\Models\RoomMember;
-use App\Support\SafeBroadcast;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -149,7 +148,7 @@ class MultiplayerLobby extends Component
 
         $this->dispatch('subscribe-room', room: $code);
 
-        SafeBroadcast::run(fn () => broadcast(new RoomUpdated($code))->toOthers());
+        broadcast(new RoomUpdated($code))->toOthers();
     }
 
     #[On('room-updated')]
@@ -229,7 +228,7 @@ class MultiplayerLobby extends Component
                 'is_ready' => ! $member->is_ready,
             ]);
 
-            SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
+            broadcast(new RoomUpdated($this->roomCode))->toOthers();
         }
     }
 
@@ -244,7 +243,7 @@ class MultiplayerLobby extends Component
                 $room->delete();
             }
 
-            SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
+            broadcast(new RoomUpdated($this->roomCode))->toOthers();
         }
 
         $this->roomCode = '';
@@ -318,21 +317,21 @@ class MultiplayerLobby extends Component
         // Ini mengganti pola lama "broadcast ping RoomUpdated -> tiap client re-render
         // Livewire + query DB". Sekarang klien lain cukup baca payload ini dan geser
         // maskot di Alpine store, tanpa round-trip server. Inilah kunci zero-delay.
-        SafeBroadcast::run(fn () => broadcast(new RaceProgressUpdated($this->roomCode, Auth::id(), [
+        broadcast(new RaceProgressUpdated($this->roomCode, Auth::id(), [
             'progress_percent' => $progressPercent,
             'wpm' => $liveWpm,
             'accuracy' => $accuracy,
             'finished' => $justFinished,
-        ]))->toOthers());
+        ]))->toOthers();
 
         // Saat pemain PERTAMA finish -> sudden death mulai. Kirim timestamp akhir yang
         // sama ke semua klien supaya hitung mundur mereka tersinkron (bukan tiap klien
         // menebak sendiri). Server tetap gerbang final via checkSuddenDeath().
         if ($suddenDeathJustStarted) {
-            SafeBroadcast::run(fn () => broadcast(new SuddenDeathTriggered(
+            broadcast(new SuddenDeathTriggered(
                 $this->roomCode,
                 $room->countdown_started_at->copy()->addSeconds(self::SUDDEN_DEATH_SECONDS)->toIso8601String(),
-            )));
+            ));
         }
 
         // Lifecycle (bukan sekadar gerakan): saat ada yang finish, kondisi room berubah
@@ -349,7 +348,7 @@ class MultiplayerLobby extends Component
                 $this->finalizeRace($room->id);
             }
 
-            SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
+            broadcast(new RoomUpdated($this->roomCode));
         }
     }
 
@@ -392,7 +391,7 @@ class MultiplayerLobby extends Component
 
             // Broadcast ke SEMUA (bukan toOthers): klien yang memicu ini juga perlu
             // menerima status 'finished' final + peringkat DNF yang baru dikunci.
-            SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
+            broadcast(new RoomUpdated($this->roomCode));
         }
     }
 
@@ -430,7 +429,7 @@ class MultiplayerLobby extends Component
             $this->showResultModal = false;
             $this->typedText = '';
 
-            SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
+            broadcast(new RoomUpdated($this->roomCode))->toOthers();
         }
     }
 
@@ -610,7 +609,7 @@ class MultiplayerLobby extends Component
 
         // logger('Broadcasting RoomUpdated');
 
-        SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
+        broadcast(new RoomUpdated($this->roomCode));
     }
 
     public function checkRoomStatus(): void
