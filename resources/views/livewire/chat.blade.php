@@ -100,7 +100,7 @@
                             <p class="font-mono text-sm font-bold text-foreground truncate">{{ $this->activeFriend->username }}</p>
                             <p class="font-mono text-xs mt-0.5">
                                 @if ($this->activeFriend->isOnline())
-                                    <span class="text-green-400">{{ __('chat.online') }}</span>
+                                    <span class="text-active">{{ __('chat.online') }}</span>
                                 @elseif ($this->activeFriend->last_seen_at)
                                     <span class="text-muted">{{ __('chat.last_seen', ['time' => $this->activeFriend->last_seen_at->diffForHumans()]) }}</span>
                                 @else

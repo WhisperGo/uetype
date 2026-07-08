@@ -45,8 +45,8 @@
                             <div class="flex-1 min-w-0">
                                 <p class="font-mono text-sm font-bold text-foreground truncate group-hover:text-gold transition-colors">{{ $row['user']->username }}</p>
                                 @if ($row['online'])
-                                    <p class="font-mono text-xs mt-0.5 flex items-center gap-1.5 text-green-400">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>{{ __('friends.online') }}
+                                    <p class="font-mono text-xs mt-0.5 flex items-center gap-1.5 text-active">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-active"></span>{{ __('friends.online') }}
                                     </p>
                                 @elseif ($row['user']->last_seen_at)
                                     <p class="font-mono text-xs text-muted mt-0.5">{{ __('friends.last_seen', ['time' => $row['user']->last_seen_at->diffForHumans()]) }}</p>

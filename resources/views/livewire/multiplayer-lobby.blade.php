@@ -164,7 +164,7 @@
                                             class="inline-block w-full px-2 py-1 text-[0.65rem] font-bold uppercase tracking-wider bg-[#cbb38a] text-black rounded-md">{{ __('multiplayer.host') }}</span>
                                     @else
                                         <span
-                                            class="inline-block w-full px-2 py-1 text-[0.65rem] font-bold uppercase tracking-wider rounded-md {{ $member->is_ready ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-zinc-800 text-zinc-400' }}">
+                                            class="inline-block w-full px-2 py-1 text-[0.65rem] font-bold uppercase tracking-wider rounded-md {{ $member->is_ready ? 'bg-active/15 text-active border border-active/35' : 'bg-zinc-800 text-zinc-400' }}">
                                             {{ $member->is_ready ? __('multiplayer.ready') : __('multiplayer.not_ready') }}
                                         </span>
                                     @endif
@@ -201,7 +201,7 @@
                     @endif
                 @else
                     <button wire:click="toggleReady"
-                        class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-[#cbb38a] hover:bg-[#bfa57a] text-black' }}">
+                        class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? 'bg-active text-background hover:bg-active-5' : 'bg-[#cbb38a] hover:bg-[#bfa57a] text-black' }}">
                         {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? __('multiplayer.im_not_ready') : __('multiplayer.im_ready') }}
                     </button>
                 @endif
@@ -308,7 +308,7 @@
                                     @if ($player->user_id === $this->roomData->host_id)
                                         <span class="text-[10px] text-zinc-500">[{{ __('multiplayer.host') }}]</span>
                                     @endif
-                                    <span class="text-emerald-400 font-bold ml-1" x-show="liveFinished" x-cloak>{{ __('multiplayer.finished') }}</span>
+                                    <span class="text-active font-bold ml-1" x-show="liveFinished" x-cloak>{{ __('multiplayer.finished') }}</span>
                                 </span>
                                 <span class="font-mono text-[#cbb38a] font-bold"><span x-text="liveWpmValue"></span> WPM</span>
                             </div>
@@ -347,7 +347,7 @@
                     <template x-for="(word, wIdx) in words" :key="wIdx">
                         <span
                             :class="{
-                                'text-emerald-400': wIdx < currentWordIndex && !wordHadError[wIdx],
+                                'text-active': wIdx < currentWordIndex && !wordHadError[wIdx],
                                 'text-amber-500/80 underline underline-offset-4 decoration-2 decoration-amber-500/50': wIdx <
                                     currentWordIndex && wordHadError[wIdx],
                                 'text-red-400 bg-red-950/40 ring-1 ring-red-500/30 px-1 rounded underline underline-offset-4 decoration-2': wIdx ===
