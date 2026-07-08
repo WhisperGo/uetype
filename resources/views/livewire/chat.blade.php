@@ -401,7 +401,9 @@
             // banyak kiriman menumpuk. Semua dibersihkan sekaligus begitu SEMUA
             // kiriman selesai (pending kembali 0), digantikan bubble asli.
             let __optSeq = 0;
-            let __pendingSends = 0;
+            // Di window supaya hook morph.updated global (didaftarkan sekali)
+            // selalu membaca counter yang benar walau setelah wire:navigate.
+            window.__chatPendingSends = window.__chatPendingSends || 0;
             window.chatAppendOutgoing = (body) => {
                 const list = document.getElementById('chat-messages');
                 if (!list) return;
@@ -437,7 +439,7 @@
                 const replyId = $wire.replyingToId || null;
                 if (replyId) $wire.cancelReply();
 
-                __pendingSends++;
+                window.__chatPendingSends++;
                 fetch(@js(route('chat.send')), {
                     method: 'POST',
                     headers: {
@@ -452,14 +454,15 @@
                         reply_to_id: replyId,
                     }),
                 }).catch(() => {}).finally(() => {
-                    __pendingSends--;
-                    if (__pendingSends === 0) {
+                    window.__chatPendingSends--;
+                    if (window.__chatPendingSends === 0) {
                         // Debounce: kalau spam beruntun, sinkron sekali di akhir.
+                        // HANYA minta re-render; bubble optimistic TIDAK dihapus
+                        // di sini -- penghapusannya menunggu morph.updated (setelah
+                        // bubble asli benar-benar ada di DOM) supaya tak ada jeda
+                        // "pesan hilang dulu baru muncul".
                         clearTimeout(__syncTimer);
-                        __syncTimer = setTimeout(() => {
-                            document.querySelectorAll('#chat-messages [data-optimistic]').forEach(n => n.remove());
-                            $wire.dispatch('message-received');
-                        }, 120);
+                        __syncTimer = setTimeout(() => $wire.dispatch('message-received'), 120);
                     }
                 });
             };
@@ -538,6 +541,12 @@
             if (!window.__chatScrollHookRegistered) {
                 window.__chatScrollHookRegistered = true;
                 Livewire.hook('morph.updated', () => {
+                    // Bubble asli sudah dirender server -> baru sekarang buang
+                    // placeholder optimistic (tak ada lagi jeda "hilang dulu").
+                    // Hanya kalau tak ada kiriman yang masih berjalan.
+                    if (window.__chatPendingSends === 0) {
+                        document.querySelectorAll('#chat-messages [data-optimistic]').forEach(n => n.remove());
+                    }
                     const el = document.getElementById('chat-messages');
                     if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
                 });
