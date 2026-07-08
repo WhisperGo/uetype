@@ -34,40 +34,40 @@
             </div>
 
             <div
-                class="flex flex-col items-center justify-center p-8 border bg-typing-surface/50 border-white/5 rounded-3xl text-center shadow-lg relative overflow-hidden group w-full">
+                class="flex flex-col items-center justify-center p-8 border bg-typing-surface/50 border-white/5 rounded-3xl text-center shadow-lg relative overflow-hidden group w-full"
+                x-data="{
+                    syncBoxes() {
+                        const boxes = [...$refs.codeBoxes.querySelectorAll('input')];
+                        $wire.set('joinCodeInput', boxes.map(box => box.value));
+                    },
+                    distribute(event) {
+                        event.preventDefault();
+                        const raw = (event.clipboardData || window.clipboardData).getData('text');
+                        const chars = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6).split('');
+                        const code = Array.from({ length: 6 }, (_, i) => chars[i] ?? '');
+                        const boxes = [...$refs.codeBoxes.querySelectorAll('input')];
+                        boxes.forEach((box, i) => { box.value = code[i]; });
+                        $wire.set('joinCodeInput', code);
+                        const lastFilled = Math.min(chars.length, 6) - 1;
+                        (boxes[lastFilled] ?? boxes[0])?.focus();
+                    },
+                    backspace(event) {
+                        if (event.target.value.length !== 0) { return; }
+                        const prev = event.target.previousElementSibling;
+                        if (!prev) { return; }
+                        event.preventDefault();
+                        prev.value = '';
+                        prev.focus();
+                        this.syncBoxes();
+                    }
+                }">
                 <div class="w-20 h-20 mb-6 flex items-center justify-center text-4xl transition duration-300">
                     <img src="/icon/uetype_mascot.png" alt="{{ __('multiplayer.join_room') }}">
                 </div>
                 <h3 class="text-xl font-mono font-bold tracking-wider text-typing-text mb-2 uppercase">{{ __('multiplayer.join_room') }}</h3>
                 <p class="text-sm text-typing-muted max-w-xs mb-6">{{ __('multiplayer.join_room_desc') }}</p>
 
-                <div class="flex gap-2 mb-6"
-                    x-data="{
-                        syncBoxes() {
-                            const boxes = [...$el.querySelectorAll('input')];
-                            $wire.set('joinCodeInput', boxes.map(box => box.value));
-                        },
-                        distribute(event) {
-                            event.preventDefault();
-                            const raw = (event.clipboardData || window.clipboardData).getData('text');
-                            const chars = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6).split('');
-                            const code = Array.from({ length: 6 }, (_, i) => chars[i] ?? '');
-                            const boxes = [...$el.querySelectorAll('input')];
-                            boxes.forEach((box, i) => { box.value = code[i]; });
-                            $wire.set('joinCodeInput', code);
-                            const lastFilled = Math.min(chars.length, 6) - 1;
-                            (boxes[lastFilled] ?? boxes[0])?.focus();
-                        },
-                        backspace(event) {
-                            if (event.target.value.length !== 0) { return; }
-                            const prev = event.target.previousElementSibling;
-                            if (!prev) { return; }
-                            event.preventDefault();
-                            prev.value = '';
-                            prev.focus();
-                            this.syncBoxes();
-                        }
-                    }">
+                <div class="flex gap-2 mb-6" x-ref="codeBoxes">
                     @foreach (range(0, 5) as $index)
                         <input type="text" maxlength="1" wire:key="join-box-{{ $index }}"
                             class="w-12 h-14 text-center font-mono text-xl font-bold uppercase bg-typing-bg border border-white/10 rounded-xl focus:border-typing-accent focus:ring-0 text-typing-text"

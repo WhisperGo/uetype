@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AchievementController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PresenceController;
@@ -45,6 +46,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/friends', Friends::class)->name('friends.index');
     Route::get('/chat', Chat::class)->name('chat.index');
+    // Kirim pesan lewat endpoint ringan (paralel, di luar antrean Livewire)
+    // supaya spam pesan tak saling menunggu.
+    Route::post('/chat/send', [ChatController::class, 'send'])->name('chat.send');
 
     Route::get('/clans', Clans::class)->name('clans.index');
     Route::get('/clan-war', ClanWar::class)->name('clan-war.index');

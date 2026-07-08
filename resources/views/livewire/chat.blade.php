@@ -46,7 +46,7 @@
             </div>
         @else
             <div class="flex flex-col items-center justify-center py-16 text-center select-none">
-                <img src="/icon/uetype_mascot.png" alt="" class="w-16 h-16 opacity-30 mb-4">
+                <img src="/icon/uetype_mascot.png" alt="" class="w-16 opacity-30 mb-4">
                 <p class="font-mono text-sm font-bold text-foreground">{{ __('chat.empty_inbox_title') }}</p>
                 <p class="font-mono text-xs text-muted mt-1">{{ __('chat.empty_inbox_body') }}</p>
                 <a href="{{ route('friends.index') }}" wire:navigate
@@ -128,7 +128,7 @@
 
             {{-- Daftar pesan --}}
             <div x-data="chatScroll()" x-init="init()" id="chat-messages"
-                class="flex-1 overflow-y-auto p-4 space-y-3">
+                class="flex-1 overflow-y-auto chat-scroll p-4 space-y-3">
                 @if ($this->hasMoreOlder)
                     <div class="flex justify-center pb-2">
                         <button wire:click="loadOlder" class="font-mono text-xs text-muted hover:text-foreground border border-white/10 rounded-lg px-3 py-1.5 transition">
@@ -170,6 +170,20 @@
                                     <div class="px-4 py-2.5 rounded-2xl font-mono text-sm break-words
                                         {{ $mine ? 'bg-gold text-background rounded-br-md' : 'bg-white/5 text-foreground rounded-bl-md' }}
                                         {{ $deleted ? 'opacity-60 italic' : '' }}">
+                                        {{-- Kutipan pesan yang dibalas (kalau ini reply & pesan asli masih ada). --}}
+                                        @if (! $deleted && $message->reply_to_id && $message->replyTo)
+                                            <button type="button" onclick="window.chatScrollToMessage({{ $message->reply_to_id }})"
+                                                class="block w-full text-left mb-1.5 pl-2 border-l-2 rounded-r
+                                                    {{ $mine ? 'border-background/40 bg-background/10' : 'border-gold/50 bg-white/5' }} px-2 py-1">
+                                                <span class="block text-[0.65rem] font-bold {{ $mine ? 'text-background/80' : 'text-gold' }}">
+                                                    {{ $message->replyTo->sender_id === auth()->id() ? __('chat.you') : $message->replyTo->sender->username }}
+                                                </span>
+                                                <span class="block text-[0.7rem] opacity-70 truncate">
+                                                    {{ $message->replyTo->isDeletedForEveryone() ? __('chat.deleted_placeholder') : Str::limit($message->replyTo->body, 60) }}
+                                                </span>
+                                            </button>
+                                        @endif
+
                                         @if ($deleted)
                                             <span class="flex items-center gap-1.5">
                                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
@@ -202,7 +216,7 @@
                                                     const btn = this.$refs.trigger.getBoundingClientRect();
                                                     const area = box.getBoundingClientRect();
                                                     const spaceBelow = area.bottom - btn.bottom;
-                                                    this.up = spaceBelow < 180; // tinggi menu ± 3 item
+                                                    this.up = spaceBelow < 220; // tinggi menu ± 4 item
                                                     this.open = true;
                                                 },
                                             }" @click.outside="open = false" class="relative shrink-0">
@@ -215,6 +229,11 @@
                                             <div x-show="open" x-cloak x-transition
                                                 :class="up ? 'bottom-full mb-1' : 'top-full mt-1'"
                                                 class="absolute z-30 {{ $mine ? 'right-0' : 'left-0' }} w-48 py-1 bg-surface border border-white/10 rounded-xl shadow-lg overflow-hidden">
+                                                <button wire:click="startReply({{ $message->id }})" @click="open = false"
+                                                    class="w-full flex items-center gap-2.5 text-left px-3 py-2 font-mono text-xs font-semibold text-foreground hover:bg-white/5 transition">
+                                                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6M3 10l6-6" /></svg>
+                                                    {{ __('chat.reply') }}
+                                                </button>
                                                 @if ($canEdit)
                                                     <button wire:click="startEdit({{ $message->id }})" @click="open = false"
                                                         class="w-full flex items-center gap-2.5 text-left px-3 py-2 font-mono text-xs font-semibold text-gold hover:bg-gold/10 transition">
@@ -247,21 +266,39 @@
                 @endforelse
             </div>
 
+            {{-- Preview pesan yang sedang dibalas (di atas input). --}}
+            @if ($this->replyingTo)
+                <div class="flex items-center gap-3 px-4 pt-3 shrink-0">
+                    <div class="flex-1 min-w-0 pl-3 border-l-2 border-gold">
+                        <p class="font-mono text-[0.65rem] font-bold text-gold">
+                            {{ __('chat.replying_to') }}
+                            {{ $this->replyingTo->sender_id === auth()->id() ? __('chat.you') : $this->replyingTo->sender->username }}
+                        </p>
+                        <p class="font-mono text-xs text-muted truncate">
+                            {{ $this->replyingTo->isDeletedForEveryone() ? __('chat.deleted_placeholder') : Str::limit($this->replyingTo->body, 80) }}
+                        </p>
+                    </div>
+                    <button wire:click="cancelReply" class="text-muted hover:text-foreground shrink-0 p-1" aria-label="{{ __('chat.cancel_reply') }}" title="{{ __('chat.cancel_reply') }}">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+            @endif
+
             {{-- Input --}}
-            {{-- Tombol enable/disable dihitung di CLIENT via Alpine (bukan
-                 @disabled server-side) supaya berubah seketika saat mengetik,
-                 tanpa menunggu round-trip Livewire. wire:model.live tetap
-                 dipakai agar $body server ikut sinkron untuk validasi. --}}
-            {{-- draft = @entangle('body') (BUKAN .live) supaya server tetap
-                 sumber kebenaran $body: Livewire men-sync input ke $body
-                 sebelum menjalankan sendMessage, lalu sendMessage yang
-                 mengosongkan $body dan entangle memantulkannya balik ke draft.
-                 Optimistic append TIDAK menyentuh draft, jadi $body tak pernah
-                 keburu kosong saat action jalan. --}}
-            <form wire:submit.prevent="sendMessage" x-data="{ draft: @entangle('body') }"
-                @submit="if (draft.trim() !== '') { window.chatAppendOutgoing(draft.trim()); }"
+            {{-- Kirim lewat fetch() ke /chat/send (PARALEL, di luar antrean
+                 Livewire) supaya spam pesan tak saling menunggu. Bubble
+                 optimistic langsung digambar, input langsung kosong & tetap
+                 fokus. Tak ada round-trip komponen per kiriman. --}}
+            <form x-data="{ draft: '' }"
+                @submit.prevent="
+                    const b = draft.trim();
+                    if (b === '') return;
+                    window.chatSend(b);
+                    draft = '';
+                    $refs.msgInput.focus();
+                "
                 class="flex items-center gap-3 p-4 border-t border-white/5 shrink-0">
-                <input type="text" x-model="draft" maxlength="2000" autocomplete="off"
+                <input type="text" x-model="draft" x-ref="msgInput" maxlength="2000" autocomplete="off"
                     placeholder="{{ __('chat.placeholder') }}"
                     class="flex-1 px-4 py-2.5 bg-surface/40 border border-white/10 rounded-2xl font-mono text-sm text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
                 <button type="submit"
@@ -358,15 +395,22 @@
             };
 
             // Pesan KELUAR (milik sendiri) ditampilkan seketika saat submit,
-            // sebelum server merespons. Tak diberi wire:key -- ditandai
-            // data-optimistic; saat Livewire morph membawa bubble asli (dengan
-            // id DB), node sementara ini otomatis tergantikan (tanpa duplikat).
+            // sebelum server merespons -- mendukung spam beruntun. Tiap bubble
+            // optimistic diberi wire:key unik "opt-N" supaya Livewire morph TAK
+            // menyentuhnya (key tak dikenal = dibiarkan), jadi tak ada kedip saat
+            // banyak kiriman menumpuk. Semua dibersihkan sekaligus begitu SEMUA
+            // kiriman selesai (pending kembali 0), digantikan bubble asli.
+            let __optSeq = 0;
+            // Di window supaya hook morph.updated global (didaftarkan sekali)
+            // selalu membaca counter yang benar walau setelah wire:navigate.
+            window.__chatPendingSends = window.__chatPendingSends || 0;
             window.chatAppendOutgoing = (body) => {
                 const list = document.getElementById('chat-messages');
                 if (!list) return;
                 const wrap = document.createElement('div');
                 wrap.className = 'flex justify-end';
                 wrap.setAttribute('data-optimistic', '1');
+                wrap.setAttribute('wire:key', `opt-${++__optSeq}`);
                 wrap.innerHTML =
                     '<div class="max-w-[75%]">' +
                         '<div class="px-4 py-2.5 rounded-2xl font-mono text-sm break-words bg-gold text-background rounded-br-md opacity-70">' +
@@ -376,6 +420,60 @@
                     '</div>';
                 list.appendChild(wrap);
                 requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
+            };
+
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+            let __syncTimer = null;
+
+            // Kirim pesan lewat fetch() PARALEL (bukan lewat Livewire) -> spam
+            // pesan tak saling menunggu. Bubble optimistic langsung tampil;
+            // setelah kiriman selesai, sinkron sekali (debounced) ke server
+            // supaya bubble asli (dgn id & waktu server) menggantikan optimistic.
+            window.chatSend = (body) => {
+                const mode = $wire.activeMode;
+                if (!mode) return;
+
+                window.chatAppendOutgoing(body);
+
+                // Reply hanya berlaku untuk kiriman pertama sejak preview dibuka.
+                const replyId = $wire.replyingToId || null;
+                if (replyId) $wire.cancelReply();
+
+                window.__chatPendingSends++;
+                fetch(@js(route('chat.send')), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        mode,
+                        body,
+                        with: $wire.withUsername || null,
+                        reply_to_id: replyId,
+                    }),
+                }).catch(() => {}).finally(() => {
+                    window.__chatPendingSends--;
+                    if (window.__chatPendingSends === 0) {
+                        // Debounce: kalau spam beruntun, sinkron sekali di akhir.
+                        // HANYA minta re-render; bubble optimistic TIDAK dihapus
+                        // di sini -- penghapusannya menunggu morph.updated (setelah
+                        // bubble asli benar-benar ada di DOM) supaya tak ada jeda
+                        // "pesan hilang dulu baru muncul".
+                        clearTimeout(__syncTimer);
+                        __syncTimer = setTimeout(() => $wire.dispatch('message-received'), 120);
+                    }
+                });
+            };
+
+            // Klik kutipan reply -> gulir ke pesan asli & kedipkan sebentar.
+            window.chatScrollToMessage = (id) => {
+                const el = document.querySelector(`[wire\\:key="msg-${id}"]`);
+                if (!el) return;
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('chat-flash');
+                setTimeout(() => el.classList.remove('chat-flash'), 1200);
             };
 
             const onRemote = (ev) => {
@@ -390,9 +488,44 @@
             };
             window.addEventListener('message-received-remote', onRemote);
 
-            // Edit/hapus pesan dari sisi lain: cukup minta Livewire re-render
-            // supaya bubble memperbarui isinya / jadi placeholder / label edited.
-            const onMutated = () => $wire.dispatch('message-received');
+            // Edit/hapus pesan dari sisi lain: PATCH bubble langsung dari payload
+            // (instan, tanpa round-trip), lalu tetap sinkron ke server di belakang
+            // layar untuk state otoritatif.
+            const patchMutation = (d) => {
+                const node = document.querySelector(`[wire\\:key="msg-${d.messageId}"]`);
+                if (!node) return false;
+                // Cari elemen bubble teks (div ber-rounded di dalam node pesan).
+                const bubble = node.querySelector('.rounded-2xl');
+                if (!bubble) return false;
+
+                if (d.action === 'edited') {
+                    // Ganti teks isi + tambahkan label "· edited" bila belum ada.
+                    // Struktur bubble: [kutipan?] teks <p time>. Kita ubah node teks
+                    // terakhir sebelum <p> waktu; paling aman: re-render sederhana.
+                    const timeP = bubble.querySelector('p.opacity-60');
+                    // Bangun ulang isi bubble: hapus semua kecuali <p> waktu, sisipkan teks baru.
+                    [...bubble.childNodes].forEach(n => { if (n !== timeP) n.remove(); });
+                    bubble.insertBefore(document.createTextNode(d.body ?? ''), timeP);
+                    if (timeP && !timeP.dataset.edited) {
+                        timeP.append(` · {{ __('chat.edited') }}`);
+                        timeP.dataset.edited = '1';
+                    }
+                } else if (d.action === 'deleted') {
+                    bubble.classList.add('opacity-60', 'italic');
+                    bubble.innerHTML =
+                        '<span class="flex items-center gap-1.5">' +
+                        '<svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>' +
+                        @js(__('chat.deleted_placeholder')) +
+                        '</span>';
+                }
+                return true;
+            };
+            const onMutated = (ev) => {
+                const d = ev.detail;
+                if (d && d.messageId) patchMutation(d);
+                // Sinkron server (mis. untuk pesan yang belum termuat / kutipan reply).
+                $wire.dispatch('message-received');
+            };
             window.addEventListener('message-mutated-remote', onMutated);
 
             document.addEventListener('livewire:navigating', () => {
@@ -408,6 +541,12 @@
             if (!window.__chatScrollHookRegistered) {
                 window.__chatScrollHookRegistered = true;
                 Livewire.hook('morph.updated', () => {
+                    // Bubble asli sudah dirender server -> baru sekarang buang
+                    // placeholder optimistic (tak ada lagi jeda "hilang dulu").
+                    // Hanya kalau tak ada kiriman yang masih berjalan.
+                    if (window.__chatPendingSends === 0) {
+                        document.querySelectorAll('#chat-messages [data-optimistic]').forEach(n => n.remove());
+                    }
                     const el = document.getElementById('chat-messages');
                     if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
                 });
