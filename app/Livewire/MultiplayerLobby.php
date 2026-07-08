@@ -187,7 +187,8 @@ class MultiplayerLobby extends Component
 
         $members = RoomMember::with('user')
             ->where('room_id', $roomId)
-            ->orderBy('wpm', 'desc')
+            // ->orderBy('wpm', 'desc')
+            ->orderBy('finished_time_seconds', 'asc')
             ->orderBy('progress_percent', 'desc')
             ->orderByRaw('finished_time_seconds IS NULL, finished_time_seconds ASC')
             ->get();

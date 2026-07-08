@@ -128,7 +128,7 @@
 
             {{-- Daftar pesan --}}
             <div x-data="chatScroll()" x-init="init()" id="chat-messages"
-                class="flex-1 overflow-y-auto p-4 space-y-3">
+                class="flex-1 overflow-y-auto chat-scroll p-4 space-y-3">
                 @if ($this->hasMoreOlder)
                     <div class="flex justify-center pb-2">
                         <button wire:click="loadOlder" class="font-mono text-xs text-muted hover:text-foreground border border-white/10 rounded-lg px-3 py-1.5 transition">
