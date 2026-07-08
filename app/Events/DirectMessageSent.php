@@ -9,12 +9,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-/**
- * Disiarkan saat pesan DM (chat teman) terkirim. Dikirim ke channel per-user
- * 'chat.{recipientId}' milik PENERIMA saja (pengirim sudah tahu pesannya
- * sendiri lewat optimistic update Livewire) -- pola sama dgn FriendshipUpdated/
- * ClanUpdated/PresenceUpdated (channel publik per-user, ShouldBroadcastNow).
- */
+/** Pesan DM terkirim; channel per-user 'chat.{recipientId}' milik penerima saja (pengirim sudah tahu via optimistic update). */
 class DirectMessageSent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
@@ -31,11 +26,7 @@ class DirectMessageSent implements ShouldBroadcastNow
         return 'dm.sent';
     }
 
-    /**
-     * Payload minimal -- cukup untuk toast + menyegarkan jendela chat kalau
-     * sedang terbuka. Tak menyertakan seluruh model (hindari bocor kolom
-     * yang tak perlu ke WebSocket publik).
-     */
+    /** Payload minimal (bukan seluruh model): hindari bocor kolom ke WebSocket publik. */
     public function broadcastWith(): array
     {
         return [

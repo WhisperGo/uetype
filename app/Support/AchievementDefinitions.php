@@ -3,19 +3,10 @@
 namespace App\Support;
 
 /**
- * DAFTAR DEFINISI ACHIEVEMENT — SATU-SATUNYA SUMBER KEBENARAN (di KODE, bukan DB).
- *
- * Sesuai catatan fitur (10. Achievement.md):
- * - Achievement bersifat STATIS: dihitung dari data yang SUDAH ADA (typing_results,
- *   users.total_xp, users.highest_wpm) saat halaman dibuka. TIDAK ada rule engine
- *   yang berjalan terus-menerus.
- * - HANYA achievement "murah" yang boleh: cek satu angka dari data existing. DILARANG
- *   yang butuh pelacakan streak/temporal (login beruntun, menang beruntun, dst).
- * - Definisi (judul/deskripsi/syarat) ADA DI KODE ini; tabel user_achievements hanya
- *   mencatat SIAPA meraih APA & KAPAN (Pendekatan B).
- *
- * Setiap syarat = closure yang menerima array $stats terhitung dan mengembalikan bool.
- * Semua metrik di $stats diturunkan dari data existing (lihat AchievementService).
+ * Sumber kebenaran definisi achievement (di kode, bukan DB). Statis: dihitung dari
+ * data existing (typing_results, users.total_xp/highest_wpm), tanpa rule engine
+ * atau pelacakan streak/temporal. user_achievements hanya mencatat siapa & kapan.
+ * Tiap `check` = closure(array $stats): bool; $stats diturunkan di AchievementService.
  */
 class AchievementDefinitions
 {

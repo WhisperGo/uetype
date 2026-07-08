@@ -12,15 +12,11 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 /**
- * Pemilih lawan Ghost Mode. Komponen TERPISAH dari TypingEngine (query
- * teman/leaderboard-nya sendiri, siklus hidup buka/tutup modal sendiri),
- * dikoordinasikan dengan Alpine di typing-engine.blade.php lewat browser
- * event 'ghost-selected'/'ghost-cleared' (bukan @entangle lintas komponen).
+ * Pemilih lawan Ghost Mode. Komponen terpisah dari TypingEngine, dikoordinasikan
+ * dengan Alpine lewat browser event 'ghost-selected'/'ghost-cleared'.
  *
- * TRUST BOUNDARY: client hanya mengirim IDENTIFIER (friendship_id / user_id),
- * TIDAK PERNAH angka WPM langsung. selectOpponent() selalu menurunkan ulang
- * WPM dari database di sini — mencegah devtools memalsukan WPM ghost lewat
- * event palsu (murni integritas tampilan, karena tak ada yang di-persist).
+ * Trust boundary: client hanya mengirim identifier (friendship_id/user_id), tak
+ * pernah WPM langsung — selectOpponent() selalu menurunkan ulang WPM dari DB.
  */
 class GhostPicker extends Component
 {
@@ -34,9 +30,7 @@ class GhostPicker extends Component
         $this->subMode = $subMode;
     }
 
-    /**
-     * Ghost Mode hanya berlaku untuk Time & Words (sesuai keputusan produk).
-     */
+    /** Ghost Mode hanya berlaku untuk Time & Words. */
     private function isEligibleMode(): bool
     {
         return in_array($this->mainMode, ['time', 'words'], true);
@@ -48,8 +42,7 @@ class GhostPicker extends Component
     }
 
     /**
-     * Teman (accepted) dengan highest_wpm > 0 saja — yang belum pernah main
-     * TIDAK ditawarkan sebagai ghost 0 WPM (disembunyikan, bukan disabled).
+     * Teman accepted dengan highest_wpm > 0 saja; yang belum pernah main disembunyikan.
      *
      * @return Collection<int, array{friendship_id:int, user_id:int, username:string, highest_wpm:float}>
      */
@@ -77,10 +70,8 @@ class GhostPicker extends Component
     }
 
     /**
-     * Top entries leaderboard untuk mode/config yang sedang aktif di TypingEngine
-     * (reuse bentuk query yang sama dengan resources/views/livewire/leaderboard.blade.php).
-     * Ghost hanya berlaku time/words, jadi metric SELALU net_wpm (bukan duration_seconds
-     * seperti survival).
+     * Top entries leaderboard untuk mode/config aktif di TypingEngine. Ghost hanya
+     * time/words, jadi metric selalu net_wpm.
      *
      * @return Collection<int, array{user_id:int, username:string, wpm:float, accuracy:float}>
      */
@@ -119,7 +110,7 @@ class GhostPicker extends Component
      *   'own'         -> diabaikan, pakai Auth::user() langsung.
      *   'friend'      -> $refId = friendship_id (divalidasi kepemilikan).
      *   'leaderboard' -> $refId = user_id target (di-scope ulang ke mode/config aktif).
-     * WPM SELALU diturunkan ulang dari DB di sini, tidak pernah dari client.
+     * WPM selalu diturunkan ulang dari DB, tidak pernah dari client.
      */
     public function selectOpponent(string $type, ?int $refId = null): void
     {

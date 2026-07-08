@@ -9,11 +9,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-/**
- * Disiarkan saat pesan diedit. Dikirim ke channel yang sama dengan saat
- * pesan pertama dibuat (chat.{recipientId} untuk DM, clan-chat.{clanId}
- * untuk clan) supaya sisi lain memperbarui isi bubble + label "(edited)".
- */
+/** Pesan diedit; channel sama seperti saat dibuat, sisi lain update bubble + label "(edited)". */
 class MessageEdited implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;

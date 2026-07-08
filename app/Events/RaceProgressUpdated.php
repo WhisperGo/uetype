@@ -4,7 +4,7 @@ namespace App\Events;
 
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow; // Menggunakan broadcastNow agar instan tanpa antrean queue
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -22,7 +22,7 @@ class RaceProgressUpdated implements ShouldBroadcastNow
     {
         $this->roomCode = $roomCode;
         $this->userId = $userId;
-        $this->progressData = $progressData; // berisi progress_percent, wpm, accuracy
+        $this->progressData = $progressData; // progress_percent, wpm, accuracy
     }
 
     public function broadcastOn(): array

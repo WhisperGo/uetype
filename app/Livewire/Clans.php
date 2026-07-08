@@ -16,7 +16,7 @@ use Livewire\Component;
 
 class Clans extends Component
 {
-    // Batas member aktif per clan (keputusan MVP -- lihat rencana Clan Mode).
+    // Batas member aktif per clan.
     public const MAX_MEMBERS = 20;
 
     // Tab aktif: 'my-clan' | 'browse' | 'create'
@@ -38,8 +38,7 @@ class Clans extends Component
 
     public function mount(): void
     {
-        // Kalau user sudah punya clan, tab default yang masuk akal adalah
-        // clan miliknya sendiri; kalau belum, arahkan ke Browse.
+        // Tab default: clan sendiri kalau sudah punya, kalau belum ke Browse.
         $this->tab = $this->myClan ? 'my-clan' : 'browse';
     }
 
@@ -50,11 +49,7 @@ class Clans extends Component
         }
     }
 
-    /**
-     * Dipanggil oleh listener Echo saat channel clan.{me} menerima event.
-     * Body kosong: pemanggilan action apa pun memicu re-render, dan semua
-     * data di render() adalah computed property yang di-query ulang.
-     */
+    /** Listener Echo clan.{me}; body kosong karena action apa pun memicu re-render. */
     #[On('clan-updated')]
     public function refreshClan(): void
     {
@@ -90,8 +85,7 @@ class Clans extends Component
             'leader_id' => Auth::id(),
         ]);
 
-        // Pembuat langsung jadi member aktif berperan leader -- tak perlu
-        // approve diri sendiri.
+        // Pembuat langsung jadi member aktif berperan leader.
         ClanMember::create([
             'clan_id' => $clan->id,
             'user_id' => Auth::id(),
@@ -113,7 +107,7 @@ class Clans extends Component
             return;
         }
 
-        // Cegah kirim ulang kalau sudah ada baris (pending atau aktif) ke clan ini.
+        // Cegah kirim ulang kalau sudah ada baris ke clan ini.
         $exists = ClanMember::where('clan_id', $clanId)
             ->where('user_id', Auth::id())
             ->exists();
@@ -181,7 +175,7 @@ class Clans extends Component
             ->whereHas('clan', fn ($q) => $q->where('leader_id', Auth::id()))
             ->first();
 
-        // Leader tak bisa mengeluarkan dirinya sendiri lewat aksi ini.
+        // Leader tak bisa mengeluarkan dirinya sendiri.
         if (! $member || $member->user_id === Auth::id()) {
             return;
         }
@@ -199,8 +193,7 @@ class Clans extends Component
             return;
         }
 
-        // Leader harus membubarkan/transfer clan dulu -- di luar scope MVP,
-        // jadi cukup blokir leave untuk leader.
+        // Leader harus membubarkan/transfer clan dulu; leave diblokir untuk leader.
         if ($membership->role === ClanRole::Leader) {
             return;
         }
@@ -211,10 +204,7 @@ class Clans extends Component
         $this->notify($leaderId);
     }
 
-    /**
-     * Baris ClanMember pending milik clan yang DIPIMPIN user ini. Gerbang
-     * keamanan: hanya leader clan bersangkutan boleh approve/reject.
-     */
+    /** Baris ClanMember pending milik clan yang dipimpin user ini; hanya leader boleh approve/reject. */
     private function pendingForMyLeadership(int $clanMemberId): ?ClanMember
     {
         return ClanMember::where('id', $clanMemberId)

@@ -8,8 +8,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-// ShouldBroadcastNow (bukan ShouldBroadcast): dikirim langsung tanpa antre queue,
-// supaya sinkronisasi hitung mundur sudden death instan tanpa perlu queue worker.
+/** ShouldBroadcastNow: hitung mundur sudden death perlu sinkron instan tanpa queue worker. */
 class SuddenDeathTriggered implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
@@ -21,7 +20,7 @@ class SuddenDeathTriggered implements ShouldBroadcastNow
     public function __construct($roomCode, $endTimeIso)
     {
         $this->roomCode = $roomCode;
-        $this->endTimeIso = $endTimeIso; // Waktu masa tenggang berakhir dalam format ISO string
+        $this->endTimeIso = $endTimeIso; // ISO string
     }
 
     public function broadcastOn(): array

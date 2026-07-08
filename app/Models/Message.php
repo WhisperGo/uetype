@@ -42,10 +42,7 @@ class Message extends Model
         return $this->belongsTo(Clan::class);
     }
 
-    /**
-     * Pesan yang dibalas oleh pesan ini (null kalau bukan reply, atau kalau
-     * pesan aslinya sudah dihapus dari DB).
-     */
+    /** Null kalau bukan reply, atau pesan aslinya sudah dihapus dari DB. */
     public function replyTo(): BelongsTo
     {
         return $this->belongsTo(Message::class, 'reply_to_id');
@@ -66,10 +63,7 @@ class Message extends Model
         return $this->deleted_for_everyone_at !== null;
     }
 
-    /**
-     * Boleh diedit hanya oleh pengirim, jika belum dihapus-untuk-semua, dan
-     * masih dalam jendela EDIT_WINDOW_MINUTES menit sejak dikirim.
-     */
+    /** Hanya pengirim, belum dihapus-untuk-semua, dan masih dalam EDIT_WINDOW_MINUTES. */
     public function canBeEditedBy(int $userId): bool
     {
         return $this->sender_id === $userId
@@ -77,18 +71,13 @@ class Message extends Model
             && $this->created_at->gt(now()->subMinutes(self::EDIT_WINDOW_MINUTES));
     }
 
-    /**
-     * "Delete for everyone" hanya boleh oleh pengirim & belum dihapus.
-     */
+    /** "Delete for everyone" hanya boleh oleh pengirim & belum dihapus. */
     public function canBeDeletedForEveryoneBy(int $userId): bool
     {
         return $this->sender_id === $userId && ! $this->isDeletedForEveryone();
     }
 
-    /**
-     * Scope: semua pesan DM antara dua user (kedua arah). Dipakai baik
-     * untuk daftar percakapan (ambil pesan terakhir) maupun riwayat penuh.
-     */
+    /** Scope: semua pesan DM antara dua user (kedua arah). */
     public function scopeBetween($query, int $userA, int $userB)
     {
         return $query->whereNull('clan_id')->where(function ($q) use ($userA, $userB) {
@@ -108,16 +97,10 @@ class Message extends Model
         return $query->where('clan_id', $clanId);
     }
 
-    /**
-     * Scope: sembunyikan pesan yang sudah di-clear oleh $userId (baik lewat
-     * clear DM dgn $otherUserId maupun clear chat clan $clanId) -- pesan
-     * created_at <= cleared_before tak akan muncul untuk user ini, tapi
-     * baris pesannya sendiri TETAP ada di DB utuh untuk partisipan lain.
-     */
+    /** Scope: sembunyikan pesan di-clear oleh $userId (soft-hide; baris tetap ada untuk partisipan lain). */
     public function scopeVisibleTo($query, int $userId, ?int $otherUserId = null, ?int $clanId = null)
     {
-        // "Delete for me" per-pesan: sembunyikan pesan yang user ini hapus
-        // untuk dirinya sendiri (tetap ada untuk orang lain).
+        // "Delete for me" per-pesan: sembunyikan untuk user ini saja, tetap ada untuk lainnya.
         $query->whereNotExists(function ($sub) use ($userId) {
             $sub->selectRaw('1')
                 ->from('message_deletes')

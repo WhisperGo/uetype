@@ -5,11 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * Penanda "delete for me" per-pesan. Lihat migration create_message_deletes_table:
- * menyembunyikan satu pesan HANYA dari user ini, baris pesan aslinya tetap ada
- * untuk semua orang lain.
- */
+/** Penanda "delete for me" per-pesan: sembunyikan dari user ini saja, baris asli tetap ada untuk lainnya. */
 class MessageDelete extends Model
 {
     protected $fillable = [
@@ -27,10 +23,7 @@ class MessageDelete extends Model
         return $this->belongsTo(Message::class);
     }
 
-    /**
-     * Sembunyikan pesan dari user ini saja. firstOrCreate supaya idempoten
-     * (klik dua kali tak error / tak menumpuk baris).
-     */
+    /** firstOrCreate: idempoten, klik dua kali tak error/menumpuk. */
     public static function hide(int $userId, int $messageId): void
     {
         static::firstOrCreate([

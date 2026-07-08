@@ -5,10 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * Penanda "clear chat" per-user. Lihat migration create_message_clears_table
- * untuk penjelasan lengkap kenapa ini soft-hide (bukan hapus pesan asli).
- */
+/** Penanda "clear chat" per-user; soft-hide, bukan hapus pesan asli (lihat migration). */
 class MessageClear extends Model
 {
     protected $fillable = [
@@ -37,11 +34,7 @@ class MessageClear extends Model
         return $this->belongsTo(Clan::class);
     }
 
-    /**
-     * Catat/perbarui penanda clear DM antara $userId & $otherUserId sampai
-     * $before (default: sekarang -> efektif "clear semua sejauh ini").
-     * updateOrCreate supaya clear berulang menaikkan batas, bukan menumpuk.
-     */
+    /** updateOrCreate: clear berulang menaikkan batas cleared_before, bukan menumpuk baris. */
     public static function clearDm(int $userId, int $otherUserId, ?\DateTimeInterface $before = null): void
     {
         static::updateOrCreate(

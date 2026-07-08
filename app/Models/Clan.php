@@ -20,11 +20,7 @@ class Clan extends Model
         'power',
     ];
 
-    /**
-     * Power (rating Elo) mulai dari 1000. Level clan diturunkan MURNI dari power —
-     * tak ada kolom level tersimpan, jadi tak pernah out-of-sync. Tiap POWER_PER_LEVEL
-     * poti power menaikkan satu level; BASE_POWER = level 1.
-     */
+    /** Level clan diturunkan murni dari power (tak ada kolom level, tak pernah out-of-sync). */
     public const BASE_POWER = 1000;
 
     public const POWER_PER_LEVEL = 100;
@@ -42,9 +38,7 @@ class Clan extends Model
     }
 
     /**
-     * Data level untuk presentasi (level, progres di level ini, dan berapa power
-     * yang dibutuhkan untuk naik). Meniru pola User::levelData(): satu sumber
-     * kebenaran, dipakai header show / kartu my-clan / baris leaderboard.
+     * Data level untuk presentasi; pola sama seperti User::levelData().
      *
      * @return array{level:int, power:int, progress:int, needed:int, next_level:int}
      */
@@ -80,11 +74,7 @@ class Clan extends Model
         return $this->members()->where('status', ClanMemberStatus::Active);
     }
 
-    /**
-     * War (challenge) yang sedang melibatkan clan ini, baik sebagai
-     * penantang maupun tertantang, selama masih Pending atau Ongoing.
-     * Null berarti clan ini bebas menantang/ditantang.
-     */
+    /** War Pending/Ongoing yang melibatkan clan ini (penantang atau tertantang); null = bebas. */
     public function activeWar(): ?ClanWar
     {
         return ClanWar::where(function ($q) {
@@ -95,10 +85,7 @@ class Clan extends Model
             ->first();
     }
 
-    /**
-     * Riwayat war SELESAI yang melibatkan clan ini (dua arah), terbaru dulu.
-     * Dipakai oleh halaman detail clan & ringkasan history di halaman war.
-     */
+    /** Riwayat war selesai yang melibatkan clan ini (dua arah), terbaru dulu. */
     public function finishedWars(int $limit = 20)
     {
         return ClanWar::with(['challenger', 'opponent'])
@@ -113,9 +100,7 @@ class Clan extends Model
     }
 
     /**
-     * Ubah sebuah baris ClanWar menjadi ringkasan dari SUDUT PANDANG clan ini:
-     * hasil (win/draw/loss), lawan, dan delta power. Menjaga logika
-     * "balik hasil kalau kita opponent" di satu tempat.
+     * Ringkasan ClanWar dari sudut pandang clan ini (hasil dibalik kalau kita opponent).
      *
      * @return array{result: string, opponent: Clan, delta: int}
      */

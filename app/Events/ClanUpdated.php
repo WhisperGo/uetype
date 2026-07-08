@@ -8,14 +8,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-/**
- * Disiarkan saat status keanggotaan clan seorang user berubah (ada
- * permintaan gabung masuk, permintaan diterima/ditolak, dikeluarkan, atau
- * keluar). Dikirim ke channel per-user 'clan.{userId}' sehingga UI Clans
- * milik user tersebut bisa memuat ulang datanya secara real-time.
- *
- * ShouldBroadcastNow: dikirim langsung tanpa antre queue (tak perlu worker).
- */
+/** Status keanggotaan clan berubah (join/accept/reject/kick/leave); channel per-user 'clan.{userId}'. */
 class ClanUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
@@ -25,10 +18,7 @@ class ClanUpdated implements ShouldBroadcastNow
     public $notification;
 
     /**
-     * @param  int  $userId  penerima siaran (channel clan.{userId})
-     * @param  array|null  $notification  payload notifikasi opsional:
-     *                                    ['type' => 'request'|'accepted', 'message' => string]. Null berarti
-     *                                    hanya menyegarkan UI tanpa memunculkan toast.
+     * @param  array|null  $notification  ['type' => 'request'|'accepted', 'message' => string]; null = refresh UI tanpa toast.
      */
     public function __construct($userId, ?array $notification = null)
     {

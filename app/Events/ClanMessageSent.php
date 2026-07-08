@@ -9,12 +9,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-/**
- * Disiarkan saat pesan chat CLAN terkirim. BEDA dari DirectMessageSent:
- * channel per-CLAN 'clan-chat.{clanId}' (bukan per-user), karena SEMUA
- * anggota aktif clan itu mendengarkan channel yang sama sekaligus --
- * satu ruang obrolan bersama, bukan satu channel per penerima.
- */
+/** Pesan chat clan; channel per-clan 'clan-chat.{clanId}' (bukan per-user, semua anggota dengar bersama). */
 class ClanMessageSent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;

@@ -26,16 +26,11 @@ class Friends extends Component
         }
     }
 
-    /**
-     * Dipanggil oleh listener Echo saat channel friends.{me} menerima event.
-     * Livewire otomatis re-render sehingga daftar/permintaan selalu terkini
-     * secara real-time (mis. saat ada yang mengirim/menerima permintaan).
-     */
+    /** Listener Echo untuk friends.{me}; body kosong karena action apa pun memicu re-render. */
     #[On('friendship-updated')]
     public function refreshFriends(): void
     {
-        // Body kosong: pemanggilan action apa pun memicu re-render, dan semua
-        // data di render() adalah computed property yang di-query ulang.
+        //
     }
 
     // ---- AKSI ----
@@ -59,8 +54,6 @@ class Friends extends Component
             'status' => FriendshipStatus::Pending,
         ]);
 
-        // Beri tahu penerima secara real-time (badge "Requests" bertambah) +
-        // notifikasi "ada permintaan pertemanan dari <username>".
         $this->notify($userId, [
             'type' => 'request',
             'message' => Auth::user()->username.' sent you a friend request',
@@ -76,8 +69,6 @@ class Friends extends Component
 
         $friendship->update(['status' => FriendshipStatus::Accepted]);
 
-        // Pengirim asli langsung melihat statusnya jadi berteman + notifikasi
-        // "permintaanmu diterima oleh <username>".
         $this->notify($friendship->requester_id, [
             'type' => 'accepted',
             'message' => Auth::user()->username.' accepted your friend request',
@@ -92,7 +83,6 @@ class Friends extends Component
         }
 
         $requesterId = $friendship->requester_id;
-        // Hapus barisnya supaya bisa mengirim ulang di kemudian hari.
         $friendship->delete();
 
         $this->notify($requesterId);
@@ -140,10 +130,7 @@ class Friends extends Component
         $this->notify($otherId);
     }
 
-    /**
-     * Ambil permintaan MASUK yang masih pending & ditujukan ke user ini.
-     * Gerbang keamanan: hanya penerima yang boleh accept/reject.
-     */
+    /** Permintaan masuk pending untuk user ini; hanya penerima yang boleh accept/reject. */
     private function incomingPending(int $friendshipId): ?Friendship
     {
         return Friendship::where('id', $friendshipId)
@@ -152,11 +139,7 @@ class Friends extends Component
             ->first();
     }
 
-    /**
-     * Siarkan perubahan ke user LAIN (real-time). $notification opsional:
-     * jika diisi, klien penerima memunculkan toast; jika null, hanya
-     * menyegarkan daftar (mis. reject/cancel/remove — tak perlu toast).
-     */
+    /** Siarkan perubahan ke user lain; $notification null berarti hanya segarkan daftar (tanpa toast). */
     private function notify(int $otherUserId, ?array $notification = null): void
     {
         SafeBroadcast::run(fn () => broadcast(new FriendshipUpdated($otherUserId, $notification)));
@@ -213,11 +196,7 @@ class Friends extends Component
         return $this->incomingRequests->count() + $this->sentRequests->count();
     }
 
-    /**
-     * Hasil pencarian username untuk tab Find Friends, lengkap dengan status
-     * relasi tiap kandidat supaya tombol yang tepat ditampilkan
-     * (Add / Request Sent / Incoming / Friends).
-     */
+    /** Hasil pencarian username, lengkap status relasi tiap kandidat untuk tombol yang tepat. */
     public function getSearchResultsProperty()
     {
         $term = trim($this->search);

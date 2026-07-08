@@ -6,17 +6,9 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 /**
- * Halaman About dibuat sebagai Livewire full-page component BUKAN karena
- * butuh interaktivitas/reactive state (isinya statis, tidak ada wire:model,
- * tidak ada method action) — tapi karena layouts/app.blade.php di project
- * ini pakai {{ $slot }} ala Livewire (@livewireStyles/@livewireScripts,
- * tanpa @yield). $slot itu hanya terisi kalau component di-render lewat
- * atribut #[Layout(...)] di bawah ini; Blade view biasa via @extends tidak
- * bisa mengisinya.
- *
- * Data tim & tech stack tetap hardcode di sini (bukan query database),
- * persis seperti rencana awal — cuma "wadah"-nya yang berubah jadi Livewire
- * component supaya cocok dengan layout yang sudah ada.
+ * Halaman About statis (tanpa reactive state), dibuat sebagai Livewire component
+ * karena layouts/app.blade.php memakai {{ $slot }} yang hanya terisi lewat #[Layout(...)].
+ * Data tim & tech stack hardcode di sini, bukan dari database.
  */
 #[Layout('layouts.app')]
 class About extends Component

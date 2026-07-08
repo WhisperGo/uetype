@@ -25,8 +25,7 @@ class Chat extends Component
 {
     public const PAGE_SIZE = 30;
 
-    // Mode percakapan aktif: 'dm' (chat teman) atau 'clan' (chat clan). Null =
-    // tampilan daftar percakapan (inbox) saja, belum ada obrolan terbuka.
+    // Mode percakapan aktif: 'dm' | 'clan'. Null = tampilan inbox saja.
     #[Url(as: 'mode')]
     public ?string $activeMode = null;
 
@@ -36,8 +35,7 @@ class Chat extends Component
 
     public string $body = '';
 
-    // Berapa pesan lama (di luar batch awal) yang sudah dimuat lewat "load
-    // more" -- offset paginasi manual supaya scroll-ke-atas terasa natural.
+    // Offset paginasi manual untuk "load more" (scroll-ke-atas).
     public int $loadedOlder = 0;
 
     // Kontrol modal "Clear Chat" (pilihan cakupan: semua / lebih lama dari N hari).
@@ -55,16 +53,11 @@ class Chat extends Component
     // Reply: id pesan yang sedang dibalas (null = kirim pesan biasa).
     public ?int $replyingToId = null;
 
-    /**
-     * Dipanggil oleh listener Echo saat channel chat.{me}/clan-chat.{clanId}
-     * menerima event pesan baru. Livewire otomatis re-render sehingga inbox
-     * & jendela obrolan aktif selalu terkini secara real-time.
-     */
+    /** Listener Echo untuk pesan baru; body kosong karena action apa pun memicu re-render. */
     #[On('message-received')]
     public function refreshChat(): void
     {
-        // Body kosong: pemanggilan action apa pun memicu re-render, dan semua
-        // data di render() adalah computed property yang di-query ulang.
+        //
     }
 
     // ---- AKSI: NAVIGASI ----
@@ -113,11 +106,8 @@ class Chat extends Component
     // ---- AKSI: KIRIM PESAN ----
 
     /**
-     * Kirim pesan. Body diterima sebagai ARGUMEN (dari client) supaya input
-     * di UI bisa langsung dikosongkan tanpa menunggu round-trip -- jadi pesan
-     * bisa di-"spam" beruntun. $body opsional: kalau tak dikirim, jatuh ke
-     * $this->body (dipakai path lama / test). Tak mengosongkan $this->body
-     * server-side lagi supaya tak memantul & mengganggu ketikan berikutnya.
+     * Kirim pesan. Body diterima sebagai argumen agar input UI langsung dikosongkan
+     * tanpa menunggu round-trip. $body opsional, fallback ke $this->body.
      */
     public function sendMessage(?string $body = null): void
     {
@@ -127,8 +117,6 @@ class Chat extends Component
             return;
         }
 
-        // Validasi target reply: harus pesan dari percakapan yang sama & boleh
-        // dilihat user ini. Kalau tidak valid, kirim sebagai pesan biasa.
         $replyToId = $this->resolveReplyTargetId();
 
         if ($this->activeMode === 'dm') {
@@ -140,9 +128,7 @@ class Chat extends Component
         $this->replyingToId = null;
     }
 
-    /**
-     * Kembalikan reply_to_id yang sah untuk percakapan aktif, atau null.
-     */
+    /** Reply_to_id yang sah untuk percakapan aktif & boleh dilihat user, atau null. */
     private function resolveReplyTargetId(): ?int
     {
         if (! $this->replyingToId) {
@@ -217,7 +203,7 @@ class Chat extends Component
         }
 
         $this->replyingToId = $message->id;
-        $this->editingId = null; // tak edit & reply bersamaan
+        $this->editingId = null;
     }
 
     public function cancelReply(): void
@@ -227,10 +213,7 @@ class Chat extends Component
 
     // ---- AKSI: EDIT & DELETE PESAN ----
 
-    /**
-     * Buka form edit inline untuk sebuah pesan (hanya jika boleh: pengirim,
-     * belum dihapus-untuk-semua, masih dalam jendela edit).
-     */
+    /** Buka form edit inline (hanya pengirim, belum dihapus-untuk-semua, dalam jendela edit). */
     public function startEdit(int $messageId): void
     {
         $message = Message::find($messageId);
@@ -275,10 +258,7 @@ class Chat extends Component
         SafeBroadcast::run(fn () => broadcast(new MessageEdited($message)));
     }
 
-    /**
-     * "Delete for everyone": ganti isi jadi placeholder untuk SEMUA orang.
-     * Hanya pengirim, dan hanya jika belum dihapus.
-     */
+    /** "Delete for everyone": ganti isi jadi placeholder untuk semua. Hanya pengirim. */
     public function deleteForEveryone(int $messageId): void
     {
         $message = Message::find($messageId);
@@ -294,10 +274,7 @@ class Chat extends Component
         SafeBroadcast::run(fn () => broadcast(new MessageDeleted($message)));
     }
 
-    /**
-     * "Delete for me": sembunyikan pesan HANYA dari user ini; tetap ada untuk
-     * orang lain. Berlaku untuk pesan siapa pun yang bisa dilihat user ini.
-     */
+    /** "Delete for me": sembunyikan hanya dari user ini, tetap ada untuk orang lain. */
     public function deleteForMe(int $messageId): void
     {
         $message = Message::find($messageId);
@@ -336,11 +313,7 @@ class Chat extends Component
 
     // ---- GERBANG KEAMANAN ----
 
-    /**
-     * Hanya boleh chat dengan user yang berteman DAN status pertemanannya
-     * accepted -- dicek ulang server-side di SETIAP aksi, tak percaya query
-     * string.
-     */
+    /** Hanya teman berstatus accepted; dicek ulang server-side tiap aksi. */
     private function isAcceptedFriend(int $otherId): bool
     {
         $friendship = Auth::user()->friendshipWith($otherId);
@@ -348,11 +321,7 @@ class Chat extends Component
         return $friendship?->status === FriendshipStatus::Accepted;
     }
 
-    /**
-     * Apakah user saat ini berhak melihat (dan karenanya "delete for me")
-     * pesan tertentu: pesan DM yang melibatkan dirinya, atau pesan clan dari
-     * clan tempat ia jadi anggota aktif.
-     */
+    /** Berhak melihat (dan "delete for me") pesan: DM yang melibatkan dirinya, atau clan aktifnya. */
     private function canSeeMessage(Message $message): bool
     {
         $me = Auth::id();
@@ -387,10 +356,7 @@ class Chat extends Component
         return $this->myMembership?->clan;
     }
 
-    /**
-     * Teman yang sedang dibuka percakapannya (null kalau belum ada yang
-     * dipilih atau username di query string tak valid/bukan teman).
-     */
+    /** Teman yang sedang dibuka percakapannya, null kalau tak valid/bukan teman. */
     public function getActiveFriendProperty(): ?User
     {
         if ($this->activeMode !== 'dm' || ! $this->withUsername) {
@@ -407,10 +373,8 @@ class Chat extends Component
     }
 
     /**
-     * Riwayat pesan percakapan aktif (DM atau clan, tergantung activeMode),
-     * sudah disaring lewat visibleTo() supaya pesan yang di-clear oleh user
-     * ini tak muncul lagi -- TAPI tetap ada di DB untuk lawan bicara/anggota
-     * clan lain. Terbaru dulu lalu dibalik supaya tampil lama->baru di layar.
+     * Riwayat pesan percakapan aktif, disaring visibleTo() (pesan yang di-clear user
+     * ini tak muncul lagi tapi tetap ada di DB untuk lawan bicara). Diurutkan lama->baru.
      */
     public function getMessagesProperty()
     {
@@ -451,10 +415,7 @@ class Chat extends Component
         return collect();
     }
 
-    /**
-     * Pesan yang sedang dibalas (untuk preview di atas input). Null kalau tak
-     * sedang membalas / target tak valid.
-     */
+    /** Pesan yang sedang dibalas (preview di atas input), null kalau tak valid. */
     public function getReplyingToProperty(): ?Message
     {
         if (! $this->replyingToId) {
@@ -484,10 +445,9 @@ class Chat extends Component
     }
 
     /**
-     * Daftar percakapan DM (inbox): satu baris per teman yang PERNAH ditukar
-     * pesan, diurutkan berdasarkan pesan terakhir. Hanya dari teman yang
-     * MASIH berstatus accepted -- kalau pertemanan diputus, riwayat pesan
-     * lama tetap ada di DB tapi tak lagi muncul di inbox (bukan dihapus).
+     * Inbox DM: satu baris per teman yang pernah ditukar pesan, diurutkan pesan
+     * terakhir. Hanya teman berstatus accepted (pertemanan putus -> hilang dari
+     * inbox, riwayat tetap ada di DB).
      */
     public function getConversationsProperty()
     {
@@ -524,7 +484,7 @@ class Chat extends Component
                     'online' => $friend->isOnline(),
                 ];
             })
-            // Percakapan tanpa pesan sama sekali ditaruh di bawah (belum pernah ngobrol).
+            // Percakapan tanpa pesan ditaruh di bawah.
             ->sortByDesc(fn ($row) => $row['lastMessage']?->created_at ?? Carbon::createFromTimestamp(0))
             ->values();
     }

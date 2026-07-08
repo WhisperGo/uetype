@@ -5,9 +5,7 @@
         </div>
     @endif
 
-    <!-- ===================================================================== -->
-    <!-- 1. HALAMAN PILIH: CREATE OR JOIN ROOM -->
-    <!-- ===================================================================== -->
+    <!-- ===== 1. HALAMAN PILIH: CREATE OR JOIN ROOM ===== -->
     @if ($this->step === 'choose')
         <div class="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24 items-stretch mt-10 relative w-full">
             <div
@@ -111,13 +109,9 @@
         </div>
     @endif
 
-    <!-- ===================================================================== -->
-    <!-- 2. HALAMAN RUANG TUNGGU: WAITING ROOM -->
-    <!-- ===================================================================== -->
+    <!-- ===== 2. HALAMAN RUANG TUNGGU: WAITING ROOM ===== -->
     @if ($this->step === 'waiting' && $this->roomData && !$showResultModal)
-        {{-- wire:poll dihapus: update lobby (join/ready/leave) sudah didorong lewat
-             WebSocket .room.updated -> Livewire.dispatch('room-updated'). Polling 2s
-             hanya menambah latensi & beban tanpa manfaat. --}}
+        {{-- Update lobby (join/ready/leave) didorong via WebSocket .room.updated -> Livewire.dispatch('room-updated'), bukan polling. --}}
         <div class="space-y-8">
             <div
                 x-data="{
@@ -233,25 +227,11 @@
         </div>
     @endif
 
-    <!-- ===================================================================== -->
-    <!-- 3. HALAMAN ARENA PERTANDINGAN: BATTLE STAGE (TYPERACER MECHANICS) -->
-    <!-- ===================================================================== -->
+    <!-- ===== 3. HALAMAN ARENA PERTANDINGAN: BATTLE STAGE (TYPERACER MECHANICS) ===== -->
     @if ($this->step === 'racing' && $this->roomData && !$showResultModal)
-        {{-- wire:key stabil: memberi tahu Livewire agar mempertahankan elemen
-             (beserta seluruh state Alpine di x-data) lintas re-render/poll.
-             Tanpa ini, morph bisa mengganti node -> x-data ter-reinisialisasi
-             -> raceStarted & countdown balik ke awal (overlay 3 detik nongol
-             lagi) sekaligus progress pengetikan hilang. --}}
-        {{-- Seluruh logika Alpine dipindah ke komponen terdaftar 'raceArena'
-             (lihat @script di bawah). Menaruh blok JS besar langsung di atribut
-             x-data rawan: komentar //, em-dash, dan karakter { } bisa merusak
-             parsing atribut HTML sehingga kode-nya bocor tampil sebagai teks di
-             halaman. Di sini x-data hanya memanggil fungsi + mengoper data server
-             lewat @js() yang sudah aman ter-escape. --}}
-        {{-- wire:poll.1s="checkSuddenDeath" dihapus: sudden death kini disinkron via
-             WebSocket .race.sudden_death (timestamp akhir dari server) + clock lokal.
-             Saat clock lokal capai 0, lockRace() memanggil checkSuddenDeath() SEKALI
-             sebagai gerbang final server (idempoten). Tidak perlu poll tiap detik. --}}
+        {{-- wire:key stabil: menjaga elemen (& state Alpine x-data) tetap sama lintas re-render/poll, supaya raceStarted/countdown/progress tak reset. --}}
+        {{-- Logika Alpine ada di komponen terdaftar 'raceArena' (lihat @script) — bukan langsung di x-data, karena JS besar berisi //, {}, <, > bisa merusak parsing atribut HTML. x-data di sini hanya memanggil fungsi + kirim data server via @js(). --}}
+        {{-- Sudden death disinkron via WebSocket .race.sudden_death + clock lokal, bukan wire:poll; saat clock lokal capai 0, lockRace() memanggil checkSuddenDeath() sekali (idempoten). --}}
         <div wire:key="race-arena-{{ $this->roomCode }}" class="space-y-8"
             x-data="raceArena({
                 myId: @js(Auth::id()),
@@ -273,10 +253,7 @@
                 </div>
             @endif
 
-            <!-- OVERLAY COUNTDOWN SCREEN -->
-            <!-- Hanya untuk permulaan race. Ditambah guard !suddenDeathActive
-                 supaya overlay ini tidak pernah nongol lagi ketika hitung mundur
-                 15 detik (sudden death) sedang berlangsung di tengah game. -->
+            <!-- OVERLAY COUNTDOWN SCREEN: hanya untuk start race; guard !suddenDeathActive agar tak muncul lagi saat countdown sudden death -->
             <template x-if="!raceStarted && !suddenDeathActive">
                 <div class="fixed inset-0 bg-typing-bg/95 flex flex-col items-center justify-center z-50 select-none">
                     <span class="font-mono text-xs uppercase tracking-[0.4em] text-typing-muted mb-4">{{ __('multiplayer.race_starting') }}</span>
@@ -294,16 +271,7 @@
                         @php
                             $isSelf = $player->user_id === Auth::id();
                         @endphp
-                        {{-- x-data lane: setiap lane menghitung progress/wpm/finished-nya sendiri
-                             secara reaktif. Pemain SENDIRI membaca state lokal raceArena (gerak
-                             instan dari ketikan). Pemain LAWAN membaca $store.race.opponents[id]
-                             yang diisi langsung dari payload WebSocket (.race.progress) — TANPA
-                             re-render Livewire. Nilai Blade dipakai sebagai seed awal / fallback. --}}
-                        {{-- Semua lane (termasuk diri sendiri) membaca dari $store.race
-                             secara SERAGAM: raceArena mem-publish progress pemain lokal ke
-                             store dengan key userId-nya sendiri (lihat publishLocal()).
-                             Ini menghindari ketergantungan rapuh pada `this` komponen induk
-                             di dalam getter Alpine nested. Nilai Blade = seed awal/fallback. --}}
+                        {{-- Semua lane (termasuk diri sendiri) baca $store.race.opponents[id] secara seragam — diisi langsung dari payload WebSocket .race.progress, tanpa re-render Livewire. raceArena mem-publish progress lokal ke store yang sama (publishLocal()) agar tak bergantung pada `this` komponen induk. Nilai Blade = seed awal/fallback. --}}
                         <div class="pt-3 first:pt-0"
                             x-data="{
                                 playerId: @js($player->user_id),
@@ -403,9 +371,7 @@
         </div>
     @endif
 
-    <!-- ===================================================================== -->
-    <!-- 4. HALAMAN BARU: MATCH RESULT -->
-    <!-- ===================================================================== -->
+    <!-- ===== 4. HALAMAN: MATCH RESULT ===== -->
     @if ($showResultModal && $this->roomData)
         <div class="space-y-12 animate-fade-in py-4 select-none">
 
@@ -551,7 +517,7 @@
                                         @if ($rank->finished_time_seconds && $rank->finished_time_seconds != 999)
                                             {{ sprintf('%02d:%02d', floor($rank->finished_time_seconds / 60), $rank->finished_time_seconds % 60) }}
                                         @else
-                                            {{-- Pemain tak selesai (DNF): jangan tampilkan waktu palsu. --}}
+                                            {{-- DNF: jangan tampilkan waktu palsu. --}}
                                             <span class="text-red-400/70 text-xs">DNF</span>
                                         @endif
                                     </td>
@@ -607,37 +573,22 @@
         </div>
     @endif
 
-    {{-- @assets (BUKAN @script): definisi komponen Alpine diletakkan di sini.
-         @script membungkus isi <script> menjadi nilai atribut wire:effects pada
-         elemen pembungkus; kode yang mengandung banyak karakter '<' dan '>'
-         (mis. `a <= b`, `wIdx < currentWordIndex`) merusak parsing atribut/DOM
-         Livewire -> DOMDocument gagal -> <body> null -> "Attempt to read
-         property childNodes on null". @assets menyuntik script apa adanya ke
-         <head> sekali saja (sebelum Alpine init), jadi aman untuk kode besar. --}}
+    {{-- @assets (bukan @script): @script membungkus <script> jadi atribut wire:effects, dan kode dengan banyak '<'/'>' (mis. `wIdx < currentWordIndex`) merusak parsing DOM Livewire. @assets menyuntik script apa adanya ke <head> sekali saja sebelum Alpine init, aman untuk kode besar. --}}
     @assets
         <script>
-            // === KOMPONEN ALPINE: raceArena ===
-            // Semua logika typing + sudden death ada di sini (bukan di atribut
-            // x-data) supaya tidak ada JS yang bocor ke HTML.
-            //
-            // Pendaftaran tahan dua kondisi timing: (1) skrip jalan SEBELUM
-            // Alpine init -> daftar via event 'alpine:init'; (2) skrip jalan
-            // SETELAH Alpine sudah booting -> window.Alpine sudah ada, daftar
-            // langsung. registerRaceArena() idempoten via flag global.
+            // Komponen Alpine 'raceArena': semua logika typing + sudden death di sini, bukan di x-data, agar JS tak bocor ke HTML.
+            // registerRaceArena() idempoten (flag global); didaftarkan baik saat Alpine sudah booting maupun via event 'alpine:init'.
             const registerRaceArena = (Alpine) => {
                 if (window.__raceArenaRegistered) return;
                 window.__raceArenaRegistered = true;
 
-                // STORE GLOBAL 'race': menyimpan posisi maskot LAWAN, diisi langsung
-                // dari payload WebSocket (.race.progress). Sengaja store (bukan state
-                // komponen) supaya bertahan lintas Livewire morph — kalau raceArena
-                // ter-reinisialisasi saat re-render, posisi lawan tidak hilang.
-                // Bentuk: opponents = { [userId]: { progress, wpm, finished } }.
+                // Store global 'race': posisi maskot lawan, diisi dari payload WebSocket .race.progress.
+                // Store (bukan state komponen) agar bertahan lintas Livewire morph. Bentuk: opponents = { [userId]: { progress, wpm, finished } }.
                 if (!Alpine.store('race')) {
                     Alpine.store('race', {
                         opponents: {},
                         apply(userId, data) {
-                            // reassign object supaya reaktivitas Alpine ter-trigger
+                            // Reassign object agar reaktivitas Alpine ter-trigger.
                             this.opponents = {
                                 ...this.opponents,
                                 [userId]: {
@@ -658,8 +609,7 @@
                     raceStarted: false,
                     myId: config.myId,
                     textToType: config.textToType || '',
-                    // Waktu absolut (ms epoch) kapan race resmi mulai, dari server.
-                    // Countdown 3-2-1 dihitung mundur ke titik ini -> sinkron antar layar.
+                    // Waktu absolut (ms epoch) race mulai, dari server — countdown dihitung mundur ke titik ini agar sinkron antar layar.
                     raceStartsAtMs: config.raceStartsAt ? new Date(config.raceStartsAt).getTime() : null,
                     _countdownInterval: null,
                     words: [],
@@ -672,25 +622,18 @@
                     totalKeystrokes: 0,
                     totalMistakes: 0,
                     prevTypedLength: 0,
-                    // Index = urutan kata, true kalau kata itu dilewati dengan salah/belum
-                    // lengkap (space ditekan tanpa exact match). Dipakai visual saja --
-                    // menandai kata yang SUDAH terlewati tapi sempat salah, beda dari kata
-                    // yang benar (hijau) supaya pemain bisa lihat sepintas riwayat errornya.
+                    // true kalau kata itu dilewati salah/belum lengkap (space tanpa exact match) — untuk highlight visual riwayat error per kata.
                     wordHadError: [],
 
-                    // Progress & WPM pemain LOKAL, reaktif -> dibaca oleh lane maskot
-                    // sendiri (self) di view. Diperbarui tiap checkInput().
+                    // Progress & WPM pemain lokal, reaktif, dibaca lane maskot sendiri di view. Diperbarui tiap checkInput().
                     progressPercent: 0,
                     liveWpm: 0,
 
-                    // Throttle emit progress ke server (Area 1.4). Visual lokal tetap
-                    // instan; pengiriman jaringan dibatasi ~120ms + trailing flush.
+                    // Throttle emit progress ke server: visual lokal instan, jaringan dibatasi ~120ms + trailing flush.
                     _lastEmit: 0,
                     _emitTimer: null,
 
-                    // Sudden death (client-side authoritative timer). Server tetap
-                    // sumber kebenaran final via checkSuddenDeath(), tapi input
-                    // dikunci di klien tepat saat hitung mundur menyentuh 0.
+                    // Sudden death: timer client-side, tapi checkSuddenDeath() di server tetap sumber kebenaran final.
                     suddenDeathActive: !!config.suddenDeathActive,
                     suddenDeathRemaining: config.suddenDeathRemaining ?? 15,
                     lockedByTimeout: false,
@@ -699,17 +642,12 @@
                     init() {
                         this.words = this.textToType.split(' ');
 
-                        // Bersihkan posisi lawan dari race SEBELUMNYA saat memulai race
-                        // baru (mis. Play Again). Kalau sudden death sedang aktif berarti
-                        // ini re-init di TENGAH race yang sama -> jangan hapus posisi.
+                        // Bersihkan posisi lawan dari race sebelumnya (mis. Play Again). Kalau sudden death aktif ini re-init di tengah race yang sama -> jangan hapus.
                         if (!this.suddenDeathActive && this.$store.race) {
                             this.$store.race.reset();
                         }
 
-                        // Kalau sudden death SUDAH aktif saat komponen ini
-                        // (re)inisialisasi, race sudah lama berjalan -> overlay
-                        // countdown 3 detik tidak boleh muncul lagi. Langsung
-                        // anggap race berjalan.
+                        // Sudden death sudah aktif saat (re)init berarti race sudah berjalan -> skip overlay countdown, langsung anggap race berjalan.
                         if (this.suddenDeathActive) {
                             this.raceStarted = true;
                             this.countdown = 'GO!';
@@ -719,29 +657,22 @@
                                 if (this.$refs.typeInput) this.$refs.typeInput.focus();
                             });
                         } else {
-                            // Alur normal: overlay hitung mundur ke race_starts_at (server).
-                            // Karena dihitung dari waktu absolut yang sama, kedua layar
-                            // menampilkan angka yang sama pada saat yang sama -> tidak ada
-                            // lagi delay ~1 detik antar host & peserta.
+                            // Overlay hitung mundur ke race_starts_at (server) — waktu absolut sama di semua layar, tanpa delay antar host & peserta.
                             this.startSyncedCountdown();
                         }
 
-                        // Sinyal server saat room resmi ditutup paksa -> kunci total.
+                        // Sinyal server saat room ditutup paksa -> kunci total.
                         this.$wire.on('force-finish', () => this.lockRace());
 
-                        // Sudden death dimulai (broadcast .race.sudden_death via WebSocket).
-                        // Bridge event window -> sinkronkan hitung mundur di komponen ini.
-                        // Disimpan supaya bisa di-remove saat komponen dibongkar.
+                        // Bridge event window .race.sudden_death -> sinkronkan hitung mundur komponen ini. Disimpan agar bisa di-remove saat destroy.
                         this._onSuddenDeath = (ev) => this.syncSuddenDeath(ev.detail.remaining);
                         window.addEventListener('race-sudden-death', this._onSuddenDeath);
                     },
 
-                    // Hitung mundur awal race berbasis WAKTU ABSOLUT server (race_starts_at),
-                    // bukan interval lokal yang dimulai saat render. Setiap ~100ms hitung
-                    // sisa waktu; tampilkan 3/2/1 lalu 'GO!' dan mulai race saat menyentuh 0.
+                    // Hitung mundur berbasis waktu absolut server (race_starts_at), bukan interval lokal, agar semua layar sinkron.
                     startSyncedCountdown() {
                         const tick = () => {
-                            // Fallback aman jika server tidak mengirim raceStartsAt.
+                            // Fallback jika server tidak mengirim raceStartsAt.
                             if (!this.raceStartsAtMs) {
                                 this.beginRace();
                                 return;
@@ -755,7 +686,6 @@
                                     clearInterval(this._countdownInterval);
                                     this._countdownInterval = null;
                                 }
-                                // Jeda singkat menampilkan "GO!" lalu buka input.
                                 setTimeout(() => this.beginRace(), 400);
                             } else {
                                 // ceil supaya 2001ms..3000ms => "3", dst. Minimal tampil "1".
@@ -763,13 +693,11 @@
                             }
                         };
 
-                        tick(); // render langsung tanpa menunggu interval pertama
+                        tick();
                         this._countdownInterval = setInterval(tick, 100);
                     },
 
-                    // Mulai race: buka input & catat startTime. startTime dipatok ke
-                    // race_starts_at server (kalau ada) supaya perhitungan WPM antar
-                    // pemain memakai titik awal yang sama.
+                    // startTime dipatok ke race_starts_at server (kalau ada) agar perhitungan WPM antar pemain pakai titik awal yang sama.
                     beginRace() {
                         if (this.raceStarted) return;
                         this.raceStarted = true;
@@ -798,11 +726,10 @@
                         }
                     },
 
-                    // Menyinkronkan sisa waktu dari server & memastikan clock lokal jalan.
-                    // Dipanggil dari x-init banner DAN dari event .race.sudden_death.
+                    // Sinkronkan sisa waktu dari server & pastikan clock lokal jalan. Dipanggil dari x-init banner dan event .race.sudden_death.
                     syncSuddenDeath(remainingFromServer) {
                         this.suddenDeathActive = true;
-                        // Ambil yang paling konservatif kalau clock sudah jalan (hindari mundur naik).
+                        // Ambil nilai paling konservatif kalau clock sudah jalan (hindari mundur naik).
                         if (this._sdInterval) {
                             this.suddenDeathRemaining = Math.min(this.suddenDeathRemaining, remainingFromServer);
                         } else {
@@ -813,7 +740,7 @@
                     },
 
                     startSuddenDeathClock() {
-                        if (this._sdInterval) return; // sudah berjalan
+                        if (this._sdInterval) return;
                         this._sdInterval = setInterval(() => {
                             this.suddenDeathRemaining--;
                             if (this.suddenDeathRemaining <= 0) {
@@ -823,7 +750,7 @@
                         }, 1000);
                     },
 
-                    // Kunci paksa: hentikan input & pengiriman progress. Idempoten.
+                    // Kunci paksa input & pengiriman progress. Idempoten.
                     lockRace() {
                         if (this.lockedByTimeout) return;
                         this.lockedByTimeout = true;
@@ -838,10 +765,7 @@
                         }
                         if (this.$refs.typeInput) this.$refs.typeInput.blur();
 
-                        // Gantikan peran poll 1 detik: saat hitung mundur lokal menyentuh
-                        // 0, minta server memfinalisasi SEKALI. checkSuddenDeath() idempoten
-                        // (guard `>= SUDDEN_DEATH_SECONDS`), jadi aman meski beberapa klien
-                        // memanggilnya bersamaan.
+                        // Minta server memfinalisasi sekali; checkSuddenDeath() idempoten jadi aman dipanggil beberapa klien bersamaan.
                         if (this.$wire) this.$wire.checkSuddenDeath();
                     },
 
@@ -885,16 +809,15 @@
                         let timePassedMinutes = (Date.now() - this.startTime) / 60000;
                         let liveWpm = timePassedMinutes > 0 ? Math.floor((totalCorrectChars / 5) / timePassedMinutes) : 0;
 
-                        // Update state reaktif LOKAL -> maskot sendiri gerak INSTAN (tak
-                        // menunggu jaringan). Ini yang bikin pemain lokal zero delay.
+                        // State reaktif lokal diperbarui langsung -> maskot sendiri gerak instan, tak menunggu jaringan.
                         this.liveWpm = liveWpm;
 
-                        // Kata terakhir: selesai otomatis saat huruf terakhir benar.
+                        // Kata terakhir selesai otomatis saat huruf terakhir benar.
                         if (this.currentWordIndex === this.words.length - 1 && this.typedText === targetWord) {
                             this.isFinished = true;
                             this.progressPercent = 100;
                             this.publishLocal(100, liveWpm, true);
-                            // Finish WAJIB dikirim sinkron & segera (tak boleh di-throttle).
+                            // force=true: finish wajib dikirim segera, tak di-throttle.
                             this.emitProgress(100, liveWpm, accuracyPercent, true);
                             return;
                         }
@@ -904,9 +827,7 @@
                         this.emitProgress(progressPercent, liveWpm, accuracyPercent, false);
                     },
 
-                    // Publikasikan posisi pemain LOKAL ke store dengan key userId sendiri,
-                    // supaya lane maskot diri sendiri membaca dari sumber yang SAMA dengan
-                    // lawan ($store.race.opponents[playerId]) -> gerak instan & seragam.
+                    // Publikasikan posisi lokal ke store dengan key userId sendiri, agar lane sendiri baca sumber yang sama dengan lawan -> gerak seragam.
                     publishLocal(progress, wpm, finished) {
                         if (this.myId == null) return;
                         this.$store.race.apply(this.myId, {
@@ -916,9 +837,7 @@
                         });
                     },
 
-                    // Kirim progress ke server dengan throttle. Keystroke di-throttle
-                    // ~120ms (trailing-edge flush menjaga posisi terakhir tak hilang),
-                    // tapi `force` (finish / pindah kata) selalu dikirim segera.
+                    // Kirim progress ke server dengan throttle ~120ms (trailing-edge flush menjaga posisi terakhir tak hilang); `force` selalu segera.
                     emitProgress(progress, wpm, accuracy, force) {
                         const now = Date.now();
                         const MIN_INTERVAL = 120;
@@ -934,8 +853,7 @@
                             return;
                         }
 
-                        // Terlalu cepat: jadwalkan pengiriman terakhir (trailing edge)
-                        // memakai nilai TERBARU saat timer menyala.
+                        // Terlalu cepat: jadwalkan trailing-edge flush dengan nilai terbaru saat timer menyala.
                         const delay = MIN_INTERVAL - (now - this._lastEmit);
                         this._emitTimer = setTimeout(() => {
                             this._emitTimer = null;
@@ -948,18 +866,13 @@
                         }, delay);
                     },
 
-                    // Permisif seperti Solo (typing-engine.blade.php): spasi SELALU
-                    // memindahkan ke kata berikutnya, tak pernah mengunci pemain di
-                    // kata yang salah/belum lengkap. Sisa huruf yang salah/belum
-                    // diketik dicatat sebagai mistake (mempengaruhi akurasi), tapi
-                    // progres tetap jalan -- filosofi: jangan blokir, cukup catat.
+                    // Permisif seperti Solo: spasi selalu pindah ke kata berikutnya (tak pernah mengunci di kata salah); sisa huruf salah/belum diketik dicatat sebagai mistake tapi progres tetap jalan.
                     handleSpace(e) {
                         if (this.lockedByTimeout || this.isFinished || !this.raceStarted) return;
 
                         let targetWord = this.words[this.currentWordIndex];
 
-                        // Cegah spam spasi di kata kosong (sejalan dgn guard Solo):
-                        // jangan biarkan "melompat" kata tanpa mengetik apa pun.
+                        // Cegah spam spasi di kata kosong (tak boleh "melompat" kata tanpa mengetik apa pun).
                         if (this.typedText.length === 0) {
                             e.preventDefault();
                             return;
@@ -971,10 +884,7 @@
                         this.wordHadError[this.currentWordIndex] = !isExactMatch;
 
                         if (!isExactMatch) {
-                            // Huruf di ekor kata yang belum "dibayar" sebagai keystroke
-                            // (belum diketik sama sekali) dihitung sbg mistake tambahan.
-                            // Mismatch pada huruf yang SUDAH diketik sudah dihitung saat
-                            // checkInput() -- tak dobel-hitung di sini.
+                            // Huruf ekor yang belum diketik dihitung sbg mistake tambahan; huruf yang sudah diketik sudah dihitung di checkInput(), tak dobel di sini.
                             const missingCount = Math.max(0, targetWord.length - this.typedText.length);
                             this.totalKeystrokes += missingCount;
                             this.totalMistakes += missingCount;
@@ -986,9 +896,7 @@
                         this.hasError = false;
                         this.prevTypedLength = 0;
 
-                        // Kata terakhir: dulu hanya selesai lewat checkInput() saat huruf
-                        // terakhir pas persis (tak akan pernah terpicu kalau kata terakhir
-                        // salah/belum lengkap) -- sekarang finish juga bisa lewat spasi.
+                        // Kata terakhir juga bisa finish lewat spasi (bukan hanya lewat exact match di checkInput()).
                         if (this.currentWordIndex >= this.words.length) {
                             this.isFinished = true;
                             this.progressPercent = 100;
@@ -1012,17 +920,15 @@
                 }));
             };
 
-            // Kondisi 1: Alpine sudah tersedia (skrip jalan setelah Alpine boot).
+            // Alpine mungkin sudah booting (daftar langsung) atau belum (daftar saat alpine:init).
             if (window.Alpine) {
                 registerRaceArena(window.Alpine);
             }
-            // Kondisi 2: Alpine belum init -> daftar saat event alpine:init.
             document.addEventListener('alpine:init', () => registerRaceArena(window.Alpine));
         </script>
     @endassets
 
-    {{-- Kode Echo/broadcast tetap di @script (butuh Livewire.on). Aman di sini
-         karena tidak mengandung karakter '<'/'>' yang bisa merusak parsing. --}}
+    {{-- Kode Echo/broadcast tetap di @script (butuh Livewire.on); aman karena tak mengandung '<'/'>' yang merusak parsing. --}}
     @script
         <script>
             let currentRoomChannel = null;
@@ -1037,7 +943,7 @@
                     window.Echo.leave(currentRaceChannel);
                     currentRaceChannel = null;
                 }
-                // Bersihkan posisi lawan supaya room berikutnya tidak kebawa state basi.
+                // Bersihkan posisi lawan agar room berikutnya tak kebawa state basi.
                 if (window.Alpine && window.Alpine.store('race')) {
                     window.Alpine.store('race').reset();
                 }
@@ -1048,8 +954,7 @@
 
                 leaveChannels();
 
-                // Channel LIFECYCLE (low-frequency): join/ready/leave/start/finish.
-                // Tetap re-render Livewire penuh karena kondisi room memang berubah.
+                // Channel lifecycle (low-frequency): join/ready/leave/start/finish -> tetap re-render Livewire penuh.
                 currentRoomChannel = `room.${room}`;
                 window.Echo
                     .channel(currentRoomChannel)
@@ -1057,8 +962,7 @@
                         Livewire.dispatch('room-updated');
                     });
 
-                // Channel RACE (high-frequency): posisi maskot lawan. Diterapkan
-                // LANGSUNG ke Alpine store TANPA round-trip Livewire -> zero delay.
+                // Channel race (high-frequency): posisi maskot lawan diterapkan langsung ke Alpine store, tanpa round-trip Livewire.
                 currentRaceChannel = `race.${room}`;
                 window.Echo
                     .channel(currentRaceChannel)
@@ -1068,8 +972,7 @@
                         }
                     })
                     .listen('.race.sudden_death', (e) => {
-                        // Semua klien menghitung sisa waktu dari timestamp akhir yang
-                        // SAMA (server) -> hitung mundur sudden death tersinkron.
+                        // Semua klien hitung sisa waktu dari timestamp akhir server yang sama -> tersinkron.
                         const endMs = new Date(e.endTimeIso).getTime();
                         const remaining = Math.max(0, Math.ceil((endMs - Date.now()) / 1000));
                         window.dispatchEvent(new CustomEvent('race-sudden-death', {

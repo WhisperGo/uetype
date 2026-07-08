@@ -43,11 +43,7 @@ class ClanWarModeClaim extends Model
         return $this->belongsTo(TypingResult::class);
     }
 
-    /**
-     * Klaim yang sudah "dipakai": hasil ketiknya sudah disubmit & final.
-     * Klaim yang typing_result_id-nya masih null berarti mode terkunci tapi
-     * belum dikerjakan (masih bisa dibatalkan).
-     */
+    /** typing_result_id null = mode terkunci tapi belum dikerjakan (masih bisa dibatalkan). */
     public function isSubmitted(): bool
     {
         return $this->typing_result_id !== null;

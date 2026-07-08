@@ -9,7 +9,6 @@
             syncCapsLock($event);
             if($event.key === 'Tab') {
                 $event.preventDefault();
-                // Tombol restart tidak ada saat war-lock (dinonaktifkan) -> guard null.
                 document.getElementById('restartButton')?.focus();
             } else if (document.activeElement.tagName !== 'BUTTON') {
                 handleInput($event);
@@ -19,9 +18,7 @@
         x-on:ghost-selected.window="window.__uetypeGhostSelection = { active: true, wpm: $event.detail.wpm, label: $event.detail.label }; ghostActive = true; ghostWpm = $event.detail.wpm; ghostLabel = $event.detail.label; ghostCharIndex = 0; ghostFinished = false; ghostFinishTime = null; $nextTick(() => { const pos = getCharPosition(0); if (pos) { ghostCursorLeft = pos.left; ghostCursorTop = pos.top; } if (isStarted) startGhostAnimationLoop(); })"
         x-on:ghost-cleared.window="window.__uetypeGhostSelection = null; ghostActive = false; ghostWpm = 0; ghostLabel = ''; stopGhostAnimationLoop();">
 
-        {{-- GhostPicker: komponen Livewire TERPISAH (query teman/leaderboard sendiri).
-             wire:key menyertakan mode/durasi supaya daftar leaderboard-nya ikut ter-scope
-             ulang saat mode/durasi berganti (sejalan dengan clear ghost otomatis). --}}
+        {{-- GhostPicker: komponen Livewire terpisah; wire:key men-scope ulang daftarnya per mode. --}}
         <livewire:ghost-picker :main-mode="$mainMode" :sub-mode="$subMode"
             wire:key="ghost-picker-{{ $mainMode }}-{{ $subMode }}" />
 
@@ -50,9 +47,7 @@
             @endif
 
             @if ($warLock)
-                {{-- WAR-LOCK: mode dikunci ke klaim Clan War. Kontrol mode disembunyikan
-                     total (bukan cuma di-disable) supaya tak ada jalur ganti mode; server
-                     juga menolak setMode() saat war-lock aktif (defense-in-depth). --}}
+                {{-- WAR-LOCK: mode dikunci klaim Clan War; kontrol mode disembunyikan (server juga menolak setMode). --}}
                 <div class="flex flex-col items-center gap-2 mb-2 transition-opacity duration-500"
                     :class="isStarted ? 'opacity-0 pointer-events-none' : 'opacity-100'">
                     <div class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold/10 border border-gold/40">
@@ -75,11 +70,9 @@
                     </a>
                 </div>
             @else
-            <!-- MODE CONTROL BAR (selaras Figma: Standard/Survival/Ghost → config → EN/ID) -->
-            <!-- Saat mengetik, control bar di-fade DI TEMPAT (ruang tetap dipesan) supaya
-                 area teks tidak melonjak ke atas. Sebelumnya pakai h-0/!mb-0 yang meng-collapse
-                 tinggi → menyebabkan layout shift ~128px tiap kali mulai mengetik.
-                 Opsi A: "Standard" hanya grup VISUAL; mainMode backend tetap time/words/quote. -->
+            <!-- MODE CONTROL BAR: Standard/Survival/Ghost → config → bahasa konten.
+                 Saat mengetik hanya di-fade (ruang tetap dipesan) agar tak ada layout shift.
+                 "Standard" cuma grup visual; mainMode backend tetap time/words/quote. -->
             <div class="flex flex-col items-center gap-3 mb-2 transition-opacity duration-500"
                 :class="isStarted ? 'opacity-0 pointer-events-none' : 'opacity-100'">
 
@@ -272,17 +265,9 @@
                     class="relative flex flex-wrap content-start gap-x-0 transition-transform duration-[85ms] ease-out"
                     :style="`transform: translateY(-${scrollOffset}px)`">
 
-                    <!-- GHOST CURSOR: elemen kedua, tipis/transparan, di jalur teks yang SAMA.
-                         z-10 (di bawah cursor asli z-20), opacity rendah, warna beda. Otomatis
-                         ikut translateY(-scrollOffset) container karena sibling di textContainer;
-                         TIDAK ikut mengontrol scroll (hanya cursor asli yang menggerakkan scroll).
-                         SENGAJA TANPA transition-all pada transform: posisi sudah di-update
-                         tiap frame via requestAnimationFrame + interpolasi pixel (lihat
-                         updateGhostPosition()), jadi geraknya sudah mulus dengan sendirinya.
-                         Menambah CSS transition di sini justru membuat cursor "mengejar" posisi
-                         yang terus berubah tiap frame -> terasa lamban/karet, bukan presisi
-                         linear sesuai WPM yang di-set. Transisi HANYA dipakai untuk opacity
-                         (show/hide), bukan transform. -->
+                    <!-- GHOST CURSOR: cursor kedua di jalur teks yang sama (z-10, di bawah cursor asli).
+                         Tak mengontrol scroll. Sengaja tanpa transition pada transform — posisi
+                         sudah dimuluskan per-frame oleh updateGhostPosition(); transisi hanya untuk opacity. -->
                     <div x-show="ghostActive && !isFinished" x-cloak
                         class="absolute top-0 left-0 w-[2.5px] h-[1.5em] transition-opacity duration-150 z-10 rounded opacity-40"
                         :style="`transform: translate(${ghostCursorLeft}px, ${ghostCursorTop}px); background-color: rgb(var(--color-muted));`">
@@ -335,9 +320,7 @@
             </div>
 
             <div class="mt-12 flex justify-center">
-                {{-- Saat war-lock aktif, restart dinonaktifkan: satu klaim = satu
-                     kesempatan, tak ada reroll teks. Gerbang sesungguhnya ada di
-                     server (TypingEngine::restart()); ini tampilan disabled-nya. --}}
+                {{-- War-lock: restart dinonaktifkan (satu klaim = satu kesempatan). Gerbangnya di server. --}}
                 @if ($warLock)
                     <div class="flex flex-col items-center gap-1.5 select-none">
                         <div class="flex items-center gap-2 text-muted/40 px-4 py-2 rounded-xl cursor-not-allowed"
@@ -367,15 +350,13 @@
     </div>
 
     <script>
-        // Preset parameter Survival (stamina bar). Semua angka SEMENTARA — gampang di-tuning
-        // saat playtest. Yang dikunci adalah polanya, bukan angkanya (lihat catatan revisi).
-        //   sMax     : kapasitas bar (cap atas — cegah "menabung" stamina lalu santai)
-        //   sStart   : stamina awal saat mulai
-        //   graceSec : detik awal tanpa/dengan drain sangat lembut (biar pemain sempat "panas")
-        //   dStart   : drain pasif awal per detik
-        //   dAccel   : percepatan drain per detik² (escalation — drain makin deras seiring waktu)
-        //   refill   : stamina bertambah per KARAKTER benar (berbasis char, bukan per-kata flat)
-        //   penalty  : drain ekstra saat kata "kotor" di-commit (cap per-kata)
+        // Preset stamina Survival.
+        //   sMax/sStart : kapasitas & stamina awal
+        //   graceSec    : detik awal dengan drain dilembutkan
+        //   dStart      : drain pasif per detik
+        //   dAccel      : percepatan drain per detik²
+        //   refill      : stamina per karakter benar
+        //   penalty     : drain ekstra saat kata kotor di-commit (cap per-kata)
         const SURVIVAL_PRESETS = {
             easy:   { sMax: 120, sStart: 120, graceSec: 4, dStart: 3.0, dAccel: 0.11, refill: 2.4, penalty: 7 },
             medium: { sMax: 100, sStart: 100, graceSec: 3, dStart: 3.8, dAccel: 0.20, refill: 1.9, penalty: 10 },
@@ -411,10 +392,7 @@
                 cursorLeft: 0,
                 cursorTop: 0,
 
-                // --- Ghost Mode: cursor kedua yang paced linear (WPM konstan) ---
-                // ghostActive/ghostWpm/ghostLabel diisi lewat event 'ghost-selected' dari
-                // GhostPicker (komponen Livewire terpisah). Pilihan ghost dipulihkan dari
-                // cache frontend saat Alpine remount; progresnya tetap direset tiap restart.
+                // --- Ghost Mode: cursor kedua ber-pacing linear (WPM konstan), diisi lewat event 'ghost-selected'. ---
                 ghostActive: false,
                 ghostWpm: 0,
                 ghostLabel: '',
@@ -436,9 +414,7 @@
                 missedChars: {},
                 modeChangedCleanup: null,
 
-                // --- State khusus Survival Mode (bar stamina terpadu) ---
-                // Stamina menyusut seiring waktu (drain), terisi tiap karakter benar (refill),
-                // terkuras ekstra saat kata kotor (penalti). Habis (0) = game over.
+                // --- Survival: stamina menyusut per detik, terisi per karakter benar, habis = game over. ---
                 stamina: 100,         // nilai stamina sekarang
                 staminaMax: 100,      // kapasitas/cap bar (di-set dari preset difficulty)
                 staminaPct: 100,      // persentase untuk UI (0–100)
@@ -469,9 +445,7 @@
                     this.resetProgress();
                     this.restoreGhostSelection();
 
-                    // Teks baru mengganti wire:key lewat typingSessionKey. Listener ini tetap
-                    // menjadi sinkronisasi eksplisit dari event Livewire, dan cleanup-nya
-                    // disimpan supaya tidak menumpuk saat Alpine remount.
+                    // Cleanup disimpan agar listener tak menumpuk saat Alpine remount.
                     const cleanup = this.$wire.on('mode-changed', (payload) => {
                         this.resetForNewText(payload.text ?? '');
                     });
@@ -504,9 +478,7 @@
                     this.resetProgress();
                 },
 
-                // Logika reset BERSAMA (wordBounds, survival, dsb) dari targetArray saat ini.
-                // Dipakai oleh init() (mount pertama) DAN resetForNewText() (restart di mode
-                // sama) — diekstrak supaya tidak duplikat & listener $wire.on tidak menumpuk.
+                // Reset state (wordBounds, survival, dsb) dari targetArray saat ini.
                 resetProgress() {
                     this.stopRuntime();
 
@@ -525,8 +497,7 @@
                     this.lineHeight = 0;
                     this.isTyping = false;
 
-                    // Reset state survival tiap mulai/restart. Preset diambil dari currentSub
-                    // (difficulty: 'easy'|'medium'|'hard'); mode lain tak terpengaruh.
+                    // Preset survival diambil dari currentSub (easy|medium|hard).
                     this.survivalCfg = survivalConfig(this.currentSub);
                     this.staminaMax = this.survivalCfg.sMax;
                     this.stamina = this.survivalCfg.sStart;
@@ -594,30 +565,20 @@
 
                 // --- Helper Survival ---
 
-                // Dipanggil tiap kali terjadi error di kata aktif (typo / huruf di-skip /
-                // karakter berlebih). Hanya MENANDAI kata sebagai "kotor" — TIDAK memotong
-                // nyawa di sini. Pemotongan nyawa terjadi sekali saat kata di-commit, maksimal
-                // -1 per kata berapa pun jumlah errornya (revisi playtest: per-kata, bukan
-                // per-karakter). Koreksi tidak menghapus status kotor. No-op di luar survival.
+                // Tandai kata aktif "kotor" saat error. Nyawa dipotong nanti saat commit, bukan di sini.
                 markWordDirty() {
                     if (this.currentMain !== 'survival' || this.isFinished) return;
                     this.currentWordDirty = true;
                 },
 
-                // Dipanggil tiap satu kata selesai (spasi ditekan / kata di-skip).
-                // Model STAMINA: kata kotor kena DRAIN EKSTRA tetap (penalti akurasi), cap per-kata.
-                //   - kata bersih (nol error) → tak ada penalti (refill sudah datang dari karakter).
-                //   - kata kotor (ada error apa pun, walau dikoreksi) → stamina -= penalty (sekali).
-                // IDEMPOTEN per-index: kalau kata sama di-commit ulang (user backspace mundur lalu
-                // maju lagi), penalti lama tak dikenakan dua kali — cap per-kata (revisi playtest).
+                // Nilai satu kata yang selesai. Kata kotor kena penalti stamina sekali saja
+                // (cap per-kata, idempoten kalau di-commit ulang); kata bersih tak kena apa-apa.
                 completeWord(wordIndex) {
                     if (this.currentMain !== 'survival') return;
 
                     const isDirty = this.currentWordDirty;
                     this.currentWordDirty = false;
 
-                    // Apakah kata ini SUDAH pernah kena penalti pada commit sebelumnya?
-                    // Cap per-kata: satu kata maksimal -1 penalti sepanjang hidupnya.
                     const alreadyPenalized = this.committedWordResults[wordIndex] === 'dirty';
 
                     if (isDirty) {
@@ -632,14 +593,11 @@
                         return;
                     }
 
-                    // Kata bersih: cukup catat (refill stamina sudah terjadi per-karakter saat diketik).
                     this.committedWordResults[wordIndex] = 'clean';
                 },
 
-                // Dipanggil saat user backspace mundur ke kata sebelumnya untuk mengoreksi.
-                // Membatalkan penilaian commit terakhir agar tak dinilai dua kali saat re-commit.
-                // Penalti stamina untuk kata kotor TIDAK dikembalikan (aturan "kotor tetap kena
-                // walau dikoreksi") — status 'dirty' DIPERTAHANKAN agar re-commit tak memotong lagi.
+                // Backspace mundur ke kata sebelumnya: batalkan penilaian commit terakhir.
+                // Status 'dirty' dipertahankan agar penalti tak dikenakan dua kali saat re-commit.
                 uncommitWord(wordIndex) {
                     if (this.currentMain !== 'survival') return;
 
@@ -647,21 +605,18 @@
                     if (prev === undefined) return;
 
                     if (prev === 'clean') {
-                        // Kata tadinya bersih: lupakan total, dinilai ulang dari nol saat re-commit.
                         delete this.committedWordResults[wordIndex];
                     }
-                    // Jika 'dirty': biarkan tetap 'dirty' agar penalti tak dikenakan dua kali.
                 },
 
-                // Refill stamina tiap satu karakter benar (cap di staminaMax). No-op di luar survival.
+                // Refill stamina tiap satu karakter benar (cap di staminaMax).
                 refillStamina() {
                     if (this.currentMain !== 'survival' || this.isFinished) return;
                     this.stamina = Math.min(this.staminaMax, this.stamina + this.survivalCfg.refill);
                     this.syncStaminaPct();
                 },
 
-                // Satu tick drain pasif. Δt = detik sejak tick sebelumnya (presisi, bukan asumsi
-                // interval tetap). Drain naik seiring waktu (escalation) dengan grace di awal.
+                // Satu tick drain pasif; Δt presisi dari tick sebelumnya, drain naik seiring waktu.
                 staminaTick() {
                     if (this.currentMain !== 'survival' || this.isFinished || !this.startTime) return;
 
@@ -673,10 +628,9 @@
                     const elapsed = (now - this.startTime) / 1000;
                     const cfg = this.survivalCfg;
 
-                    // Grace: beberapa detik pertama drain dilembutkan agar awal tak terasa kasar.
                     const graceFactor = elapsed < cfg.graceSec ? (elapsed / cfg.graceSec) : 1;
 
-                    // D = D_start + D_accel * elapsed  (escalation: makin lama makin deras).
+                    // D = D_start + D_accel * elapsed
                     const drainPerSec = (cfg.dStart + cfg.dAccel * elapsed) * graceFactor;
 
                     this.stamina = Math.max(0, this.stamina - drainPerSec * dt);
@@ -693,8 +647,7 @@
                     }
                 },
 
-                // Game over survival: stamina habis. Hentikan loop tick lalu selesaikan sesi
-                // lewat jalur finish() yang sama dengan mode lain.
+                // Stamina habis: hentikan loop tick, selesaikan sesi lewat finish() seperti mode lain.
                 survivalGameOver() {
                     if (this.isFinished) return;
                     if (this.staminaInterval) {
@@ -736,10 +689,7 @@
                     }
                 },
 
-                // Lookup posisi DOM char-{index} generik (dipakai cursor asli & ghost).
-                // Ghost tidak punya extraChars/overtyping sendiri (index-nya selalu murni
-                // 0..targetArray.length), jadi cukup fallback ke karakter terakhir kalau
-                // index melebihi teks (mis. ghost sudah "sampai" akhir).
+                // Lookup posisi DOM char-{index}; fallback ke karakter terakhir bila index melewati teks.
                 getCharPosition(index) {
                     let activeEl = document.getElementById('char-' + index);
                     let isEnd = false;
@@ -757,17 +707,9 @@
                     };
                 },
 
-                // Posisi ghost dihitung dari progres waktu (pacing linear). Dipanggil dari
-                // requestAnimationFrame (lihat startGhostAnimationLoop), BUKAN dari
-                // timerInterval 1 detik — itulah sebabnya dulu terlihat patah/loncat per
-                // detik. rAF jalan tiap frame (~60x/detik) sehingga interpolasi pixel di
-                // bawah benar-benar terlihat mulus, sesuai kecepatan WPM yang di-set.
-                //
-                // ghostCharIndex tetap dibulatkan (integer) — dipakai untuk logika menang/
-                // kalah di finish(), TIDAK untuk render. Posisi VISUAL (ghostCursorLeft/Top)
-                // dihitung terpisah dari nilai PECAHAN (fractionalChars) supaya cursor
-                // bergerak halus MELINTASI lebar tiap karakter, bukan meloncat karakter demi
-                // karakter tiap kali index integer bertambah.
+                // Posisi ghost dari progres waktu (pacing linear); dipanggil per-frame lewat rAF.
+                // ghostCharIndex (integer) dipakai untuk menang/kalah di finish(); posisi visual
+                // dihitung dari nilai pecahan agar cursor bergerak halus melintasi tiap karakter.
                 updateGhostPosition() {
                     if (!this.startTime || this.ghostFinished) return;
 
@@ -793,11 +735,7 @@
                         return;
                     }
 
-                    // Interpolasi pixel: posisi karakter SEKARANG -> posisi karakter
-                    // BERIKUTNYA, digeser sebesar bagian pecahan (0..1) dari fractionalChars.
-                    // Hanya diterapkan kalau keduanya di baris yang SAMA (top identik) —
-                    // kalau beda baris (ganti kata yang wrap ke bawah), lompat langsung ke
-                    // posisi target tanpa interpolasi supaya cursor tak "terbang" diagonal.
+                    // Interpolasi pixel antar karakter; hanya bila keduanya sebaris (kalau wrap, lompat langsung).
                     const fraction = fractionalChars - flooredIndex;
                     const currentPos = this.getCharPosition(flooredIndex);
                     if (!currentPos) return;
@@ -813,10 +751,7 @@
                     }
                 },
 
-                // Loop animasi ghost via requestAnimationFrame — terpisah total dari
-                // timerInterval (yang tetap 1 detik untuk stats/timer). rAF memberi update
-                // per-frame (~60fps) yang dibutuhkan supaya interpolasi pixel di atas benar-
-                // benar mulus, bukan patah tiap 1 detik.
+                // Loop animasi ghost via rAF (~60fps), terpisah dari timerInterval 1 detik.
                 startGhostAnimationLoop() {
                     if (this._ghostRafId) return; // sudah berjalan
 
@@ -968,7 +903,7 @@
                     if (e.key === ' ') e.preventDefault();
                     if (e.key.length > 1 && e.key !== 'Backspace') return;
 
-                    // Efek kursor berhenti berkedip saat mengetik
+                    // Kursor berhenti berkedip selama mengetik.
                     this.isTyping = true;
                     clearTimeout(this.typingTimeout);
                     this.typingTimeout = setTimeout(() => {
@@ -979,17 +914,13 @@
                         this.isStarted = true;
                         this.startTime = Date.now();
 
-                        // Survival: jalankan loop drain stamina yang halus (~100ms) agar tekanan
-                        // terasa mulus (bukan patah-patah per detik). Drain & game over di staminaTick.
+                        // Survival: loop drain ~100ms agar tekanan terasa mulus (drain & game over di staminaTick).
                         if (this.currentMain === 'survival') {
                             this.lastTickTime = this.startTime;
                             this.staminaInterval = setInterval(() => this.staminaTick(), 100);
                         }
 
-                        // Ghost: loop requestAnimationFrame TERPISAH dari timerInterval di
-                        // bawah. Sebelumnya ghost menumpang interval 1 detik ini -> terlihat
-                        // loncat/patah karena posisi hanya di-update sekali per detik. rAF
-                        // jalan tiap frame (~60fps), jadi gerakan benar-benar mulus sesuai WPM.
+                        // Ghost: loop rAF terpisah dari timerInterval 1 detik di bawah.
                         if (this.ghostActive) {
                             this.startGhostAnimationLoop();
                         }
@@ -1035,31 +966,29 @@
                         return;
                     }
 
-                    // Mulai dari titik ini, berarti user menekan tuts karakter/spasi (bukan backspace)
+                    // Sejak titik ini: user menekan karakter/spasi, bukan backspace.
                     this.totalKeystrokes++;
 
-                    // Jika kursor sedang di posisi spasi pembatas antar kata
+                    // Kursor di posisi spasi pembatas antar kata.
                     if (this.currentIndex === bounds.space) {
                         if (e.key !== ' ') {
-                            // OVERTYPING: Tambahkan ke ekstra karakter
+                            // Overtyping: karakter berlebih ditampung, kata ditandai kotor.
                             if (!this.extraChars[this.currentWordIndex]) this.extraChars[this.currentWordIndex] = [];
                             if (this.extraChars[this.currentWordIndex].length < 15) {
                                 this.extraChars[this.currentWordIndex].push(e.key);
                             }
-                            // Survival: karakter berlebih = error → tandai kata kotor (nyawa
-                            // dipotong nanti saat kata di-commit, maks -1 per kata).
                             this.markWordDirty();
                             this.calculateStats();
                             this.schedulePositionUpdate();
                             return;
                         } else {
-                            // SPASI DITEKAN: Pindah ke kata selanjutnya
-                            this.correctKeystrokes++; // Spasi di akhir kata adalah tuts benar
-                            this.refillStamina();      // survival: spasi benar juga me-refill
+                            // Spasi ditekan: pindah ke kata berikutnya & nilai kata yang baru selesai.
+                            this.correctKeystrokes++;
+                            this.refillStamina();
                             this.inputResults[this.currentIndex] = true;
                             this.currentIndex++;
                             this.currentWordIndex++;
-                            this.completeWord(this.currentWordIndex - 1); // survival: nilai kata yang baru selesai
+                            this.completeWord(this.currentWordIndex - 1);
                             if (this.currentIndex === this.targetArray.length) this.finish();
                             this.calculateStats();
                             this.schedulePositionUpdate();
@@ -1067,30 +996,27 @@
                         }
                     }
 
-                    // Jika user menekan spasi di tengah kata (belum selesai)
+                    // Spasi di tengah kata: sisa huruf ditandai terlewat (kata di-skip).
                     if (e.key === ' ') {
-                        // Mencegah spam spasi: Abaikan spasi jika user belum mengetik huruf apapun di kata ini
+                        // Abaikan spasi kalau kata ini belum diketik sama sekali (cegah spam spasi).
                         if (this.currentIndex === bounds.start) {
                             return;
                         }
 
                         for (let i = this.currentIndex; i <= bounds.end; i++) {
-                            this.inputResults[i] = 'skipped'; // Tandai terlewat
+                            this.inputResults[i] = 'skipped';
 
-                            // Track missed character
                             const expectedChar = this.targetArray[i].toLowerCase();
                             if (expectedChar !== ' ' && expectedChar.length === 1) {
                                 this.missedChars[expectedChar] = (this.missedChars[expectedChar] || 0) + 1;
                             }
                         }
-                        // Survival: melewati huruf = error → tandai kata kotor (potongan nyawa
-                        // terjadi sekali saat completeWord, maks -1 untuk kata ini).
                         this.markWordDirty();
                         if (bounds.space !== null) {
-                            this.inputResults[bounds.space] = 'skipped'; // Jangan berikan WPM gratis untuk spasi yang di-skip
+                            this.inputResults[bounds.space] = 'skipped'; // spasi di-skip tak dihitung benar
                             this.currentIndex = bounds.space + 1;
                             this.currentWordIndex++;
-                            this.completeWord(this.currentWordIndex - 1); // kata (ternoda) tetap terhitung selesai
+                            this.completeWord(this.currentWordIndex - 1);
                         } else {
                             this.currentIndex = this.targetArray.length;
                             this.finish();
@@ -1100,19 +1026,16 @@
                         return;
                     }
 
-                    // Pengetikan normal
+                    // Pengetikan normal.
                     const isCorrect = (e.key === this.targetArray[this.currentIndex]);
                     if (isCorrect) {
                         this.correctKeystrokes++;
-                        this.refillStamina(); // survival: karakter benar me-refill stamina
+                        this.refillStamina();
                     } else {
-                        // Track missed character
                         const expectedChar = this.targetArray[this.currentIndex].toLowerCase();
                         if (expectedChar !== ' ' && expectedChar.length === 1) {
                             this.missedChars[expectedChar] = (this.missedChars[expectedChar] || 0) + 1;
                         }
-                        // Survival: typo → tandai kata kotor saja. Nyawa baru dipotong saat
-                        // kata di-commit (maks -1 per kata), bukan per-karakter.
                         this.markWordDirty();
                     }
 
@@ -1129,22 +1052,20 @@
 
                     const elapsedMs = Date.now() - this.startTime;
 
-                    // Pencegahan WPM meledak (infinite/ribuan) di awal ketikan
-                    // Kita asumsikan minimal waktu berlalu adalah 1 detik untuk kalkulasi live
+                    // Lantai 1 detik: cegah WPM meledak di awal ketikan.
                     const effectiveMs = (elapsedMs < 1000 && !this.isFinished) ? 1000 : elapsedMs;
                     const timeElapsed = effectiveMs / 60000;
 
                     if (timeElapsed <= 0) return;
 
-                    // 1. Net WPM — pakai correctKeystrokes (SUMBER YANG SAMA dengan finish/server),
-                    // termasuk spasi antar-kata yang benar (definisi Monkeytype). Ini memastikan
-                    // angka live == angka di result page (tidak ada lagi WPM "gratis" saat finish).
+                    // Net WPM dari correctKeystrokes — sumber yang sama dengan finish/server,
+                    // sehingga angka live identik dengan angka di halaman hasil.
                     this.wpm = Math.round((this.correctKeystrokes / 5) / timeElapsed) || 0;
 
-                    // 1b. Raw WPM (mengabaikan error: total tuts / 5) — stat sampingan
+                    // Raw WPM: mengabaikan error (total tuts / 5).
                     this.rawWpm = Math.round((this.totalKeystrokes / 5) / timeElapsed) || 0;
 
-                    // 2. Accuracy Calculation (Monkeytype style: based on physical keystrokes)
+                    // Akurasi berbasis tuts fisik (gaya Monkeytype).
                     if (this.totalKeystrokes > 0) {
                         this.accuracy = Math.round((this.correctKeystrokes / this.totalKeystrokes) * 100);
                     } else {
@@ -1152,8 +1073,7 @@
                     }
                 },
 
-                // Ubah wpmHistory[] menjadi string `points` untuk <polyline> sparkline.
-                // Auto-scale ke min/max history; getter reaktif Alpine (murni presentasi).
+                // wpmHistory[] -> string `points` untuk <polyline> sparkline, auto-scale ke min/max.
                 get sparklinePoints() {
                     const h = this.wpmHistory;
                     if (h.length < 2) return '';
@@ -1176,20 +1096,14 @@
                         this.staminaInterval = null;
                     }
 
-                    // Durasi PRESISI (ms) dari keystroke pertama sampai sekarang — sumber yang
-                    // sama dengan perhitungan live, supaya WPM final == WPM saat mengetik.
-                    // (Sebelumnya pakai detik bulat 'subMode - timer' → durasi mengecil → WPM "gratis".)
+                    // Durasi presisi (ms) sejak keystroke pertama — sumber yang sama dengan
+                    // perhitungan live, agar WPM final identik dengan WPM saat mengetik.
                     const durationMs = this.startTime ? (Date.now() - this.startTime) : 0;
 
-                    // Pembilang konsisten: pakai correctKeystrokes (sudah termasuk spasi antar-kata
-                    // yang benar, sama seperti definisi Monkeytype).
                     const correct = this.correctKeystrokes;
                     const total = this.totalKeystrokes;
 
-                    // Ghost: hitung posisi ghost PERSIS pada momen finish (bukan snapshot rAF
-                    // terakhir yang bisa sedikit telat) untuk perbandingan akurat, lalu hentikan
-                    // loop animasinya (juga akan berhenti sendiri karena isFinished sudah true,
-                    // tapi dihentikan eksplisit di sini untuk kebersihan).
+                    // Hitung posisi ghost tepat pada momen finish (bukan snapshot rAF terakhir).
                     if (this.ghostActive && !this.ghostFinished) {
                         this.updateGhostPosition();
                     }

@@ -12,11 +12,8 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
- * Tombol aksi pertemanan yang berdiri sendiri, dipakai di halaman profil publik.
- * Membungkus logika kirim/terima/batal/hapus yang SAMA dengan komponen Friends
- * (gerbang keamanan & siaran real-time identik), tapi hanya untuk satu target
- * user — sehingga profil publik bisa mengelola pertemanan tanpa perlu meniru
- * seluruh UI tab daftar teman.
+ * Tombol aksi pertemanan berdiri sendiri untuk halaman profil publik. Membungkus
+ * logika kirim/terima/batal/hapus yang sama dengan komponen Friends, tapi untuk satu target user.
  */
 class FriendButton extends Component
 {
@@ -28,15 +25,11 @@ class FriendButton extends Component
         $this->target = $target;
     }
 
-    /**
-     * Segarkan tombol saat channel friends.{me} menerima event (mis. target
-     * menerima/menolak permintaan kita) — statusnya selalu terkini real-time.
-     */
+    /** Listener Echo friends.{me}; body kosong karena action apa pun memicu re-render. */
     #[On('friendship-updated')]
     public function refresh(): void
     {
-        // Body kosong: pemanggilan action apa pun memicu re-render, dan
-        // status di render() selalu di-query ulang lewat computed property.
+        //
     }
 
     // ---- AKSI (cermin dari Friends.php, gerbang keamanan identik) ----
@@ -146,10 +139,7 @@ class FriendButton extends Component
         SafeBroadcast::run(fn () => broadcast(new FriendshipUpdated($otherUserId, $notification)));
     }
 
-    /**
-     * Status relasi antara viewer dan target: 'self' | 'none' | 'sent'
-     * | 'incoming' | 'friends'. Menentukan tombol mana yang dirender.
-     */
+    /** Status relasi viewer-target: 'self' | 'none' | 'sent' | 'incoming' | 'friends'. */
     public function getRelationProperty(): string
     {
         $me = Auth::user();

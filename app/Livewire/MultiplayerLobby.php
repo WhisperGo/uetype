@@ -26,15 +26,12 @@ class MultiplayerLobby extends Component
 
     public bool $showResultModal = false;
 
-    // Durasi sudden death dalam detik. Diekstrak jadi konstanta supaya
-    // checkSuddenDeath() dan getSuddenDeathRemainingProperty() selalu
-    // pakai angka yang sama persis (sebelumnya '15' ditulis manual di
-    // checkSuddenDeath() saja, sehingga view harus menebak/re-implement
-    // sendiri arah hitungannya — ini sumber bug "maju" tadi).
+    // Durasi sudden death (detik). Konstanta tunggal dipakai checkSuddenDeath() dan
+    // getSuddenDeathRemainingProperty() agar selalu sinkron.
     private const SUDDEN_DEATH_SECONDS = 15;
 
-    // Durasi hitung mundur awal race (overlay "3, 2, 1, GO!") dalam detik. Server
-    // menetapkan race_starts_at = now() + durasi ini agar semua klien sinkron.
+    // Durasi countdown awal race ("3, 2, 1, GO!"). Server set race_starts_at = now() + ini
+    // agar semua klien sinkron.
     private const COUNTDOWN_SECONDS = 3;
 
     public function createRoom(): void
@@ -45,7 +42,6 @@ class MultiplayerLobby extends Component
 
         $code = strtoupper(Str::random(6));
 
-        // Kunci kalimat acak yang sama ini ke dalam database ruangan
         $room = Room::create([
             'code' => $code,
             'host_id' => $user->id,
@@ -69,12 +65,7 @@ class MultiplayerLobby extends Component
         $this->dispatch('subscribe-room', room: $code);
     }
 
-    /**
-     * 🎲 ARSITEKTUR REUSE: Merakit kalimat acak dari Wordlist JSON (mengikuti
-     * jalur Solo Mode). Diekstrak dari createRoom() supaya bisa dipakai ulang
-     * di playAgain() — sebelumnya playAgain() tidak generate teks baru sama
-     * sekali, jadi teks race ke-2 dst selalu identik dengan race pertama.
-     */
+    /** Merakit kalimat acak dari wordlist JSON (dipakai createRoom() dan playAgain()). */
     private function generateRaceText(): string
     {
         $textToType = "And i know we were perfect but i never felt this way for no one and i just can't imagine how you could be so okay now that I gone guess you did mean what you wrote in that song about me cause you said forever now i drive alone past";
@@ -87,11 +78,8 @@ class MultiplayerLobby extends Component
 
             if (is_array($data) && isset($data['words']) && is_array($data['words'])) {
                 $wordsArray = $data['words'];
-
-                // Acak seluruh isi wordlist
                 shuffle($wordsArray);
 
-                // Ambil batas aman kata untuk balapan bersama (misal: 45 hingga 50 kata)
                 $limit = 45;
                 $selectedWords = [];
 
@@ -101,7 +89,6 @@ class MultiplayerLobby extends Component
                     $selectedWords = array_merge($selectedWords, array_slice($wordsArray, 0, $needed));
                 }
 
-                // Gabungkan kumpulan kata acak menjadi satu paragraf balapan utuh
                 $textToType = implode(' ', $selectedWords);
             }
         }
@@ -155,8 +142,6 @@ class MultiplayerLobby extends Component
     #[On('room-updated')]
     public function roomUpdated()
     {
-        // logger('EVENT MASUK');
-
         $room = Room::where('code', $this->roomCode)->first();
 
         if (! $room) {
@@ -196,14 +181,11 @@ class MultiplayerLobby extends Component
         foreach ($members as $index => $member) {
             $updateData = ['place' => $index + 1];
 
-            // Beri EXP SEKALI per pemain. xp_earned yang masih null = belum pernah
-            // diberi -> aman dari double-award (finalizeRace bisa terpanggil dari
-            // fast-path "semua finish" maupun dari checkSuddenDeath).
+            // EXP sekali per pemain: xp_earned null = belum diberi (aman dari double-award
+            // lewat fast-path "semua finish" maupun checkSuddenDeath).
             if (is_null($member->xp_earned) && $member->user) {
-                // room_members tidak menyimpan jumlah karakter benar, jadi diturunkan
-                // dari progress: correctChars = progress% × panjang teks. Ini memberi
-                // basis VOLUME yang setara dengan mode solo, dipakai rumus yang SAMA
-                // (User::addExp) supaya EXP multiplayer & solo konsisten.
+                // correctChars diturunkan dari progress% x panjang teks (room_members tak
+                // menyimpan jumlah karakter benar), lalu pakai rumus sama dengan mode solo.
                 $progress = max(0, min(100, (int) $member->progress_percent));
                 $correctChars = (int) round(($progress / 100) * $textLength);
 
@@ -266,9 +248,7 @@ class MultiplayerLobby extends Component
 
         $member = RoomMember::where('room_id', $room->id)->where('user_id', Auth::id())->first();
 
-        // FIX bug laten: guard sebelumnya cek `finished_at` yang TIDAK ADA di skema
-        // (kolomnya `finished_time_seconds`) -> selalu null -> guard mati -> pemain
-        // yang sudah finish tetap mem-broadcast progress. Sekarang cek kolom benar.
+        // Pemain yang sudah finish tak boleh lagi mem-broadcast progress.
         if (! $member || ! is_null($member->finished_time_seconds)) {
             return;
         }
@@ -288,12 +268,9 @@ class MultiplayerLobby extends Component
         if ($progressPercent >= 100) {
             $justFinished = true;
 
-            // Durasi tempuh ASLI = sekarang - kapan race benar-benar mulai
-            // (race_starts_at, titik countdown 3-2-1 selesai). BUG lama memakai
-            // $room->updated_at yang berubah tiap update baris room, jadi angkanya
-            // acak & kecil (2s/5s), bukan lama mengetik sebenarnya. Fallback ke
-            // updated_at hanya kalau race_starts_at entah kenapa kosong (jaga-jaga).
-            // absolute: true -> cegah hasil negatif (Carbon 3 default-nya signed diff).
+            // Durasi tempuh = sekarang - race_starts_at (titik countdown selesai);
+            // fallback ke updated_at hanya kalau race_starts_at kosong.
+            // absolute: true -> cegah hasil negatif.
             $raceStart = $room->race_starts_at ?? $room->updated_at;
             $updateData['finished_time_seconds'] = (int) round($raceStart->diffInSeconds(now(), true));
 
@@ -315,10 +292,8 @@ class MultiplayerLobby extends Component
 
         $member->update($updateData);
 
-        // GERAKAN MASKOT LAWAN = payload langsung lewat WebSocket (channel race.{code}).
-        // Ini mengganti pola lama "broadcast ping RoomUpdated -> tiap client re-render
-        // Livewire + query DB". Sekarang klien lain cukup baca payload ini dan geser
-        // maskot di Alpine store, tanpa round-trip server. Inilah kunci zero-delay.
+        // Gerakan maskot lawan: payload langsung lewat WebSocket (channel race.{code}),
+        // klien lain cukup baca & geser maskot di Alpine store tanpa round-trip server.
         SafeBroadcast::run(fn () => broadcast(new RaceProgressUpdated($this->roomCode, Auth::id(), [
             'progress_percent' => $progressPercent,
             'wpm' => $liveWpm,
@@ -326,9 +301,8 @@ class MultiplayerLobby extends Component
             'finished' => $justFinished,
         ]))->toOthers());
 
-        // Saat pemain PERTAMA finish -> sudden death mulai. Kirim timestamp akhir yang
-        // sama ke semua klien supaya hitung mundur mereka tersinkron (bukan tiap klien
-        // menebak sendiri). Server tetap gerbang final via checkSuddenDeath().
+        // Pemain pertama finish -> sudden death mulai. Kirim timestamp akhir yang sama ke
+        // semua klien agar countdown tersinkron; server tetap gerbang final via checkSuddenDeath().
         if ($suddenDeathJustStarted) {
             SafeBroadcast::run(fn () => broadcast(new SuddenDeathTriggered(
                 $this->roomCode,
@@ -336,11 +310,9 @@ class MultiplayerLobby extends Component
             )));
         }
 
-        // Lifecycle (bukan sekadar gerakan): saat ada yang finish, kondisi room berubah
-        // (badge FINISHED, modal hasil, place). Ini butuh re-render -> pakai RoomUpdated.
+        // Lifecycle (bukan sekadar gerakan): room berubah (badge, modal, place) -> re-render via RoomUpdated.
         if ($justFinished) {
-            // Fast-path: kalau SEMUA peserta sudah finish, tutup room sekarang juga
-            // tanpa menunggu timeout sudden death 15 detik.
+            // Fast-path: kalau semua peserta sudah finish, tutup room tanpa menunggu timeout.
             $unfinished = RoomMember::where('room_id', $room->id)
                 ->whereNull('finished_time_seconds')
                 ->count();
@@ -365,17 +337,14 @@ class MultiplayerLobby extends Component
             return;
         }
 
-        // Hitung detik yang SUDAH berlalu sejak sudden death dimulai (maju, 0 → 15).
-        // Ini dipakai HANYA sebagai syarat auto-finish — bukan untuk ditampilkan
-        // langsung ke player. Untuk tampilan mundur (15 → 0), pakai
-        // getSuddenDeathRemainingProperty() di bawah.
+        // Detik yang sudah berlalu sejak sudden death dimulai (maju, 0 -> 15), hanya
+        // syarat auto-finish. Untuk tampilan mundur, pakai getSuddenDeathRemainingProperty().
         $secondsPassed = now()->diffInSeconds($room->countdown_started_at, true);
 
-        // Jika sudah melewati batas waktu, paksa kunci game menjadi 'finished'
         if ($secondsPassed >= self::SUDDEN_DEATH_SECONDS) {
             $room->update(['status' => 'finished']);
 
-            // Berikan peringkat default ke pemain yang belum selesai berdasarkan progress tertinggi
+            // Peringkat default (DNF) untuk pemain yang belum selesai.
             RoomMember::where('room_id', $room->id)
                 ->whereNull('finished_time_seconds')
                 ->update([
@@ -385,14 +354,11 @@ class MultiplayerLobby extends Component
             $this->finalizeRace($room->id);
             $this->showResultModal = true;
 
-            // Perintahkan Alpine di klien ini untuk mengunci input SEKARANG JUGA.
-            // Dipanggil sekali oleh klien saat hitung-mundur sinkronnya menyentuh 0
-            // (bukan lagi via poll 1 detik). Guard `>= SUDDEN_DEATH_SECONDS` di atas
-            // membuat method ini idempoten meski dipicu beberapa klien sekaligus.
+            // Kunci input klien ini sekarang; guard di atas membuat method idempoten
+            // meski dipicu beberapa klien sekaligus.
             $this->dispatch('force-finish');
 
-            // Broadcast ke SEMUA (bukan toOthers): klien yang memicu ini juga perlu
-            // menerima status 'finished' final + peringkat DNF yang baru dikunci.
+            // Broadcast ke semua (bukan toOthers): klien pemicu juga perlu status final.
             SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
         }
     }
@@ -403,17 +369,8 @@ class MultiplayerLobby extends Component
         if ($room && $room->host_id === Auth::id()) {
             $room->update([
                 'status' => 'waiting',
-                // FIX bug 1: countdown_started_at WAJIB direset ke null di sini.
-                // Sebelumnya kolom ini tidak disentuh, jadi timestamp sudden death
-                // dari race sebelumnya masih nyangkut. Begitu race baru dimulai dan
-                // status kembali 'racing', checkSuddenDeath() langsung melihat
-                // elapsed time yang sudah jauh lebih dari 15 detik (dihitung dari
-                // race lama) -> auto-finish dalam ~1 detik -> leaderboard "langsung"
-                // muncul lagi.
+                // Reset agar checkSuddenDeath() tak langsung auto-finish dari timer race lama.
                 'countdown_started_at' => null,
-                // FIX bug 2: generate teks balapan baru, sama seperti createRoom().
-                // Sebelumnya text_to_type tidak pernah diperbarui di sini, jadi
-                // race ke-2 dst memakai teks yang identik dengan race pertama.
                 'text_to_type' => $this->generateRaceText(),
             ]);
             RoomMember::where('room_id', $room->id)->update([
@@ -423,8 +380,7 @@ class MultiplayerLobby extends Component
                 'accuracy' => 100,
                 'finished_time_seconds' => null,
                 'place' => null,
-                // Reset penanda EXP -> race berikutnya bisa memberi EXP lagi (sekali).
-                'xp_earned' => null,
+                'xp_earned' => null, // race berikutnya bisa memberi EXP lagi
             ]);
 
             $this->step = 'waiting';
@@ -476,11 +432,8 @@ class MultiplayerLobby extends Component
     }
 
     /**
-     * Data EXP nyata untuk panel hasil match (mengganti angka hardcoded lama).
-     * - earned  : EXP yang diperoleh user dari match ini (dari room_members.xp_earned).
-     * - level   : levelData() user TERKINI (level, progress, needed) — satu sumber
-     *             dengan profil/navigation, diturunkan dari total_xp.
-     * Null-safe untuk guest / sebelum EXP diberikan.
+     * Data EXP untuk panel hasil match: earned (room_members.xp_earned) + level
+     * (levelData() user terkini). Null-safe untuk guest / sebelum EXP diberikan.
      *
      * @return array{earned:int, level:array}|null
      */
@@ -523,11 +476,7 @@ class MultiplayerLobby extends Component
         return $participants->count() > 0 && $participants->where('is_ready', false)->count() === 0;
     }
 
-    /**
-     * True kalau sudden death sedang aktif (sudah ada minimal satu player
-     * finish, room masih racing). Dipakai di view untuk memunculkan/
-     * menyembunyikan badge countdown.
-     */
+    /** True kalau sudden death aktif (minimal satu player finish, room masih racing). */
     public function getSuddenDeathActiveProperty(): bool
     {
         $room = $this->roomData;
@@ -535,12 +484,7 @@ class MultiplayerLobby extends Component
         return (bool) ($room && $room->status === 'racing' && $room->countdown_started_at);
     }
 
-    /**
-     * Sisa waktu sudden death dalam DETIK MUNDUR (15 → 0), bukan elapsed.
-     * Inilah angka yang seharusnya dipakai di view/badge countdown untuk
-     * player yang belum selesai — ganti tampilan yang sebelumnya hitung
-     * maju dengan properti ini.
-     */
+    /** Sisa waktu sudden death dalam detik mundur (15 -> 0), bukan elapsed. */
     public function getSuddenDeathRemainingProperty(): int
     {
         $room = $this->roomData;
@@ -554,10 +498,7 @@ class MultiplayerLobby extends Component
         return max(0, self::SUDDEN_DEATH_SECONDS - (int) floor($elapsed));
     }
 
-    /**
-     * Waktu absolut (ISO string) kapan race resmi mulai. Dipakai klien untuk
-     * menghitung mundur overlay 3-2-1 secara sinkron. Null jika belum di-set.
-     */
+    /** Waktu absolut (ISO string) kapan race resmi mulai, untuk countdown 3-2-1 sinkron. */
     public function getRaceStartsAtProperty(): ?string
     {
         $room = $this->roomData;
@@ -574,7 +515,6 @@ class MultiplayerLobby extends Component
 
     public function startRace(): void
     {
-        // dd(config('broadcasting.default'));
         $room = Room::where('code', $this->roomCode)->first();
 
         if (! $room || $room->host_id !== Auth::id()) {
@@ -587,29 +527,20 @@ class MultiplayerLobby extends Component
             'accuracy' => 100,
             'finished_time_seconds' => null,
             'place' => null,
-            // Defense in depth: bersihkan penanda EXP setiap race baru dimulai,
-            // agar jalur apa pun ke startRace() tetap bisa memberi EXP sekali.
-            'xp_earned' => null,
+            'xp_earned' => null, // defense in depth: pastikan bisa memberi EXP sekali lagi
         ]);
 
         $room->update([
             'status' => 'racing',
-            // Jaga-jaga tambahan (defense in depth): pastikan sudden death
-            // timer selalu bersih setiap kali race BARU dimulai, apa pun
-            // penyebabnya. playAgain() sudah reset ini duluan, tapi kalau
-            // suatu saat ada jalur lain yang memanggil startRace() tanpa
-            // lewat playAgain(), race tetap tidak akan kebawa timer basi.
+            // Defense in depth: pastikan sudden death timer bersih tiap race baru.
             'countdown_started_at' => null,
-            // Titik START race ditetapkan SERVER: now() + 3 detik. Semua klien
-            // menghitung mundur ke waktu absolut ini -> countdown 3-2-1 sinkron,
-            // delay jaringan tidak lagi menggeser start antar-layar.
+            // Start ditetapkan server: now() + 3 detik, semua klien hitung mundur ke waktu
+            // absolut ini agar countdown sinkron.
             'race_starts_at' => now()->addSeconds(self::COUNTDOWN_SECONDS),
         ]);
 
         $this->step = 'racing';
         $this->showResultModal = false;
-
-        // logger('Broadcasting RoomUpdated');
 
         SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
     }

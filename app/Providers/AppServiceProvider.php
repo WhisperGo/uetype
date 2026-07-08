@@ -25,10 +25,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Di balik reverse proxy/tunnel (Cloudflare, ngrok), request sampai ke Laravel
-        // sebagai http polos meski browser mengaksesnya lewat https. Tanpa ini, URL yang
-        // digenerate (route(), Livewire update endpoint, dll) memakai http dan diblokir
-        // browser sebagai mixed content di halaman https.
+        // Di belakang reverse proxy (Cloudflare/ngrok) request masuk sebagai http;
+        // paksa https agar URL yang digenerate tak jadi mixed content.
         if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }
@@ -46,5 +44,3 @@ class AppServiceProvider extends ServiceProvider
         });
     }
 }
-
-
