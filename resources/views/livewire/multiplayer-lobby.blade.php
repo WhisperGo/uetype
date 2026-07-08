@@ -120,16 +120,35 @@
              hanya menambah latensi & beban tanpa manfaat. --}}
         <div class="space-y-8">
             <div
+                x-data="{
+                    copied: false,
+                    copyTimer: null,
+                    async copyRoomCode() {
+                        if (this.copied) { return; }
+
+                        await navigator.clipboard.writeText(@js($this->roomData->code));
+
+                        this.copied = true;
+                        clearTimeout(this.copyTimer);
+                        this.copyTimer = setTimeout(() => { this.copied = false; }, 4000);
+                    }
+                }"
                 class="p-6 border bg-typing-surface/40 border-white/5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
                     <span class="text-xs font-mono tracking-widest text-typing-muted uppercase">{{ __('multiplayer.room_code_share') }}</span>
                     <h2 class="text-fluid-title font-mono font-black tracking-[0.3em] text-white mt-1">
                         {{ $this->roomData->code }}</h2>
                 </div>
-                <button
-                    onclick="navigator.clipboard.writeText('{{ $this->roomData->code }}'); alert(@js(__('multiplayer.code_copied')))"
-                    class="px-5 py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 font-mono text-xs font-bold uppercase tracking-wider rounded-xl transition">
-                    {{ __('multiplayer.copy_code') }}
+                <button type="button"
+                    x-on:click.prevent="copyRoomCode()"
+                    x-bind:disabled="copied"
+                    x-bind:class="copied ? 'bg-active text-background border-active/35 cursor-default' : 'bg-white/5 border-white/10 hover:bg-white/10'"
+                    class="inline-grid appearance-none place-items-center px-5 py-2.5 border font-mono text-xs font-bold uppercase tracking-wider rounded-xl transition-colors duration-200 disabled:pointer-events-none disabled:opacity-100"
+                    aria-live="polite">
+                    <span class="[grid-area:1/1] translate-y-[0.5px] font-mono text-xs font-bold uppercase leading-[1.1] tracking-wider text-current"
+                        x-bind:class="copied ? 'invisible' : 'visible'">{{ __('multiplayer.copy_code') }}</span>
+                    <span class="[grid-area:1/1] translate-y-[0.5px] font-mono text-xs font-bold uppercase leading-[1.1] tracking-wider text-current"
+                        x-bind:class="copied ? 'visible' : 'invisible'">{{ __('multiplayer.copied') }}</span>
                 </button>
             </div>
 
