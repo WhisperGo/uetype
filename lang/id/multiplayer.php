@@ -13,6 +13,7 @@ return [
 
     'room_code_share' => 'Kode Ruang - Bagikan ke teman',
     'copy_code' => 'Salin Kode',
+    'copied' => 'Disalin',
     'code_copied' => 'Kode ruang disalin!',
     'players' => 'Pemain',
     'joined' => ':count / 5 Bergabung',

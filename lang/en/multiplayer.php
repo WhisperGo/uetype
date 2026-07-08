@@ -13,6 +13,7 @@ return [
 
     'room_code_share' => 'Room Code - Share with friends',
     'copy_code' => 'Copy Code',
+    'copied' => 'Copied',
     'code_copied' => 'Room code copied!',
     'players' => 'Players',
     'joined' => ':count / 5 Joined',
