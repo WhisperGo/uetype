@@ -21,9 +21,9 @@
             <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(var(--color-brand)/0.14),transparent_70%)]"></div>
 
             <div class="relative">
-                <a href="/" class="flex items-center gap-2 group">
+                <a href="{{ route('home') }}" class="flex items-center gap-3 group">
                     <x-application-logo class="h-12 w-auto transition-transform group-hover:scale-105" />
-                    <span class="font-mono text-2xl font-bold tracking-tight text-foreground">Ue<span class="text-brand">Type</span></span>
+                    <span class="font-display text-lg text-gold leading-none pt-1">UETYPE</span>
                 </a>
             </div>
 
