@@ -47,6 +47,16 @@
         background-color: rgb(var(--color-gold) / 0.6);
     }
 
+    /* Sorotan sekejap saat menggulir ke pesan asli dari kutipan reply. */
+    @keyframes chat-flash-highlight {
+        0%, 100% { background-color: transparent; }
+        30% { background-color: rgb(var(--color-gold) / 0.18); }
+    }
+    .chat-flash {
+        animation: chat-flash-highlight 1.2s ease-in-out;
+        border-radius: 0.75rem;
+    }
+
     @keyframes caret-flash-smooth {
         0%, 100% { opacity: 0; }
         50% { opacity: 1; }

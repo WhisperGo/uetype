@@ -52,6 +52,9 @@ class Chat extends Component
 
     public string $editBody = '';
 
+    // Reply: id pesan yang sedang dibalas (null = kirim pesan biasa).
+    public ?int $replyingToId = null;
+
     /**
      * Dipanggil oleh listener Echo saat channel chat.{me}/clan-chat.{clanId}
      * menerima event pesan baru. Livewire otomatis re-render sehingga inbox
@@ -109,22 +112,64 @@ class Chat extends Component
 
     // ---- AKSI: KIRIM PESAN ----
 
-    public function sendMessage(): void
+    /**
+     * Kirim pesan. Body diterima sebagai ARGUMEN (dari client) supaya input
+     * di UI bisa langsung dikosongkan tanpa menunggu round-trip -- jadi pesan
+     * bisa di-"spam" beruntun. $body opsional: kalau tak dikirim, jatuh ke
+     * $this->body (dipakai path lama / test). Tak mengosongkan $this->body
+     * server-side lagi supaya tak memantul & mengganggu ketikan berikutnya.
+     */
+    public function sendMessage(?string $body = null): void
     {
-        $body = trim($this->body);
+        $body = trim($body ?? $this->body);
 
         if ($body === '' || mb_strlen($body) > 2000) {
             return;
         }
 
+        // Validasi target reply: harus pesan dari percakapan yang sama & boleh
+        // dilihat user ini. Kalau tidak valid, kirim sebagai pesan biasa.
+        $replyToId = $this->resolveReplyTargetId();
+
         if ($this->activeMode === 'dm') {
-            $this->sendDm($body);
+            $this->sendDm($body, $replyToId);
         } elseif ($this->activeMode === 'clan') {
-            $this->sendClanMessage($body);
+            $this->sendClanMessage($body, $replyToId);
         }
+
+        $this->replyingToId = null;
     }
 
-    private function sendDm(string $body): void
+    /**
+     * Kembalikan reply_to_id yang sah untuk percakapan aktif, atau null.
+     */
+    private function resolveReplyTargetId(): ?int
+    {
+        if (! $this->replyingToId) {
+            return null;
+        }
+
+        $target = Message::find($this->replyingToId);
+
+        if (! $target || ! $this->canSeeMessage($target)) {
+            return null;
+        }
+
+        // Pastikan pesan yang dibalas memang milik percakapan yang sama.
+        if ($this->activeMode === 'clan') {
+            return $target->clan_id === $this->myClan?->id ? $target->id : null;
+        }
+
+        $friend = $this->activeFriend;
+
+        return $friend && ! $target->isClanMessage()
+            && in_array($friend->id, [$target->sender_id, $target->recipient_id], true)
+            && in_array(Auth::id(), [$target->sender_id, $target->recipient_id], true)
+            ? $target->id
+            : null;
+    }
+
+    private function sendDm(string $body, ?int $replyToId = null): void
     {
         $friend = $this->activeFriend;
 
@@ -136,14 +181,13 @@ class Chat extends Component
             'sender_id' => Auth::id(),
             'recipient_id' => $friend->id,
             'body' => $body,
+            'reply_to_id' => $replyToId,
         ]);
-
-        $this->body = '';
 
         SafeBroadcast::run(fn () => broadcast(new DirectMessageSent($message->load('sender'))));
     }
 
-    private function sendClanMessage(string $body): void
+    private function sendClanMessage(string $body, ?int $replyToId = null): void
     {
         $clan = $this->myClan;
 
@@ -155,11 +199,30 @@ class Chat extends Component
             'sender_id' => Auth::id(),
             'clan_id' => $clan->id,
             'body' => $body,
+            'reply_to_id' => $replyToId,
         ]);
 
-        $this->body = '';
-
         SafeBroadcast::run(fn () => broadcast(new ClanMessageSent($message->load('sender'))));
+    }
+
+    // ---- AKSI: REPLY ----
+
+    public function startReply(int $messageId): void
+    {
+        $message = Message::find($messageId);
+
+        // Hanya boleh reply pesan yang boleh dilihat & belum dihapus-untuk-semua.
+        if (! $message || ! $this->canSeeMessage($message) || $message->isDeletedForEveryone()) {
+            return;
+        }
+
+        $this->replyingToId = $message->id;
+        $this->editingId = null; // tak edit & reply bersamaan
+    }
+
+    public function cancelReply(): void
+    {
+        $this->replyingToId = null;
     }
 
     // ---- AKSI: EDIT & DELETE PESAN ----
@@ -361,6 +424,7 @@ class Chat extends Component
 
             return Message::between(Auth::id(), $friend->id)
                 ->visibleTo(Auth::id(), otherUserId: $friend->id)
+                ->with('replyTo.sender')
                 ->latest('id')
                 ->take($take)
                 ->get()
@@ -376,7 +440,7 @@ class Chat extends Component
 
             return Message::inClan($clan->id)
                 ->visibleTo(Auth::id(), clanId: $clan->id)
-                ->with('sender')
+                ->with(['sender', 'replyTo.sender'])
                 ->latest('id')
                 ->take($take)
                 ->get()
@@ -385,6 +449,21 @@ class Chat extends Component
         }
 
         return collect();
+    }
+
+    /**
+     * Pesan yang sedang dibalas (untuk preview di atas input). Null kalau tak
+     * sedang membalas / target tak valid.
+     */
+    public function getReplyingToProperty(): ?Message
+    {
+        if (! $this->replyingToId) {
+            return null;
+        }
+
+        $message = Message::with('sender')->find($this->replyingToId);
+
+        return $message && $this->canSeeMessage($message) ? $message : null;
     }
 
     public function getHasMoreOlderProperty(): bool

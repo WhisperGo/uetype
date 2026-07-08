@@ -15,6 +15,7 @@ class Message extends Model
         'recipient_id',
         'clan_id',
         'body',
+        'reply_to_id',
         'read_at',
         'edited_at',
         'deleted_for_everyone_at',
@@ -39,6 +40,15 @@ class Message extends Model
     public function clan(): BelongsTo
     {
         return $this->belongsTo(Clan::class);
+    }
+
+    /**
+     * Pesan yang dibalas oleh pesan ini (null kalau bukan reply, atau kalau
+     * pesan aslinya sudah dihapus dari DB).
+     */
+    public function replyTo(): BelongsTo
+    {
+        return $this->belongsTo(Message::class, 'reply_to_id');
     }
 
     public function isClanMessage(): bool

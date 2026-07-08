@@ -444,3 +444,142 @@ it('does not let a non-participant delete-for-me a message they cannot see', fun
 
     $this->assertDatabaseMissing('message_deletes', ['user_id' => $stranger->id, 'message_id' => $msg->id]);
 });
+
+// ---- REPLY ----
+
+it('sends a DM as a reply, storing reply_to_id', function () {
+    [$me, $friend] = makeAcceptedFriends();
+
+    $original = Message::create(['sender_id' => $friend->id, 'recipient_id' => $me->id, 'body' => 'pertanyaan?']);
+
+    Livewire::actingAs($me)->test(Chat::class)
+        ->call('openDm', $friend->username)
+        ->call('startReply', $original->id)
+        ->assertSet('replyingToId', $original->id)
+        ->set('body', 'jawaban!')
+        ->call('sendMessage')
+        ->assertSet('replyingToId', null); // reset setelah kirim
+
+    $this->assertDatabaseHas('messages', [
+        'sender_id' => $me->id,
+        'recipient_id' => $friend->id,
+        'body' => 'jawaban!',
+        'reply_to_id' => $original->id,
+    ]);
+});
+
+it('sends a clan message as a reply', function () {
+    [$clan, [$leader, $member]] = makeClanWithMembers(2);
+
+    $original = Message::create(['sender_id' => $leader->id, 'clan_id' => $clan->id, 'body' => 'ayo ngobrol']);
+
+    Livewire::actingAs($member)->test(Chat::class)
+        ->call('openClanChat')
+        ->call('startReply', $original->id)
+        ->set('body', 'siap!')
+        ->call('sendMessage');
+
+    $this->assertDatabaseHas('messages', [
+        'sender_id' => $member->id,
+        'clan_id' => $clan->id,
+        'body' => 'siap!',
+        'reply_to_id' => $original->id,
+    ]);
+});
+
+it('ignores a reply target from a different conversation (drops reply_to_id)', function () {
+    [$me, $friend] = makeAcceptedFriends();
+    $other = User::factory()->create();
+    Friendship::create(['requester_id' => $me->id, 'addressee_id' => $other->id, 'status' => FriendshipStatus::Accepted]);
+
+    // Pesan dari percakapan DM dengan $other, tak boleh jadi target reply di DM dengan $friend.
+    $foreign = Message::create(['sender_id' => $other->id, 'recipient_id' => $me->id, 'body' => 'dari orang lain']);
+
+    Livewire::actingAs($me)->test(Chat::class)
+        ->call('openDm', $friend->username)
+        ->set('replyingToId', $foreign->id)
+        ->set('body', 'halo')
+        ->call('sendMessage');
+
+    // Terkirim, tapi TANPA reply_to_id (target lintas-percakapan ditolak).
+    $this->assertDatabaseHas('messages', [
+        'sender_id' => $me->id,
+        'recipient_id' => $friend->id,
+        'body' => 'halo',
+        'reply_to_id' => null,
+    ]);
+});
+
+it('does not let a stranger start a reply to a message they cannot see', function () {
+    [$me, $friend] = makeAcceptedFriends();
+    $stranger = User::factory()->create();
+
+    $msg = Message::create(['sender_id' => $me->id, 'recipient_id' => $friend->id, 'body' => 'rahasia']);
+
+    Livewire::actingAs($stranger)->test(Chat::class)
+        ->call('startReply', $msg->id)
+        ->assertSet('replyingToId', null);
+});
+
+// ---- ENDPOINT KIRIM (paralel, di luar Livewire) ----
+
+it('sends a DM via the /chat/send endpoint and broadcasts', function () {
+    Event::fake([DirectMessageSent::class]);
+    [$me, $friend] = makeAcceptedFriends();
+
+    $this->actingAs($me)
+        ->postJson(route('chat.send'), ['mode' => 'dm', 'with' => $friend->username, 'body' => 'via endpoint'])
+        ->assertOk()
+        ->assertJson(['ok' => true]);
+
+    $this->assertDatabaseHas('messages', [
+        'sender_id' => $me->id,
+        'recipient_id' => $friend->id,
+        'body' => 'via endpoint',
+    ]);
+    Event::assertDispatched(DirectMessageSent::class);
+});
+
+it('rejects a DM via endpoint to a non-friend (trust boundary)', function () {
+    $me = User::factory()->create();
+    $stranger = User::factory()->create();
+
+    $this->actingAs($me)
+        ->postJson(route('chat.send'), ['mode' => 'dm', 'with' => $stranger->username, 'body' => 'halo'])
+        ->assertForbidden();
+
+    $this->assertDatabaseMissing('messages', ['sender_id' => $me->id, 'recipient_id' => $stranger->id]);
+});
+
+it('sends a clan message via the endpoint for an active member', function () {
+    Event::fake([ClanMessageSent::class]);
+    [$clan, [$leader]] = makeClanWithMembers(1);
+
+    $this->actingAs($leader)
+        ->postJson(route('chat.send'), ['mode' => 'clan', 'body' => 'halo clan'])
+        ->assertOk();
+
+    $this->assertDatabaseHas('messages', ['sender_id' => $leader->id, 'clan_id' => $clan->id, 'body' => 'halo clan']);
+    Event::assertDispatched(ClanMessageSent::class);
+});
+
+it('rejects a clan message via endpoint from a user without a clan', function () {
+    $me = User::factory()->create();
+
+    $this->actingAs($me)
+        ->postJson(route('chat.send'), ['mode' => 'clan', 'body' => 'halo'])
+        ->assertForbidden();
+});
+
+it('requires authentication to use the send endpoint', function () {
+    $this->postJson(route('chat.send'), ['mode' => 'dm', 'body' => 'x'])
+        ->assertUnauthorized();
+});
+
+it('validates the send endpoint payload', function () {
+    $me = User::factory()->create();
+
+    $this->actingAs($me)
+        ->postJson(route('chat.send'), ['mode' => 'invalid', 'body' => ''])
+        ->assertStatus(422);
+});

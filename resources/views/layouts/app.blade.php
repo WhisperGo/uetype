@@ -289,11 +289,12 @@
                                         this.push(e);
                                     }
                                 });
-                                // Edit/hapus pesan DM -> cukup picu refresh (jarang, tak perlu optimistic).
+                                // Edit/hapus pesan DM -> teruskan payload supaya bubble
+                                // di-patch LANGSUNG di client (tanpa round-trip).
                                 dmChannel.stopListening('.message.edited');
-                                dmChannel.listen('.message.edited', () => window.dispatchEvent(new CustomEvent('message-mutated-remote')));
+                                dmChannel.listen('.message.edited', (e) => window.dispatchEvent(new CustomEvent('message-mutated-remote', { detail: { ...e, action: 'edited' } })));
                                 dmChannel.stopListening('.message.deleted');
-                                dmChannel.listen('.message.deleted', () => window.dispatchEvent(new CustomEvent('message-mutated-remote')));
+                                dmChannel.listen('.message.deleted', (e) => window.dispatchEvent(new CustomEvent('message-mutated-remote', { detail: { ...e, action: 'deleted' } })));
 
                                 @if (Auth::user()->clan)
                                     // Clan chat: channel per-clan clan-chat.{clanId} -- SEMUA
@@ -313,9 +314,9 @@
                                         }
                                     });
                                     clanChannel.stopListening('.message.edited');
-                                    clanChannel.listen('.message.edited', () => window.dispatchEvent(new CustomEvent('message-mutated-remote')));
+                                    clanChannel.listen('.message.edited', (e) => window.dispatchEvent(new CustomEvent('message-mutated-remote', { detail: { ...e, action: 'edited' } })));
                                     clanChannel.stopListening('.message.deleted');
-                                    clanChannel.listen('.message.deleted', () => window.dispatchEvent(new CustomEvent('message-mutated-remote')));
+                                    clanChannel.listen('.message.deleted', (e) => window.dispatchEvent(new CustomEvent('message-mutated-remote', { detail: { ...e, action: 'deleted' } })));
                                 @endif
                             },
                             // Cek dari URL apakah user sedang membuka percakapan tertentu,
