@@ -15,7 +15,7 @@
     @if (! is_null($online))
         <span @class([
             'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface',
-            'bg-green-400' => $online,
+            'bg-active' => $online,
             'bg-white/25' => ! $online,
         ]) title="{{ $online ? __('friends.online') : __('friends.offline') }}"></span>
     @endif

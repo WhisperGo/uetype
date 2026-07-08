@@ -18,18 +18,18 @@ Ganti tema = ganti blok `:root` saja; komponen tidak perlu disentuh.
 
 ## Palet primitive
 
-| Step | primary (biru) | secondary (emas) | accent (netral) | tertiary (merah) |
-|------|----------------|------------------|-----------------|------------------|
-| 1  | `#E8EAF4` | `#F9F5F0` | `#E8E9EA` | `#F8E8EA` |
-| 2  | `#C7CDE5` | `#F1E8DB` | `#C8C9CB` | `#EEC8CC` |
-| 3  | `#9BA5D1` | `#E6D6BE` | `#9C9FA3` | `#E09DA4` |
-| 4  | `#6C7BBB` | `#DBC3A0` | `#6E7278` | `#D26F7A` |
-| 5  | `#4054A6` | `#D0B083` | `#42474F` | `#C54452` |
-| 6  | `#162E93` | `#C69F68` | `#191F28` | `#B81B2C` |
-| 7  | `#13277D` | `#A88758` | `#151A22` | `#9C1725` |
-| 8  | `#102168` | `#8D714A` | `#12161C` | `#83131F` |
-| 9  | `#0D1A54` | `#715B3B` | `#0E1217` | `#690F19` |
-| 10 | `#0A1542` | `#59482F` | `#0B0E12` | `#530C14` |
+| Step | primary (biru) | secondary (emas) | accent (netral) | tertiary (merah) | active (hijau) |
+|------|----------------|------------------|-----------------|------------------|----------------|
+| 1  | `#E8EAF4` | `#F9F5F0` | `#E8E9EA` | `#F8E8EA` | `#E8F5EE` |
+| 2  | `#C7CDE5` | `#F1E8DB` | `#C8C9CB` | `#EEC8CC` | `#C7E7D6` |
+| 3  | `#9BA5D1` | `#E6D6BE` | `#9C9FA3` | `#E09DA4` | `#9AD4B5` |
+| 4  | `#6C7BBB` | `#DBC3A0` | `#6E7278` | `#D26F7A` | `#6CC093` |
+| 5  | `#4054A6` | `#D0B083` | `#42474F` | `#C54452` | `#3FAD73` |
+| 6  | `#162E93` | `#C69F68` | `#191F28` | `#B81B2C` | `#159B54` |
+| 7  | `#13277D` | `#A88758` | `#151A22` | `#9C1725` | `#128447` |
+| 8  | `#102168` | `#8D714A` | `#12161C` | `#83131F` | `#0F6E3C` |
+| 9  | `#0D1A54` | `#715B3B` | `#0E1217` | `#690F19` | `#0C5830` |
+| 10 | `#0A1542` | `#59482F` | `#0B0E12` | `#530C14` | `#094626` |
 
 Pakai via class Tailwind, mis. `bg-primary-6`, `text-secondary-3`, `border-accent-5`.
 
@@ -45,10 +45,11 @@ Pakai via class Tailwind, mis. `bg-primary-6`, `text-secondary-3`, `border-accen
 | `border` | accent-5 | garis / pemisah | `border-border` |
 | `brand` | primary-6 | biru logo / maskot | `bg-brand` `text-brand` |
 | `gold` | secondary-6 | highlight, koin, aksen hangat | `text-gold` |
+| `active` | active-6 | online, siap, status aktif | `text-active` |
 | `danger` | tertiary-6 | error / missed / loss | `bg-danger` |
 
-> **State positif / "win" / success:** belum ada token hijau (Foundation tidak punya). Untuk
-> sekarang pakai `gold` (emas) atau `brand` (biru). Tambah token success hanya bila playtest menuntut.
+> **State aktif / online / ready:** pakai `active`. Untuk highlight kemenangan atau skor utama,
+> tetap pertimbangkan `gold` bila konteksnya reward, bukan status aktif.
 
 ## Tipografi
 

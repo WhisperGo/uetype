@@ -33,6 +33,11 @@ export default {
                     1: '#F8E8EA', 2: '#EEC8CC', 3: '#E09DA4', 4: '#D26F7A', 5: '#C54452',
                     6: '#B81B2C', 7: '#9C1725', 8: '#83131F', 9: '#690F19', 10: '#530C14',
                 },
+                active: {
+                    DEFAULT: token('--color-active'),
+                    1: '#E8F5EE', 2: '#C7E7D6', 3: '#9AD4B5', 4: '#6CC093', 5: '#3FAD73',
+                    6: '#159B54', 7: '#128447', 8: '#0F6E3C', 9: '#0C5830', 10: '#094626',
+                },
 
                 // Semantic - token peran yang dipakai komponen (nilainya di app.css :root).
                 background: token('--color-background'),
