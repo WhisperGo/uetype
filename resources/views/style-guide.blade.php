@@ -20,6 +20,7 @@
         'secondary' => ['#F9F5F0','#F1E8DB','#E6D6BE','#DBC3A0','#D0B083','#C69F68','#A88758','#8D714A','#715B3B','#59482F'],
         'accent'    => ['#E8E9EA','#C8C9CB','#9C9FA3','#6E7278','#42474F','#191F28','#151A22','#12161C','#0E1217','#0B0E12'],
         'tertiary'  => ['#F8E8EA','#EEC8CC','#E09DA4','#D26F7A','#C54452','#B81B2C','#9C1725','#83131F','#690F19','#530C14'],
+        'active'    => ['#E8F5EE','#C7E7D6','#9AD4B5','#6CC093','#3FAD73','#159B54','#128447','#0F6E3C','#0C5830','#094626'],
     ];
     $semantics = [
         ['background','Latar halaman'],
@@ -30,6 +31,7 @@
         ['border','Garis / pemisah'],
         ['brand','Biru logo / maskot'],
         ['gold','Highlight / koin / aksen hangat'],
+        ['active','Online / siap / status aktif'],
         ['danger','Error / missed / loss'],
     ];
     $typeScale = [
@@ -115,6 +117,7 @@
                 <div class="flex flex-wrap items-center gap-3">
                     <button class="px-4 py-2 rounded-lg text-small bg-brand text-foreground hover:bg-primary-5 transition-colors">Primary</button>
                     <button class="px-4 py-2 rounded-lg text-small bg-gold text-primary-10 hover:bg-secondary-5 transition-colors">Gold</button>
+                    <button class="px-4 py-2 rounded-lg text-small bg-active text-background hover:bg-active-5 transition-colors">Active</button>
                     <button class="px-4 py-2 rounded-lg text-small bg-danger text-foreground hover:bg-tertiary-7 transition-colors">Danger</button>
                     <button class="px-4 py-2 rounded-lg text-small border border-border text-foreground hover:bg-elevated transition-colors">Outline</button>
                     <button class="px-4 py-2 rounded-lg text-small text-muted hover:text-foreground transition-colors">Ghost</button>
@@ -127,6 +130,7 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="px-2 py-0.5 rounded text-x-small bg-brand/20 text-primary-2">brand</span>
                     <span class="px-2 py-0.5 rounded text-x-small bg-gold/20 text-gold">gold</span>
+                    <span class="px-2 py-0.5 rounded text-x-small bg-active/20 text-active">active</span>
                     <span class="px-2 py-0.5 rounded text-x-small bg-danger/20 text-tertiary-3">danger</span>
                     <span class="px-2 py-0.5 rounded text-x-small bg-elevated text-muted">soon</span>
                 </div>
