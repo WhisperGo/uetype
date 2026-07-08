@@ -94,6 +94,19 @@ if (app()->environment('local')) {
 
         return redirect('/typing');
     })->name('dev.login');
+
+    Route::get('/dev-login2', function () {
+        $email = request('email', 'dummy2@uetype.test');
+        $user = User::where('email', $email)->first();
+
+        if (! $user) {
+            abort(404, "User dummy '{$email}' tidak ditemukan. Jalankan: php artisan db:seed --class=DummyUserSeeder");
+        }
+
+        Auth::login($user);
+
+        return redirect('/typing');
+    })->name('dev.login2');
 }
 
 require __DIR__.'/auth.php';
