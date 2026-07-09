@@ -24,6 +24,12 @@ use Livewire\Volt\Volt;
 
 Route::get('/', TypingEngine::class)->name('home');
 
+// Mesin ketik solo & halaman hasilnya terbuka untuk tamu (sama seperti '/'):
+// TypingEngine menjaga tiap akses Auth dengan Auth::check(), dan TypingResult
+// membaca dari session. Tamu bisa mengetik, cuma tak dapat XP/rekor.
+Route::get('/typing', TypingEngine::class)->name('typing');
+Route::get('/result', TypingResult::class)->name('typing.result');
+
 Route::get('/dashboard', function () {
     return redirect('/');
 })->middleware(['auth', 'verified'])->name('dashboard');
@@ -54,9 +60,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/clan-war', ClanWar::class)->name('clan-war.index');
     Route::get('/clan-leaderboard', ClanLeaderboard::class)->name('clan-leaderboard.index');
     Route::get('/clans/{clan}', ClanShow::class)->name('clans.show');
-
-    Route::get('/typing', TypingEngine::class)->name('typing');
-    Route::get('/result', TypingResult::class)->name('typing.result');
 
     Volt::route('/multiplayer', 'multiplayer-lobby')->name('multiplayer.lobby');
 
