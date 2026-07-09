@@ -106,7 +106,7 @@
                             <div class="flex items-start justify-between mb-3">
                                 <div class="flex flex-col gap-2">
                                     <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
-                                    <span class="text-xl sm:text-2xl font-bold font-mono text-brand-bright leading-none">{{ __('result.xp_gained', ['amount' => $xpEarned]) }}</span>
+                                    <span class="text-xl sm:text-2xl font-bold font-mono text-foreground leading-none">{{ __('result.xp_gained', ['amount' => $xpEarned]) }}</span>
                                 </div>
                                 <div class="text-right font-mono text-xs text-muted leading-relaxed">
                                     <div>{{ __('result.xp_progress', ['progress' => number_format($levelData['progress']), 'needed' => number_format($levelData['needed'])]) }}</div>
@@ -225,7 +225,7 @@
                             <div class="flex items-start justify-between mb-3">
                                 <div class="flex flex-col gap-2">
                                     <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
-                                    <span class="text-xl sm:text-2xl font-bold font-mono text-brand leading-none">{{ __('result.xp_gained', ['amount' => $xpEarned]) }}</span>
+                                    <span class="text-xl sm:text-2xl font-bold font-mono text-foreground leading-none">{{ __('result.xp_gained', ['amount' => $xpEarned]) }}</span>
                                 </div>
                                 <div class="text-right font-mono text-xs text-muted leading-relaxed">
                                     <div>{{ __('result.xp_progress', ['progress' => number_format($levelData['progress']), 'needed' => number_format($levelData['needed'])]) }}</div>
