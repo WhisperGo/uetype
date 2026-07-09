@@ -205,30 +205,55 @@
                                     @unless ($deleted)
                                         <div x-data="{
                                                 open: false,
-                                                up: false,
+                                                placed: false,
+                                                topPx: 0,
                                                 toggle() {
                                                     if (this.open) { this.open = false; return; }
-                                                    // Tentukan arah buka menu dari ruang tersisa di dalam kotak chat:
-                                                    // kalau ruang di BAWAH tombol cukup, buka ke bawah (default,
-                                                    // supaya pesan pertama/paling atas tak menembus header);
-                                                    // kalau mepet ke dasar, baru buka ke atas.
-                                                    const box = document.getElementById('chat-messages');
-                                                    const btn = this.$refs.trigger.getBoundingClientRect();
-                                                    const area = box.getBoundingClientRect();
-                                                    const spaceBelow = area.bottom - btn.bottom;
-                                                    this.up = spaceBelow < 220; // tinggi menu ± 4 item
+                                                    this.placed = false;
                                                     this.open = true;
+                                                    // Posisikan SETELAH menu dirender, supaya tingginya terukur
+                                                    // (jumlah item berbeda-beda: reply/edit/delete).
+                                                    this.$nextTick(() => { this.place(); this.placed = true; });
                                                 },
-                                            }" @click.outside="open = false" class="relative shrink-0">
+                                                // Jepit menu agar SELALU utuh di dalam frame chat: coba buka ke
+                                                // bawah, kalau tak muat coba ke atas, lalu geser (clamp) supaya
+                                                // tepi atas & bawahnya tak pernah keluar dari #chat-messages.
+                                                place() {
+                                                    const box = document.getElementById('chat-messages');
+                                                    const menu = this.$refs.menu;
+                                                    if (!box || !menu) return;
+
+                                                    const area = box.getBoundingClientRect();
+                                                    const btn = this.$refs.trigger.getBoundingClientRect();
+                                                    const h = menu.offsetHeight;
+                                                    const gap = 4, pad = 8;
+
+                                                    // Kandidat posisi (koordinat viewport) untuk tepi ATAS menu.
+                                                    let top = btn.bottom + gap;                 // buka ke bawah
+                                                    if (top + h > area.bottom - pad) {
+                                                        top = btn.top - gap - h;                // buka ke atas
+                                                    }
+                                                    // Clamp ke dalam area chat (menang atas dua pilihan di atas).
+                                                    const maxTop = area.bottom - pad - h;
+                                                    const minTop = area.top + pad;
+                                                    top = Math.max(minTop, Math.min(top, maxTop));
+
+                                                    // Simpan relatif terhadap tombol (menu absolute thd wrapper).
+                                                    this.topPx = top - btn.top;
+                                                },
+                                            }" @click.outside="open = false"
+                                            @chat-scrolled.window="open = false"
+                                            class="relative shrink-0">
                                             <button x-ref="trigger" @click="toggle()"
                                                 :class="open ? 'bg-gold text-background' : 'bg-white/10 text-foreground hover:bg-gold hover:text-background'"
                                                 class="p-1.5 rounded-full border border-white/10 shadow-sm transition"
                                                 aria-label="{{ __('chat.message_actions') }}">
                                                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" /></svg>
                                             </button>
-                                            <div x-show="open" x-cloak x-transition
-                                                :class="up ? 'bottom-full mb-1' : 'top-full mt-1'"
-                                                class="absolute z-30 {{ $mine ? 'right-0' : 'left-0' }} w-48 py-1 bg-surface border border-white/10 rounded-xl shadow-lg overflow-hidden">
+                                            <div x-show="open" x-cloak x-ref="menu"
+                                                :style="`top: ${topPx}px`"
+                                                :class="placed ? 'opacity-100' : 'opacity-0'"
+                                                class="absolute z-30 {{ $mine ? 'right-0' : 'left-0' }} w-48 py-1 bg-surface border border-white/10 rounded-xl shadow-lg overflow-hidden transition-opacity duration-150">
                                                 <button wire:click="startReply({{ $message->id }})" @click="open = false"
                                                     class="w-full flex items-center gap-2.5 text-left px-3 py-2 font-mono text-xs font-semibold text-foreground hover:bg-white/5 transition">
                                                     <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6M3 10l6-6" /></svg>
@@ -556,7 +581,14 @@
                 init() {
                     this.$nextTick(() => {
                         const el = document.getElementById('chat-messages');
-                        if (el) el.scrollTop = el.scrollHeight;
+                        if (!el) return;
+                        el.scrollTop = el.scrollHeight;
+
+                        // Tutup menu aksi yang terbuka saat daftar di-scroll, supaya
+                        // posisinya (yang dihitung sekali saat dibuka) tak jadi basi.
+                        el.addEventListener('scroll', () => {
+                            window.dispatchEvent(new CustomEvent('chat-scrolled'));
+                        }, { passive: true });
                     });
                 },
             }));
