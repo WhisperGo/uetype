@@ -93,7 +93,7 @@
                         ];
                     @endphp
                     @foreach ($survivalStats as [$label, $value, $tone])
-                        <div class="rounded-2xl bg-surface/70 border border-white/5 p-4 flex flex-col gap-2">
+                        <div class="rounded-2xl bg-foreground border border-foreground p-4 flex flex-col gap-2">
                             <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ $label }}</span>
                             <span class="text-xl sm:text-2xl font-bold font-mono leading-none tabular-nums {{ $tone }}">{{ $value }}</span>
                         </div>
@@ -106,11 +106,11 @@
                             <div class="flex items-start justify-between mb-3">
                                 <div class="flex flex-col gap-2">
                                     <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
-                                    <span class="text-xl sm:text-2xl font-bold font-mono text-brand-bright leading-none">+{{ $xpEarned }} XP</span>
+                                    <span class="text-xl sm:text-2xl font-bold font-mono text-brand-bright leading-none">{{ __('result.xp_gained', ['amount' => $xpEarned]) }}</span>
                                 </div>
                                 <div class="text-right font-mono text-xs text-muted leading-relaxed">
-                                    <div>{{ number_format($levelData['progress']) }} / {{ number_format($levelData['needed']) }} XP</div>
-                                    <div>Level {{ $levelData['level'] }} → {{ $levelData['next_level'] }}</div>
+                                    <div>{{ __('result.xp_progress', ['progress' => number_format($levelData['progress']), 'needed' => number_format($levelData['needed'])]) }}</div>
+                                    <div>{{ __('result.xp_level_up', ['from' => $levelData['level'], 'to' => $levelData['next_level']]) }}</div>
                                 </div>
                             </div>
                             <div class="h-2 overflow-hidden rounded-full bg-white/5">
@@ -225,11 +225,11 @@
                             <div class="flex items-start justify-between mb-3">
                                 <div class="flex flex-col gap-2">
                                     <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
-                                    <span class="text-xl sm:text-2xl font-bold font-mono text-brand leading-none">+{{ $xpEarned }} XP</span>
+                                    <span class="text-xl sm:text-2xl font-bold font-mono text-brand leading-none">{{ __('result.xp_gained', ['amount' => $xpEarned]) }}</span>
                                 </div>
                                 <div class="text-right font-mono text-xs text-muted leading-relaxed">
-                                    <div>{{ number_format($levelData['progress']) }} / {{ number_format($levelData['needed']) }} XP</div>
-                                    <div>Level {{ $levelData['level'] }} → {{ $levelData['next_level'] }}</div>
+                                    <div>{{ __('result.xp_progress', ['progress' => number_format($levelData['progress']), 'needed' => number_format($levelData['needed'])]) }}</div>
+                                    <div>{{ __('result.xp_level_up', ['from' => $levelData['level'], 'to' => $levelData['next_level']]) }}</div>
                                 </div>
                             </div>
                             <div class="h-2 overflow-hidden rounded-full bg-white/5">
@@ -245,7 +245,7 @@
                     <a id="restartButton" href="/typing"
                         class="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-mono font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition"
                         title="{{ $isSurvival ? __('result.play_again_title') : __('result.next_test_title') }}">
-                        <span>{{ $isSurvival ? __('result.play_again') : __('result.next_test') }}</span>
+                        <span>{{ $isSurvival ? __('result.play_again_title') : __('result.next_test_title') }}</span>
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
                         </svg>
@@ -254,7 +254,7 @@
                         <a href="/typing"
                             class="inline-flex items-center justify-center h-12 px-6 rounded-2xl bg-surface border border-white/5 text-foreground/80 hover:text-foreground hover:border-white/10 font-mono font-semibold text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-border transition"
                             title="{{ __('result.retry_title') }}">
-                            {{ __('result.retry') }}
+                            {{ __('result.retry_title') }}
                         </a>
                     @endunless
                 </div>

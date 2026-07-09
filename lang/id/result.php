@@ -33,6 +33,9 @@ return [
     ],
 
     'xp_earned' => 'xp didapat',
+    'xp_gained' => '+:amount XP',
+    'xp_progress' => ':progress / :needed XP',
+    'xp_level_up' => 'Level :from → :to',
 
     'chart_stamina' => 'stamina',
     'chart_performance' => 'performa',
