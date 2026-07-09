@@ -93,7 +93,7 @@
                         ];
                     @endphp
                     @foreach ($survivalStats as [$label, $value, $tone])
-                        <div class="rounded-2xl bg-foreground border border-foreground p-4 flex flex-col gap-2">
+                        <div class="rounded-2xl bg-surface/70 border border-white/5 p-4 flex flex-col gap-2">
                             <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ $label }}</span>
                             <span class="text-xl sm:text-2xl font-bold font-mono leading-none tabular-nums {{ $tone }}">{{ $value }}</span>
                         </div>
@@ -123,7 +123,7 @@
 
                 <a id="restartButton" href="/typing"
                     class="inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-mono font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition">
-                    <span>{{ __('result.play_again') }}</span>
+                    <span>{{ __('result.play_again_title') }}</span>
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
                     </svg>
