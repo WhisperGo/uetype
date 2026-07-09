@@ -9,17 +9,13 @@ use App\Models\ClanWarModeClaim;
 use App\Support\SafeBroadcast;
 
 /**
- * Menutup Clan War yang sudah waktunya diselesaikan: tantangan Pending yang
- * lewat batas accept 1 jam jadi Expired, dan war Ongoing yang SELESAI --
- * baik karena lewat ends_at (3 hari) MAUPUN karena kedua clan sudah
- * menyelesaikan seluruh 9 mode lebih cepat (early finish). Hasilnya dihitung
- * dari akumulasi POIN mode-klaim kedua clan lalu power diupdate lewat
- * EloCalculator.
+ * Menutup Clan War yang sudah waktunya diselesaikan: tantangan Pending yang lewat
+ * batas accept jadi Expired, dan war Ongoing yang selesai (lewat ends_at atau early
+ * finish karena kedua clan sudah menyelesaikan 9 mode) dihitung dari akumulasi poin
+ * mode-klaim lalu power diupdate lewat EloCalculator.
  *
- * Dipanggil on-the-fly dari App\Livewire\ClanWar::mount() -- war yang sudah
- * selesai otomatis tertutup begitu ada yang membuka halaman Clan War, tanpa
- * perlu command/scheduler terjadwal. Command `clan-war:resolve` memanggil
- * method yang sama untuk pemakaian manual.
+ * Dipanggil on-the-fly dari App\Livewire\ClanWar::mount(), jadi tak perlu scheduler;
+ * command `clan-war:resolve` memanggil method yang sama untuk pemakaian manual.
  */
 class ClanWarResolver
 {
@@ -38,8 +34,7 @@ class ClanWarResolver
 
     private function resolveFinishedWars(): void
     {
-        // Ambil SEMUA war Ongoing, lalu tutup yang sudah lewat waktu ATAU yang
-        // kedua clannya sudah menyelesaikan seluruh 9 mode (early finish).
+        // Tutup war Ongoing yang sudah lewat waktu atau early finish.
         $ongoing = ClanWar::where('status', ClanWarStatus::Ongoing)->get();
 
         foreach ($ongoing as $war) {
@@ -81,12 +76,7 @@ class ClanWarResolver
         }
     }
 
-    /**
-     * Beri tahu KEDUA leader hasil war lewat toast real-time (channel
-     * clan.{leaderId}) begitu war ditutup -- entah karena waktu habis maupun
-     * early finish. Sudut pandang masing-masing dibalik dengan benar
-     * (menang challenger = kalah opponent).
-     */
+    /** Beri tahu kedua leader hasil war lewat toast real-time; sudut pandang tiap sisi dibalik dengan benar. */
     private function notifyResult(ClanWar $war, string $result, int $deltaChallenger, int $deltaOpponent): void
     {
         $label = fn (string $r) => match ($r) {
@@ -117,12 +107,7 @@ class ClanWarResolver
         return ($n >= 0 ? '+' : '').$n;
     }
 
-    /**
-     * War dianggap "beres lebih cepat" kalau KEDUA clan sudah menyelesaikan
-     * (submit) seluruh 9 mode -- tak ada lagi yang bisa dikerjakan, jadi tak
-     * perlu menunggu ends_at. Karena tiap klaim tersubmit itu unik per
-     * (mode, config) untuk clan, cukup hitung jumlah klaim tersubmit = 9.
-     */
+    /** War beres lebih cepat kalau kedua clan sudah submit seluruh 9 mode; tak perlu menunggu ends_at. */
     private function bothClansFinishedAllModes(ClanWar $war): bool
     {
         $target = count(ClanWarModeCatalog::MODES);
@@ -139,11 +124,7 @@ class ClanWarResolver
             ->count();
     }
 
-    /**
-     * Total poin war sebuah clan: jumlah `points` dari klaim mode yang SUDAH
-     * disubmit (typing_result_id terisi). Klaim yang cuma terkunci tapi tak
-     * pernah dikerjakan sampai war berakhir bernilai 0 (tak terhitung).
-     */
+    /** Total poin war: jumlah `points` klaim mode yang sudah disubmit; klaim terkunci tapi belum dikerjakan bernilai 0. */
     private function clanWarPoints(int $clanWarId, int $clanId): float
     {
         return (float) ClanWarModeClaim::where('clan_war_id', $clanWarId)

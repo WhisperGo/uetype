@@ -5,18 +5,13 @@ namespace App\Services;
 use App\Models\TypingResult;
 
 /**
- * Menghitung poin Clan War dari sebuah TypingResult yang SUDAH tervalidasi
- * (post-AntiCheatService). Murni fungsi, tanpa state/DB -- mudah di-unit-test
- * seperti EloCalculator.
+ * Menghitung poin Clan War dari sebuah TypingResult yang sudah tervalidasi
+ * (post-AntiCheatService). Fungsi murni, tanpa state/DB.
  *
- * Formula:
- *   poin = ceiling[mode] × performanceRatio × accuracyMultiplier
- *
+ * Formula: poin = ceiling[mode] × performanceRatio × accuracyMultiplier
  * - performanceRatio: Time/Words pakai net_wpm/WPM_SCALE, Survival pakai
- *   duration_seconds/SURVIVAL_SECONDS_SCALE (survival tak punya WPM tetap;
- *   metriknya lama bertahan). Keduanya di-cap ke 1.0.
- * - accuracyMultiplier (0.5–1.0×) identik dengan rumus User::addExp() supaya
- *   konsisten dengan sistem EXP.
+ *   duration_seconds/SURVIVAL_SECONDS_SCALE (metriknya lama bertahan). Di-cap ke 1.0.
+ * - accuracyMultiplier (0.5-1.0x) identik dengan rumus User::addExp().
  */
 class ClanWarScorer
 {

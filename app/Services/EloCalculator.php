@@ -3,11 +3,9 @@
 namespace App\Services;
 
 /**
- * Formula Elo standar untuk power rating Clan War. Zero-sum: delta yang
- * didapat satu clan persis sama besarnya dengan yang hilang dari lawannya,
- * mencegah inflasi/deflasi power di seluruh sistem. Asimetris terhadap
- * selisih power: menang melawan clan yang lebih kuat menambah power lebih
- * banyak daripada menang melawan yang lebih lemah (begitu pula untuk seri).
+ * Formula Elo standar untuk power rating Clan War. Zero-sum: delta yang didapat
+ * satu clan sama besar dengan yang hilang dari lawannya. Asimetris terhadap
+ * selisih power: menang melawan clan lebih kuat menambah power lebih banyak.
  */
 class EloCalculator
 {

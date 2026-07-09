@@ -15,10 +15,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Endpoint kirim pesan yang RINGAN & PARALEL -- sengaja di luar Livewire supaya
- * spam pesan (p p p p) tak ter-serialize oleh antrean request komponen. Tiap
- * kiriman = satu fetch() fire-and-forget, tanpa re-render komponen. Validasi &
- * otorisasinya sama persis dengan aksi di App\Livewire\Chat.
+ * Endpoint kirim pesan yang ringan & paralel, sengaja di luar Livewire supaya spam
+ * pesan tak ter-serialize oleh antrean request komponen (tiap kiriman = fetch()
+ * fire-and-forget). Validasi & otorisasi sama persis dengan App\Livewire\Chat.
  */
 class ChatController extends Controller
 {

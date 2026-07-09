@@ -14,11 +14,7 @@ use Illuminate\Validation\ValidationException;
 
 class RegisteredUserController extends Controller
 {
-    /**
-     * Sign In & Sign Up disatukan: auth Google-only tak membedakan keduanya
-     * (callback memutuskan login/register otomatis), jadi /register mengarah
-     * ke satu halaman auth tunggal di /login.
-     */
+    /** Sign In & Sign Up disatukan: auth Google-only, /register mengarah ke /login. */
     public function create(): RedirectResponse
     {
         return redirect()->route('login');
@@ -41,8 +37,8 @@ class RegisteredUserController extends Controller
             'username' => $request->username,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role_id' => 2, // ASUMSI: ID 2 adalah role 'player'. Sesuaikan dengan ID di tabel roles kamu.
-            'clan_id' => null, // Pastikan di migrasi sudah nullable()
+            'role_id' => 2, // asumsi: ID 2 = role 'player'.
+            'clan_id' => null,
         ]);
 
         event(new Registered($user));

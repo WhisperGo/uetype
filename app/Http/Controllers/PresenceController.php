@@ -8,9 +8,8 @@ use Illuminate\Support\Facades\Auth;
 class PresenceController extends Controller
 {
     /**
-     * Heartbeat presence. Dipanggil klien secara berkala (setiap ~30 detik)
-     * untuk menandai user masih aktif. Ringan sengaja: hanya meng-update
-     * last_seen_at dan — pada transisi offline->online — menyiarkan ke teman.
+     * Heartbeat presence, dipanggil klien berkala untuk menandai user masih aktif.
+     * Hanya update last_seen_at, dan pada transisi offline->online menyiarkan ke teman.
      */
     public function heartbeat(): JsonResponse
     {

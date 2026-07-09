@@ -3,16 +3,9 @@
 namespace App\Services;
 
 /**
- * Validasi kewajaran (sanity check) server-side untuk hasil mengetik.
- *
- * Sesuai requirement Statistics & Scores bagian 5: untuk skala proyek ini
- * TIDAK perlu anti-cheat canggih. Cukup tolak hasil yang mustahil sebelum
- * disimpan. Validasi per-keystroke (analisis timing/pola) sengaja TIDAK
- * dilakukan karena "terlalu mahal untuk timeline; jangan ke sana".
- *
- * Prinsip: jangan percaya angka client mentah-mentah untuk hal yang masuk
- * leaderboard / memberi EXP. Server menghitung ulang dari karakter & durasi,
- * lalu menolak sesi yang tidak masuk akal (bukan menyimpannya).
+ * Sanity check server-side untuk hasil mengetik. Tidak percaya angka WPM/accuracy
+ * dari client: server menghitung ulang dari karakter & durasi, lalu menolak sesi
+ * yang tidak masuk akal sebelum disimpan/masuk leaderboard.
  */
 class AntiCheatService
 {
@@ -23,12 +16,9 @@ class AntiCheatService
     private const MIN_DURATION_SECONDS = 1.0;
 
     /**
-     * Throughput minimum (karakter per detik) yang dianggap aktivitas mengetik nyata.
-     * Manusia yang benar-benar mengetik menghasilkan jauh lebih dari ini; nilai sangat
-     * rendah berarti durasi besar tapi input sepele — pola sesi idle/dipalsukan. Krusial
-     * untuk survival, di mana duration_seconds ADALAH metrik leaderboard: tanpa ambang ini,
-     * client bisa mengirim durasi raksasa + segelintir keystroke untuk menjuarai papan.
-     * ~0.5 cps ≈ 6 WPM — di bawah pengetik paling lambat sekalipun.
+     * Throughput minimum (karakter/detik) agar dianggap aktivitas mengetik nyata, bukan
+     * sesi idle/dipalsukan (durasi besar, input sepele). Krusial untuk survival, di mana
+     * duration_seconds sendiri adalah metrik leaderboard. ~0.5 cps ≈ 6 WPM.
      */
     private const MIN_CHARS_PER_SECOND = 0.5;
 
@@ -44,8 +34,7 @@ class AntiCheatService
     {
         $reasons = [];
 
-        // --- Server HITUNG ULANG dari karakter & durasi (tidak percaya WPM client) ---
-        // Standar: 1 kata = 5 karakter.
+        // Hitung ulang dari karakter & durasi (standar: 1 kata = 5 karakter).
         $durationMinutes = $durationSeconds / 60;
         $netWpm = 0.0;
         $rawWpm = 0.0;
@@ -59,36 +48,33 @@ class AntiCheatService
             ? round(($correctChars / $totalChars) * 100, 2)
             : 0.0;
 
-        // --- Sanity check 1: durasi terlalu pendek = sesi tidak bermakna ---
+        // Durasi terlalu pendek = sesi tidak bermakna.
         if ($durationSeconds < self::MIN_DURATION_SECONDS) {
             $reasons[] = 'duration_too_short';
         }
 
-        // --- Sanity check 2: WPM di atas batas manusiawi ---
+        // WPM di atas batas manusiawi.
         if ($netWpm > self::MAX_HUMAN_WPM || $rawWpm > self::MAX_HUMAN_WPM) {
             $reasons[] = 'wpm_too_high';
         }
 
-        // --- Sanity check 3: accuracy mustahil ---
+        // Accuracy mustahil.
         if ($accuracy > 100) {
             $reasons[] = 'accuracy_impossible';
         }
 
-        // --- Sanity check 4: konsistensi karakter (benar tak boleh > total) ---
+        // Konsistensi karakter: benar tak boleh > total.
         if ($correctChars > $totalChars) {
             $reasons[] = 'char_count_inconsistent';
         }
 
-        // --- Sanity check 5: tidak ada karakter sama sekali = bukan sesi nyata ---
+        // Tidak ada karakter sama sekali = bukan sesi nyata.
         if ($totalChars <= 0) {
             $reasons[] = 'no_input';
         }
 
-        // --- Sanity check 6: throughput terlalu rendah untuk durasi yang diklaim ---
-        // Konsistensi karakter-vs-durasi (requirement: "apakah jumlah karakter masuk akal
-        // dengan durasi?"). Menutup vektor cheat survival: durasi raksasa + input sepele.
-        // Hanya berlaku untuk sesi yang sudah melewati durasi minimum (sesi pendek wajar
-        // punya rasio yang lebih bising).
+        // Throughput terlalu rendah untuk durasi yang diklaim (hanya dicek di atas durasi
+        // minimum, karena sesi pendek wajar punya rasio lebih bising).
         if ($durationSeconds >= self::MIN_DURATION_SECONDS
             && ($totalChars / $durationSeconds) < self::MIN_CHARS_PER_SECOND) {
             $reasons[] = 'throughput_too_low';

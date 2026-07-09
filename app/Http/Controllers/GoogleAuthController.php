@@ -20,13 +20,13 @@ class GoogleAuthController extends Controller
         try {
             $googleUser = Socialite::driver('google')->user();
             
-            // 1. Cek apakah user sudah terdaftar di database
+            // Cek apakah user sudah terdaftar di database.
             $user = User::where('google_id', $googleUser->id)
                         ->orWhere('email', $googleUser->email)
                         ->first();
 
             if ($user) {
-                // JIKA AKUN SUDAH ADA: Langsung sinkronisasi ID dan login (Alur Login Biasa)
+                // Akun sudah ada: sinkronisasi ID lalu login.
                 if (!$user->google_id) {
                     $user->update(
                         [
@@ -39,8 +39,7 @@ class GoogleAuthController extends Controller
                 return redirect()->intended('/typing');
             }
 
-            // JIKA AKUN BELUM ADA (ALUR REGISTER):
-            // Jangan simpan ke database dulu. Titipkan data Google ke dalam Session.
+            // Akun belum ada: jangan simpan ke database dulu, titipkan data Google ke session.
             $request->session()->put('google_register_data', [
                 'email' => $googleUser->email,
                 'google_id' => $googleUser->id,
@@ -65,7 +64,7 @@ class GoogleAuthController extends Controller
      */
     public function showChooseUsernameForm(Request $request)
     {
-        // Pastikan ada session data Google, kalau tidak ada kembalikan ke register
+        // Perlu session data Google, kalau tidak ada kembalikan ke register.
         if (!$request->session()->has('google_register_data')) {
             return redirect('/register');
         }
@@ -78,26 +77,26 @@ class GoogleAuthController extends Controller
      */
     public function storeUsername(Request $request)
     {
-        // 1. Validasi data Google di session
+        // Validasi data Google di session.
         if (!$request->session()->has('google_register_data')) {
             return redirect('/register');
         }
 
         $googleData = $request->session()->get('google_register_data');
 
-        // 🔥 PERTAHANAN TAMBAHAN: Cek ulang database sebelum insert untuk mencegah Duplicate Entry
+        // Cek ulang database sebelum insert, untuk mencegah duplicate entry.
         $existingUser = User::where('google_id', $googleData['google_id'])
                             ->orWhere('email', $googleData['email'])
                             ->first();
 
         if ($existingUser) {
-            // Jika ternyata datanya sudah ada di database, batalkan register, langsung loginkan saja!
+            // Datanya sudah ada: batalkan register, langsung login.
             $request->session()->forget('google_register_data');
             Auth::login($existingUser);
             return redirect('/typing');
         }
 
-        // 2. Validasi input username dari user (wajib unik)
+        // Validasi input username dari user (wajib unik).
         $request->validate([
             'username' => [
                 'required', 
@@ -112,7 +111,7 @@ class GoogleAuthController extends Controller
             'username.alpha_dash' => __('auth.username.format'),
         ]);
 
-        // 3. Buat user baru di database secara aman
+        // Buat user baru di database.
         $user = User::create([
             'username' => $request->username,
             'email' => $googleData['email'],
@@ -121,10 +120,10 @@ class GoogleAuthController extends Controller
             'password' => encrypt(\Illuminate\Support\Str::random(16)), 
         ]);
 
-        // 4. Bersihkan session data Google agar aman
+        // Bersihkan session data Google.
         $request->session()->forget('google_register_data');
 
-        // 5. Otomatis login-kan dan lempar ke game
+        // Otomatis login-kan dan lempar ke game.
         Auth::login($user);
         return redirect('/typing');
     }

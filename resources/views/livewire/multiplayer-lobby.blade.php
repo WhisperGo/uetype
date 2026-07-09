@@ -229,9 +229,9 @@
 
     <!-- ===== 3. HALAMAN ARENA PERTANDINGAN: BATTLE STAGE (TYPERACER MECHANICS) ===== -->
     @if ($this->step === 'racing' && $this->roomData && !$showResultModal)
-        {{-- wire:key stabil: menjaga elemen (& state Alpine x-data) tetap sama lintas re-render/poll, supaya raceStarted/countdown/progress tak reset. --}}
-        {{-- Logika Alpine ada di komponen terdaftar 'raceArena' (lihat @script) — bukan langsung di x-data, karena JS besar berisi //, {}, <, > bisa merusak parsing atribut HTML. x-data di sini hanya memanggil fungsi + kirim data server via @js(). --}}
-        {{-- Sudden death disinkron via WebSocket .race.sudden_death + clock lokal, bukan wire:poll; saat clock lokal capai 0, lockRace() memanggil checkSuddenDeath() sekali (idempoten). --}}
+        {{-- wire:key stabil: state Alpine (raceStarted/countdown/progress) tak reset lintas re-render. --}}
+        {{-- Logika Alpine ada di komponen 'raceArena' (lihat @assets), bukan inline di x-data. --}}
+        {{-- Sudden death disinkron via WebSocket + clock lokal; saat 0, lockRace() panggil checkSuddenDeath() sekali. --}}
         <div wire:key="race-arena-{{ $this->roomCode }}" class="space-y-8"
             x-data="raceArena({
                 myId: @js(Auth::id()),
@@ -271,7 +271,8 @@
                         @php
                             $isSelf = $player->user_id === Auth::id();
                         @endphp
-                        {{-- Semua lane (termasuk diri sendiri) baca $store.race.opponents[id] secara seragam — diisi langsung dari payload WebSocket .race.progress, tanpa re-render Livewire. raceArena mem-publish progress lokal ke store yang sama (publishLocal()) agar tak bergantung pada `this` komponen induk. Nilai Blade = seed awal/fallback. --}}
+                        {{-- Semua lane baca $store.race.opponents[id] seragam, diisi dari payload WebSocket tanpa
+                             re-render Livewire. Nilai Blade hanya seed awal/fallback. --}}
                         <div class="pt-3 first:pt-0"
                             x-data="{
                                 playerId: @js($player->user_id),
@@ -573,17 +574,18 @@
         </div>
     @endif
 
-    {{-- @assets (bukan @script): @script membungkus <script> jadi atribut wire:effects, dan kode dengan banyak '<'/'>' (mis. `wIdx < currentWordIndex`) merusak parsing DOM Livewire. @assets menyuntik script apa adanya ke <head> sekali saja sebelum Alpine init, aman untuk kode besar. --}}
+    {{-- Wajib @assets, bukan @script: @script membungkus script jadi atribut wire:effects, dan
+         kode dengan banyak '<'/'>' merusak parsing DOM Livewire. --}}
     @assets
         <script>
-            // Komponen Alpine 'raceArena': semua logika typing + sudden death di sini, bukan di x-data, agar JS tak bocor ke HTML.
-            // registerRaceArena() idempoten (flag global); didaftarkan baik saat Alpine sudah booting maupun via event 'alpine:init'.
+            // Komponen Alpine 'raceArena': logika typing + sudden death.
+            // registerRaceArena() idempoten (flag global).
             const registerRaceArena = (Alpine) => {
                 if (window.__raceArenaRegistered) return;
                 window.__raceArenaRegistered = true;
 
-                // Store global 'race': posisi maskot lawan, diisi dari payload WebSocket .race.progress.
-                // Store (bukan state komponen) agar bertahan lintas Livewire morph. Bentuk: opponents = { [userId]: { progress, wpm, finished } }.
+                // Store global 'race': posisi maskot lawan dari payload WebSocket. Store (bukan state
+                // komponen) agar bertahan lintas Livewire morph. opponents = { [userId]: {progress, wpm, finished} }.
                 if (!Alpine.store('race')) {
                     Alpine.store('race', {
                         opponents: {},
@@ -642,12 +644,12 @@
                     init() {
                         this.words = this.textToType.split(' ');
 
-                        // Bersihkan posisi lawan dari race sebelumnya (mis. Play Again). Kalau sudden death aktif ini re-init di tengah race yang sama -> jangan hapus.
+                        // Bersihkan posisi lawan dari race sebelumnya; jangan hapus kalau sudden death aktif (re-init di tengah race).
                         if (!this.suddenDeathActive && this.$store.race) {
                             this.$store.race.reset();
                         }
 
-                        // Sudden death sudah aktif saat (re)init berarti race sudah berjalan -> skip overlay countdown, langsung anggap race berjalan.
+                        // Sudden death aktif saat (re)init = race sudah berjalan -> skip overlay countdown.
                         if (this.suddenDeathActive) {
                             this.raceStarted = true;
                             this.countdown = 'GO!';
@@ -657,19 +659,19 @@
                                 if (this.$refs.typeInput) this.$refs.typeInput.focus();
                             });
                         } else {
-                            // Overlay hitung mundur ke race_starts_at (server) — waktu absolut sama di semua layar, tanpa delay antar host & peserta.
+                            // Hitung mundur ke race_starts_at server: waktu absolut sama di semua layar.
                             this.startSyncedCountdown();
                         }
 
                         // Sinyal server saat room ditutup paksa -> kunci total.
                         this.$wire.on('force-finish', () => this.lockRace());
 
-                        // Bridge event window .race.sudden_death -> sinkronkan hitung mundur komponen ini. Disimpan agar bisa di-remove saat destroy.
+                        // Bridge event .race.sudden_death -> hitung mundur komponen ini. Disimpan agar bisa di-remove saat destroy.
                         this._onSuddenDeath = (ev) => this.syncSuddenDeath(ev.detail.remaining);
                         window.addEventListener('race-sudden-death', this._onSuddenDeath);
                     },
 
-                    // Hitung mundur berbasis waktu absolut server (race_starts_at), bukan interval lokal, agar semua layar sinkron.
+                    // Berbasis waktu absolut server, bukan interval lokal, agar semua layar sinkron.
                     startSyncedCountdown() {
                         const tick = () => {
                             // Fallback jika server tidak mengirim raceStartsAt.
@@ -697,7 +699,7 @@
                         this._countdownInterval = setInterval(tick, 100);
                     },
 
-                    // startTime dipatok ke race_starts_at server (kalau ada) agar perhitungan WPM antar pemain pakai titik awal yang sama.
+                    // startTime dipatok ke race_starts_at server agar WPM antar pemain pakai titik awal sama.
                     beginRace() {
                         if (this.raceStarted) return;
                         this.raceStarted = true;
@@ -726,7 +728,7 @@
                         }
                     },
 
-                    // Sinkronkan sisa waktu dari server & pastikan clock lokal jalan. Dipanggil dari x-init banner dan event .race.sudden_death.
+                    // Sinkronkan sisa waktu dari server & pastikan clock lokal jalan.
                     syncSuddenDeath(remainingFromServer) {
                         this.suddenDeathActive = true;
                         // Ambil nilai paling konservatif kalau clock sudah jalan (hindari mundur naik).
@@ -765,7 +767,7 @@
                         }
                         if (this.$refs.typeInput) this.$refs.typeInput.blur();
 
-                        // Minta server memfinalisasi sekali; checkSuddenDeath() idempoten jadi aman dipanggil beberapa klien bersamaan.
+                        // checkSuddenDeath() idempoten: aman dipanggil beberapa klien bersamaan.
                         if (this.$wire) this.$wire.checkSuddenDeath();
                     },
 
@@ -827,7 +829,7 @@
                         this.emitProgress(progressPercent, liveWpm, accuracyPercent, false);
                     },
 
-                    // Publikasikan posisi lokal ke store dengan key userId sendiri, agar lane sendiri baca sumber yang sama dengan lawan -> gerak seragam.
+                    // Publikasikan posisi lokal ke store (key userId sendiri) agar lane sendiri & lawan seragam.
                     publishLocal(progress, wpm, finished) {
                         if (this.myId == null) return;
                         this.$store.race.apply(this.myId, {
@@ -837,7 +839,7 @@
                         });
                     },
 
-                    // Kirim progress ke server dengan throttle ~120ms (trailing-edge flush menjaga posisi terakhir tak hilang); `force` selalu segera.
+                    // Throttle ~120ms + trailing-edge flush agar posisi terakhir tak hilang; `force` selalu segera.
                     emitProgress(progress, wpm, accuracy, force) {
                         const now = Date.now();
                         const MIN_INTERVAL = 120;
@@ -866,7 +868,8 @@
                         }, delay);
                     },
 
-                    // Permisif seperti Solo: spasi selalu pindah ke kata berikutnya (tak pernah mengunci di kata salah); sisa huruf salah/belum diketik dicatat sebagai mistake tapi progres tetap jalan.
+                    // Permisif seperti Solo: spasi selalu pindah kata (tak pernah mengunci); huruf salah/terlewat
+                    // dicatat sebagai mistake tapi progres tetap jalan.
                     handleSpace(e) {
                         if (this.lockedByTimeout || this.isFinished || !this.raceStarted) return;
 
@@ -884,7 +887,7 @@
                         this.wordHadError[this.currentWordIndex] = !isExactMatch;
 
                         if (!isExactMatch) {
-                            // Huruf ekor yang belum diketik dihitung sbg mistake tambahan; huruf yang sudah diketik sudah dihitung di checkInput(), tak dobel di sini.
+                            // Hanya huruf ekor yang belum diketik; yang sudah diketik dihitung di checkInput().
                             const missingCount = Math.max(0, targetWord.length - this.typedText.length);
                             this.totalKeystrokes += missingCount;
                             this.totalMistakes += missingCount;

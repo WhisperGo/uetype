@@ -38,9 +38,7 @@
         </nav>
     </div>
 
-    {{-- ===================================================================== --}}
     {{-- TAB: MY CLAN --}}
-    {{-- ===================================================================== --}}
     @if ($tab === 'my-clan')
         @if ($this->myClan)
             @php $lvl = $this->myClan->levelData(); @endphp
@@ -176,9 +174,7 @@
         @endif
     @endif
 
-    {{-- ===================================================================== --}}
     {{-- TAB: BROWSE CLANS --}}
-    {{-- ===================================================================== --}}
     @if ($tab === 'browse')
         <div class="relative mb-6">
             <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -229,9 +225,7 @@
         @endif
     @endif
 
-    {{-- ===================================================================== --}}
     {{-- TAB: CREATE CLAN --}}
-    {{-- ===================================================================== --}}
     @if ($tab === 'create')
         <form wire:submit.prevent="createClan" class="max-w-lg space-y-5">
             {{-- Preview + identitas --}}

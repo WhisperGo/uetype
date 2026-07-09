@@ -3,9 +3,7 @@
     <h1 class="font-display text-2xl tracking-wide text-foreground mb-6">{{ __('chat.title') }}</h1>
 
     @if ($activeMode === null)
-        {{-- ===================================================================== --}}
         {{-- TABS: Friends | Clan --}}
-        {{-- ===================================================================== --}}
         <div class="border-b border-white/10 mb-6">
             <nav class="flex gap-6 -mb-px font-mono text-sm" aria-label="Chat tabs">
                 <button wire:click="$set('activeMode', null)"
@@ -56,7 +54,7 @@
             </div>
         @endif
 
-        {{-- CLAN CHAT: kartu pintasan (bukan tab terpisah -- clan cuma satu). --}}
+        {{-- CLAN CHAT: kartu pintasan (clan cuma satu, bukan tab terpisah). --}}
         <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">{{ __('chat.tab_clan') }}</p>
         @if ($this->myClan)
             <button wire:click="openClanChat"
@@ -81,9 +79,7 @@
             </div>
         @endif
     @else
-        {{-- ===================================================================== --}}
         {{-- JENDELA OBROLAN AKTIF (DM atau Clan) --}}
-        {{-- ===================================================================== --}}
         <div class="border bg-surface/40 border-white/5 rounded-3xl flex flex-col h-[70vh]">
             {{-- Header --}}
             <div class="flex items-center gap-3 p-4 border-b border-white/5 shrink-0">
@@ -200,8 +196,7 @@
                                         </p>
                                     </div>
 
-                                    {{-- Menu aksi per-pesan (muncul saat hover). Tak muncul untuk
-                                         pesan yang sudah dihapus-untuk-semua. --}}
+                                    {{-- Menu aksi per-pesan; tak muncul untuk pesan yang sudah dihapus-untuk-semua. --}}
                                     @unless ($deleted)
                                         <div x-data="{
                                                 open: false,
@@ -211,13 +206,11 @@
                                                     if (this.open) { this.open = false; return; }
                                                     this.placed = false;
                                                     this.open = true;
-                                                    // Posisikan SETELAH menu dirender, supaya tingginya terukur
-                                                    // (jumlah item berbeda-beda: reply/edit/delete).
+                                                    // Posisikan setelah dirender agar tingginya terukur (2-4 item).
                                                     this.$nextTick(() => { this.place(); this.placed = true; });
                                                 },
-                                                // Jepit menu agar SELALU utuh di dalam frame chat: coba buka ke
-                                                // bawah, kalau tak muat coba ke atas, lalu geser (clamp) supaya
-                                                // tepi atas & bawahnya tak pernah keluar dari #chat-messages.
+                                                // Buka ke bawah; kalau tak muat ke atas; lalu clamp agar menu
+                                                // selalu utuh di dalam #chat-messages.
                                                 place() {
                                                     const box = document.getElementById('chat-messages');
                                                     const menu = this.$refs.menu;
@@ -228,17 +221,15 @@
                                                     const h = menu.offsetHeight;
                                                     const gap = 4, pad = 8;
 
-                                                    // Kandidat posisi (koordinat viewport) untuk tepi ATAS menu.
                                                     let top = btn.bottom + gap;                 // buka ke bawah
                                                     if (top + h > area.bottom - pad) {
                                                         top = btn.top - gap - h;                // buka ke atas
                                                     }
-                                                    // Clamp ke dalam area chat (menang atas dua pilihan di atas).
                                                     const maxTop = area.bottom - pad - h;
                                                     const minTop = area.top + pad;
                                                     top = Math.max(minTop, Math.min(top, maxTop));
 
-                                                    // Simpan relatif terhadap tombol (menu absolute thd wrapper).
+                                                    // Menu absolute terhadap wrapper -> simpan relatif ke tombol.
                                                     this.topPx = top - btn.top;
                                                 },
                                             }" @click.outside="open = false"
@@ -309,11 +300,8 @@
                 </div>
             @endif
 
-            {{-- Input --}}
-            {{-- Kirim lewat fetch() ke /chat/send (PARALEL, di luar antrean
-                 Livewire) supaya spam pesan tak saling menunggu. Bubble
-                 optimistic langsung digambar, input langsung kosong & tetap
-                 fokus. Tak ada round-trip komponen per kiriman. --}}
+            {{-- Input: kirim lewat fetch() ke /chat/send (paralel, di luar antrean
+                 Livewire) agar spam pesan tak saling menunggu. --}}
             <form x-data="{ draft: '' }"
                 @submit.prevent="
                     const b = draft.trim();
@@ -370,23 +358,18 @@
         </div>
     @endif
 
-    {{-- ===== REAL-TIME =====
-         Subscription Echo ke chat.{id}/clan-chat.{clanId} DIPEGANG oleh toast
-         global di layout (satu-satunya subscriber, agar tak dobel). Halaman
-         ini cukup mendengar event window yang diteruskan toast lalu
-         menyegarkan datanya. --}}
+    {{-- REAL-TIME: subscription Echo dipegang toast global di layout (satu-satunya
+         subscriber). Halaman ini cukup mendengar event window yang diteruskannya. --}}
     @script
         <script>
             const meId = {{ auth()->id() }};
 
-            // Escape teks pesan sebelum dimasukkan ke DOM (payload dari WebSocket
-            // = input user lain, jangan pernah dianggap HTML aman).
+            // Payload WebSocket = input user lain; escape sebelum masuk DOM.
             const esc = (s) => { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; };
 
-            // Apakah pesan yang masuk termasuk percakapan yang SEDANG dibuka?
+            // Apakah pesan masuk termasuk percakapan yang sedang dibuka?
             const belongsToOpenConversation = (d) => {
                 if (d.kind === 'dm') {
-                    // DM masuk dari lawan bicara: relevan kalau mode dm & pengirim = lawan yang dibuka.
                     return $wire.activeMode === 'dm' && $wire.withUsername === d.senderUsername;
                 }
                 if (d.kind === 'clan') {
@@ -395,9 +378,8 @@
                 return false;
             };
 
-            // Tempel bubble pesan LANGSUNG ke DOM dari payload WebSocket, tanpa
-            // menunggu render server. Livewire lalu rekonsiliasi di belakang
-            // layar; karena id (wire:key) sama, node ini tak akan terduplikasi.
+            // Gambar bubble langsung dari payload WS tanpa menunggu render server.
+            // wire:key sama dengan render Livewire nanti -> tak terduplikasi.
             const appendBubble = (d) => {
                 const list = document.getElementById('chat-messages');
                 if (!list) return;
@@ -419,15 +401,12 @@
                 requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
             };
 
-            // Pesan KELUAR (milik sendiri) ditampilkan seketika saat submit,
-            // sebelum server merespons -- mendukung spam beruntun. Tiap bubble
-            // optimistic diberi wire:key unik "opt-N" supaya Livewire morph TAK
-            // menyentuhnya (key tak dikenal = dibiarkan), jadi tak ada kedip saat
-            // banyak kiriman menumpuk. Semua dibersihkan sekaligus begitu SEMUA
-            // kiriman selesai (pending kembali 0), digantikan bubble asli.
+            // Bubble pesan sendiri tampil seketika saat submit (mendukung spam beruntun).
+            // wire:key unik "opt-N" agar Livewire morph tak menyentuhnya (tak kedip);
+            // dibuang serentak saat semua kiriman selesai, digantikan bubble asli.
             let __optSeq = 0;
-            // Di window supaya hook morph.updated global (didaftarkan sekali)
-            // selalu membaca counter yang benar walau setelah wire:navigate.
+            // Di window agar hook morph.updated global tetap membaca counter yang benar
+            // setelah wire:navigate.
             window.__chatPendingSends = window.__chatPendingSends || 0;
             window.chatAppendOutgoing = (body) => {
                 const list = document.getElementById('chat-messages');
@@ -450,10 +429,8 @@
             const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
             let __syncTimer = null;
 
-            // Kirim pesan lewat fetch() PARALEL (bukan lewat Livewire) -> spam
-            // pesan tak saling menunggu. Bubble optimistic langsung tampil;
-            // setelah kiriman selesai, sinkron sekali (debounced) ke server
-            // supaya bubble asli (dgn id & waktu server) menggantikan optimistic.
+            // Kirim via fetch() paralel (bukan Livewire) agar spam tak saling menunggu.
+            // Setelah semua kiriman selesai, sinkron sekali (debounced) ke server.
             window.chatSend = (body) => {
                 const mode = $wire.activeMode;
                 if (!mode) return;
@@ -481,11 +458,9 @@
                 }).catch(() => {}).finally(() => {
                     window.__chatPendingSends--;
                     if (window.__chatPendingSends === 0) {
-                        // Debounce: kalau spam beruntun, sinkron sekali di akhir.
-                        // HANYA minta re-render; bubble optimistic TIDAK dihapus
-                        // di sini -- penghapusannya menunggu morph.updated (setelah
-                        // bubble asli benar-benar ada di DOM) supaya tak ada jeda
-                        // "pesan hilang dulu baru muncul".
+                        // Hanya minta re-render (debounced). Bubble optimistic dibuang
+                        // di morph.updated, setelah bubble asli ada di DOM, agar pesan
+                        // tak sempat hilang lalu muncul lagi.
                         clearTimeout(__syncTimer);
                         __syncTimer = setTimeout(() => $wire.dispatch('message-received'), 120);
                     }
@@ -503,8 +478,6 @@
 
             const onRemote = (ev) => {
                 const d = ev.detail;
-                // Optimistic: kalau pesan untuk percakapan yang sedang dibuka,
-                // tampilkan seketika supaya tak terasa delay.
                 if (d && belongsToOpenConversation(d)) {
                     appendBubble(d);
                 }
@@ -513,22 +486,17 @@
             };
             window.addEventListener('message-received-remote', onRemote);
 
-            // Edit/hapus pesan dari sisi lain: PATCH bubble langsung dari payload
-            // (instan, tanpa round-trip), lalu tetap sinkron ke server di belakang
-            // layar untuk state otoritatif.
+            // Edit/hapus dari sisi lain: patch bubble langsung dari payload (instan),
+            // server tetap disinkronkan di belakang layar.
             const patchMutation = (d) => {
                 const node = document.querySelector(`[wire\\:key="msg-${d.messageId}"]`);
                 if (!node) return false;
-                // Cari elemen bubble teks (div ber-rounded di dalam node pesan).
                 const bubble = node.querySelector('.rounded-2xl');
                 if (!bubble) return false;
 
                 if (d.action === 'edited') {
-                    // Ganti teks isi + tambahkan label "· edited" bila belum ada.
-                    // Struktur bubble: [kutipan?] teks <p time>. Kita ubah node teks
-                    // terakhir sebelum <p> waktu; paling aman: re-render sederhana.
+                    // Bangun ulang isi: buang semua kecuali <p> waktu, sisipkan teks baru.
                     const timeP = bubble.querySelector('p.opacity-60');
-                    // Bangun ulang isi bubble: hapus semua kecuali <p> waktu, sisipkan teks baru.
                     [...bubble.childNodes].forEach(n => { if (n !== timeP) n.remove(); });
                     bubble.insertBefore(document.createTextNode(d.body ?? ''), timeP);
                     if (timeP && !timeP.dataset.edited) {
@@ -558,17 +526,12 @@
                 window.removeEventListener('message-mutated-remote', onMutated);
             }, { once: true });
 
-            // Auto-scroll ke pesan terbaru saat jendela obrolan pertama kali
-            // dibuka DAN setiap kali daftar pesan berubah (pesan baru masuk/keluar).
-            // Hook Livewire didaftarkan SEKALI secara global (bukan di init()
-            // tiap instance x-data) supaya tak menumpuk listener tiap kali
-            // jendela obrolan dibuka/tutup.
+            // Auto-scroll ke pesan terbaru tiap daftar berubah. Hook didaftarkan
+            // sekali secara global agar tak menumpuk tiap jendela dibuka/tutup.
             if (!window.__chatScrollHookRegistered) {
                 window.__chatScrollHookRegistered = true;
                 Livewire.hook('morph.updated', () => {
-                    // Bubble asli sudah dirender server -> baru sekarang buang
-                    // placeholder optimistic (tak ada lagi jeda "hilang dulu").
-                    // Hanya kalau tak ada kiriman yang masih berjalan.
+                    // Bubble asli sudah ada di DOM -> baru buang placeholder optimistic.
                     if (window.__chatPendingSends === 0) {
                         document.querySelectorAll('#chat-messages [data-optimistic]').forEach(n => n.remove());
                     }

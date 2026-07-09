@@ -25,8 +25,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Di belakang reverse proxy (Cloudflare/ngrok) request masuk sebagai http;
-        // paksa https agar URL yang digenerate tak jadi mixed content.
+        // Di belakang reverse proxy request bisa masuk sebagai http; paksa https
+        // agar URL yang digenerate tak jadi mixed content.
         if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }

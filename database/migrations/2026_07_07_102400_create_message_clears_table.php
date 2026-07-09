@@ -7,16 +7,9 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Penanda "clear chat" per-user -- BUKAN penghapusan pesan sungguhan.
-     * Satu baris = satu user meng-clear satu percakapan (DM dgn user lain,
-     * ATAU chat clan) sampai batas waktu tertentu. Pesan dengan
-     * created_at <= cleared_before disembunyikan HANYA dari user ini;
-     * partisipan lain tetap melihat riwayat penuh mereka sendiri.
-     *
-     * "Clear semua" direpresentasikan sebagai cleared_before = now() (semua
-     * pesan sejauh ini otomatis lebih lama dari now()) -- tak perlu kolom
-     * boolean terpisah, satu mekanisme timestamp cukup utk kedua opsi
-     * (clear semua vs clear sebelum N hari yang lalu).
+     * Penanda "clear chat" per-user, bukan penghapusan pesan. Pesan dengan
+     * created_at <= cleared_before disembunyikan hanya dari user ini; partisipan
+     * lain tetap melihat riwayat penuh. "Clear semua" = cleared_before now().
      */
     public function up(): void
     {
@@ -29,9 +22,7 @@ return new class extends Migration
             $table->timestamp('cleared_before');
             $table->timestamps();
 
-            // Satu user cuma punya SATU baris "clear" aktif per lawan-bicara/clan
-            // -- clear ulang meng-update baris ini (naikkan cleared_before),
-            // bukan menumpuk baris baru.
+            // Satu baris "clear" per lawan-bicara/clan: clear ulang meng-update, bukan menumpuk.
             $table->unique(['user_id', 'other_user_id'], 'message_clears_dm_unique');
             $table->unique(['user_id', 'clan_id'], 'message_clears_clan_unique');
         });

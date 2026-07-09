@@ -102,17 +102,13 @@
                                 if (!window.Echo) return; // Echo dimuat via app.js
                                 const channelName = `friends.{{ Auth::id() }}`;
 
-                                // FIX toast dobel: dengan wire:navigate, layout & init() bisa
-                                // jalan berkali-kali sehingga .listen() menumpuk callback pada
-                                // channel yang sama -> 1 event = banyak toast. Lepas dulu listener
-                                // lama, lalu pasang SATU listener bersih.
+                                // wire:navigate bisa menjalankan init() berkali-kali; lepas listener
+                                // lama dulu agar callback tak menumpuk (1 event = 1 toast).
                                 const channel = window.Echo.channel(channelName);
                                 channel.stopListening('.friendship.updated');
                                 channel.listen('.friendship.updated', (e) => {
-                                    // Satu-satunya subscriber Echo untuk friends.{id}. Selain
-                                    // memunculkan toast, teruskan sebagai event window supaya
-                                    // halaman Friends bisa menyegarkan diri TANPA subscribe
-                                    // channel yang sama (mencegah listener dobel & toast dobel).
+                                    // Satu-satunya subscriber friends.{id}: selain toast, teruskan sebagai
+                                    // event window agar halaman Friends menyegarkan diri tanpa subscribe lagi.
                                     window.dispatchEvent(new CustomEvent('friendship-updated-remote'));
 
                                     if (e && e.notification && e.notification.message) {
@@ -120,8 +116,7 @@
                                     }
                                 });
 
-                                // Status online/offline teman: tanpa toast, hanya menyegarkan
-                                // daftar teman supaya titik status menyala/padam real-time.
+                                // Status online/offline: tanpa toast, hanya menyegarkan daftar teman.
                                 channel.stopListening('.presence.updated');
                                 channel.listen('.presence.updated', () => {
                                     window.dispatchEvent(new CustomEvent('friendship-updated-remote'));
@@ -208,8 +203,7 @@
                                 if (!window.Echo) return; // Echo dimuat via app.js
                                 const channelName = `clan.{{ Auth::id() }}`;
 
-                                // FIX toast dobel: sama seperti friendToasts -- lepas
-                                // listener lama dulu sebelum memasang yang baru.
+                                // Lepas listener lama dulu (sama seperti friendToasts).
                                 const channel = window.Echo.channel(channelName);
                                 channel.stopListening('.clan.updated');
                                 channel.listen('.clan.updated', (e) => {
@@ -277,36 +271,31 @@
                                 const dmChannel = window.Echo.channel(`chat.{{ Auth::id() }}`);
                                 dmChannel.stopListening('.dm.sent');
                                 dmChannel.listen('.dm.sent', (e) => {
-                                    // Teruskan payload lengkap supaya halaman chat bisa
-                                    // menampilkan pesan SEKETIKA (optimistic, tanpa round-trip).
+                                    // Payload lengkap agar halaman chat bisa menampilkan pesan seketika.
                                     window.dispatchEvent(new CustomEvent('message-received-remote', {
                                         detail: { ...e, kind: 'dm' },
                                     }));
-                                    // Toast hanya kalau user TIDAK sedang membuka percakapan
-                                    // dengan pengirim ini (kalau sedang dibuka, pesan sudah terlihat).
+                                    // Toast hanya kalau percakapan dengan pengirim ini tak sedang dibuka.
                                     if (e && e.body && e.senderUsername
                                         && !this.isViewingDm(e.senderUsername)) {
                                         this.push(e);
                                     }
                                 });
-                                // Edit/hapus pesan DM -> teruskan payload supaya bubble
-                                // di-patch LANGSUNG di client (tanpa round-trip).
+                                // Edit/hapus DM: teruskan payload agar bubble di-patch langsung di client.
                                 dmChannel.stopListening('.message.edited');
                                 dmChannel.listen('.message.edited', (e) => window.dispatchEvent(new CustomEvent('message-mutated-remote', { detail: { ...e, action: 'edited' } })));
                                 dmChannel.stopListening('.message.deleted');
                                 dmChannel.listen('.message.deleted', (e) => window.dispatchEvent(new CustomEvent('message-mutated-remote', { detail: { ...e, action: 'deleted' } })));
 
                                 @if (Auth::user()->clan)
-                                    // Clan chat: channel per-clan clan-chat.{clanId} -- SEMUA
-                                    // anggota subscribe channel yang sama (bukan per-user).
+                                    // Clan chat: channel per-clan, semua anggota subscribe yang sama.
                                     const clanChannel = window.Echo.channel(`clan-chat.{{ Auth::user()->clan->id }}`);
                                     clanChannel.stopListening('.clan-message.sent');
                                     clanChannel.listen('.clan-message.sent', (e) => {
                                         window.dispatchEvent(new CustomEvent('message-received-remote', {
                                             detail: { ...e, kind: 'clan' },
                                         }));
-                                        // Jangan toast pesan dari diri sendiri, DAN jangan toast
-                                        // kalau user sedang membuka chat clan (sudah terlihat).
+                                        // Jangan toast pesan sendiri, atau kalau chat clan sedang dibuka.
                                         if (e && e.body && e.senderUsername
                                             && e.senderId !== {{ Auth::id() }}
                                             && !this.isViewingClan()) {
@@ -319,8 +308,7 @@
                                     clanChannel.listen('.message.deleted', (e) => window.dispatchEvent(new CustomEvent('message-mutated-remote', { detail: { ...e, action: 'deleted' } })));
                                 @endif
                             },
-                            // Cek dari URL apakah user sedang membuka percakapan tertentu,
-                            // supaya toast tak muncul untuk chat yang sedang ditonton.
+                            // Baca URL: percakapan mana yang sedang dibuka (agar toast-nya dilewati).
                             isViewingDm(username) {
                                 if (!location.pathname.endsWith('/chat')) return false;
                                 const p = new URLSearchParams(location.search);

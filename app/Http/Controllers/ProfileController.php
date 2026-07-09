@@ -20,10 +20,8 @@ class ProfileController extends Controller
     }
 
     /**
-     * Profil PUBLIK milik user lain (dibuka lewat daftar teman / pencarian).
-     * Hanya menampilkan data yang layak publik — TANPA field privat seperti
-     * email, koin, atau total XP. Kalau seseorang membuka profilnya sendiri
-     * lewat rute ini, arahkan ke halaman /profile miliknya yang penuh.
+     * Profil publik milik user lain: tanpa field privat (email, koin, total XP).
+     * Kalau membuka profil sendiri lewat rute ini, arahkan ke /profile penuh.
      */
     public function show(Request $request, User $user): View
     {
@@ -35,10 +33,8 @@ class ProfileController extends Controller
     }
 
     /**
-     * Rakit data agregat sebuah profil dari hasil ketik tersimpan (semua sudah
-     * tervalidasi server). Dipakai bersama oleh profil sendiri & profil publik
-     * supaya angkanya konsisten; $public menentukan field privat disertakan
-     * atau tidak.
+     * Rakit data agregat sebuah profil dari hasil ketik tersimpan. Dipakai bersama
+     * oleh profil sendiri & publik; $public menentukan field privat disertakan atau tidak.
      *
      * @return array<string, mixed>
      */
@@ -49,7 +45,6 @@ class ProfileController extends Controller
             ->take(8)
             ->get();
 
-        // Statistik agregat dari seluruh hasil tersimpan (semua sudah tervalidasi server).
         $base = TypingResult::where('user_id', $user->id);
 
         $stats = [
@@ -59,11 +54,9 @@ class ProfileController extends Controller
             'best_wpm' => round((float) (clone $base)->max('net_wpm'), 1),
         ];
 
-        // Total waktu mengetik (detik) dari seluruh sesi valid.
         $stats['total_seconds'] = (int) (clone $base)->sum('duration_seconds');
 
-        // Level diturunkan dari total_xp lewat SATU sumber kebenaran (User::levelData()).
-        // Kurva progresif: tiap level butuh BASE × level EXP (requirement Level/EXP).
+        // Level diturunkan dari total_xp lewat satu sumber kebenaran (User::levelData()).
         $levelData = $user->levelData();
         $stats['level'] = $levelData['level'];
         $stats['level_progress'] = $levelData['progress']; // EXP di dalam level ini
@@ -74,7 +67,7 @@ class ProfileController extends Controller
             ->groupBy('mode', 'mode_config')
             ->get();
 
-        // Data grafik progres WPM (urut kronologis, maks 20 sesi terakhir, hanya yang valid).
+        // Data grafik progres WPM: urut kronologis, maks 20 sesi terakhir.
         $progress = (clone $base)->latest('created_at')->take(20)->get()->reverse()->values();
         $wpmProgress = $progress->pluck('net_wpm')->map(fn ($v) => (float) $v)->all();
 

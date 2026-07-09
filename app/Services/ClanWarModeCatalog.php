@@ -3,21 +3,16 @@
 namespace App\Services;
 
 /**
- * Katalog 9 mode wajib Clan War beserta ceiling (poin maksimal) per mode.
- * SATU sumber kebenaran yang dipakai bersama oleh komponen ClanWar (grid &
- * klaim), ClanWarScorer (perhitungan poin), dan ClanWarResolver (penutupan
- * war) supaya angka ceiling & daftar mode tak terduplikasi di banyak tempat.
- *
- * Daftar mode SENGAJA cocok persis dengan TypingEngine::ALLOWED_SUBMODES
- * (time 15/30/60/120, words 10/25/50/100, survival hard) -- kombinasi di
- * luar ini tak akan pernah bisa diklaim sebagai war attempt.
+ * Katalog 9 mode wajib Clan War beserta ceiling (poin maksimal) per mode. Satu
+ * sumber kebenaran dipakai bersama oleh komponen ClanWar, ClanWarScorer, dan
+ * ClanWarResolver. Daftar mode cocok persis dengan TypingEngine::ALLOWED_SUBMODES;
+ * kombinasi di luar ini tak bisa diklaim sebagai war attempt.
  */
 class ClanWarModeCatalog
 {
     /**
-     * Urutan di sini = urutan tampil di grid. Ceiling naik seiring
-     * kesulitan/durasi mode; Survival Hard tertinggi karena risiko
-     * kegagalan total (0 poin kalau cepat mati) paling besar.
+     * Urutan = urutan tampil di grid. Ceiling naik seiring kesulitan/durasi mode;
+     * Survival Hard tertinggi karena risiko kegagalan total paling besar.
      *
      * @var list<array{mode: string, config: string, ceiling: int}>
      */
@@ -33,18 +28,10 @@ class ClanWarModeCatalog
         ['mode' => 'survival', 'config' => 'hard', 'ceiling' => 150],
     ];
 
-    /**
-     * Time/Words: WPM di mana poin mode mencapai ceiling penuh (di atas ini
-     * di-cap). 150 = tier "Supersonic" pada sistem achievement -- bisa
-     * disesuaikan kalau ternyata terlalu mudah/sulit dicapai.
-     */
+    /** Time/Words: WPM di mana poin mode mencapai ceiling penuh (di-cap di atas ini). */
     public const WPM_SCALE = 150;
 
-    /**
-     * Survival: durasi bertahan (detik) di mana poin mencapai ceiling penuh.
-     * 90 = estimasi awal utk Survival Hard (drain rate agresif) -- bisa
-     * disesuaikan setelah dipakai.
-     */
+    /** Survival: durasi bertahan (detik) di mana poin mencapai ceiling penuh. */
     public const SURVIVAL_SECONDS_SCALE = 90;
 
     public static function ceilingFor(string $mode, string $config): ?int
