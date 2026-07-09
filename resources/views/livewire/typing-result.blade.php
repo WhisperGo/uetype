@@ -114,7 +114,7 @@
                                 </div>
                             </div>
                             <div class="h-2 overflow-hidden rounded-full bg-white/5">
-                                <div class="h-full rounded-full bg-brand-bright transition-all"
+                                <div class="h-full rounded-full bg-foreground transition-all"
                                     style="width: {{ $levelData['needed'] > 0 ? min(100, ($levelData['progress'] / $levelData['needed']) * 100) : 0 }}%"></div>
                             </div>
                         </div>
@@ -233,7 +233,7 @@
                                 </div>
                             </div>
                             <div class="h-2 overflow-hidden rounded-full bg-white/5">
-                                <div class="h-full rounded-full bg-brand transition-all"
+                                <div class="h-full rounded-full bg-foreground transition-all"
                                     style="width: {{ $levelData['needed'] > 0 ? min(100, ($levelData['progress'] / $levelData['needed']) * 100) : 0 }}%"></div>
                             </div>
                         </div>
