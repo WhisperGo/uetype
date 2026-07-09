@@ -144,7 +144,14 @@ class MultiplayerLobby extends Component
     {
         $room = Room::where('code', $this->roomCode)->first();
 
+        // Room hilang (host keluar / room dibubarkan): kembalikan pemain yang
+        // tersisa ke halaman pilih, bukan dibiarkan di step 'racing' tanpa data
+        // (semua blok view butuh roomData -> halaman jadi kosong).
         if (! $room) {
+            $this->resetToChoose();
+            // Lepas langganan channel room yang sudah tak ada.
+            $this->dispatch('leave-room');
+
             return;
         }
 
@@ -230,13 +237,19 @@ class MultiplayerLobby extends Component
             SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
         }
 
+        $this->resetToChoose();
+
+        $this->dispatch('leave-room');
+    }
+
+    /** Bersihkan seluruh state room & kembali ke halaman create/join. */
+    private function resetToChoose(): void
+    {
         $this->roomCode = '';
         $this->joinCodeInput = ['', '', '', '', '', ''];
         $this->step = 'choose';
         $this->typedText = '';
         $this->showResultModal = false;
-
-        $this->dispatch('leave-room');
     }
 
     public function updateRaceProgress(int $progressPercent, int $liveWpm, int $accuracy = 100): void
@@ -510,6 +523,15 @@ class MultiplayerLobby extends Component
 
     public function render()
     {
+        // Penjaga terakhir sebelum view dievaluasi: kalau masih menahan roomCode
+        // tapi room-nya sudah tak ada (host keluar), pulihkan ke halaman pilih.
+        // Tanpa ini semua blok view gagal syarat -> halaman kosong.
+        if ($this->step !== 'choose' && $this->roomCode !== ''
+            && ! Room::where('code', $this->roomCode)->exists()) {
+            $this->resetToChoose();
+            $this->dispatch('leave-room');
+        }
+
         return view('livewire.multiplayer-lobby')->layout('layouts.app');
     }
 

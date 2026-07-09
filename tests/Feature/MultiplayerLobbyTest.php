@@ -107,4 +107,53 @@ describe('multiplayer lobby', function () {
         expect($seconds)->toBeGreaterThanOrEqual(29);
         expect($seconds)->toBeLessThanOrEqual(31);
     });
+
+    it('sends the remaining racer back to the choose screen when the host leaves mid-race', function () {
+        Event::fake([RoomUpdated::class]);
+
+        $host = User::factory()->create();
+        $racer = User::factory()->create();
+
+        $room = Room::create([
+            'code' => 'LEAVE1',
+            'host_id' => $host->id,
+            'status' => 'racing',
+            'text_to_type' => 'the quick brown fox',
+            'race_starts_at' => now()->subSeconds(5),
+        ]);
+        foreach ([$host, $racer] as $u) {
+            RoomMember::create(['room_id' => $room->id, 'user_id' => $u->id, 'is_ready' => true]);
+        }
+
+        // Host keluar di tengah balapan -> room dihapus.
+        Livewire::actingAs($host)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'LEAVE1')
+            ->set('step', 'racing')
+            ->call('leaveRoom');
+
+        $this->assertDatabaseMissing('rooms', ['code' => 'LEAVE1']);
+
+        // Pemain yang tersisa menerima room-updated: harus balik ke 'choose',
+        // bukan tertinggal di 'racing' tanpa roomData (halaman kosong).
+        Livewire::actingAs($racer)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'LEAVE1')
+            ->set('step', 'racing')
+            ->call('roomUpdated')
+            ->assertSet('step', 'choose')
+            ->assertSet('roomCode', '')
+            ->assertSee('Create Room')
+            ->assertSee('Join Room');
+    });
+
+    it('recovers to the choose screen on render when the room vanished without an event', function () {
+        // Reverb mati -> event room-updated tak pernah sampai. Penjaga di render()
+        // tetap harus memulihkan, bukan merender halaman kosong.
+        $racer = User::factory()->create();
+
+        Livewire::actingAs($racer)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'GHOST1') // room tak pernah ada di DB
+            ->set('step', 'racing')
+            ->assertSet('step', 'choose')
+            ->assertSee('Create Room');
+    });
 });
