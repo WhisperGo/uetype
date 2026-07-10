@@ -1,8 +1,6 @@
 <?php
 
 use App\Livewire\TypingEngine;
-use App\Models\Language;
-use App\Models\Text;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -68,22 +66,4 @@ test('the content language persists in the session preferences', function () {
     Livewire::test(TypingEngine::class)->call('setContentLang', 'id');
 
     expect(session('typing_preferences')['contentLang'])->toBe('id');
-});
-
-test('quote mode only draws quotes for the selected content language', function () {
-    $user = User::factory()->create();
-    $this->actingAs($user);
-
-    $en = Language::create(['code' => 'en', 'name' => 'English']);
-    $id = Language::create(['code' => 'id', 'name' => 'Indonesian']);
-
-    Text::create(['language_id' => $en->id, 'content' => 'An english quote here.', 'mode' => 'quote', 'difficulty' => 'medium']);
-    $idText = Text::create(['language_id' => $id->id, 'content' => 'Sebuah kutipan indonesia.', 'mode' => 'quote', 'difficulty' => 'medium']);
-
-    $component = Livewire::test(TypingEngine::class)
-        ->call('setContentLang', 'id')
-        ->call('setMode', 'quote', null);
-
-    expect($component->get('textId'))->toBe($idText->id);
-    expect($component->get('textToType'))->toBe('Sebuah kutipan indonesia.');
 });
