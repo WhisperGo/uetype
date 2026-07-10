@@ -29,6 +29,7 @@ return [
 
     'achievements' => 'Achievements',
     'achievements_count' => ':earned of :total unlocked',
+    'no_achievements' => 'No achievements unlocked yet. Finish a test to earn your first one.',
     'view_all' => 'View all',
 
     'wpm_progression' => 'WPM Progression',

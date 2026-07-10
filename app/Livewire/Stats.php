@@ -30,9 +30,6 @@ class Stats extends Component
     /** Whitelist rentang; nilai di luar ini dianggap '7'. */
     private const RANGES = ['7', '30', 'all'];
 
-    /** Halaman ini cuma cuplikan; daftar lengkapnya ada di /achievements. */
-    private const ACHIEVEMENT_PREVIEW = 8;
-
     public function setRange(string $range): void
     {
         $this->range = in_array($range, self::RANGES, true) ? $range : '7';
@@ -133,27 +130,18 @@ class Stats extends Component
     }
 
     /**
-     * Cuplikan achievement untuk halaman ini: yang SUDAH diraih didahulukan,
-     * lalu dipotong ACHIEVEMENT_PREVIEW. Daftar penuh + filter kategori tetap
-     * jadi tugas /achievements, jadi halaman ini tak perlu mengulanginya.
+     * Halaman ini hanya memajang achievement yang SUDAH diraih — semuanya, tanpa
+     * batas. Yang masih terkunci sengaja tak ditampilkan: daftar lengkap beserta
+     * progresnya sudah jadi tugas /achievements.
      *
      * @param  array<int, array{earned: bool}>  $items
-     * @return array{preview: array<int, array<string, mixed>>, earned: int, total: int, remaining: int}
+     * @return array{earned: array<int, array<string, mixed>>, total: int}
      */
-    private function achievementPreview(array $items): array
+    private function earnedAchievements(array $items): array
     {
-        $earned = array_values(array_filter($items, fn ($a) => $a['earned']));
-        $locked = array_values(array_filter($items, fn ($a) => ! $a['earned']));
-
-        // Kalau yang diraih belum memenuhi kuota, sisanya diisi yang terkunci
-        // supaya barisnya tak terlihat kosong bagi pemain baru.
-        $preview = array_slice([...$earned, ...$locked], 0, self::ACHIEVEMENT_PREVIEW);
-
         return [
-            'preview' => $preview,
-            'earned' => count($earned),
+            'earned' => array_values(array_filter($items, fn ($a) => $a['earned'])),
             'total' => count($items),
-            'remaining' => max(count($items) - count($preview), 0),
         ];
     }
 
@@ -179,7 +167,7 @@ class Stats extends Component
             'bestWords' => $this->bestWpmByConfig($user->id, 'words'),
             'bestTime' => $this->bestWpmByConfig($user->id, 'time'),
             'bestSurvival' => $this->bestSurvivalSeconds($user->id),
-            'achievements' => $this->achievementPreview($achievements->evaluate($user)['items']),
+            'achievements' => $this->earnedAchievements($achievements->evaluate($user)['items']),
             'series' => $this->series($user->id),
             'distribution' => $this->modeDistribution($user->id),
         ]);

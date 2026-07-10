@@ -106,7 +106,7 @@
                                 {{ __('stats.xp_progress', ['progress' => number_format($levelData['progress']), 'needed' => number_format($levelData['needed'])]) }}
                             </div>
                             <div class="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                                <div class="h-full rounded-full bg-brand transition-all" style="width: {{ $pct }}%"></div>
+                                <div class="h-full rounded-full bg-foreground transition-all" style="width: {{ $pct }}%"></div>
                             </div>
                         </div>
 
@@ -184,7 +184,7 @@
                     <div class="flex items-baseline gap-3">
                         <h2 class="text-h6 font-bold text-foreground">{{ __('stats.achievements') }}</h2>
                         <span class="text-x-small text-muted">
-                            {{ __('stats.achievements_count', ['earned' => $achievements['earned'], 'total' => $achievements['total']]) }}
+                            {{ __('stats.achievements_count', ['earned' => count($achievements['earned']), 'total' => $achievements['total']]) }}
                         </span>
                     </div>
                     <a href="{{ route('achievements.index') }}"
@@ -196,29 +196,25 @@
                     </a>
                 </div>
 
-                {{-- Cuplikan saja (yang diraih didahulukan); daftar penuh di /achievements. --}}
-                <div class="flex flex-wrap gap-3">
-                    @foreach ($achievements['preview'] as $a)
-                        <div title="{{ __('achievements.defs.' . $a['key'] . '.title') }}"
-                            class="flex flex-col items-center justify-center w-16 h-16 rounded-xl border shrink-0 transition
-                                {{ $a['earned']
-                                    ? 'bg-brand/15 border-brand text-gold'
-                                    : 'bg-surface/40 border-border text-muted/40' }}">
-                            <span class="font-pixel text-h6 leading-none">{{ $a['icon_value'] }}</span>
-                            <span class="mt-1 text-[0.5rem] uppercase tracking-wider {{ $a['earned'] ? 'text-gold/70' : 'text-muted/40' }}">
-                                {{ $a['icon_unit'] }}
-                            </span>
-                        </div>
-                    @endforeach
-
-                    @if ($achievements['remaining'] > 0)
-                        <a href="{{ route('achievements.index') }}"
-                            class="flex items-center justify-center w-16 h-16 rounded-xl border border-dashed border-border
-                                text-x-small text-muted shrink-0 transition hover:border-gold/50 hover:text-gold">
-                            +{{ $achievements['remaining'] }}
-                        </a>
-                    @endif
-                </div>
+                {{-- Hanya yang sudah diraih. Yang terkunci beserta progresnya di /achievements. --}}
+                @if (empty($achievements['earned']))
+                    <div class="rounded-2xl border border-border bg-surface/40 px-5 py-8 text-center text-small text-muted">
+                        {{ __('stats.no_achievements') }}
+                    </div>
+                @else
+                    <div class="flex flex-wrap gap-3">
+                        @foreach ($achievements['earned'] as $a)
+                            <div title="{{ __('achievements.defs.' . $a['key'] . '.title') }}"
+                                class="flex flex-col items-center justify-center w-16 h-16 rounded-xl shrink-0
+                                    border border-brand bg-brand/15 text-gold">
+                                <span class="font-pixel text-h6 leading-none">{{ $a['icon_value'] }}</span>
+                                <span class="mt-1 text-[0.5rem] uppercase tracking-wider text-gold/70">
+                                    {{ $a['icon_unit'] }}
+                                </span>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </section>
 
             {{-- ===== WPM Progression ===== --}}
