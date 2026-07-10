@@ -31,6 +31,9 @@ return [
     'sudden_death' => 'Sudden Death Aktif! Ruang Ditutup Dalam:',
     'race_starting' => 'Balapan Dimulai',
     'mascot_track' => 'Lintasan Balap Maskot',
+    'live_standings' => 'Klasemen Langsung',
+    'leader' => 'Memimpin',
+    'dnf' => 'DNF',
     'finished' => '[SELESAI]',
     'finish' => 'GARIS AKHIR',
     'arena_mode' => 'Arena - Mode Ketik Cepat',
@@ -39,7 +42,7 @@ return [
     'input_finished' => 'Kamu menyelesaikan balapan!',
     'input_type' => 'Ketik kata ini di sini...',
     'input_wait' => 'Tunggu hitung mundur...',
-    'give_up' => 'Menyerah & Keluar',
+    'give_up' => 'Give Up',
 
     'match_result' => 'Hasil Pertandingan',
     'room' => 'Ruang :code',
