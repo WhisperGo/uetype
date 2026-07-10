@@ -4,12 +4,12 @@ return [
     'standard' => 'Standard',
     'survival' => 'Survival',
     'ghost' => 'Ghost',
-    'ghost_vs' => 'vs :label',
+    'ghost_pick' => '+ Race a Ghost',
+    'ghost_change' => 'Change',
+    'ghost_clear' => 'Clear',
 
     'type_time' => 'Time',
     'type_words' => 'Words',
-    'type_quote' => 'Quote',
-    'random_quote' => 'random quote',
 
     'stat_left' => 'left',
     'stat_time' => 'time',

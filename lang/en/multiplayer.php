@@ -28,7 +28,8 @@ return [
     'im_not_ready' => "I'm Not Ready",
     'leave_room' => 'Leave Room',
 
-    'sudden_death' => 'Sudden Death Activated! Room Closes In:',
+    'sudden_death' => 'Sudden Death',
+    'room_label' => 'Room',
     'race_starting' => 'The Race is Starting',
     'mascot_track' => 'Mascot Race Track',
     'live_standings' => 'Live Standings',
@@ -43,6 +44,11 @@ return [
     'input_type' => 'Type the current word here...',
     'input_wait' => 'Wait for countdown...',
     'give_up' => 'Give Up',
+    'gave_up_title' => 'You Gave Up',
+    'gave_up_waiting' => 'Waiting for other players to finish the race...',
+    'finished_title' => 'You Finished',
+    'finished_waiting' => 'Waiting for other players to finish the race...',
+    'left_room' => 'Has left the room',
 
     'match_result' => 'Match Result',
     'room' => 'Room :code',

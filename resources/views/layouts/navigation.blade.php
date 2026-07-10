@@ -58,7 +58,7 @@
 
                                 <span class="flex flex-col items-start font-mono">
                                     <span class="text-sm font-bold text-foreground leading-tight">{{ Auth::user()->username }}</span>
-                                    <span class="text-xs text-muted leading-tight">lv. {{ Auth::user()->levelData()['level'] }}</span>
+                                    <span class="text-xs leading-tight transition-colors" :class="open ? 'text-gold' : 'text-muted'">lv. {{ Auth::user()->levelData()['level'] }}</span>
                                 </span>
                             @else
                                 <span class="font-medium text-sm text-foreground px-1">{{ __('common.guest') }}</span>

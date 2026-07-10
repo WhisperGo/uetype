@@ -104,10 +104,22 @@ it('tells the client to clear the ghost when switching to a non-eligible mode', 
         ->assertDispatched('ghost-cleared');
 });
 
-it('tells the client to clear the ghost when switching to quote mode', function () {
+it('normalizes an unknown quote mode to the safe time default', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)->test(TypingEngine::class)
         ->call('setMode', 'quote', null)
-        ->assertDispatched('ghost-cleared');
+        ->assertSet('mainMode', 'time')
+        ->assertSet('subMode', '30');
+});
+
+it('forces the ghost off on the server when switching to survival', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)->test(TypingEngine::class)
+        ->call('setMode', 'time', '30')
+        ->dispatch('ghost-selected', type: 'own', wpm: 90.0, label: 'me')
+        ->assertSet('ghostActive', true)
+        ->call('setMode', 'survival', 'medium')
+        ->assertSet('ghostActive', false);
 });

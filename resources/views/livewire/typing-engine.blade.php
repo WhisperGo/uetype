@@ -72,7 +72,7 @@
             @else
             <!-- MODE CONTROL BAR: Standard/Survival/Ghost → config → bahasa konten.
                  Saat mengetik hanya di-fade (ruang tetap dipesan) agar tak ada layout shift.
-                 "Standard" cuma grup visual; mainMode backend tetap time/words/quote. -->
+                 "Standard" cuma grup visual; mainMode backend tetap time/words. -->
             <div class="flex flex-col items-center gap-3 mb-2 transition-opacity duration-500"
                 :class="isStarted ? 'opacity-0 pointer-events-none' : 'opacity-100'">
 
@@ -80,38 +80,28 @@
                 <div class="inline-flex items-stretch gap-0.5 p-[3px] rounded-lg bg-surface border border-border"
                     role="group" aria-label="{{ __('typing.aria.pick_main_mode') }}">
                     <button type="button" aria-label="{{ __('typing.aria.mode_standard') }}"
-                        :aria-pressed="['time','words','quote'].includes(currentMain)"
-                        @click.prevent="if(!['time','words','quote'].includes(currentMain)){ currentMain='time'; currentSub='30'; $wire.setMode('time','30'); } $el.blur()"
+                        :aria-pressed="['time','words'].includes(currentMain)"
+                        @click.prevent="if(!['time','words'].includes(currentMain)){ currentMain='time'; currentSub='30'; $wire.setMode('time','30'); } $el.blur()"
                         class="px-3 sm:px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                        :class="['time','words','quote'].includes(currentMain) ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">{{ __('typing.standard') }}</button>
+                        :class="['time','words'].includes(currentMain) ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">{{ __('typing.standard') }}</button>
 
                     <button type="button" aria-label="{{ __('typing.aria.mode_survival') }}"
                         :aria-pressed="currentMain === 'survival'"
                         @click.prevent="currentMain='survival'; currentSub='medium'; $wire.setMode('survival','medium'); $el.blur()"
                         class="px-3 sm:px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand"
                         :class="currentMain === 'survival' ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">{{ __('typing.survival') }}</button>
-
-                    <button type="button" aria-label="{{ __('typing.aria.mode_ghost') }}"
-                        @click.prevent="$dispatch('open-modal', 'ghost-picker'); $el.blur()"
-                        class="px-3 sm:px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand inline-flex items-center gap-1.5"
-                        :class="ghostActive ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">
-                        {{ __('typing.ghost') }}
-                        <template x-if="ghostActive">
-                            <span class="text-[0.6rem] font-mono normal-case tracking-normal opacity-80" x-text="@js(__('typing.ghost_vs', ['label' => ''])) + ghostLabel"></span>
-                        </template>
-                    </button>
                 </div>
 
                 <!-- Row 2: Config (Standard → Time/Words/Quote + durasi; Survival → difficulty) -->
                 <div class="flex flex-wrap items-center justify-center gap-1.5 min-h-[34px] text-small font-mono"
                     role="group" aria-label="{{ __('typing.aria.mode_config') }}">
                     <!-- STANDARD: pemilih tipe + sub-konfigurasi -->
-                    <template x-if="['time','words','quote'].includes(currentMain)">
+                    <template x-if="['time','words'].includes(currentMain)">
                         <div class="flex flex-wrap items-center justify-center gap-1.5">
-                            @foreach (['time' => __('typing.type_time'), 'words' => __('typing.type_words'), 'quote' => __('typing.type_quote')] as $type => $label)
+                            @foreach (['time' => __('typing.type_time'), 'words' => __('typing.type_words')] as $type => $label)
                                 <button type="button" aria-label="{{ __('typing.aria.type', ['label' => $label]) }}"
                                     :aria-pressed="currentMain === '{{ $type }}'"
-                                    @click.prevent="currentMain='{{ $type }}'; currentSub='{{ $type === 'time' ? '15' : ($type === 'words' ? '25' : 'medium') }}'; $wire.setMode('{{ $type }}', currentSub); $el.blur()"
+                                    @click.prevent="currentMain='{{ $type }}'; currentSub='{{ $type === 'time' ? '15' : '25' }}'; $wire.setMode('{{ $type }}', currentSub); $el.blur()"
                                     class="px-3 sm:px-[14px] py-[6px] rounded-md border transition-all duration-150 outline-none hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-brand"
                                     :class="currentMain === '{{ $type }}' ? 'bg-elevated border-border text-foreground font-bold' : 'border-border text-muted hover:text-foreground'">{{ $label }}</button>
                             @endforeach
@@ -140,9 +130,6 @@
                                     @endforeach
                                 </div>
                             </template>
-                            <template x-if="currentMain === 'quote'">
-                                <span class="px-2.5 py-1 text-muted italic text-x-small">{{ __('typing.random_quote') }}</span>
-                            </template>
                         </div>
                     </template>
 
@@ -159,6 +146,33 @@
                         </div>
                     </template>
                 </div>
+
+                <!-- Baris Ghost: lawan tambahan hanya untuk Standard (time/words); hilang saat Survival. -->
+                <template x-if="['time','words'].includes(currentMain)">
+                    <div class="flex items-center justify-center gap-2 text-small font-mono" role="group"
+                        aria-label="{{ __('typing.aria.mode_ghost') }}">
+                        <template x-if="!ghostActive">
+                            <button type="button"
+                                @click.prevent="$dispatch('open-modal', 'ghost-picker'); $el.blur()"
+                                class="px-3 py-[6px] rounded-md border border-border text-muted hover:text-foreground transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand">
+                                {{ __('typing.ghost_pick') }}</button>
+                        </template>
+                        <template x-if="ghostActive">
+                            <div class="inline-flex items-center gap-2">
+                                <span class="text-muted">{{ __('typing.ghost') }}</span>
+                                <span class="text-gold font-bold">- <span x-text="ghostLabel"></span></span>
+                                <button type="button"
+                                    @click.prevent="$dispatch('open-modal', 'ghost-picker'); $el.blur()"
+                                    class="px-2.5 py-[5px] rounded-md border border-border text-muted hover:text-foreground transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand">
+                                    {{ __('typing.ghost_change') }}</button>
+                                <button type="button"
+                                    @click.prevent="$dispatch('ghost-cleared'); $el.blur()"
+                                    class="px-2.5 py-[5px] rounded-md border border-border text-muted hover:text-danger transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-danger">
+                                    {{ __('typing.ghost_clear') }}</button>
+                            </div>
+                        </template>
+                    </div>
+                </template>
 
                 <!-- Row 3: Language switch (EN/ID) — memilih bahasa KONTEN yang diketik (bukan bahasa UI) -->
                 <div class="inline-flex items-stretch gap-0.5 p-[3px] rounded-lg bg-surface border border-border"
@@ -235,7 +249,7 @@
             </div>
 
             <div class="relative">
-            <div x-cloak x-show="capsLockOn && currentMain !== 'quote'" x-transition.opacity
+            <div x-cloak x-show="capsLockOn" x-transition.opacity
                 class="absolute bottom-full left-0 right-0 flex justify-center mb-2 pointer-events-none"
                 role="status" aria-live="polite">
                 <div class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold/10 border border-gold/40">
@@ -453,7 +467,7 @@
                 },
 
                 // Ghost hanya sah di time/words. Kalau state global tersisa dari mode
-                // sebelumnya sementara mode sekarang survival/quote, buang -- jangan
+                // sebelumnya sementara mode sekarang survival, buang -- jangan
                 // dihidupkan lagi saat Alpine remount.
                 ghostEligible() {
                     return ['time', 'words'].includes(this.currentMain);

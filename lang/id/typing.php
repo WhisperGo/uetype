@@ -4,12 +4,12 @@ return [
     'standard' => 'Standard',
     'survival' => 'Survival',
     'ghost' => 'Ghost',
-    'ghost_vs' => 'vs :label',
+    'ghost_pick' => '+ Lawan Ghost',
+    'ghost_change' => 'Ubah',
+    'ghost_clear' => 'Lepas',
 
     'type_time' => 'Time',
     'type_words' => 'Words',
-    'type_quote' => 'Quote',
-    'random_quote' => 'kutipan acak',
 
     'stat_left' => 'sisa',
     'stat_time' => 'waktu',

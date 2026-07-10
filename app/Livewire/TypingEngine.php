@@ -5,7 +5,6 @@ namespace App\Livewire;
 use App\Enums\ClanWarStatus;
 use App\Models\ClanWarFixedText;
 use App\Models\ClanWarModeClaim;
-use App\Models\Text;
 use App\Models\TypingResult;
 use App\Models\User;
 use App\Services\AntiCheatService;
@@ -14,23 +13,23 @@ use App\Support\TypingLanguage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
 class TypingEngine extends Component
 {
-    // Mode Utama: 'time', 'words', 'quote'
+    // Mode Utama: 'time', 'words', 'survival'
     public $mainMode = 'time';
 
     // Sub Mode (Pilihan angka/panjang)
     public $subMode = '30';
 
     // Whitelist sub-mode sah per mode utama; gerbang server-side karena mainMode/subMode
-    // dikendalikan client dan mode_config masuk kunci filter leaderboard. 'quote' tanpa sub-mode.
+    // dikendalikan client dan mode_config masuk kunci filter leaderboard.
     private const ALLOWED_SUBMODES = [
         'time' => ['15', '30', '60', '120'],
         'words' => ['10', '25', '50', '100'],
-        'quote' => [],
         'survival' => ['easy', 'medium', 'hard'],
     ];
 
@@ -40,9 +39,13 @@ class TypingEngine extends Component
 
     public int $typingSessionKey = 0;
 
-    // ID baris `texts` yang diketik: terisi untuk quote (dari DB), null untuk time/words
-    // (dirakit acak dari wordlist JSON).
+    // ID baris `texts` yang diketik: selalu null (teks time/words/survival dirakit acak
+    // dari wordlist JSON, bukan dari DB).
     public $textId = null;
+
+    // Penanda ghost aktif; sumber kebenaran server. Ghost hanya sah untuk time/words -
+    // pindah ke survival memaksa false (invariant, bukan sekadar event klien).
+    public bool $ghostActive = false;
 
     // Clan War: id ClanWarModeClaim yang dikerjakan (dari ?war_claim=). Kalau valid, mode
     // dikunci ke mode/config klaim & hasil ketik otomatis jadi war attempt. Null = sesi solo.
@@ -134,15 +137,29 @@ class TypingEngine extends Component
 
         $label = User::find($this->ghostUserId)?->username ?? 'Leaderboard';
 
+        $this->ghostActive = true;
         $this->dispatch('ghost-selected', type: 'leaderboard', wpm: (float) $best, label: $label);
 
         $this->clearGhostDeepLinkParams();
     }
 
-    /** Ghost Mode hanya sah untuk time & words (survival/quote dikecualikan). */
+    /** Ghost Mode hanya sah untuk time & words (survival dikecualikan). */
     private function isGhostEligibleMode(): bool
     {
         return in_array($this->mainMode, ['time', 'words'], true);
+    }
+
+    /** Sinkronkan state ghost server saat klien memilih/melepas ghost. */
+    #[On('ghost-selected')]
+    public function onGhostSelected(): void
+    {
+        $this->ghostActive = $this->isGhostEligibleMode();
+    }
+
+    #[On('ghost-cleared')]
+    public function onGhostCleared(): void
+    {
+        $this->ghostActive = false;
     }
 
     /** Kosongkan param ghost dari URL/state setelah diproses. */
@@ -217,10 +234,6 @@ class TypingEngine extends Component
 
         $allowed = self::ALLOWED_SUBMODES[$main];
 
-        if ($main === 'quote') {
-            return ['quote', null];
-        }
-
         $sub = (string) $sub;
         if (! in_array($sub, $allowed, true)) {
             $sub = $allowed[0]; // default aman pertama
@@ -252,9 +265,10 @@ class TypingEngine extends Component
 
         $this->generateText();
 
-        // Pindah ke mode yang tak mendukung ghost (survival/quote): matikan ghost
-        // yang mungkin masih aktif dari mode sebelumnya.
+        // Invariant server: mode yang tak mendukung ghost (survival) memaksa ghost mati,
+        // apa pun keadaan klien. Cegah ghost tersisa saat berpindah ke survival.
         if (! $this->isGhostEligibleMode()) {
+            $this->ghostActive = false;
             $this->dispatch('ghost-cleared');
         }
 
@@ -328,18 +342,7 @@ class TypingEngine extends Component
             }
         }
 
-        if ($this->mainMode === 'quote') {
-            $text = Text::where('mode', 'quote')
-                ->whereHas('language', fn ($q) => $q->where('code', $this->contentLang))
-                ->inRandomOrder()
-                ->first();
-
-            // Fallback: kalau belum ada kutipan untuk bahasa terpilih, ambil kutipan apa pun.
-            $text ??= Text::where('mode', 'quote')->inRandomOrder()->first();
-
-            $this->textToType = $text ? $text->content : 'Kutipan belum tersedia di database.';
-            $this->textId = $text?->id;
-        } else {
+        {
             // Time/words/survival: teks dirakit acak dari wordlist JSON sesuai bahasa konten.
             $this->textId = null;
 
@@ -464,10 +467,10 @@ class TypingEngine extends Component
 
                 $typingResult = TypingResult::create([
                     'user_id' => $user->id,
-                    'text_id' => $this->textId, // terisi untuk quote, null untuk time/words
-                    'mode' => $this->mainMode, // 'time' | 'words' | 'quote' | 'survival'
-                    // survival: difficulty ('easy'|'medium'|'hard', kunci filter leaderboard); quote: null.
-                    'mode_config' => $this->mainMode === 'quote' ? null : (string) $this->subMode,
+                    'text_id' => $this->textId, // selalu null (time/words/survival dirakit dari wordlist)
+                    'mode' => $this->mainMode, // 'time' | 'words' | 'survival'
+                    // survival: difficulty ('easy'|'medium'|'hard', kunci filter leaderboard).
+                    'mode_config' => (string) $this->subMode,
                     'net_wpm' => $finalNetWpm,
                     'raw_wpm' => $finalRawWpm,
                     'accuracy' => $finalAccuracy,
@@ -483,7 +486,7 @@ class TypingEngine extends Component
                 // tetap tersimpan normal apa pun hasilnya).
                 $this->attachToWarClaim($typingResult);
 
-                // Rekor WPM hanya dari mode terukur time/words/quote; survival dikecualikan
+                // Rekor WPM hanya dari mode terukur time/words; survival dikecualikan
                 // (dicapai di bawah tekanan stamina, bukan apple-to-apple, cuma stat sampingan).
                 if ($this->mainMode !== 'survival' && $finalNetWpm > (float) $user->highest_wpm) {
                     $user->highest_wpm = $finalNetWpm;
