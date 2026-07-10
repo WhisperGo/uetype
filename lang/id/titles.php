@@ -9,6 +9,7 @@ return [
         'profile.show' => 'Profil Pemain',
         'settings' => 'Pengaturan',
         'achievements.index' => 'Pencapaian',
+        'stats' => 'Statistik',
         'friends.index' => 'Teman',
         'clans.index' => 'Klan',
         'clan-war.index' => 'Clan War',

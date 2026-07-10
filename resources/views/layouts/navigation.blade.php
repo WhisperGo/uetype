@@ -78,10 +78,7 @@
 
                             <x-dropdown-link :href="route('achievements.index')">{{ __('nav.achievements') }}</x-dropdown-link>
 
-                            <span class="flex items-center justify-between w-full px-4 py-2 text-sm text-muted/50 cursor-not-allowed" title="{{ __('common.coming_soon') }}">
-                                {{ __('nav.user_stats') }}
-                                <span class="text-[0.6rem] font-mono uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">{{ __('common.soon') }}</span>
-                            </span>
+                            <x-dropdown-link :href="route('stats')">{{ __('nav.user_stats') }}</x-dropdown-link>
                             <x-dropdown-link :href="route('friends.index')">{{ __('nav.friends') }}</x-dropdown-link>
                             <x-dropdown-link :href="route('chat.index')">{{ __('nav.chat') }}</x-dropdown-link>
                             <x-dropdown-link :href="route('settings')">{{ __('nav.settings') }}</x-dropdown-link>
@@ -176,10 +173,7 @@
                 <div class="mt-3 space-y-1">
                     <x-responsive-nav-link :href="route('profile.edit')">{{ __('nav.profile') }}</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('achievements.index')">{{ __('nav.achievements') }}</x-responsive-nav-link>
-                    <span class="flex items-center justify-between gap-2 border-l-4 border-transparent py-2 ps-3 pe-4 text-base font-medium text-muted/50 cursor-not-allowed" title="{{ __('common.coming_soon') }}">
-                        {{ __('nav.user_stats') }}
-                        <span class="text-[0.6rem] font-mono uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">{{ __('common.soon') }}</span>
-                    </span>
+                    <x-responsive-nav-link :href="route('stats')">{{ __('nav.user_stats') }}</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('friends.index')">{{ __('nav.friends') }}</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('chat.index')">{{ __('nav.chat') }}</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('settings')">{{ __('nav.settings') }}</x-responsive-nav-link>

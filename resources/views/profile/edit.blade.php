@@ -5,14 +5,7 @@
         </h2>
     </x-slot>
 
-    @php
-        $totalSeconds = $stats['total_seconds'] ?? 0;
-        $hours = intdiv($totalSeconds, 3600);
-        $minutes = intdiv($totalSeconds % 3600, 60);
-        $timeLabel = $hours > 0 ? "{$hours}j {$minutes}m" : "{$minutes}m";
-    @endphp
-
-    <div class="py-10" x-data="{ activeTab: 'stats' }">
+    <div class="py-10" x-data="{ activeTab: 'BestRecords' }">
         <div class="max-w-5xl px-4 mx-auto space-y-8 sm:px-6 lg:px-8">
 
             <!-- ===== IDENTITY HEADER ===== -->
@@ -66,103 +59,27 @@
                 </div>
             </div>
 
+            <!-- Statistik penuh (grafik, aktivitas, distribusi mode) pindah ke /stats. -->
+            <a href="{{ route('stats') }}"
+                class="flex items-center justify-between gap-4 p-5 transition-colors border bg-surface/40 border-white/5 rounded-2xl hover:border-brand/40 group">
+                <div>
+                    <h3 class="font-mono text-sm font-semibold text-foreground">{{ __('profile.tab.stats') }}</h3>
+                    <p class="mt-1 font-mono text-xs text-muted">{{ __('profile.view_stats_hint') }}</p>
+                </div>
+                <svg class="w-4 h-4 transition-colors text-muted group-hover:text-brand-bright shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+            </a>
+
             <!-- Tabs -->
             <div class="border-b border-white/10">
                 <nav class="flex gap-6 -mb-px" aria-label="Tabs">
-                    <button @click="activeTab = 'stats'"
-                            :class="activeTab === 'stats' ? 'border-brand-bright text-brand-bright' : 'border-transparent text-muted hover:text-foreground'"
-                            class="px-1 py-3 font-mono text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
-                        {{ __('profile.tab.stats') }}
-                    </button>
                     <button @click="activeTab = 'BestRecords'"
                             :class="activeTab === 'BestRecords' ? 'border-brand-bright text-brand-bright' : 'border-transparent text-muted hover:text-foreground'"
                             class="px-1 py-3 font-mono text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
                         {{ __('profile.tab.best_records') }}
                     </button>
                 </nav>
-            </div>
-
-            <!-- ===== STATS TAB ===== -->
-            <div x-show="activeTab === 'stats'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="space-y-6">
-
-                <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    @php
-                        $cards = [
-                            ['label' => __('profile.card.highest_wpm'), 'value' => rtrim(rtrim(number_format($user->highest_wpm, 1), '0'), '.'), 'accent' => 'text-brand-bright'],
-                            ['label' => __('profile.card.avg_wpm'), 'value' => $stats['avg_wpm'], 'accent' => 'text-gold'],
-                            ['label' => __('profile.card.avg_accuracy'), 'value' => $stats['avg_accuracy'].'%', 'accent' => 'text-gold'],
-                            ['label' => __('profile.card.total_tests'), 'value' => $stats['total_matches'], 'accent' => 'text-foreground'],
-                        ];
-                    @endphp
-                    @foreach($cards as $card)
-                        <div class="p-5 border bg-surface/60 border-white/5 rounded-2xl">
-                            <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ $card['label'] }}</p>
-                            <p class="text-3xl font-bold font-mono tabular-nums {{ $card['accent'] }}">{{ $card['value'] }}</p>
-                        </div>
-                    @endforeach
-                </div>
-
-                <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ __('profile.card.total_time') }}</p>
-                        <p class="font-mono text-2xl font-bold text-foreground tabular-nums">{{ $timeLabel }}</p>
-                    </div>
-                    <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">XP</p>
-                        <p class="font-mono text-2xl font-bold text-gold tabular-nums">{{ $user->total_xp ?? 0 }}</p>
-                    </div>
-                    <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ __('profile.card.coins') }}</p>
-                        <p class="font-mono text-2xl font-bold text-gold tabular-nums">{{ $user->coins ?? 0 }}</p>
-                    </div>
-                    <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ __('profile.card.best_wpm') }}</p>
-                        <p class="font-mono text-2xl font-bold text-brand-bright tabular-nums">{{ $stats['best_wpm'] }}</p>
-                    </div>
-                </div>
-
-                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl sm:p-6">
-                    <h3 class="mb-4 font-mono text-sm font-semibold text-foreground">{{ __('profile.wpm_progress') }}</h3>
-                    @if(count($wpmProgress) >= 2)
-                        <div class="w-full h-48" wire:ignore>
-                            <canvas id="profileWpmChart"></canvas>
-                        </div>
-                    @else
-                        <p class="font-mono text-sm text-muted">{{ __('profile.wpm_progress_empty') }}</p>
-                    @endif
-                </div>
-
-                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl sm:p-6">
-                    <h3 class="mb-4 font-mono text-sm font-semibold text-foreground">{{ __('profile.recent_matches') }}</h3>
-                    @if(isset($recentMatches) && $recentMatches->count() > 0)
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left">
-                                <thead>
-                                    <tr class="font-mono text-xs tracking-wider uppercase text-muted">
-                                        <th class="pb-3 font-semibold">{{ __('profile.th_date') }}</th>
-                                        <th class="pb-3 font-semibold">{{ __('profile.th_mode') }}</th>
-                                        <th class="pb-3 font-semibold text-right">{{ __('profile.th_wpm') }}</th>
-                                        <th class="pb-3 font-semibold text-right">{{ __('profile.th_accuracy') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="font-mono text-sm">
-                                    @foreach($recentMatches as $p)
-                                    <tr class="border-t border-white/5">
-                                        <td class="py-2.5 text-muted">@localtime($p->created_at, 'd M Y H:i')</td>
-                                        <td class="py-2.5 text-foreground capitalize">
-                                            {{ $p->mode?->value ?? 'practice' }}
-                                        </td>
-                                        <td class="py-2.5 text-right text-brand-bright font-bold tabular-nums">{{ rtrim(rtrim(number_format($p->net_wpm, 1), '0'), '.') }}</td>
-                                        <td class="py-2.5 text-right text-foreground tabular-nums">{{ rtrim(rtrim(number_format($p->accuracy, 1), '0'), '.') }}%</td>
-                                    </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @else
-                        <p class="font-mono text-sm text-muted">{{ __('profile.no_history') }} <a href="{{ url('/typing') }}" class="text-brand-bright hover:underline">{{ __('profile.start_first') }}</a></p>
-                    @endif
-                </div>
             </div>
 
             <!-- ===== BEST RECORDS TAB ===== -->
@@ -306,41 +223,4 @@
         </div>
     </div>
 
-    <!-- Script Chart.js -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const el = document.getElementById('profileWpmChart');
-            if (!el) return;
-            const data = @json($wpmProgress);
-            const render = () => {
-                new Chart(el.getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: data.map((_, i) => i + 1),
-                        datasets: [{
-                            label: 'wpm', data: data,
-                            borderColor: '#C69F68',
-                            backgroundColor: 'rgba(198,159,104,0.12)',
-                            fill: true, borderWidth: 3, tension: 0.4,
-                            pointRadius: 2, pointBackgroundColor: '#C69F68',
-                        }]
-                    },
-                    options: {
-                        responsive: true, maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#94a3b8' } },
-                            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#94a3b8' }, beginAtZero: true }
-                        }
-                    }
-                });
-            };
-            if (typeof Chart === 'undefined') {
-                const s = document.createElement('script');
-                s.src = 'https://cdn.jsdelivr.net/npm/chart.js';
-                s.onload = render;
-                document.head.appendChild(s);
-            } else { render(); }
-        });
-    </script>
 </x-app-layout>
