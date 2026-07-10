@@ -29,6 +29,7 @@ return [
 
     'achievements' => 'Pencapaian',
     'achievements_count' => ':earned dari :total terbuka',
+    'no_achievements' => 'Belum ada pencapaian yang terbuka. Selesaikan satu tes untuk meraih yang pertama.',
     'view_all' => 'Lihat semua',
 
     'wpm_progression' => 'Perkembangan WPM',

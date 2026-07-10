@@ -159,36 +159,36 @@ it('rejects an out of range value from the query string', function () {
         ->assertSet('range', '7');
 });
 
-it('only previews a slice of the achievements, not the full list', function () {
-    $user = User::factory()->create();
+it('shows every earned achievement and hides the locked ones', function () {
+    $user = User::factory()->create(['highest_wpm' => 100]); // buka 'Speed Demon'
+    makeResult($user, ['correct_chars' => 50_000]);          // buka 'Word Smith'
 
     $component = Livewire::actingAs($user)->test(Stats::class);
-    $achievements = $component->viewData('achievements');
 
-    // Daftar penuh milik /achievements; halaman ini cuma cuplikan.
-    expect($achievements['preview'])->toHaveCount(8)
-        ->and($achievements['total'])->toBeGreaterThan(8)
-        ->and($achievements['remaining'])->toBe($achievements['total'] - 8);
+    // Semua yang diraih tampil, berapa pun jumlahnya (tanpa batas cuplikan).
+    expect($component->viewData('achievements')['earned'])->toHaveCount(2);
+    $component->assertSee('Speed Demon')->assertSee('Word Smith');
 
-    // Sisa yang tak muat jadi tautan "+N" ke halaman achievement.
-    $component->assertSee('+' . $achievements['remaining'])
-        ->assertSee(route('achievements.index'));
+    // Yang belum diraih sengaja disembunyikan — itu tugas /achievements.
+    $component->assertDontSee('Untouchable')   // butuh 200 WPM
+        ->assertDontSee('Unstoppable');        // butuh 1.000.000 karakter
 });
 
-it('puts earned achievements first in the preview', function () {
-    $user = User::factory()->create(['highest_wpm' => 100]); // membuka 'Speed Demon'
+it('shows an empty state when nothing is unlocked yet', function () {
+    $user = User::factory()->create();
 
-    $preview = Livewire::actingAs($user)->test(Stats::class)->viewData('achievements')['preview'];
-
-    // Achievement yang sudah diraih tak boleh terdorong keluar cuplikan
-    // oleh achievement yang masih terkunci.
-    expect($preview[0]['earned'])->toBeTrue();
+    Livewire::actingAs($user)->test(Stats::class)
+        ->assertSee('No achievements unlocked yet.')
+        ->assertDontSee('Speed Demon');
 });
 
 it('reports how many achievements are unlocked out of the total', function () {
     $user = User::factory()->create(['highest_wpm' => 100]);
 
-    Livewire::actingAs($user)->test(Stats::class)->assertSee('1 of 15 unlocked');
+    // Totalnya tetap disebut walau yang terkunci tak ditampilkan.
+    Livewire::actingAs($user)->test(Stats::class)
+        ->assertSee('1 of 15 unlocked')
+        ->assertSee(route('achievements.index'));
 });
 
 it('exposes the stats link on the profile page instead of the charts', function () {
