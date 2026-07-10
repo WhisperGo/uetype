@@ -44,7 +44,9 @@ class DummyUserSeeder extends Seeder
             ['mode' => 'time', 'config' => '60'],
             ['mode' => 'words', 'config' => '25'],
             ['mode' => 'words', 'config' => '50'],
-            ['mode' => 'quote', 'config' => null],
+            ['mode' => 'survival', 'config' => 'easy'],
+            ['mode' => 'survival', 'config' => 'medium'],
+            ['mode' => 'survival', 'config' => 'hard'],
         ];
 
         $totalXp = 0;
@@ -64,20 +66,35 @@ class DummyUserSeeder extends Seeder
             $accuracy = round(mt_rand(880, 995) / 10, 2); // 88.0% - 99.5%
             $rawWpm = round($netWpm / ($accuracy / 100), 2); // raw selalu >= net
 
-            $duration = $pick['mode'] === 'time'
-                ? (float) $pick['config']
-                : (float) mt_rand(20, 70);
+            // Survival dinilai dari lama bertahan (detik), makin sulit makin pendek;
+            // time pakai durasi config; words durasi acak wajar.
+            $duration = match ($pick['mode']) {
+                'time' => (float) $pick['config'],
+                'survival' => (float) match ($pick['config']) {
+                    'hard' => mt_rand(30, 90),
+                    'medium' => mt_rand(60, 150),
+                    default => mt_rand(90, 240),
+                },
+                default => (float) mt_rand(20, 70),
+            };
 
             // Perkiraan jumlah karakter dari net wpm & durasi (1 kata = 5 karakter).
             $correctChars = (int) round(($netWpm / 60) * $duration * 5);
             $incorrectChars = (int) round($correctChars * ((100 - $accuracy) / 100));
-            $totalChars = $correctChars + $incorrectChars;
+
+            // Survival menyimpan jumlah kata bersih di kolom score; mode lain null.
+            $score = $pick['mode'] === 'survival' ? (int) round($correctChars / 5) : null;
 
             // EXP berbasis volume + bonus akurasi tipis — selaras dengan rumus di TypingEngine.
             $accuracyMultiplier = 0.5 + 0.5 * ($accuracy / 100);
             $xpEarned = (int) round($correctChars * 0.1 * $accuracyMultiplier);
             $totalXp += $xpEarned;
-            $highestWpm = max($highestWpm, $netWpm);
+
+            // Rekor WPM tak mencakup survival (dicapai di bawah tekanan stamina),
+            // selaras dengan TypingEngine.
+            if ($pick['mode'] !== 'survival') {
+                $highestWpm = max($highestWpm, $netWpm);
+            }
 
             TypingResult::create([
                 'user_id' => $user->id,
@@ -90,7 +107,7 @@ class DummyUserSeeder extends Seeder
                 'correct_chars' => $correctChars,
                 'incorrect_chars' => $incorrectChars,
                 'duration_seconds' => $duration,
-                'score' => null,
+                'score' => $score,
                 'xp_earned' => $xpEarned,
                 'ghost_data' => null,
                 'created_at' => Carbon::now()->subDays($sessions - $i)->subMinutes(mt_rand(0, 600)),

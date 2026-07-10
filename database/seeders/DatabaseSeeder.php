@@ -15,7 +15,6 @@ class DatabaseSeeder extends Seeder
         $this->call([
             LanguageSeeder::class, // Pastikan ini jalan duluan
             TextSeeder::class,
-            QuoteSeeder::class,
             DummyDataSeeder::class,
         ]);
 
