@@ -15,7 +15,7 @@
             }
         "
         @keyup.window="syncCapsLock($event)"
-        x-on:ghost-selected.window="window.__uetypeGhostSelection = { active: true, wpm: $event.detail.wpm, label: $event.detail.label }; ghostActive = true; ghostWpm = $event.detail.wpm; ghostLabel = $event.detail.label; ghostCharIndex = 0; ghostFinished = false; ghostFinishTime = null; $nextTick(() => { const pos = getCharPosition(0); if (pos) { ghostCursorLeft = pos.left; ghostCursorTop = pos.top; } if (isStarted) startGhostAnimationLoop(); })"
+        x-on:ghost-selected.window="if (ghostEligible()) { window.__uetypeGhostSelection = { active: true, wpm: $event.detail.wpm, label: $event.detail.label }; ghostActive = true; ghostWpm = $event.detail.wpm; ghostLabel = $event.detail.label; ghostCharIndex = 0; ghostFinished = false; ghostFinishTime = null; $nextTick(() => { const pos = getCharPosition(0); if (pos) { ghostCursorLeft = pos.left; ghostCursorTop = pos.top; } if (isStarted) startGhostAnimationLoop(); }) }"
         x-on:ghost-cleared.window="window.__uetypeGhostSelection = null; ghostActive = false; ghostWpm = 0; ghostLabel = ''; stopGhostAnimationLoop();">
 
         {{-- GhostPicker: komponen Livewire terpisah; wire:key men-scope ulang daftarnya per mode. --}}
@@ -452,7 +452,23 @@
                     this.modeChangedCleanup = typeof cleanup === 'function' ? cleanup : null;
                 },
 
+                // Ghost hanya sah di time/words. Kalau state global tersisa dari mode
+                // sebelumnya sementara mode sekarang survival/quote, buang -- jangan
+                // dihidupkan lagi saat Alpine remount.
+                ghostEligible() {
+                    return ['time', 'words'].includes(this.currentMain);
+                },
+
                 restoreGhostSelection() {
+                    if (!this.ghostEligible()) {
+                        window.__uetypeGhostSelection = null;
+                        this.ghostActive = false;
+                        this.ghostWpm = 0;
+                        this.ghostLabel = '';
+
+                        return;
+                    }
+
                     const selection = window.__uetypeGhostSelection;
                     if (!selection || !selection.active) return;
 

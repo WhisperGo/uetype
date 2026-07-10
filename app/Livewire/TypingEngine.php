@@ -139,6 +139,12 @@ class TypingEngine extends Component
         $this->clearGhostDeepLinkParams();
     }
 
+    /** Ghost Mode hanya sah untuk time & words (survival/quote dikecualikan). */
+    private function isGhostEligibleMode(): bool
+    {
+        return in_array($this->mainMode, ['time', 'words'], true);
+    }
+
     /** Kosongkan param ghost dari URL/state setelah diproses. */
     private function clearGhostDeepLinkParams(): void
     {
@@ -245,6 +251,12 @@ class TypingEngine extends Component
         session()->save();
 
         $this->generateText();
+
+        // Pindah ke mode yang tak mendukung ghost (survival/quote): matikan ghost
+        // yang mungkin masih aktif dari mode sebelumnya.
+        if (! $this->isGhostEligibleMode()) {
+            $this->dispatch('ghost-cleared');
+        }
 
         $this->dispatch(
             'mode-changed',
@@ -485,8 +497,9 @@ class TypingEngine extends Component
 
         // Ghost Mode: perbandingan ghost-vs-player efemeral (session-only), tidak ditulis
         // ke DB — attempt yang mendasari tetap tersimpan normal seperti mode biasa.
+        // Gerbang server-side: ghost HANYA sah untuk time/words, apa pun yang dikirim klien.
         $ghostResult = null;
-        if ($ghostWpm !== null && (float) $ghostWpm > 0) {
+        if ($this->isGhostEligibleMode() && $ghostWpm !== null && (float) $ghostWpm > 0) {
             $ghostCharsAtFinish = (int) $ghostCharsAtFinish;
             $ghostResult = [
                 'label' => (string) $ghostLabel,

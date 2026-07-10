@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\GhostPicker;
+use App\Livewire\TypingEngine;
 use App\Models\TypingResult;
 use App\Models\User;
 use Livewire\Livewire;
@@ -63,4 +64,50 @@ it('does not offer ghost mode for survival', function () {
     $user = User::factory()->create(['highest_wpm' => 100]);
     Livewire::actingAs($user)->test(GhostPicker::class, ['mainMode' => 'survival', 'subMode' => 'medium'])
         ->assertSee('only available for Time and Words');
+});
+
+/**
+ * Ghost hanya sah di time/words. Klien tak dipercaya: walau mengirim ghostWpm,
+ * server harus mengabaikannya di survival/quote.
+ */
+it('ignores ghost data sent by the client while in survival mode', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)->test(TypingEngine::class)
+        ->call('setMode', 'survival', 'medium')
+        // Klien "nakal" tetap mengirim data ghost.
+        ->call('saveResult', 30000, 150, 140, [40, 42], [45, 47], [], 0, 95.0, 'speedy', 120);
+
+    expect(session('typing_result.ghostResult'))->toBeNull();
+});
+
+it('keeps ghost data in time mode', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)->test(TypingEngine::class)
+        ->call('setMode', 'time', '30')
+        ->call('saveResult', 30000, 150, 140, [40, 42], [45, 47], [], 0, 95.0, 'speedy', 120);
+
+    $ghost = session('typing_result.ghostResult');
+
+    expect($ghost)->not->toBeNull();
+    expect($ghost['label'])->toBe('speedy');
+});
+
+it('tells the client to clear the ghost when switching to a non-eligible mode', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)->test(TypingEngine::class)
+        ->call('setMode', 'time', '30')
+        ->assertNotDispatched('ghost-cleared')
+        ->call('setMode', 'survival', 'medium')
+        ->assertDispatched('ghost-cleared');
+});
+
+it('tells the client to clear the ghost when switching to quote mode', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)->test(TypingEngine::class)
+        ->call('setMode', 'quote', null)
+        ->assertDispatched('ghost-cleared');
 });
