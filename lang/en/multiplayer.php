@@ -31,6 +31,9 @@ return [
     'sudden_death' => 'Sudden Death Activated! Room Closes In:',
     'race_starting' => 'The Race is Starting',
     'mascot_track' => 'Mascot Race Track',
+    'live_standings' => 'Live Standings',
+    'leader' => 'Leading',
+    'dnf' => 'DNF',
     'finished' => '[FINISHED]',
     'finish' => 'FINISH',
     'arena_mode' => 'Arena - Fast Typing Mode',
@@ -39,7 +42,7 @@ return [
     'input_finished' => 'You finished the race!',
     'input_type' => 'Type the current word here...',
     'input_wait' => 'Wait for countdown...',
-    'give_up' => 'Give Up & Leave',
+    'give_up' => 'Give Up',
 
     'match_result' => 'Match Result',
     'room' => 'Room :code',

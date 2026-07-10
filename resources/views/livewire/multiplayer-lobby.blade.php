@@ -1,6 +1,6 @@
-<div class="max-w-5xl px-4 mx-auto py-10 sm:px-6 lg:px-8 text-typing-text">
+<div class="max-w-5xl px-4 mx-auto py-6 sm:px-6 lg:px-8 text-foreground">
     @if (session()->has('error'))
-        <div class="p-4 mb-6 text-sm text-red-400 bg-red-950/40 border border-red-900 rounded-2xl">
+        <div class="p-4 mb-6 text-sm text-danger bg-danger/10 border border-danger/40 rounded-2xl">
             {{ session('error') }}
         </div>
     @endif
@@ -9,30 +9,30 @@
     @if ($this->step === 'choose')
         <div class="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24 items-stretch mt-10 relative w-full">
             <div
-                class="flex flex-col items-center justify-center p-8 border bg-typing-surface/50 border-white/5 rounded-3xl text-center shadow-lg relative overflow-hidden group w-full">
+                class="flex flex-col items-center justify-center p-8 border bg-surface/50 border-border/40 rounded-3xl text-center shadow-lg relative overflow-hidden group w-full">
                 <div class="w-20 h-20 mb-6 flex items-center justify-center text-4xl transition duration-300">
                     <img src="/icon/uetype_mascot.png" alt="{{ __('multiplayer.create_room') }}">
                 </div>
-                <h3 class="text-xl font-mono font-bold tracking-wider text-typing-text mb-2 uppercase">{{ __('multiplayer.create_room') }}</h3>
-                <p class="text-sm text-typing-muted max-w-xs mb-8">{{ __('multiplayer.create_room_desc') }}</p>
+                <h3 class="text-xl font-mono font-bold tracking-wider text-foreground mb-2 uppercase">{{ __('multiplayer.create_room') }}</h3>
+                <p class="text-sm text-muted max-w-xs mb-8">{{ __('multiplayer.create_room_desc') }}</p>
                 <button wire:click="createRoom"
-                    class="px-6 py-3 bg-[#cbb38a] hover:bg-[#bfa57a] text-black font-mono font-bold uppercase tracking-wider rounded-xl transition duration-200 shadow-md">
+                    class="px-6 py-3 bg-gold hover:bg-secondary-7 text-background font-mono font-bold uppercase tracking-wider rounded-xl transition duration-200 shadow-md">
                     {{ __('multiplayer.create_room') }}
                 </button>
             </div>
 
             <div
                 class="hidden md:flex absolute inset-y-0 left-1/2 -translate-x-1/2 items-center justify-center pointer-events-none">
-                <div class="w-[1px] h-full bg-white/10 relative flex items-center justify-center">
+                <div class="w-[1px] h-full bg-border/50 relative flex items-center justify-center">
                     <div
-                        class="absolute w-12 h-12 rounded-full border-2 border-[#cbb38a] bg-typing-bg flex items-center justify-center font-mono text-xs font-bold tracking-wider text-typing-text shadow-xl">
+                        class="absolute w-12 h-12 rounded-full border-2 border-gold bg-background flex items-center justify-center font-mono text-xs font-bold tracking-wider text-foreground shadow-xl">
                         {{ __('multiplayer.or') }}
                     </div>
                 </div>
             </div>
 
             <div
-                class="flex flex-col items-center justify-center p-8 border bg-typing-surface/50 border-white/5 rounded-3xl text-center shadow-lg relative overflow-hidden group w-full"
+                class="flex flex-col items-center justify-center p-8 border bg-surface/50 border-border/40 rounded-3xl text-center shadow-lg relative overflow-hidden group w-full"
                 x-data="{
                     syncBoxes() {
                         const boxes = [...$refs.codeBoxes.querySelectorAll('input')];
@@ -62,13 +62,13 @@
                 <div class="w-20 h-20 mb-6 flex items-center justify-center text-4xl transition duration-300">
                     <img src="/icon/uetype_mascot.png" alt="{{ __('multiplayer.join_room') }}">
                 </div>
-                <h3 class="text-xl font-mono font-bold tracking-wider text-typing-text mb-2 uppercase">{{ __('multiplayer.join_room') }}</h3>
-                <p class="text-sm text-typing-muted max-w-xs mb-6">{{ __('multiplayer.join_room_desc') }}</p>
+                <h3 class="text-xl font-mono font-bold tracking-wider text-foreground mb-2 uppercase">{{ __('multiplayer.join_room') }}</h3>
+                <p class="text-sm text-muted max-w-xs mb-6">{{ __('multiplayer.join_room_desc') }}</p>
 
                 <div class="flex gap-2 mb-6" x-ref="codeBoxes">
                     @foreach (range(0, 5) as $index)
                         <input type="text" maxlength="1" wire:key="join-box-{{ $index }}"
-                            class="w-12 h-14 text-center font-mono text-xl font-bold uppercase bg-typing-bg border border-white/10 rounded-xl focus:border-typing-accent focus:ring-0 text-typing-text"
+                            class="w-12 h-14 text-center font-mono text-xl font-bold uppercase bg-background border border-border/40 rounded-xl focus:border-brand-bright focus:ring-0 text-foreground"
                             x-on:paste="distribute($event)"
                             x-on:input="$el.value = $el.value.toUpperCase()"
                             x-on:keydown.backspace="backspace($event)"
@@ -77,7 +77,7 @@
                 </div>
 
                 <button type="button" x-on:click="syncBoxes(); $wire.joinRoom()"
-                    class="px-8 py-3 border border-white/10 text-typing-text hover:bg-white/5 font-mono font-semibold uppercase tracking-wider rounded-xl transition duration-200">
+                    class="px-8 py-3 border border-border/40 text-foreground hover:bg-foreground/5 font-mono font-semibold uppercase tracking-wider rounded-xl transition duration-200">
                     {{ __('multiplayer.join_room') }}
                 </button>
             </div>
@@ -85,26 +85,26 @@
 
         <!-- HOW IT WORKS PANEL -->
         <div
-            class="mt-20 pt-10 border-t border-white/5 flex flex-col md:flex-row items-center justify-center gap-6 md:gap-8 select-none">
+            class="mt-20 pt-10 border-t border-border/30 flex flex-col md:flex-row items-center justify-center gap-6 md:gap-8 select-none">
             <div class="flex items-center gap-3">
                 <div
-                    class="w-7 h-7 rounded-full border border-[#cbb38a] bg-[#1a2333]/80 flex items-center justify-center font-mono text-xs font-bold text-white shadow-inner">
+                    class="w-7 h-7 rounded-full border border-gold bg-elevated/80 flex items-center justify-center font-mono text-xs font-bold text-foreground shadow-inner">
                     1</div>
-                <span class="font-mono text-sm text-typing-muted tracking-wide">{{ __('multiplayer.how_1') }}</span>
+                <span class="font-mono text-sm text-muted tracking-wide">{{ __('multiplayer.how_1') }}</span>
             </div>
-            <span class="text-white/20 font-mono text-sm hidden md:block">→</span>
+            <span class="text-muted/40 font-mono text-sm hidden md:block">→</span>
             <div class="flex items-center gap-3">
                 <div
-                    class="w-7 h-7 rounded-full border border-[#cbb38a] bg-[#1a2333]/80 flex items-center justify-center font-mono text-xs font-bold text-white shadow-inner">
+                    class="w-7 h-7 rounded-full border border-gold bg-elevated/80 flex items-center justify-center font-mono text-xs font-bold text-foreground shadow-inner">
                     2</div>
-                <span class="font-mono text-sm text-typing-muted tracking-wide">{{ __('multiplayer.how_2') }}</span>
+                <span class="font-mono text-sm text-muted tracking-wide">{{ __('multiplayer.how_2') }}</span>
             </div>
-            <span class="text-white/20 font-mono text-sm hidden md:block">→</span>
+            <span class="text-muted/40 font-mono text-sm hidden md:block">→</span>
             <div class="flex items-center gap-3">
                 <div
-                    class="w-7 h-7 rounded-full border border-[#cbb38a] bg-[#1a2333]/80 flex items-center justify-center font-mono text-xs font-bold text-white shadow-inner">
+                    class="w-7 h-7 rounded-full border border-gold bg-elevated/80 flex items-center justify-center font-mono text-xs font-bold text-foreground shadow-inner">
                     3</div>
-                <span class="font-mono text-sm text-typing-muted tracking-wide">{{ __('multiplayer.how_3') }}</span>
+                <span class="font-mono text-sm text-muted tracking-wide">{{ __('multiplayer.how_3') }}</span>
             </div>
         </div>
     @endif
@@ -127,16 +127,16 @@
                         this.copyTimer = setTimeout(() => { this.copied = false; }, 4000);
                     }
                 }"
-                class="p-6 border bg-typing-surface/40 border-white/5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                class="p-6 border bg-surface/40 border-border/40 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
-                    <span class="text-xs font-mono tracking-widest text-typing-muted uppercase">{{ __('multiplayer.room_code_share') }}</span>
-                    <h2 class="text-fluid-title font-mono font-black tracking-[0.3em] text-white mt-1">
+                    <span class="text-xs font-mono tracking-widest text-muted uppercase">{{ __('multiplayer.room_code_share') }}</span>
+                    <h2 class="text-fluid-title font-mono font-black tracking-[0.3em] text-foreground mt-1">
                         {{ $this->roomData->code }}</h2>
                 </div>
                 <button type="button"
                     x-on:click.prevent="copyRoomCode()"
                     x-bind:disabled="copied"
-                    x-bind:class="copied ? 'bg-active text-background border-active/35 cursor-default' : 'bg-white/5 border-white/10 hover:bg-white/10'"
+                    x-bind:class="copied ? 'bg-active text-background border-active/35 cursor-default' : 'bg-foreground/5 border-border/40 hover:bg-foreground/10'"
                     class="inline-grid appearance-none place-items-center px-5 py-2.5 border font-mono text-xs font-bold uppercase tracking-wider rounded-xl transition-colors duration-200 disabled:pointer-events-none disabled:opacity-100"
                     aria-live="polite">
                     <span class="[grid-area:1/1] translate-y-[0.5px] font-mono text-xs font-bold uppercase leading-[1.1] tracking-wider text-current"
@@ -148,8 +148,8 @@
 
             <div>
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xs uppercase tracking-widest text-typing-muted font-mono font-bold">{{ __('multiplayer.players') }}</h3>
-                    <span class="text-xs font-mono text-[#cbb38a] font-bold">{{ __('multiplayer.joined', ['count' => $this->roomData->members->count()]) }}</span>
+                    <h3 class="text-xs uppercase tracking-widest text-muted font-mono font-bold">{{ __('multiplayer.players') }}</h3>
+                    <span class="text-xs font-mono text-gold font-bold">{{ __('multiplayer.joined', ['count' => $this->roomData->members->count()]) }}</span>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
@@ -159,37 +159,35 @@
                         @endphp
                         @if ($member)
                             <div
-                                class="p-5 border flex flex-col items-center justify-center text-center rounded-2xl relative transition duration-300 {{ $member->user_id === Auth::id() ? 'bg-[#1a2333]/60 border-typing-accent' : 'bg-typing-surface/40 border-white/5' }}">
+                                class="p-5 border flex flex-col items-center justify-center text-center rounded-2xl relative transition duration-300 {{ $member->user_id === Auth::id() ? 'bg-elevated/60 border-brand-bright' : 'bg-surface/40 border-border/40' }}">
                                 <div
-                                    class="w-14 h-14 rounded-xl overflow-hidden bg-white/5 mb-3 flex items-center justify-center text-xl">
+                                    class="w-14 h-14 rounded-xl overflow-hidden bg-foreground/5 mb-3 flex items-center justify-center text-xl">
                                     @if ($member->user->avatar)
                                         <img src="{{ $member->user->avatar }}" referrerpolicy="no-referrer"
                                             class="w-full h-full object-cover">
                                     @else
-                                        👨‍💻
+                                        <img src="/icon/uetype_mascot.png" alt="{{ $member->user->username }}" class="w-4/5 h-4/5 object-contain">
                                     @endif
                                 </div>
                                 <span
-                                    class="font-mono text-sm font-bold truncate max-w-[100px]">{{ $member->user->username }}</span>
-                                <div class="mt-3 w-full">
+                                    class="font-mono text-sm font-bold truncate max-w-[100px] text-foreground">{{ $member->user->username }}</span>
+                                <div class="mt-2.5 flex items-center gap-1.5">
                                     @if ($member->user_id === $this->roomData->host_id)
-                                        <span
-                                            class="inline-block w-full px-2 py-1 text-[0.65rem] font-bold uppercase tracking-wider bg-[#cbb38a] text-black rounded-md">{{ __('multiplayer.host') }}</span>
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gold"></span>
+                                        <span class="text-[10px] font-mono font-bold uppercase tracking-wider text-gold">{{ __('multiplayer.host') }}</span>
                                     @else
-                                        <span
-                                            class="inline-block w-full px-2 py-1 text-[0.65rem] font-bold uppercase tracking-wider rounded-md {{ $member->is_ready ? 'bg-active/15 text-active border border-active/35' : 'bg-zinc-800 text-zinc-400' }}">
-                                            {{ $member->is_ready ? __('multiplayer.ready') : __('multiplayer.not_ready') }}
-                                        </span>
+                                        <span class="w-1.5 h-1.5 rounded-full {{ $member->is_ready ? 'bg-active' : 'bg-muted' }}"></span>
+                                        <span class="text-[10px] font-mono font-bold uppercase tracking-wider {{ $member->is_ready ? 'text-active' : 'text-muted' }}">{{ $member->is_ready ? __('multiplayer.ready') : __('multiplayer.not_ready') }}</span>
                                     @endif
                                 </div>
                             </div>
                         @else
                             <div
-                                class="p-5 border border-dashed border-white/10 flex flex-col items-center justify-center text-center rounded-2xl opacity-40">
+                                class="p-5 border border-dashed border-border/50 flex flex-col items-center justify-center text-center rounded-2xl opacity-40">
                                 <div
-                                    class="w-12 h-12 rounded-full border border-dashed border-white/20 mb-2 flex items-center justify-center font-mono text-sm">
+                                    class="w-12 h-12 rounded-full border border-dashed border-border/60 mb-2 flex items-center justify-center font-mono text-sm text-muted">
                                     ?</div>
-                                <span class="text-xs font-mono text-typing-muted">{{ __('multiplayer.empty_slot') }}</span>
+                                <span class="text-xs font-mono text-muted">{{ __('multiplayer.empty_slot') }}</span>
                             </div>
                         @endif
                     @endforeach
@@ -197,30 +195,30 @@
             </div>
 
             <div class="space-y-1">
-                <div class="h-2 w-full bg-zinc-900 rounded-full overflow-hidden border border-white/5">
-                    <div class="h-full bg-[#cbb38a] transition-all duration-300"
+                <div class="h-2 w-full bg-background rounded-full overflow-hidden border border-border/30">
+                    <div class="h-full bg-gold transition-all duration-300"
                         style="width: {{ ($this->roomData->members->count() / 5) * 100 }}%"></div>
                 </div>
             </div>
 
-            <div class="pt-6 border-t border-white/5 flex flex-wrap gap-3 sm:gap-4">
+            <div class="pt-6 border-t border-border/30 flex flex-wrap gap-3 sm:gap-4">
                 @if ($this->isHost)
                     <button wire:click="startRace" @disabled(!$this->allReady)
-                        class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->allReady ? 'bg-[#cbb38a] hover:bg-[#bfa57a] text-black shadow-md' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5' }}">
+                        class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->allReady ? 'bg-gold hover:bg-secondary-7 text-background shadow-md' : 'bg-elevated text-muted cursor-not-allowed border border-border/30' }}">
                         {{ __('multiplayer.start_race') }}
                     </button>
                     @if (!$this->allReady)
-                        <span class="text-xs font-mono text-typing-muted self-center">{{ __('multiplayer.waiting_ready') }}</span>
+                        <span class="text-xs font-mono text-muted self-center">{{ __('multiplayer.waiting_ready') }}</span>
                     @endif
                 @else
                     <button wire:click="toggleReady"
-                        class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? 'bg-active text-background hover:bg-active-5' : 'bg-[#cbb38a] hover:bg-[#bfa57a] text-black' }}">
+                        class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? 'bg-active text-background hover:bg-active-5' : 'bg-gold hover:bg-secondary-7 text-background' }}">
                         {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? __('multiplayer.im_not_ready') : __('multiplayer.im_ready') }}
                     </button>
                 @endif
 
                 <button wire:click="leaveRoom"
-                    class="px-6 py-3 bg-transparent border border-white/10 text-typing-muted hover:text-typing-text hover:bg-white/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition">
+                    class="px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition">
                     {{ __('multiplayer.leave_room') }}
                 </button>
             </div>
@@ -232,7 +230,8 @@
         {{-- wire:key stabil: state Alpine (raceStarted/countdown/progress) tak reset lintas re-render. --}}
         {{-- Logika Alpine ada di komponen 'raceArena' (lihat @assets), bukan inline di x-data. --}}
         {{-- Sudden death disinkron via WebSocket + clock lokal; saat 0, lockRace() panggil checkSuddenDeath() sekali. --}}
-        <div wire:key="race-arena-{{ $this->roomCode }}" class="space-y-8"
+        @php $arenaDense = $this->roomData->members->count() >= 4; @endphp
+        <div wire:key="race-arena-{{ $this->roomCode }}" class="{{ $arenaDense ? 'space-y-4' : 'space-y-6' }}"
             x-data="raceArena({
                 myId: @js(Auth::id()),
                 textToType: @js($this->roomData->text_to_type),
@@ -245,36 +244,49 @@
             @if ($this->suddenDeathActive)
                 <div
                     x-init="syncSuddenDeath(@js($this->suddenDeathRemaining))"
-                    class="p-3 bg-amber-950/40 border border-amber-700/50 rounded-2xl text-center animate-pulse flex items-center justify-center gap-2">
-                    <span class="text-amber-400 font-mono text-sm uppercase tracking-wider font-bold">{{ __('multiplayer.sudden_death') }}</span>
+                    class="p-3 bg-danger/10 border border-danger/40 rounded-2xl text-center animate-pulse flex items-center justify-center gap-2">
+                    <span class="text-danger font-mono text-sm uppercase tracking-wider font-bold">{{ __('multiplayer.sudden_death') }}</span>
                     <span
-                        class="text-xl font-mono font-black text-white bg-amber-600 px-3 py-0.5 rounded-lg"
+                        class="text-xl font-mono font-black text-foreground bg-danger px-3 py-0.5 rounded-lg"
                         x-text="suddenDeathRemaining + 's'"></span>
                 </div>
             @endif
 
             <!-- OVERLAY COUNTDOWN SCREEN: hanya untuk start race; guard !suddenDeathActive agar tak muncul lagi saat countdown sudden death -->
             <template x-if="!raceStarted && !suddenDeathActive">
-                <div class="fixed inset-0 bg-typing-bg/95 flex flex-col items-center justify-center z-50 select-none">
-                    <span class="font-mono text-xs uppercase tracking-[0.4em] text-typing-muted mb-4">{{ __('multiplayer.race_starting') }}</span>
-                    <div class="text-fluid-hero font-mono font-black tracking-wider text-[#cbb38a] scale-110 transition-all duration-300"
+                <div class="fixed inset-0 bg-background/95 flex flex-col items-center justify-center z-50 select-none">
+                    <span class="font-mono text-xs uppercase tracking-[0.4em] text-muted mb-4">{{ __('multiplayer.race_starting') }}</span>
+                    <div class="text-fluid-hero font-mono font-black tracking-wider text-gold scale-110 transition-all duration-300"
                         x-text="countdown"></div>
                 </div>
             </template>
 
-            <!-- VISUALISASI ARENA BALAPAN MASKOT UETYPE -->
-            <div class="p-6 border bg-typing-surface/50 border-white/5 rounded-3xl space-y-4 shadow-xl">
-                <span class="text-xs font-mono uppercase tracking-widest text-typing-muted block mb-2">{{ __('multiplayer.mascot_track') }}</span>
+            @php
+                $laneAccents = [
+                    ['ring' => 'border-brand-bright', 'text' => 'text-brand-bright', 'bar' => 'bg-brand-bright/15', 'edge' => 'border-brand-bright', 'chip' => 'bg-brand-bright/20', 'dot' => 'bg-brand-bright'],
+                    ['ring' => 'border-gold', 'text' => 'text-gold', 'bar' => 'bg-gold/15', 'edge' => 'border-gold', 'chip' => 'bg-gold/20', 'dot' => 'bg-gold'],
+                    ['ring' => 'border-active', 'text' => 'text-active', 'bar' => 'bg-active/15', 'edge' => 'border-active', 'chip' => 'bg-active/20', 'dot' => 'bg-active'],
+                    ['ring' => 'border-secondary-4', 'text' => 'text-secondary-4', 'bar' => 'bg-secondary-4/15', 'edge' => 'border-secondary-4', 'chip' => 'bg-secondary-4/20', 'dot' => 'bg-secondary-4'],
+                    ['ring' => 'border-primary-3', 'text' => 'text-primary-3', 'bar' => 'bg-primary-3/15', 'edge' => 'border-primary-3', 'chip' => 'bg-primary-3/20', 'dot' => 'bg-primary-3'],
+                ];
+                $playerCount = $this->roomData->members->count();
+                $dense = $playerCount >= 4;
+            @endphp
 
-                <div class="space-y-3 bg-black/30 p-4 rounded-2xl border border-white/[0.02] divide-y divide-white/5">
+            <!-- KLASEMEN LANGSUNG: LANE PER PEMAIN -->
+            <div class="border bg-surface/50 border-border/40 rounded-3xl shadow-xl {{ $dense ? 'p-4 space-y-2' : 'p-6 space-y-3' }}">
+                <span class="text-xs font-mono uppercase tracking-widest text-muted block">{{ __('multiplayer.live_standings') }}</span>
+
+                <div class="bg-background/40 rounded-2xl border border-border/20 {{ $dense ? 'p-3 space-y-2' : 'p-4 space-y-3' }}">
                     @foreach ($this->roomData->members as $player)
                         @php
                             $isSelf = $player->user_id === Auth::id();
+                            $accent = $laneAccents[$loop->index % count($laneAccents)];
+                            $isHostPlayer = $player->user_id === $this->roomData->host_id;
                         @endphp
-                        {{-- Semua lane baca $store.race.opponents[id] seragam, diisi dari payload WebSocket tanpa
-                             re-render Livewire. Nilai Blade hanya seed awal/fallback. --}}
-                        <div class="pt-3 first:pt-0"
-                            x-data="{
+                        {{-- Semua lane baca $store.race.opponents[id] seragam (termasuk diri sendiri lewat publishLocal),
+                             diisi dari payload WebSocket tanpa re-render Livewire. Nilai Blade hanya seed awal. --}}
+                        <div x-data="{
                                 playerId: @js($player->user_id),
                                 seedProgress: @js((int) ($player->progress_percent ?? 0)),
                                 seedWpm: @js((int) ($player->wpm ?? 0)),
@@ -288,31 +300,49 @@
                                 get liveFinished() {
                                     return $store.race.opponents[this.playerId]?.finished ?? this.seedFinished;
                                 },
+                                get isLeader() {
+                                    return String($store.race.leaderId()) === String(this.playerId) && this.liveProgress > 0;
+                                },
+                                get runnerTilt() {
+                                    const w = Math.min(this.liveWpmValue, 120);
+                                    return `rotate(${(w / 120) * -8}deg) scale(${1 + (w / 120) * 0.12})`;
+                                },
                             }">
                             <div class="flex justify-between items-center mb-1 text-xs font-mono">
-                                <span
-                                    class="{{ $isSelf ? 'text-[#cbb38a] font-bold' : 'text-typing-muted' }}">
-                                    {{ $player->user->username }}
-                                    @if ($player->user_id === $this->roomData->host_id)
-                                        <span class="text-[10px] text-zinc-500">[{{ __('multiplayer.host') }}]</span>
+                                <span class="flex items-center gap-1.5 min-w-0 {{ $isSelf ? $accent['text'].' font-bold' : 'text-muted' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ $accent['dot'] }}"></span>
+                                    <span class="truncate">{{ $player->user->username }}</span>
+                                    @if ($isSelf)
+                                        <span class="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded {{ $accent['chip'] }} {{ $accent['text'] }} shrink-0">{{ __('multiplayer.you') }}</span>
                                     @endif
-                                    <span class="text-active font-bold ml-1" x-show="liveFinished" x-cloak>{{ __('multiplayer.finished') }}</span>
+                                    @if ($isHostPlayer)
+                                        <span class="text-[10px] text-muted/70 shrink-0">[{{ __('multiplayer.host') }}]</span>
+                                    @endif
+                                    <span class="text-gold font-bold text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-1" x-show="isLeader && !liveFinished" x-cloak><span class="text-xs leading-none">👑</span>{{ __('multiplayer.leader') }}</span>
+                                    <span class="text-active font-bold ml-1 shrink-0" x-show="liveFinished" x-cloak>{{ __('multiplayer.finished') }}</span>
                                 </span>
-                                <span class="font-mono text-[#cbb38a] font-bold"><span x-text="liveWpmValue"></span> WPM</span>
+                                <span class="font-mono font-bold shrink-0 {{ $accent['text'] }}"><span x-text="liveWpmValue"></span> WPM</span>
                             </div>
 
-                            <div
-                                class="h-10 w-full bg-typing-bg/80 rounded-xl relative border border-white/5 overflow-hidden flex items-center">
-                                <div
-                                    class="absolute right-0 top-0 bottom-0 w-8 bg-zinc-900 border-l border-dashed border-white/20 flex items-center justify-center font-mono text-[10px] text-zinc-600 select-none">
+                            <div class="w-full bg-background rounded-lg relative border overflow-hidden flex items-center transition-all duration-300 {{ $dense ? 'h-7' : 'h-9' }}"
+                                :class="{
+                                    'border-gold/60': isLeader && !liveFinished,
+                                    'border-active/60': liveFinished,
+                                    'border-border/30': !isLeader && !liveFinished,
+                                }">
+                                <div class="absolute right-0 top-0 bottom-0 w-7 bg-elevated/50 border-l border-dashed border-border/50 flex items-center justify-center font-mono text-[9px] text-muted/50 select-none">
                                     {{ __('multiplayer.finish') }}</div>
 
-                                <div class="h-full bg-white/[0.02] transition-all duration-300 flex items-center justify-end relative"
-                                    :style="`width: calc(10% + ${liveProgress}% * 0.85);`">
-                                    <div
-                                        class="w-8 h-8 flex items-center justify-center animate-bounce transition-all duration-200">
-                                        <img src="/icon/uetype_mascot.png" alt="Player Maskot"
-                                            class="w-full h-full object-contain">
+                                <div class="h-full transition-all duration-300 flex items-center justify-end relative border-r-2 {{ $accent['bar'] }} {{ $accent['edge'] }}"
+                                    :class="{ 'opacity-100': liveProgress > 0, 'opacity-70': liveProgress === 0 }"
+                                    :style="`width: calc(8% + ${liveProgress}% * 0.86);`">
+                                    <div class="race-runner rounded-md overflow-hidden border-2 bg-surface flex items-center justify-center -mr-1 {{ $accent['ring'] }} {{ $dense ? 'w-6 h-6' : 'w-7 h-7' }}"
+                                        :style="`transform: ${runnerTilt}`">
+                                        @if ($player->user->avatar)
+                                            <img src="{{ $player->user->avatar }}" alt="{{ $player->user->username }}" referrerpolicy="no-referrer" class="w-full h-full object-cover">
+                                        @else
+                                            <img src="/icon/uetype_mascot.png" alt="{{ $player->user->username }}" class="w-4/5 h-4/5 object-contain">
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -322,27 +352,28 @@
             </div>
 
             <!-- CONTAINER UTAMA TEKS (VISUAL HIGH-RESPONSIVE TYPERACER STYLE) -->
-            <div class="p-8 border bg-typing-surface/40 border-white/5 rounded-3xl space-y-6 shadow-xl">
-                <div class="flex justify-between items-center border-b border-white/5 pb-4">
-                    <span class="text-xs font-mono uppercase tracking-widest text-typing-muted">{{ __('multiplayer.arena_mode') }}</span>
-                    <span class="text-xs font-mono text-[#cbb38a]">{{ __('multiplayer.room_code') }} <strong
-                            class="text-white">{{ $this->roomCode }}</strong></span>
+            <div class="border bg-surface/40 border-border/40 rounded-3xl shadow-xl {{ $dense ? 'p-5 space-y-4' : 'p-8 space-y-6' }}"
+                :class="{ 'race-typo': hasError }">
+                <div class="flex justify-between items-center border-b border-border/30 {{ $dense ? 'pb-3' : 'pb-4' }}">
+                    <span class="text-xs font-mono uppercase tracking-widest text-muted">{{ __('multiplayer.arena_mode') }}</span>
+                    <span class="text-xs font-mono text-gold">{{ __('multiplayer.room_code') }} <strong
+                            class="text-foreground">{{ $this->roomCode }}</strong></span>
                 </div>
 
                 <!-- BLOK DRAF PARAGRAF DENGAN INDIKATOR WARNA TYPERACER -->
                 <div
-                    class="font-mono text-xl leading-relaxed tracking-wide select-none p-5 bg-black/20 rounded-xl border border-white/[0.02] flex flex-wrap gap-x-2 gap-y-1">
+                    class="font-mono text-xl leading-relaxed tracking-wide select-none p-5 bg-background/30 rounded-xl border border-border/20 flex flex-wrap gap-x-2 gap-y-1">
                     <template x-for="(word, wIdx) in words" :key="wIdx">
                         <span
                             :class="{
                                 'text-active': wIdx < currentWordIndex && !wordHadError[wIdx],
-                                'text-amber-500/80 underline underline-offset-4 decoration-2 decoration-amber-500/50': wIdx <
+                                'text-gold/80 underline underline-offset-4 decoration-2 decoration-gold/50': wIdx <
                                     currentWordIndex && wordHadError[wIdx],
-                                'text-red-400 bg-red-950/40 ring-1 ring-red-500/30 px-1 rounded underline underline-offset-4 decoration-2': wIdx ===
+                                'text-danger bg-danger/15 ring-1 ring-danger/40 px-1 rounded underline underline-offset-4 decoration-2': wIdx ===
                                     currentWordIndex && hasError,
-                                'text-white font-bold ring-1 ring-white/10 bg-white/5 px-1 rounded': wIdx ===
+                                'text-foreground font-bold ring-1 ring-border/50 bg-foreground/5 px-1 rounded': wIdx ===
                                     currentWordIndex && !hasError,
-                                'text-zinc-500': wIdx > currentWordIndex
+                                'text-muted': wIdx > currentWordIndex
                             }"
                             x-text="word"></span>
                     </template>
@@ -355,16 +386,16 @@
                         :placeholder="lockedByTimeout ? @js(__('multiplayer.input_locked')) : (isFinished ? @js(__('multiplayer.input_finished')) : (raceStarted ? @js(__('multiplayer.input_type')) :
                             @js(__('multiplayer.input_wait'))))"
                         :class="{
-                            'border-red-500/60 focus:ring-red-500 focus:border-red-500 bg-red-950/10 text-red-200': hasError,
-                            'focus:ring-1 focus:ring-[#cbb38a] focus:border-[#cbb38a] border-white/10 text-white': !
+                            'border-danger/60 focus:ring-danger focus:border-danger bg-danger/10 text-danger': hasError,
+                            'focus:ring-1 focus:ring-gold focus:border-gold border-border/40 text-foreground': !
                                 hasError
                         }"
-                        class="w-full px-5 py-4 bg-typing-bg border rounded-xl font-mono text-base transition-all duration-200 placeholder-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed" />
+                        class="w-full px-5 py-4 bg-background border rounded-xl font-mono text-base transition-all duration-200 placeholder-muted/60 disabled:opacity-40 disabled:cursor-not-allowed" />
                 </div>
 
                 <div class="pt-4 flex justify-end">
                     <button wire:click="leaveRoom"
-                        class="px-5 py-2.5 bg-red-950/20 border border-red-900/30 text-red-400 hover:bg-red-950/40 font-mono text-xs font-bold uppercase tracking-wider rounded-xl transition">
+                        class="px-5 py-2.5 bg-transparent border border-border/40 text-muted hover:text-danger hover:border-danger/40 font-mono text-xs font-bold uppercase tracking-wider rounded-xl transition">
                         {{ __('multiplayer.give_up') }}
                     </button>
                 </div>
@@ -378,7 +409,7 @@
 
             <!-- HEADER MATCH RESULT -->
             <div class="flex flex-col space-y-1">
-                <h1 class="text-fluid-title font-mono font-black text-[#cbb38a] tracking-wider uppercase">{{ __('multiplayer.match_result') }}</h1>
+                <h1 class="text-fluid-title font-mono font-black text-gold tracking-wider uppercase">{{ __('multiplayer.match_result') }}</h1>
                 @php
                     $myRank = $this->leaderboardData->search(fn($m) => $m->user_id === Auth::id()) + 1;
                     $suffix = match ($myRank) {
@@ -388,10 +419,10 @@
                         default => 'th',
                     };
                 @endphp
-                <div class="flex items-center gap-2 text-xs font-mono text-typing-muted uppercase tracking-widest">
+                <div class="flex items-center gap-2 text-xs font-mono text-muted uppercase tracking-widest">
                     <span>{{ __('multiplayer.room', ['code' => $this->roomCode]) }}</span>
-                    <span class="text-white/20">•</span>
-                    <span>{!! __('multiplayer.you_placed', ['rank' => '<strong class="text-white font-bold">'.$myRank.(app()->getLocale() === 'en' ? $suffix : '').'</strong>']) !!}</span>
+                    <span class="text-muted/40">•</span>
+                    <span>{!! __('multiplayer.you_placed', ['rank' => '<strong class="text-foreground font-bold">'.$myRank.(app()->getLocale() === 'en' ? $suffix : '').'</strong>']) !!}</span>
                 </div>
             </div>
 
@@ -407,20 +438,18 @@
                 <div class="flex flex-col items-center space-y-3">
                     @if ($rank2)
                         <div class="text-center font-mono text-xs">
-                            <span class="text-typing-muted block text-[10px]">{{ $rank2->wpm }} wpm</span>
+                            <span class="text-muted block text-[10px]">{{ $rank2->wpm }} wpm</span>
                             <span
-                                class="text-white font-bold block truncate max-w-[100px]">{{ $rank2->user->username }}</span>
+                                class="text-foreground font-bold block truncate max-w-[100px]">{{ $rank2->user->username }}</span>
                             @if ($rank2->user_id === Auth::id())
                                 <span
-                                    class="inline-block bg-[#cbb38a] text-black text-[9px] font-black px-1.5 py-0.2 rounded mt-0.5 scale-90">{{ __('multiplayer.you') }}</span>
+                                    class="inline-block bg-gold text-background text-[9px] font-black px-1.5 py-0.2 rounded mt-0.5 scale-90">{{ __('multiplayer.you') }}</span>
                             @endif
                         </div>
-                        <div class="w-10 h-10 animate-bounce">
-                            <img src="/icon/uetype_mascot.png" class="w-full h-full object-contain">
-                        </div>
+                        <x-friend-avatar :user="$rank2->user" size="w-10 h-10" ring="border-muted/60" fallback-size="w-4/5 h-4/5" class="race-surge" />
                     @endif
                     <div
-                        class="w-full h-20 bg-transparent border-2 border-white/10 rounded-2xl flex items-center justify-center font-mono font-black text-3xl text-white/30">
+                        class="w-full h-20 bg-transparent border-2 border-border/50 rounded-2xl flex items-center justify-center font-mono font-black text-3xl text-muted/40">
                         2
                     </div>
                 </div>
@@ -429,20 +458,18 @@
                 <div class="flex flex-col items-center space-y-3">
                     @if ($rank1)
                         <div class="text-center font-mono text-xs">
-                            <span class="text-typing-muted block text-[10px]">{{ $rank1->wpm }} wpm</span>
+                            <span class="text-muted block text-[10px]">{{ $rank1->wpm }} wpm</span>
                             <span
-                                class="text-white font-bold block truncate max-w-[120px]">{{ $rank1->user->username }}</span>
+                                class="text-foreground font-bold block truncate max-w-[120px]">{{ $rank1->user->username }}</span>
                             @if ($rank1->user_id === Auth::id())
                                 <span
-                                    class="inline-block bg-black text-[#cbb38a] text-[9px] font-black px-1.5 py-0.2 rounded mt-0.5 scale-90">{{ __('multiplayer.you') }}</span>
+                                    class="inline-block bg-background text-gold text-[9px] font-black px-1.5 py-0.2 rounded mt-0.5 scale-90">{{ __('multiplayer.you') }}</span>
                             @endif
                         </div>
-                        <div class="w-12 h-12 animate-bounce" style="animation-duration: 2.2s;">
-                            <img src="/icon/uetype_mascot.png" class="w-full h-full object-contain">
-                        </div>
+                        <x-friend-avatar :user="$rank1->user" size="w-12 h-12" ring="border-gold" fallback-size="w-4/5 h-4/5" class="race-surge shadow-lg" />
                     @endif
                     <div
-                        class="w-full h-32 bg-[#cbb38a] rounded-2xl flex items-center justify-center font-mono font-black text-3xl sm:text-5xl text-black shadow-lg">
+                        class="w-full h-32 bg-gold rounded-2xl flex items-center justify-center font-mono font-black text-3xl sm:text-5xl text-background shadow-lg">
                         1
                     </div>
                 </div>
@@ -451,20 +478,18 @@
                 <div class="flex flex-col items-center space-y-3">
                     @if ($rank3)
                         <div class="text-center font-mono text-xs">
-                            <span class="text-typing-muted block text-[10px]">{{ $rank3->wpm }} wpm</span>
+                            <span class="text-muted block text-[10px]">{{ $rank3->wpm }} wpm</span>
                             <span
-                                class="text-white font-bold block truncate max-w-[100px]">{{ $rank3->user->username }}</span>
+                                class="text-foreground font-bold block truncate max-w-[100px]">{{ $rank3->user->username }}</span>
                             @if ($rank3->user_id === Auth::id())
                                 <span
-                                    class="inline-block bg-[#cbb38a] text-black text-[9px] font-black px-1.5 py-0.2 rounded mt-0.5 scale-90">{{ __('multiplayer.you') }}</span>
+                                    class="inline-block bg-gold text-background text-[9px] font-black px-1.5 py-0.2 rounded mt-0.5 scale-90">{{ __('multiplayer.you') }}</span>
                             @endif
                         </div>
-                        <div class="w-10 h-10 animate-bounce" style="animation-duration: 1.8s;">
-                            <img src="/icon/uetype_mascot.png" class="w-full h-full object-contain">
-                        </div>
+                        <x-friend-avatar :user="$rank3->user" size="w-10 h-10" ring="border-gold/50" fallback-size="w-4/5 h-4/5" class="race-surge" />
                     @endif
                     <div
-                        class="w-full h-16 bg-transparent border-2 border-[#cbb38a]/20 rounded-2xl flex items-center justify-center font-mono font-black text-2xl text-[#cbb38a]/30">
+                        class="w-full h-16 bg-transparent border-2 border-gold/20 rounded-2xl flex items-center justify-center font-mono font-black text-2xl text-gold/30">
                         3
                     </div>
                 </div>
@@ -473,13 +498,13 @@
 
             <!-- TABEL FULL RESULTS -->
             <div class="space-y-3">
-                <span class="text-[11px] font-mono uppercase tracking-[0.25em] text-typing-muted block mb-1">{{ __('multiplayer.full_results') }}</span>
+                <span class="text-[11px] font-mono uppercase tracking-[0.25em] text-muted block mb-1">{{ __('multiplayer.full_results') }}</span>
                 <div
-                    class="w-full border border-white/5 rounded-2xl overflow-x-auto bg-typing-surface/10 backdrop-blur-sm">
+                    class="w-full border border-border/40 rounded-2xl overflow-x-auto bg-surface/10 backdrop-blur-sm">
                     <table class="w-full text-left font-mono text-sm border-collapse">
                         <thead>
                             <tr
-                                class="border-b border-white/5 bg-black/20 text-xs text-typing-muted uppercase tracking-wider">
+                                class="border-b border-border/30 bg-background/20 text-xs text-muted uppercase tracking-wider">
                                 <th class="py-3.5 px-3 sm:px-5 font-medium">{{ __('multiplayer.th_place') }}</th>
                                 <th class="py-3.5 px-3 sm:px-5 font-medium">{{ __('multiplayer.th_player') }}</th>
                                 <th class="py-3.5 px-3 sm:px-5 font-medium">{{ __('multiplayer.th_wpm') }}</th>
@@ -487,7 +512,7 @@
                                 <th class="py-3.5 px-3 sm:px-5 font-medium">{{ __('multiplayer.th_time') }}</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-white/[0.03]">
+                        <tbody class="divide-y divide-border/20">
                             @foreach ($this->leaderboardData as $index => $rank)
                                 @php
                                     $pos = $index + 1;
@@ -500,26 +525,26 @@
                                     $isMe = $rank->user_id === Auth::id();
                                 @endphp
                                 <tr
-                                    class="transition duration-150 {{ $isMe ? 'bg-blue-950/40 text-white font-bold' : 'text-typing-muted hover:bg-white/[0.01]' }}">
-                                    <td class="py-4 px-3 sm:px-5 font-bold text-white">{{ $pos }}{{ $suffix }}
+                                    class="transition duration-150 {{ $isMe ? 'bg-brand/25 text-foreground font-bold' : 'text-muted hover:bg-foreground/[0.02]' }}">
+                                    <td class="py-4 px-3 sm:px-5 font-bold text-foreground">{{ $pos }}{{ $suffix }}
                                     </td>
                                     <td class="py-4 px-5">
                                         <div class="flex items-center gap-2">
                                             <span>{{ $rank->user->username }}</span>
                                             @if ($isMe)
                                                 <span
-                                                    class="bg-blue-500 text-white text-[9px] font-black px-1 py-0.1 rounded uppercase tracking-wide">{{ __('multiplayer.you') }}</span>
+                                                    class="bg-brand-bright text-background text-[9px] font-black px-1 py-0.1 rounded uppercase tracking-wide">{{ __('multiplayer.you') }}</span>
                                             @endif
                                         </div>
                                     </td>
-                                    <td class="py-4 px-3 sm:px-5 text-[#cbb38a] font-bold">{{ $rank->wpm }} wpm</td>
+                                    <td class="py-4 px-3 sm:px-5 text-gold font-bold">{{ $rank->wpm }} wpm</td>
                                     <td class="py-4 px-5">{{ $rank->accuracy ?? 97.0 }}%</td>
                                     <td class="py-4 px-5">
                                         @if ($rank->finished_time_seconds && $rank->finished_time_seconds != 999)
                                             {{ sprintf('%02d:%02d', floor($rank->finished_time_seconds / 60), $rank->finished_time_seconds % 60) }}
                                         @else
                                             {{-- DNF: jangan tampilkan waktu palsu. --}}
-                                            <span class="text-red-400/70 text-xs">DNF</span>
+                                            <span class="text-danger/70 text-xs">{{ __('multiplayer.dnf') }}</span>
                                         @endif
                                     </td>
                                 </tr>
@@ -538,20 +563,20 @@
                 $xpBarWidth = $xpNeeded > 0 ? min(100, ($xpProgress / $xpNeeded) * 100) : 0;
             @endphp
             @if ($xp)
-                <div class="p-5 border border-white/5 bg-typing-surface/30 rounded-2xl space-y-2">
+                <div class="p-5 border border-border/40 bg-surface/30 rounded-2xl space-y-2">
                     <div class="flex justify-between items-center text-xs font-mono">
                         <div class="flex flex-col">
-                            <span class="text-typing-muted text-[10px] uppercase tracking-wide">{{ __('multiplayer.xp_earned') }}</span>
-                            <span class="text-2xl font-black text-[#cbb38a] mt-0.5">+{{ number_format($xp['earned']) }} XP</span>
+                            <span class="text-muted text-[10px] uppercase tracking-wide">{{ __('multiplayer.xp_earned') }}</span>
+                            <span class="text-2xl font-black text-gold mt-0.5">+{{ number_format($xp['earned']) }} XP</span>
                         </div>
                         <div class="text-right flex flex-col items-end">
-                            <span class="text-white font-bold text-xs">{{ number_format($xpProgress) }} / {{ number_format($xpNeeded) }} XP</span>
-                            <span class="text-typing-muted text-[10px] mt-0.5">Level {{ $lvl['level'] }} <span
-                                    class="text-white/30">→</span> {{ $lvl['next_level'] }}</span>
+                            <span class="text-foreground font-bold text-xs">{{ number_format($xpProgress) }} / {{ number_format($xpNeeded) }} XP</span>
+                            <span class="text-muted text-[10px] mt-0.5">Level {{ $lvl['level'] }} <span
+                                    class="text-muted/50">→</span> {{ $lvl['next_level'] }}</span>
                         </div>
                     </div>
-                    <div class="h-1.5 w-full bg-black/40 rounded-full overflow-hidden border border-white/[0.03]">
-                        <div class="h-full bg-blue-600 rounded-full transition-all duration-500"
+                    <div class="h-1.5 w-full bg-background/40 rounded-full overflow-hidden border border-border/20">
+                        <div class="h-full bg-brand rounded-full transition-all duration-500"
                             style="width: {{ $xpBarWidth }}%"></div>
                     </div>
                 </div>
@@ -561,12 +586,12 @@
             <div class="pt-2 flex flex-wrap gap-3 sm:gap-4">
                 @if ($this->isHost)
                     <button wire:click="playAgain"
-                        class="px-6 py-3 bg-[#cbb38a] hover:bg-[#bfa57a] text-black font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 shadow-md">
+                        class="px-6 py-3 bg-gold hover:bg-secondary-7 text-background font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 shadow-md">
                         {{ __('multiplayer.play_again') }}
                     </button>
                 @endif
                 <button wire:click="leaveRoom"
-                    class="px-6 py-3 bg-transparent border border-white/10 text-typing-muted hover:text-typing-text hover:bg-white/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition">
+                    class="px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition">
                     {{ __('multiplayer.leave_room') }}
                 </button>
             </div>
@@ -599,6 +624,18 @@
                                     finished: !!data.finished,
                                 },
                             };
+                        },
+                        leaderId() {
+                            let bestId = null;
+                            let bestProgress = 0;
+                            for (const [id, o] of Object.entries(this.opponents)) {
+                                const p = o.progress ?? 0;
+                                if (p > bestProgress) {
+                                    bestProgress = p;
+                                    bestId = id;
+                                }
+                            }
+                            return bestId;
                         },
                         reset() {
                             this.opponents = {};
