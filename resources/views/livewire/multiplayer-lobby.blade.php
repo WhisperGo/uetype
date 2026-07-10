@@ -282,8 +282,23 @@
             <div class="border bg-surface/50 border-border/40 rounded-3xl shadow-xl {{ $dense ? 'p-4 space-y-2' : 'p-6 space-y-3' }}">
                 <span class="text-xs font-mono uppercase tracking-widest text-muted block">{{ __('multiplayer.live_standings') }}</span>
 
-                {{-- laneSeeds dideklarasikan sekali di sini, lalu diwarisi tiap x-data lane. --}}
-                <div x-data="{ laneSeeds: @js($laneSeeds) }"
+                {{-- laneSeeds/raceStartMs/textLength dideklarasikan sekali di sini, lalu
+                     diwarisi tiap x-data lane. Jam bersama dijalankan sekali juga, supaya
+                     WPM tiap lane dihitung ulang tiap detik tanpa satu timer per pemain. --}}
+                <div x-data="{
+                        laneSeeds: @js($laneSeeds),
+                        textLength: @js(mb_strlen($this->roomData->text_to_type)),
+                        {{-- raceStartsInMs = sisa waktu menurut server saat render (negatif
+                             kalau balapan sudah jalan). Ditambahkan ke Date.now() supaya titik
+                             mulainya berada di jam KLIEN -- kebal selisih jam server-klien.
+                             null = balapan belum dijadwalkan. --}}
+                        raceStartsInMs: @js($this->raceStartsInMs),
+                        raceStartMs: null,
+                    }"
+                    x-init="
+                        raceStartMs = raceStartsInMs === null ? null : Date.now() + raceStartsInMs;
+                        $store.race.startClock();
+                    "
                     class="bg-background/40 rounded-2xl border border-border/20 {{ $dense ? 'p-3 space-y-1' : 'p-4 space-y-1.5' }}">
                     @foreach ($this->roomData->members as $player)
                         @php $isSelf = $player->user_id === Auth::id(); @endphp
@@ -297,8 +312,33 @@
                                 get liveProgress() {
                                     return $store.race.opponents[this.playerId]?.progress ?? this.seedProgress;
                                 },
+                                /**
+                                 * WPM dihitung SENDIRI oleh tiap penonton, bukan menunggu
+                                 * kiriman pemiliknya. Tab lawan yang tidak aktif dibekukan
+                                 * browser, jadi lawan yang berhenti mengetik takkan pernah
+                                 * menyiarkan WPM-nya yang meluruh -- angkanya akan macet.
+                                 *
+                                 * WPM = (karakter benar / 5) / menit berlalu, dan karakter
+                                 * benar diturunkan dari progres yang memang disiarkan.
+                                 * Pemain yang sudah finis dibekukan di angka terakhirnya.
+                                 */
                                 get liveWpmValue() {
-                                    return $store.race.opponents[this.playerId]?.wpm ?? this.seedWpm;
+                                    const reported = $store.race.opponents[this.playerId]?.wpm ?? this.seedWpm;
+
+                                    // Pemain yang sudah finis: WPM final dibekukan, tak meluruh lagi.
+                                    // raceStartMs null: balapan belum mulai, tak ada waktu berlalu.
+                                    if (this.liveFinished || raceStartMs === null) return reported;
+
+                                    // $store.race.now membuat getter ini dihitung ulang tiap detik.
+                                    const minutes = ($store.race.now - raceStartMs) / 60000;
+                                    if (minutes <= 0) return reported;
+
+                                    // progress_percent bilangan bulat, jadi karakter benar di sini
+                                    // dibulatkan ke ~1% teks -- semua lane (termasuk milik sendiri)
+                                    // memakai rumus yang sama supaya angkanya konsisten antar layar.
+                                    const correctChars = (this.liveProgress / 100) * textLength;
+
+                                    return Math.floor((correctChars / 5) / minutes);
                                 },
                                 get liveFinished() {
                                     return $store.race.opponents[this.playerId]?.finished ?? this.seedFinished;
@@ -716,6 +756,31 @@
                         deadline: null,
 
                         /**
+                         * Detak jam bersama (ms epoch), dinaikkan tiap detik selama balapan.
+                         *
+                         * WPM tiap pemain = f(karakter benar, waktu berlalu). Karena waktu
+                         * terus jalan walau tak ada yang mengetik, lane harus dihitung ulang
+                         * secara berkala. Nilai reaktif ini yang memicunya -- SATU timer untuk
+                         * seluruh lane, dan tak bergantung pada tab lawan (tab latar dibekukan
+                         * browser, jadi lawan yang diam takkan pernah menyiarkan WPM barunya).
+                         */
+                        now: Date.now(),
+                        _nowInterval: null,
+
+                        startClock() {
+                            if (this._nowInterval) return;
+                            this._nowInterval = setInterval(() => {
+                                this.now = Date.now();
+                            }, 1000);
+                        },
+
+                        stopClock() {
+                            if (! this._nowInterval) return;
+                            clearInterval(this._nowInterval);
+                            this._nowInterval = null;
+                        },
+
+                        /**
                          * Kunci tenggat SEKALI per race. Panggilan berikutnya untuk race yang
                          * sama diabaikan, jadi countdown terus berjalan menuju tenggat semula.
                          * `remainingMs` datang dari server (sisa waktu saat halaman dirender).
@@ -736,6 +801,7 @@
                             this.opponents = {};
                             this.raceKey = null;
                             this.deadline = null;
+                            this.stopClock();
                         },
 
                         /**
@@ -787,6 +853,9 @@
                     _lastEmit: 0,
                     _emitTimer: null,
 
+                    // Ticker WPM (1 detik): menyegarkan angka saat pemain berhenti mengetik.
+                    _wpmInterval: null,
+
                     // Sudden death: timer client-side, tapi checkSuddenDeath() di server tetap sumber kebenaran final.
                     suddenDeathActive: !!config.suddenDeathActive,
                     suddenDeathRemaining: config.suddenDeathRemaining ?? 15,
@@ -810,6 +879,7 @@
                             this.countdown = 'GO!';
                             this.startTime = Date.now();
                             this.startSuddenDeathClock();
+                            this.startWpmTicker();
                             this.$nextTick(() => {
                                 if (this.$refs.typeInput) this.$refs.typeInput.focus();
                             });
@@ -880,6 +950,7 @@
                         if (this.raceStarted) return;
                         this.raceStarted = true;
                         this.startTime = this.raceStartsAtMs ?? Date.now();
+                        this.startWpmTicker();
                         this.$nextTick(() => {
                             if (this.$refs.typeInput) this.$refs.typeInput.focus();
                         });
@@ -897,6 +968,10 @@
                         if (this._sdInterval) {
                             clearInterval(this._sdInterval);
                             this._sdInterval = null;
+                        }
+                        if (this._wpmInterval) {
+                            clearInterval(this._wpmInterval);
+                            this._wpmInterval = null;
                         }
                         if (this._emitTimer) {
                             clearTimeout(this._emitTimer);
@@ -937,6 +1012,11 @@
                             clearInterval(this._sdInterval);
                             this._sdInterval = null;
                         }
+                        // WPM berhenti di angka terakhir; balapan sudah usai bagi pemain ini.
+                        if (this._wpmInterval) {
+                            clearInterval(this._wpmInterval);
+                            this._wpmInterval = null;
+                        }
                         if (this._emitTimer) {
                             clearTimeout(this._emitTimer);
                             this._emitTimer = null;
@@ -964,28 +1044,12 @@
                         }
                         this.prevTypedLength = this.typedText.length;
 
-                        let correctInCurrent = 0;
-                        if (!this.hasError) {
-                            correctInCurrent = this.typedText.length;
-                        } else {
-                            for (let i = 0; i < this.typedText.length; i++) {
-                                if (this.typedText[i] === targetWord[i]) {
-                                    correctInCurrent++;
-                                } else {
-                                    break;
-                                }
-                            }
-                        }
-
-                        let totalCorrectChars = this.correctCharsFromPastWords + correctInCurrent;
+                        // Satu rumus dipakai bersama ticker WPM (lihat correctCharsSoFar/currentWpm).
+                        let totalCorrectChars = this.correctCharsSoFar();
                         let progressPercent = Math.floor((totalCorrectChars / this.textToType.length) * 100);
 
-                        let accuracyPercent = this.totalKeystrokes > 0 ?
-                            Math.round(((this.totalKeystrokes - this.totalMistakes) / this.totalKeystrokes) * 100) :
-                            100;
-
-                        let timePassedMinutes = (Date.now() - this.startTime) / 60000;
-                        let liveWpm = timePassedMinutes > 0 ? Math.floor((totalCorrectChars / 5) / timePassedMinutes) : 0;
+                        let accuracyPercent = this.currentAccuracy();
+                        let liveWpm = this.currentWpm();
 
                         // State reaktif lokal diperbarui langsung -> maskot sendiri gerak instan, tak menunggu jaringan.
                         this.liveWpm = liveWpm;
@@ -1003,6 +1067,56 @@
                         this.progressPercent = progressPercent;
                         this.publishLocal(progressPercent, liveWpm, false);
                         this.emitProgress(progressPercent, liveWpm, accuracyPercent, false);
+                    },
+
+                    /**
+                     * Jumlah karakter benar yang sudah diketik sejauh ini: kata-kata yang
+                     * sudah lewat + awalan benar pada kata yang sedang diketik.
+                     */
+                    correctCharsSoFar() {
+                        const targetWord = this.words[this.currentWordIndex] ?? '';
+                        let correctInCurrent = 0;
+
+                        for (let i = 0; i < this.typedText.length; i++) {
+                            if (this.typedText[i] !== targetWord[i]) break;
+                            correctInCurrent++;
+                        }
+
+                        return this.correctCharsFromPastWords + correctInCurrent;
+                    },
+
+                    /** WPM standar: (karakter benar / 5) dibagi menit yang berlalu. */
+                    currentWpm() {
+                        const minutes = (Date.now() - this.startTime) / 60000;
+                        if (minutes <= 0) return 0;
+
+                        return Math.floor((this.correctCharsSoFar() / 5) / minutes);
+                    },
+
+                    /**
+                     * Menjaga `liveWpm` lokal tetap segar saat pemain berhenti mengetik,
+                     * agar nilai yang dikirim ke server (mis. saat finish) tak basi.
+                     *
+                     * TIDAK mengirim apa pun ke jaringan: tiap lane sudah menghitung WPM
+                     * lawannya sendiri dari progres + waktu (lihat liveWpmValue). Kalau
+                     * mengandalkan kiriman pemiliknya, tab lawan yang tidak aktif dibekukan
+                     * browser dan angkanya macet -- persis bug yang diperbaiki di sini.
+                     */
+                    startWpmTicker() {
+                        if (this._wpmInterval) return;
+
+                        this._wpmInterval = setInterval(() => {
+                            if (this.isFinished || this.lockedByTimeout || !this.raceStarted) return;
+
+                            this.liveWpm = this.currentWpm();
+                        }, 1000);
+                    },
+
+                    /** Akurasi berjalan; dipisah agar ticker tak menduplikasi rumusnya. */
+                    currentAccuracy() {
+                        return this.totalKeystrokes > 0
+                            ? Math.round(((this.totalKeystrokes - this.totalMistakes) / this.totalKeystrokes) * 100)
+                            : 100;
                     },
 
                     // Publikasikan posisi lokal ke store (key userId sendiri) agar lane sendiri & lawan seragam.
@@ -1080,13 +1194,10 @@
                             this.isFinished = true;
                             this.progressPercent = 100;
 
-                            const accuracyPercent = this.totalKeystrokes > 0
-                                ? Math.round(((this.totalKeystrokes - this.totalMistakes) / this.totalKeystrokes) * 100)
-                                : 100;
-                            const timePassedMinutes = (Date.now() - this.startTime) / 60000;
-                            const liveWpm = timePassedMinutes > 0
-                                ? Math.floor((this.correctCharsFromPastWords / 5) / timePassedMinutes)
-                                : 0;
+                            // typedText sudah kosong & tak ada kata berikutnya, jadi
+                            // correctCharsSoFar() == correctCharsFromPastWords.
+                            const accuracyPercent = this.currentAccuracy();
+                            const liveWpm = this.currentWpm();
                             this.liveWpm = liveWpm;
 
                             this.publishLocal(100, liveWpm, true);
