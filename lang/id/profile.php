@@ -13,6 +13,9 @@ return [
         'best_records' => 'Rekor Terbaik',
     ],
 
+    'view_stats' => 'Lihat Statistik Lengkap',
+    'view_stats_hint' => 'Lihat grafik, aktivitas, dan distribusi mode lengkap',
+
     'card' => [
         'highest_wpm' => 'WPM Tertinggi',
         'avg_wpm' => 'Rata-rata WPM',

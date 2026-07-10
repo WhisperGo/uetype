@@ -14,6 +14,7 @@ use App\Livewire\ClanShow;
 use App\Livewire\ClanWar;
 use App\Livewire\Friends;
 use App\Livewire\Settings;
+use App\Livewire\Stats;
 use App\Livewire\Terms;
 use App\Livewire\TypingEngine;
 use App\Livewire\TypingResult;
@@ -49,6 +50,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/heartbeat', [PresenceController::class, 'heartbeat'])->name('presence.heartbeat');
 
     Route::get('/achievements', [AchievementController::class, 'index'])->name('achievements.index');
+
+    Route::get('/stats', Stats::class)->name('stats');
 
     Route::get('/friends', Friends::class)->name('friends.index');
     Route::get('/chat', Chat::class)->name('chat.index');

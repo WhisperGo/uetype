@@ -19,10 +19,6 @@
         $hours = intdiv($totalSeconds, 3600);
         $minutes = intdiv($totalSeconds % 3600, 60);
         $timeLabel = $hours > 0 ? "{$hours}j {$minutes}m" : "{$minutes}m";
-
-        $timeRecords = $bestRecords->where('mode', 'time');
-        $wordsRecords = $bestRecords->where('mode', 'words');
-        $survivalRecords = $bestRecords->where('mode', 'survival');
     @endphp
 
     <div class="py-10">
@@ -125,153 +121,21 @@
                 @endif
             </div>
 
-            <!-- ===== PROGRES WPM ===== -->
-            <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl sm:p-6">
-                <h3 class="mb-4 font-mono text-sm font-semibold text-foreground">{{ __('profile.wpm_progress') }}</h3>
-                @if(count($wpmProgress) >= 2)
-                    <div class="w-full h-48" wire:ignore>
-                        <canvas id="profileWpmChart"></canvas>
+            {{-- Statistik lengkap (grafik, rekor per mode, aktivitas) ada di /stats;
+                 profil fokus identitas. Link hanya di profil sendiri. --}}
+            @if(! $isPublic)
+                <a href="{{ route('stats') }}" wire:navigate
+                    class="flex items-center justify-between gap-4 p-5 border bg-surface/40 border-white/5 rounded-2xl transition-colors hover:border-brand/40 hover:bg-surface/60">
+                    <div>
+                        <h3 class="font-mono text-sm font-semibold text-foreground">{{ __('profile.view_stats') }}</h3>
+                        <p class="text-xs text-muted font-mono mt-0.5">{{ __('profile.view_stats_hint') }}</p>
                     </div>
-                @else
-                    <p class="font-mono text-sm text-muted">{{ __('profile.wpm_progress_empty') }}</p>
-                @endif
-            </div>
-
-            <!-- ===== RIWAYAT PERTANDINGAN TERAKHIR ===== -->
-            <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl sm:p-6">
-                <h3 class="mb-4 font-mono text-sm font-semibold text-foreground">{{ __('profile.recent_matches') }}</h3>
-                @if(isset($recentMatches) && $recentMatches->count() > 0)
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left">
-                            <thead>
-                                <tr class="font-mono text-xs tracking-wider uppercase text-muted">
-                                    <th class="pb-3 font-semibold">{{ __('profile.th_date') }}</th>
-                                    <th class="pb-3 font-semibold">{{ __('profile.th_mode') }}</th>
-                                    <th class="pb-3 font-semibold text-right">{{ __('profile.th_wpm') }}</th>
-                                    <th class="pb-3 font-semibold text-right">{{ __('profile.th_accuracy') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody class="font-mono text-sm">
-                                @foreach($recentMatches as $p)
-                                <tr class="border-t border-white/5">
-                                    <td class="py-2.5 text-muted">@localtime($p->created_at, 'd M Y H:i')</td>
-                                    <td class="py-2.5 text-foreground capitalize">{{ $p->mode?->value ?? 'practice' }}</td>
-                                    <td class="py-2.5 text-right text-brand-bright font-bold tabular-nums">{{ rtrim(rtrim(number_format($p->net_wpm, 1), '0'), '.') }}</td>
-                                    <td class="py-2.5 text-right text-foreground tabular-nums">{{ rtrim(rtrim(number_format($p->accuracy, 1), '0'), '.') }}%</td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    @if($isPublic)
-                        <p class="font-mono text-sm text-muted">{{ __('profile.no_history_public', ['name' => $user->username]) }}</p>
-                    @else
-                        <p class="font-mono text-sm text-muted">{{ __('profile.no_history') }} <a href="{{ url('/typing') }}" class="text-brand-bright hover:underline">{{ __('profile.start_first') }}</a></p>
-                    @endif
-                @endif
-            </div>
-
-            <!-- ===== REKOR TERBAIK ===== -->
-            <div class="space-y-4">
-                <h3 class="font-mono text-sm font-semibold text-foreground">{{ __('profile.tab.best_records') }}</h3>
-
-                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                    <div class="mb-3">
-                        <h4 class="text-sm font-semibold text-foreground">{{ __('profile.records.time_mode') }}</h4>
-                        <p class="text-xs text-muted font-mono mt-0.5">{{ __('profile.records.time_desc') }}</p>
-                    </div>
-                    @if($timeRecords->count() > 0)
-                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                            @foreach($timeRecords as $record)
-                                <div class="p-4 border bg-surface/60 border-white/5 rounded-2xl">
-                                    <span class="text-[0.65rem] uppercase tracking-wider text-muted font-mono">{{ $record->mode_config }} {{ __('profile.records.seconds') }}</span>
-                                    <p class="mt-1 font-mono text-xl font-bold text-brand-bright tabular-nums">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <p class="py-2 font-mono text-xs text-muted">{{ __('profile.records.time_empty') }}</p>
-                    @endif
-                </div>
-
-                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                    <div class="mb-3">
-                        <h4 class="text-sm font-semibold text-foreground">{{ __('profile.records.words_mode') }}</h4>
-                        <p class="text-xs text-muted font-mono mt-0.5">{{ __('profile.records.words_desc') }}</p>
-                    </div>
-                    @if($wordsRecords->count() > 0)
-                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                            @foreach($wordsRecords as $record)
-                                <div class="p-4 border bg-surface/60 border-white/5 rounded-2xl">
-                                    <span class="text-[0.65rem] uppercase tracking-wider text-muted font-mono">{{ $record->mode_config }} {{ __('profile.records.words') }}</span>
-                                    <p class="mt-1 font-mono text-xl font-bold text-gold tabular-nums">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <p class="py-2 font-mono text-xs text-muted">{{ __('profile.records.words_empty') }}</p>
-                    @endif
-                </div>
-
-                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                    <div class="mb-3">
-                        <h4 class="text-sm font-semibold text-foreground">{{ __('profile.records.survival_mode') }}</h4>
-                        <p class="text-xs text-muted font-mono mt-0.5">{{ __('profile.records.survival_desc') }}</p>
-                    </div>
-                    @if($survivalRecords->count() > 0)
-                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            @foreach($survivalRecords as $record)
-                                <div class="p-4 border bg-surface/60 border-white/5 rounded-2xl">
-                                    <span class="text-[0.65rem] uppercase tracking-wider text-muted font-mono">{{ $record->mode_config }} {{ __('profile.records.difficulty') }}</span>
-                                    <p class="mt-1 font-mono text-xl font-bold text-gold tabular-nums">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <p class="py-2 font-mono text-xs text-muted">{{ __('profile.records.survival_empty') }}</p>
-                    @endif
-                </div>
-            </div>
+                    <svg class="w-5 h-5 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                </a>
+            @endif
 
         </div>
     </div>
-
-    <!-- Script Chart.js -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const el = document.getElementById('profileWpmChart');
-            if (!el) return;
-            const data = @json($wpmProgress);
-            const render = () => {
-                new Chart(el.getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: data.map((_, i) => i + 1),
-                        datasets: [{
-                            label: 'wpm', data: data,
-                            borderColor: '#C69F68',
-                            backgroundColor: 'rgba(198,159,104,0.12)',
-                            fill: true, borderWidth: 3, tension: 0.4,
-                            pointRadius: 2, pointBackgroundColor: '#C69F68',
-                        }]
-                    },
-                    options: {
-                        responsive: true, maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#94a3b8' } },
-                            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#94a3b8' }, beginAtZero: true }
-                        }
-                    }
-                });
-            };
-            if (typeof Chart === 'undefined') {
-                const s = document.createElement('script');
-                s.src = 'https://cdn.jsdelivr.net/npm/chart.js';
-                s.onload = render;
-                document.head.appendChild(s);
-            } else { render(); }
-        });
-    </script>
 </x-app-layout>

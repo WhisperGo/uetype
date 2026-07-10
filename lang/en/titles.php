@@ -9,6 +9,7 @@ return [
         'profile.show' => 'Player Profile',
         'settings' => 'Settings',
         'achievements.index' => 'Achievements',
+        'stats' => 'Stats',
         'friends.index' => 'Friends',
         'clans.index' => 'Clans',
         'clan-war.index' => 'Clan War',

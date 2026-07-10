@@ -13,6 +13,9 @@ return [
         'best_records' => 'Best Records',
     ],
 
+    'view_stats' => 'View Full Statistics',
+    'view_stats_hint' => 'View full charts, activity, and mode distribution',
+
     'card' => [
         'highest_wpm' => 'Highest WPM',
         'avg_wpm' => 'Average WPM',
