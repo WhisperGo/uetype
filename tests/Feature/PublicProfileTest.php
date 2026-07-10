@@ -16,7 +16,7 @@ it('renders another user public profile page', function () {
         ->get(route('profile.show', $other))
         ->assertOk()
         ->assertSee('targetplayer')
-        ->assertSee('Profil Pemain');
+        ->assertSee(__('profile.header_public'));
 });
 
 it('does not leak private fields on a public profile', function () {

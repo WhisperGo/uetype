@@ -6,27 +6,26 @@ use App\Models\TypingResult;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
     /**
-     * Display the user's profile form.
+     * Profil sendiri (privat): menampilkan semua field termasuk email, koin, total XP.
      */
-    public function edit(Request $request): View
+    public function me(Request $request): View
     {
-        return view('profile.edit', $this->profilePayload($request->user()));
+        return view('profile.show', $this->profilePayload($request->user()));
     }
 
     /**
      * Profil publik milik user lain: tanpa field privat (email, koin, total XP).
-     * Kalau membuka profil sendiri lewat rute ini, arahkan ke /profile penuh.
+     * Kalau membuka profil sendiri lewat rute ini, arahkan ke profil penuh sendiri.
      */
     public function show(Request $request, User $user): View
     {
         if ($request->user() && $request->user()->id === $user->id) {
-            return $this->edit($request);
+            return $this->me($request);
         }
 
         return view('profile.show', $this->profilePayload($user, public: true));
@@ -40,11 +39,8 @@ class ProfileController extends Controller
      */
     private function profilePayload(User $user, bool $public = false): array
     {
-        $recentMatches = TypingResult::where('user_id', $user->id)
-            ->latest('created_at')
-            ->take(8)
-            ->get();
-
+        // Profil fokus identitas: cuma ringkasan. Grafik, rekor per mode, & aktivitas
+        // lengkap ada di halaman /stats (App\Livewire\Stats).
         $base = TypingResult::where('user_id', $user->id);
 
         $stats = [
@@ -62,21 +58,9 @@ class ProfileController extends Controller
         $stats['level_progress'] = $levelData['progress']; // EXP di dalam level ini
         $stats['level_needed'] = $levelData['needed'];     // EXP rentang menuju level berikutnya
 
-        $bestRecords = (clone $base)
-            ->select('mode', 'mode_config', DB::raw('MAX(net_wpm) as high_wpm'))
-            ->groupBy('mode', 'mode_config')
-            ->get();
-
-        // Data grafik progres WPM: urut kronologis, maks 20 sesi terakhir.
-        $progress = (clone $base)->latest('created_at')->take(20)->get()->reverse()->values();
-        $wpmProgress = $progress->pluck('net_wpm')->map(fn ($v) => (float) $v)->all();
-
         return [
             'user' => $user,
-            'recentMatches' => $recentMatches,
             'stats' => $stats,
-            'bestRecords' => $bestRecords,
-            'wpmProgress' => $wpmProgress,
             'isPublic' => $public,
         ];
     }

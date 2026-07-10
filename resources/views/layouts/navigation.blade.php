@@ -74,7 +74,7 @@
 
                     <x-slot name="content">
                         @auth
-                            <x-dropdown-link :href="route('profile.edit')">{{ __('nav.profile') }}</x-dropdown-link>
+                            <x-dropdown-link :href="route('profile.me')">{{ __('nav.profile') }}</x-dropdown-link>
 
                             <x-dropdown-link :href="route('achievements.index')">{{ __('nav.achievements') }}</x-dropdown-link>
 
@@ -171,7 +171,7 @@
                     <div class="text-sm font-medium text-muted">{{ Auth::user()->email }}</div>
                 </div>
                 <div class="mt-3 space-y-1">
-                    <x-responsive-nav-link :href="route('profile.edit')">{{ __('nav.profile') }}</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('profile.me')">{{ __('nav.profile') }}</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('achievements.index')">{{ __('nav.achievements') }}</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('stats')">{{ __('nav.user_stats') }}</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('friends.index')">{{ __('nav.friends') }}</x-responsive-nav-link>

@@ -194,7 +194,7 @@ it('reports how many achievements are unlocked out of the total', function () {
 it('exposes the stats link on the profile page instead of the charts', function () {
     $user = User::factory()->create();
 
-    actingAs($user)->get(route('profile.edit'))
+    actingAs($user)->get(route('profile.me'))
         ->assertOk()
         ->assertSee(route('stats'))
         // Grafik & kartu aktivitas sudah pindah; profil tak lagi merendernya.
