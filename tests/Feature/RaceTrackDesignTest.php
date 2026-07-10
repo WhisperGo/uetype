@@ -155,6 +155,64 @@ it('keeps the runner on the flag in the dense layout too', function () {
         ->and($html)->toContain('left: 12px; right: 12px;');
 });
 
+/**
+ * Logika store Alpine ada di dalam @assets, yang TIDAK ikut ter-render di HTML
+ * komponen Livewire. Jadi kontraknya dijaga lewat berkas sumbernya langsung.
+ */
+function arenaSource(): string
+{
+    return file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php'));
+}
+
+it('does not wipe mascot positions when the arena re-initializes mid race', function () {
+    $src = arenaSource();
+
+    // Dulu init() memanggil $store.race.reset() tanpa syarat, jadi tiap re-init di
+    // tengah balapan (mis. saat pemain berhenti mengetik sejenak) mengosongkan store
+    // dan semua lane jatuh ke seed lama = 0 -- maskot & WPM ikut jadi 0.
+    expect($src)->toContain('resetForRace(this.raceKey())');
+
+    // Satu-satunya reset() polos yang tersisa adalah saat benar-benar keluar room.
+    expect(substr_count($src, "store('race').reset()"))->toBe(1);
+    expect($src)->not->toContain('this.$store.race.reset();');
+});
+
+it('scopes the store to one race so a rematch still starts clean', function () {
+    $src = arenaSource();
+
+    // raceKey = roomCode + waktu mulai. Rematch di room yang sama memakai
+    // race_starts_at baru -> key berubah -> store dibersihkan.
+    expect($src)->toContain('${this.roomCode}@${this.raceStartsAtMs')
+        ->and($src)->toContain('if (this.raceKey === key) return;');
+
+    // roomCode harus benar-benar dialirkan ke komponen, bukan cuma dipakai di raceKey().
+    expect($src)->toContain('roomCode: config.roomCode');
+    expect(renderTrack(racingRoom([['username' => 'Narutooo']])[0]))->toContain('roomCode: ');
+});
+
+it('keeps the race key stable for the whole race so sudden death does not wipe it', function () {
+    // raceKey dibangun dari race_starts_at. Kalau kolom itu pernah di-null-kan atau
+    // ditulis ulang di tengah balapan, key ikut berubah dan store dibersihkan --
+    // maskot semua pemain balik ke 0 saat sudden death.
+    $source = file_get_contents(app_path('Livewire/MultiplayerLobby.php'));
+
+    // Hanya SATU penulisan race_starts_at, yaitu saat balapan dimulai.
+    expect(substr_count($source, "'race_starts_at' =>"))->toBe(1);
+
+    // Nilainya tetap ada setelah balapan berjalan.
+    [$host, $room] = racingRoom([['username' => 'Narutooo']]);
+    expect($room->fresh()->race_starts_at)->not->toBeNull();
+    expect(renderTrack($host))->toContain('raceStartsAt: ');
+});
+
+it('keeps a finished player pinned at the finish line', function () {
+    $src = arenaSource();
+
+    // Paket WebSocket lama bisa menyusul setelah finish; jangan tarik mundur.
+    expect($src)->toContain('if (prev.finished)')
+        ->and($src)->toContain('next.progress = Math.max(next.progress, prev.progress);');
+});
+
 it('marks a finished player as finished rather than dropping the state', function () {
     [$host] = racingRoom([['username' => 'Narutooo', 'progress' => 100, 'finished' => 12]]);
 

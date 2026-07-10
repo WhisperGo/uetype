@@ -234,6 +234,7 @@
         <div wire:key="race-arena-{{ $this->roomCode }}" class="{{ $arenaDense ? 'space-y-4' : 'space-y-6' }}"
             x-data="raceArena({
                 myId: @js(Auth::id()),
+                roomCode: @js($this->roomCode),
                 textToType: @js($this->roomData->text_to_type),
                 raceStartsAt: @js($this->raceStartsAt),
                 serverNow: @js($this->serverNow),
@@ -661,15 +662,24 @@
                     Alpine.store('race', {
                         opponents: {},
                         apply(userId, data) {
-                            // Reassign object agar reaktivitas Alpine ter-trigger.
-                            this.opponents = {
-                                ...this.opponents,
-                                [userId]: {
-                                    progress: data.progress_percent ?? 0,
-                                    wpm: data.wpm ?? 0,
-                                    finished: !!data.finished,
-                                },
+                            const prev = this.opponents[userId];
+                            const next = {
+                                progress: data.progress_percent ?? 0,
+                                wpm: data.wpm ?? 0,
+                                finished: !!data.finished,
                             };
+
+                            if (prev) {
+                                // Pemain yang sudah finish tetap finish di 100%: paket lama
+                                // yang menyusul tak boleh menariknya mundur dari garis finis.
+                                if (prev.finished) {
+                                    next.finished = true;
+                                    next.progress = Math.max(next.progress, prev.progress);
+                                }
+                            }
+
+                            // Reassign object agar reaktivitas Alpine ter-trigger.
+                            this.opponents = { ...this.opponents, [userId]: next };
                         },
                         leaderId() {
                             let bestId = null;
@@ -696,8 +706,25 @@
                             }
                             return ahead + 1;
                         },
+                        // Race yang sedang "dimiliki" store ini. Dipakai untuk membedakan
+                        // "race baru" (boleh dibersihkan) dari "re-init race yang sama".
+                        raceKey: null,
+
                         reset() {
                             this.opponents = {};
+                            this.raceKey = null;
+                        },
+
+                        /**
+                         * Bersihkan HANYA kalau ini benar-benar race lain. Re-init pada race
+                         * yang sama (morph Livewire, sudden death, komponen di-mount ulang)
+                         * tak boleh menghapus posisi -- itulah yang dulu menarik semua maskot
+                         * kembali ke 0 saat pemain berhenti mengetik sejenak.
+                         */
+                        resetForRace(key) {
+                            if (this.raceKey === key) return;
+                            this.opponents = {};
+                            this.raceKey = key;
                         },
                     });
                 }
@@ -706,6 +733,7 @@
                     countdown: 3,
                     raceStarted: false,
                     myId: config.myId,
+                    roomCode: config.roomCode || '',
                     textToType: config.textToType || '',
                     // Waktu absolut (ms epoch) race mulai, dari server - countdown dihitung mundur ke titik ini agar sinkron antar layar.
                     raceStartsAtMs: config.raceStartsAt ? new Date(config.raceStartsAt).getTime() : null,
@@ -742,9 +770,12 @@
                     init() {
                         this.words = this.textToType.split(' ');
 
-                        // Bersihkan posisi lawan dari race sebelumnya; jangan hapus kalau sudden death aktif (re-init di tengah race).
-                        if (!this.suddenDeathActive && this.$store.race) {
-                            this.$store.race.reset();
+                        // Bersihkan posisi HANYA saat masuk race yang berbeda. Kalau komponen
+                        // ini di-init ulang untuk race yang sama (morph Livewire, sudden death),
+                        // posisi tiap maskot dipertahankan -- kalau dihapus, semua lane jatuh
+                        // ke seed lama (0) sampai payload berikutnya tiba.
+                        if (this.$store.race) {
+                            this.$store.race.resetForRace(this.raceKey());
                         }
 
                         // Sudden death aktif saat (re)init = race sudah berjalan -> skip overlay countdown.
@@ -767,6 +798,12 @@
                         // Bridge event .race.sudden_death -> hitung mundur komponen ini. Disimpan agar bisa di-remove saat destroy.
                         this._onSuddenDeath = (ev) => this.syncSuddenDeath(ev.detail.remaining);
                         window.addEventListener('race-sudden-death', this._onSuddenDeath);
+                    },
+
+                    // Identitas satu balapan: room + waktu mulai. Rematch di room yang sama
+                    // memakai race_starts_at baru -> key berubah -> store dibersihkan.
+                    raceKey() {
+                        return `${this.roomCode}@${this.raceStartsAtMs ?? 'pending'}`;
                     },
 
                     // Waktu lokal yang sudah diselaraskan ke jam server (Date.now() + offset).
