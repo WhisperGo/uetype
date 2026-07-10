@@ -236,6 +236,7 @@
                 myId: @js(Auth::id()),
                 textToType: @js($this->roomData->text_to_type),
                 raceStartsAt: @js($this->raceStartsAt),
+                serverNow: @js($this->serverNow),
                 suddenDeathActive: @js($this->suddenDeathActive),
                 suddenDeathRemaining: @js($this->suddenDeathRemaining),
             })"
@@ -670,6 +671,8 @@
                     textToType: config.textToType || '',
                     // Waktu absolut (ms epoch) race mulai, dari server - countdown dihitung mundur ke titik ini agar sinkron antar layar.
                     raceStartsAtMs: config.raceStartsAt ? new Date(config.raceStartsAt).getTime() : null,
+                    // offset = jam server saat render - jam lokal; menyelaraskan Date.now() ke jam server agar countdown sinkron antar layar.
+                    clockOffsetMs: config.serverNow ? new Date(config.serverNow).getTime() - Date.now() : 0,
                     _countdownInterval: null,
                     words: [],
                     currentWordIndex: 0,
@@ -728,6 +731,11 @@
                         window.addEventListener('race-sudden-death', this._onSuddenDeath);
                     },
 
+                    // Waktu lokal yang sudah diselaraskan ke jam server (Date.now() + offset).
+                    serverNow() {
+                        return Date.now() + this.clockOffsetMs;
+                    },
+
                     // Berbasis waktu absolut server, bukan interval lokal, agar semua layar sinkron.
                     startSyncedCountdown() {
                         const tick = () => {
@@ -737,7 +745,7 @@
                                 return;
                             }
 
-                            const remainingMs = this.raceStartsAtMs - Date.now();
+                            const remainingMs = this.raceStartsAtMs - this.serverNow();
 
                             if (remainingMs <= 0) {
                                 this.countdown = 'GO!';

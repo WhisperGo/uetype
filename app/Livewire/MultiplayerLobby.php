@@ -642,6 +642,12 @@ class MultiplayerLobby extends Component
             : null;
     }
 
+    /** Waktu server saat render; klien pakai untuk hitung offset jam agar countdown sinkron. */
+    public function getServerNowProperty(): string
+    {
+        return now()->toIso8601String();
+    }
+
     public function render()
     {
         // Penjaga terakhir sebelum view dievaluasi: kalau masih menahan roomCode
