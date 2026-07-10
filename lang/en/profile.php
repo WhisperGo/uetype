@@ -2,11 +2,11 @@
 
 return [
     'header' => 'Profile',
+    'header_public' => 'Player Profile',
+    'back' => 'Back',
     'joined' => 'Joined :date',
     'level' => 'Level :level',
     'clan_role_member' => 'member',
-    'elo' => 'ELO',
-    'ranking' => 'Ranking',
 
     'tab' => [
         'stats' => 'Statistics',
@@ -19,8 +19,8 @@ return [
         'avg_accuracy' => 'Average Accuracy',
         'total_tests' => 'Total Tests',
         'total_time' => 'Total Time',
+        'level' => 'Level',
         'xp' => 'XP',
-        'coins' => 'Coins',
         'best_wpm' => 'Best WPM',
     ],
 
@@ -33,7 +33,8 @@ return [
     'th_wpm' => 'WPM',
     'th_accuracy' => 'Accuracy',
     'no_history' => 'No typing history yet.',
-    'start_first' => 'Start your first test →',
+    'no_history_public' => ':name has no typing history yet.',
+    'start_first' => 'Start your first test -',
 
     'records' => [
         'time_mode' => 'Time Mode',
@@ -50,8 +51,5 @@ return [
         'survival_desc' => 'Longest survival duration without running out of life',
         'survival_empty' => 'No records for survival mode yet.',
         'difficulty' => 'Difficulty',
-
-        'quote_mode' => 'Quote Mode',
-        'quote_desc' => 'Records for typing full quotes',
     ],
 ];

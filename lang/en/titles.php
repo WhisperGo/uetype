@@ -5,7 +5,7 @@ return [
     'template' => ':page | :brand',
 
     'pages' => [
-        'profile.edit' => 'Profile',
+        'profile.me' => 'Profile',
         'profile.show' => 'Player Profile',
         'settings' => 'Settings',
         'achievements.index' => 'Achievements',

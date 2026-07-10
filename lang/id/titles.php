@@ -5,7 +5,7 @@ return [
     'template' => ':page | :brand',
 
     'pages' => [
-        'profile.edit' => 'Profil',
+        'profile.me' => 'Profil',
         'profile.show' => 'Profil Pemain',
         'settings' => 'Pengaturan',
         'achievements.index' => 'Pencapaian',

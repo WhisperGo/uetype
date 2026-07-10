@@ -35,7 +35,7 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::get('/profile', [ProfileController::class, 'me'])->name('profile.me');
 
     // Profil publik user lain (dibuka dari daftar teman / hasil pencarian).
     // Dirujuk lewat username, bukan ID, supaya ID user (dan jumlah total

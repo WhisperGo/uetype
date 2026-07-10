@@ -2,11 +2,11 @@
 
 return [
     'header' => 'Profil',
+    'header_public' => 'Profil Pemain',
+    'back' => 'Kembali',
     'joined' => 'Bergabung :date',
     'level' => 'Level :level',
     'clan_role_member' => 'anggota',
-    'elo' => 'ELO',
-    'ranking' => 'Peringkat',
 
     'tab' => [
         'stats' => 'Statistik',
@@ -19,8 +19,8 @@ return [
         'avg_accuracy' => 'Rata-rata Akurasi',
         'total_tests' => 'Total Tes',
         'total_time' => 'Total Waktu',
+        'level' => 'Level',
         'xp' => 'XP',
-        'coins' => 'Koin',
         'best_wpm' => 'Best WPM',
     ],
 
@@ -33,7 +33,8 @@ return [
     'th_wpm' => 'WPM',
     'th_accuracy' => 'Akurasi',
     'no_history' => 'Belum ada riwayat mengetik.',
-    'start_first' => 'Mulai tes pertamamu →',
+    'no_history_public' => ':name belum punya riwayat mengetik.',
+    'start_first' => 'Mulai tes pertamamu -',
 
     'records' => [
         'time_mode' => 'Time Mode',
@@ -50,8 +51,5 @@ return [
         'survival_desc' => 'Rekor durasi bertahan terlama tanpa kehabisan nyawa',
         'survival_empty' => 'Belum ada riwayat rekor untuk mode survival.',
         'difficulty' => 'Difficulty',
-
-        'quote_mode' => 'Quote Mode',
-        'quote_desc' => 'Rekor pengetikan kalimat kutipan utuh',
     ],
 ];

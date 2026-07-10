@@ -12,21 +12,21 @@ use Illuminate\View\View;
 class ProfileController extends Controller
 {
     /**
-     * Display the user's profile form.
+     * Profil sendiri (privat): menampilkan semua field termasuk email, koin, total XP.
      */
-    public function edit(Request $request): View
+    public function me(Request $request): View
     {
-        return view('profile.edit', $this->profilePayload($request->user()));
+        return view('profile.show', $this->profilePayload($request->user()));
     }
 
     /**
      * Profil publik milik user lain: tanpa field privat (email, koin, total XP).
-     * Kalau membuka profil sendiri lewat rute ini, arahkan ke /profile penuh.
+     * Kalau membuka profil sendiri lewat rute ini, arahkan ke profil penuh sendiri.
      */
     public function show(Request $request, User $user): View
     {
         if ($request->user() && $request->user()->id === $user->id) {
-            return $this->edit($request);
+            return $this->me($request);
         }
 
         return view('profile.show', $this->profilePayload($user, public: true));

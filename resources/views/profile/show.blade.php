@@ -1,11 +1,15 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center gap-3">
-            <a href="{{ route('friends.index') }}" class="text-muted hover:text-foreground transition" aria-label="{{ __('Kembali') }}">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
-            </a>
+            @if($isPublic)
+                <a href="{{ route('friends.index') }}" wire:navigate class="text-muted hover:text-foreground transition" aria-label="{{ __('profile.back') }}">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </a>
+            @endif
             <h2 class="font-mono text-xl font-semibold tracking-tight text-foreground">
-                {{ __('Profil Pemain') }}
+                {{ $isPublic ? __('profile.header_public') : __('profile.header') }}
             </h2>
         </div>
     </x-slot>
@@ -15,14 +19,17 @@
         $hours = intdiv($totalSeconds, 3600);
         $minutes = intdiv($totalSeconds % 3600, 60);
         $timeLabel = $hours > 0 ? "{$hours}j {$minutes}m" : "{$minutes}m";
+
+        $timeRecords = $bestRecords->where('mode', 'time');
+        $wordsRecords = $bestRecords->where('mode', 'words');
+        $survivalRecords = $bestRecords->where('mode', 'survival');
     @endphp
 
-    <div class="py-10" x-data="{ activeTab: 'stats' }">
+    <div class="py-10">
         <div class="max-w-5xl px-4 mx-auto space-y-8 sm:px-6 lg:px-8">
 
             <!-- ===== IDENTITY HEADER ===== -->
-            <div class="relative p-6 overflow-hidden border bg-surface/70 border-white/10 rounded-3xl sm:p-8 shadow-glow">
-                <div class="absolute w-48 h-48 rounded-full -top-16 -right-16 bg-brand/10 blur-3xl"></div>
+            <div class="relative p-6 overflow-hidden border bg-surface/70 border-white/10 rounded-3xl sm:p-8">
                 <div class="relative flex flex-col gap-6 sm:flex-row sm:items-center">
 
                     <!-- Avatar Google / fallback inisial -->
@@ -42,270 +49,189 @@
                             <h1 class="font-mono text-2xl font-bold text-foreground">{{ $user->username }}</h1>
                             @if($user->clan)
                                 <span class="px-2 py-0.5 rounded-md bg-brand/15 text-brand-bright text-xs font-mono font-semibold">
-                                    [{{ $user->clan->tag }}] {{ ucfirst($user->clan_role ?? 'member') }}
+                                    [{{ $user->clan->tag }}] {{ ucfirst($user->clan_role ?? __('profile.clan_role_member')) }}
                                 </span>
                             @endif
-                            <span class="px-2 py-0.5 rounded-md bg-white/5 text-muted text-xs font-mono">Level {{ $stats['level'] }}</span>
+                            <span class="px-2 py-0.5 rounded-md bg-white/5 text-muted text-xs font-mono">{{ __('profile.level', ['level' => $stats['level']]) }}</span>
                         </div>
-                        {{-- Profil publik: TANPA email. Hanya tanggal bergabung. --}}
+
+                        {{-- Email hanya di profil sendiri (privat). --}}
+                        @if(! $isPublic)
+                            <p class="mt-1 font-mono text-sm text-muted">{{ $user->email }}</p>
+                        @endif
+
                         <p class="mt-1 text-xs text-muted">
-                            Bergabung @localtime($user->joined_at ?? $user->created_at, 'd F Y')
+                            {{ __('profile.joined', ['date' => \App\Support\AppTime::format($user->joined_at ?? $user->created_at, 'd F Y')]) }}
                         </p>
+
                         <div class="max-w-xs mt-3">
                             <div class="flex justify-between text-[0.65rem] text-muted font-mono mb-1">
                                 <span>{{ $stats['level_progress'] }} / {{ $stats['level_needed'] }} XP</span>
-                                <span>Level {{ $stats['level'] + 1 }}</span>
+                                <span>{{ __('profile.level', ['level' => $stats['level'] + 1]) }}</span>
                             </div>
                             <div class="h-2 overflow-hidden rounded-full bg-white/5">
                                 <div class="h-full rounded-full bg-gradient-to-r from-brand to-gold" style="width: {{ $stats['level_needed'] > 0 ? ($stats['level_progress'] / $stats['level_needed']) * 100 : 0 }}%"></div>
                             </div>
                         </div>
 
-                        {{-- Aksi pertemanan (Livewire, real-time). --}}
-                        <div class="mt-4">
-                            <livewire:friend-button :target="$user" :key="'friend-btn-'.$user->id" />
-                        </div>
-                    </div>
-                    <div class="pt-4 text-center border-t sm:text-right shrink-0 sm:border-t-0 sm:border-l border-white/10 sm:pt-0 sm:pl-6">
-                        <p class="text-xs uppercase tracking-[0.2em] text-muted font-mono">ELO</p>
-                        <p class="mt-1 font-mono text-3xl sm:text-4xl font-bold leading-none text-gold">{{ $user->elo_rating ?? 0 }}</p>
-                        <p class="mt-1 text-xs text-muted">Ranking</p>
+                        {{-- Aksi pertemanan hanya di profil publik user lain (real-time). --}}
+                        @if($isPublic)
+                            <div class="mt-4">
+                                <livewire:friend-button :target="$user" :key="'friend-btn-'.$user->id" />
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
 
-            <!-- Tabs -->
-            <div class="border-b border-white/10">
-                <nav class="flex gap-6 -mb-px" aria-label="Tabs">
-                    <button @click="activeTab = 'stats'"
-                            :class="activeTab === 'stats' ? 'border-brand-bright text-brand-bright' : 'border-transparent text-muted hover:text-foreground'"
-                            class="px-1 py-3 font-mono text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
-                        Statistik
-                    </button>
-                    <button @click="activeTab = 'BestRecords'"
-                            :class="activeTab === 'BestRecords' ? 'border-brand-bright text-brand-bright' : 'border-transparent text-muted hover:text-foreground'"
-                            class="px-1 py-3 font-mono text-sm font-semibold transition-colors border-b-2 whitespace-nowrap">
-                        Rekor Terbaik
-                    </button>
-                </nav>
-            </div>
-
-            <!-- ===== STATS TAB ===== -->
-            <div x-show="activeTab === 'stats'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="space-y-6">
-
-                {{-- Profil publik: hanya kartu statistik ketik. TANPA XP total, koin, dsb. --}}
-                <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    @php
-                        $cards = [
-                            ['label' => 'WPM Tertinggi', 'value' => rtrim(rtrim(number_format($user->highest_wpm, 1), '0'), '.'), 'accent' => 'text-brand-bright'],
-                            ['label' => 'Rata-rata WPM', 'value' => $stats['avg_wpm'], 'accent' => 'text-gold'],
-                            ['label' => 'Rata-rata Akurasi', 'value' => $stats['avg_accuracy'].'%', 'accent' => 'text-gold'],
-                            ['label' => 'Total Tes', 'value' => $stats['total_matches'], 'accent' => 'text-foreground'],
-                        ];
-                    @endphp
-                    @foreach($cards as $card)
-                        <div class="p-5 border bg-surface/60 border-white/5 rounded-2xl">
-                            <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ $card['label'] }}</p>
-                            <p class="text-3xl font-bold font-mono tabular-nums {{ $card['accent'] }}">{{ $card['value'] }}</p>
-                        </div>
-                    @endforeach
-                </div>
-
-                <div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
-                    <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">Total Waktu</p>
-                        <p class="font-mono text-2xl font-bold text-foreground tabular-nums">{{ $timeLabel }}</p>
-                    </div>
-                    <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">Level</p>
-                        <p class="font-mono text-2xl font-bold text-gold tabular-nums">{{ $stats['level'] }}</p>
-                    </div>
-                    <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">Best WPM</p>
-                        <p class="font-mono text-2xl font-bold text-brand-bright tabular-nums">{{ $stats['best_wpm'] }}</p>
-                    </div>
-                </div>
-
-                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl sm:p-6">
-                    <h3 class="mb-4 font-mono text-sm font-semibold text-foreground">Progres WPM (tes terakhir)</h3>
-                    @if(count($wpmProgress) >= 2)
-                        <div class="w-full h-48" wire:ignore>
-                            <canvas id="profileWpmChart"></canvas>
-                        </div>
-                    @else
-                        <p class="font-mono text-sm text-muted">Belum cukup data untuk menampilkan progres.</p>
-                    @endif
-                </div>
-
-                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl sm:p-6">
-                    <h3 class="mb-4 font-mono text-sm font-semibold text-foreground">Riwayat Pertandingan Terakhir</h3>
-                    @if(isset($recentMatches) && $recentMatches->count() > 0)
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left">
-                                <thead>
-                                    <tr class="font-mono text-xs tracking-wider uppercase text-muted">
-                                        <th class="pb-3 font-semibold">Tanggal</th>
-                                        <th class="pb-3 font-semibold">Mode</th>
-                                        <th class="pb-3 font-semibold text-right">WPM</th>
-                                        <th class="pb-3 font-semibold text-right">Akurasi</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="font-mono text-sm">
-                                    @foreach($recentMatches as $p)
-                                    <tr class="border-t border-white/5">
-                                        <td class="py-2.5 text-muted">@localtime($p->created_at, 'd M Y H:i')</td>
-                                        <td class="py-2.5 text-foreground capitalize">
-                                            {{ $p->mode?->value ?? 'practice' }}
-                                        </td>
-                                        <td class="py-2.5 text-right text-brand-bright font-bold tabular-nums">{{ rtrim(rtrim(number_format($p->net_wpm, 1), '0'), '.') }}</td>
-                                        <td class="py-2.5 text-right text-foreground tabular-nums">{{ rtrim(rtrim(number_format($p->accuracy, 1), '0'), '.') }}%</td>
-                                    </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @else
-                        <p class="font-mono text-sm text-muted">{{ $user->username }} belum punya riwayat mengetik.</p>
-                    @endif
-                </div>
-            </div>
-
-            <!-- ===== BEST RECORDS TAB ===== -->
-            <div x-show="activeTab === 'BestRecords'"
-                 x-transition:enter="transition ease-out duration-300"
-                 x-transition:enter-start="opacity-0 translate-y-2"
-                 x-transition:enter-end="opacity-100 translate-y-0"
-                 style="display: none;"
-                 class="space-y-4"
-                 x-data="{ openMode: 'time' }">
+            <!-- ===== STATISTIK ===== -->
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 @php
-                    $timeRecords = $bestRecords->where('mode', 'time');
-                    $wordsRecords = $bestRecords->where('mode', 'words');
-                    $survivalRecords = $bestRecords->where('mode', 'survival');
-                    $quoteRecords = $bestRecords->where('mode', 'quote');
+                    $cards = [
+                        ['label' => __('profile.card.highest_wpm'), 'value' => rtrim(rtrim(number_format($user->highest_wpm, 1), '0'), '.'), 'accent' => 'text-brand-bright'],
+                        ['label' => __('profile.card.avg_wpm'), 'value' => $stats['avg_wpm'], 'accent' => 'text-gold'],
+                        ['label' => __('profile.card.avg_accuracy'), 'value' => $stats['avg_accuracy'].'%', 'accent' => 'text-gold'],
+                        ['label' => __('profile.card.total_tests'), 'value' => $stats['total_matches'], 'accent' => 'text-foreground'],
+                    ];
                 @endphp
-
-                <div class="overflow-hidden border bg-surface/40 border-white/5 rounded-2xl">
-                    <button @click="openMode = (openMode === 'time' ? '' : 'time')"
-                            class="flex items-center justify-between w-full p-5 font-mono text-left transition-colors hover:bg-white/5">
-                        <div class="flex items-center gap-3">
-                            <span class="text-xl">⏱️</span>
-                            <div>
-                                <h4 class="text-sm font-semibold capitalize text-foreground">Time Mode</h4>
-                                <p class="text-xs text-muted font-mono mt-0.5">Rekor berdasarkan durasi waktu pengetikan</p>
-                            </div>
-                        </div>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-200 text-muted" :class="openMode === 'time' ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-
-                    <div x-show="openMode === 'time'" x-collapse class="px-5 pt-4 pb-5 border-t border-white/5 bg-background/20">
-                        @if($timeRecords->count() > 0)
-                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                @foreach($timeRecords as $record)
-                                    <div class="p-4 border bg-surface/60 border-white/5 rounded-2xl">
-                                        <span class="text-[0.65rem] uppercase tracking-wider text-muted font-mono">{{ $record->mode_config }} Detik</span>
-                                        <p class="mt-1 font-mono text-xl font-bold text-brand-bright tabular-nums">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @else
-                            <p class="py-2 font-mono text-xs text-muted">Belum ada riwayat rekor untuk mode waktu.</p>
-                        @endif
+                @foreach($cards as $card)
+                    <div class="p-5 border bg-surface/60 border-white/5 rounded-2xl">
+                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ $card['label'] }}</p>
+                        <p class="text-3xl font-bold font-mono tabular-nums {{ $card['accent'] }}">{{ $card['value'] }}</p>
                     </div>
+                @endforeach
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 {{ $isPublic ? 'lg:grid-cols-3' : 'lg:grid-cols-4' }}">
+                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
+                    <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ __('profile.card.total_time') }}</p>
+                    <p class="font-mono text-2xl font-bold text-foreground tabular-nums">{{ $timeLabel }}</p>
+                </div>
+                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
+                    <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ __('profile.card.best_wpm') }}</p>
+                    <p class="font-mono text-2xl font-bold text-brand-bright tabular-nums">{{ $stats['best_wpm'] }}</p>
+                </div>
+                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
+                    <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ __('profile.card.level') }}</p>
+                    <p class="font-mono text-2xl font-bold text-gold tabular-nums">{{ $stats['level'] }}</p>
                 </div>
 
-                <div class="overflow-hidden border bg-surface/40 border-white/5 rounded-2xl">
-                    <button @click="openMode = (openMode === 'words' ? '' : 'words')"
-                            class="flex items-center justify-between w-full p-5 font-mono text-left transition-colors hover:bg-white/5">
-                        <div class="flex items-center gap-3">
-                            <span class="text-xl">🔤</span>
-                            <div>
-                                <h4 class="text-sm font-semibold capitalize text-foreground">Words Mode</h4>
-                                <p class="text-xs text-muted font-mono mt-0.5">Rekor berdasarkan volume target jumlah kata</p>
-                            </div>
-                        </div>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-200 text-muted" :class="openMode === 'words' ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-
-                    <div x-show="openMode === 'words'" x-collapse class="px-5 pt-4 pb-5 border-t border-white/5 bg-background/20">
-                        @if($wordsRecords->count() > 0)
-                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                @foreach($wordsRecords as $record)
-                                    <div class="p-4 border bg-surface/60 border-white/5 rounded-2xl">
-                                        <span class="text-[0.65rem] uppercase tracking-wider text-muted font-mono">{{ $record->mode_config }} Kata</span>
-                                        <p class="mt-1 font-mono text-xl font-bold text-gold tabular-nums">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @else
-                            <p class="py-2 font-mono text-xs text-muted">Belum ada riwayat rekor untuk mode jumlah kata.</p>
-                        @endif
+                {{-- Kartu privat: hanya profil sendiri. --}}
+                @if(! $isPublic)
+                    <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
+                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ __('profile.card.xp') }}</p>
+                        <p class="font-mono text-2xl font-bold text-gold tabular-nums">{{ $user->total_xp ?? 0 }}</p>
                     </div>
-                </div>
+                @endif
+            </div>
 
-                <div class="overflow-hidden border bg-surface/40 border-white/5 rounded-2xl">
-                    <button @click="openMode = (openMode === 'survival' ? '' : 'survival')"
-                            class="flex items-center justify-between w-full p-5 font-mono text-left transition-colors hover:bg-white/5">
-                        <div class="flex items-center gap-3">
-                            <span class="text-xl">❤️</span>
-                            <div>
-                                <h4 class="text-sm font-semibold capitalize text-foreground">Survival Mode</h4>
-                                <p class="text-xs text-muted font-mono mt-0.5">Rekor durasi bertahan terlama tanpa kehabisan nyawa</p>
-                            </div>
-                        </div>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-200 text-muted" :class="openMode === 'survival' ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-
-                    <div x-show="openMode === 'survival'" x-collapse class="px-5 pt-4 pb-5 border-t border-white/5 bg-background/20">
-                        @if($survivalRecords->count() > 0)
-                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                @foreach($survivalRecords as $record)
-                                    <div class="p-4 border bg-surface/60 border-white/5 rounded-2xl">
-                                        <span class="text-[0.65rem] uppercase tracking-wider text-muted font-mono capitalize">{{ $record->mode_config }} Difficulty</span>
-                                        <p class="mt-1 font-mono text-xl font-bold text-gold tabular-nums">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @else
-                            <p class="py-2 font-mono text-xs text-muted">Belum ada riwayat rekor untuk mode survival.</p>
-                        @endif
+            <!-- ===== PROGRES WPM ===== -->
+            <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl sm:p-6">
+                <h3 class="mb-4 font-mono text-sm font-semibold text-foreground">{{ __('profile.wpm_progress') }}</h3>
+                @if(count($wpmProgress) >= 2)
+                    <div class="w-full h-48" wire:ignore>
+                        <canvas id="profileWpmChart"></canvas>
                     </div>
-                </div>
+                @else
+                    <p class="font-mono text-sm text-muted">{{ __('profile.wpm_progress_empty') }}</p>
+                @endif
+            </div>
 
-                @if($quoteRecords->count() > 0)
-                <div class="overflow-hidden border bg-surface/40 border-white/5 rounded-2xl">
-                    <button @click="openMode = (openMode === 'quote' ? '' : 'quote')"
-                            class="flex items-center justify-between w-full p-5 font-mono text-left transition-colors hover:bg-white/5">
-                        <div class="flex items-center gap-3">
-                            <span class="text-xl">💬</span>
-                            <div>
-                                <h4 class="text-sm font-semibold capitalize text-foreground">Quote Mode</h4>
-                                <p class="text-xs text-muted font-mono mt-0.5">Rekor pengetikan kalimat kutipan utuh</p>
-                            </div>
-                        </div>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-200 text-muted" :class="openMode === 'quote' ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
+            <!-- ===== RIWAYAT PERTANDINGAN TERAKHIR ===== -->
+            <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl sm:p-6">
+                <h3 class="mb-4 font-mono text-sm font-semibold text-foreground">{{ __('profile.recent_matches') }}</h3>
+                @if(isset($recentMatches) && $recentMatches->count() > 0)
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="font-mono text-xs tracking-wider uppercase text-muted">
+                                    <th class="pb-3 font-semibold">{{ __('profile.th_date') }}</th>
+                                    <th class="pb-3 font-semibold">{{ __('profile.th_mode') }}</th>
+                                    <th class="pb-3 font-semibold text-right">{{ __('profile.th_wpm') }}</th>
+                                    <th class="pb-3 font-semibold text-right">{{ __('profile.th_accuracy') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="font-mono text-sm">
+                                @foreach($recentMatches as $p)
+                                <tr class="border-t border-white/5">
+                                    <td class="py-2.5 text-muted">@localtime($p->created_at, 'd M Y H:i')</td>
+                                    <td class="py-2.5 text-foreground capitalize">{{ $p->mode?->value ?? 'practice' }}</td>
+                                    <td class="py-2.5 text-right text-brand-bright font-bold tabular-nums">{{ rtrim(rtrim(number_format($p->net_wpm, 1), '0'), '.') }}</td>
+                                    <td class="py-2.5 text-right text-foreground tabular-nums">{{ rtrim(rtrim(number_format($p->accuracy, 1), '0'), '.') }}%</td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    @if($isPublic)
+                        <p class="font-mono text-sm text-muted">{{ __('profile.no_history_public', ['name' => $user->username]) }}</p>
+                    @else
+                        <p class="font-mono text-sm text-muted">{{ __('profile.no_history') }} <a href="{{ url('/typing') }}" class="text-brand-bright hover:underline">{{ __('profile.start_first') }}</a></p>
+                    @endif
+                @endif
+            </div>
 
-                    <div x-show="openMode === 'quote'" x-collapse class="px-5 pt-4 pb-5 border-t border-white/5 bg-background/20">
-                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                            @foreach($quoteRecords as $record)
+            <!-- ===== REKOR TERBAIK ===== -->
+            <div class="space-y-4">
+                <h3 class="font-mono text-sm font-semibold text-foreground">{{ __('profile.tab.best_records') }}</h3>
+
+                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
+                    <div class="mb-3">
+                        <h4 class="text-sm font-semibold text-foreground">{{ __('profile.records.time_mode') }}</h4>
+                        <p class="text-xs text-muted font-mono mt-0.5">{{ __('profile.records.time_desc') }}</p>
+                    </div>
+                    @if($timeRecords->count() > 0)
+                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            @foreach($timeRecords as $record)
                                 <div class="p-4 border bg-surface/60 border-white/5 rounded-2xl">
-                                    <span class="text-[0.65rem] uppercase tracking-wider text-muted font-mono capitalize">{{ $record->mode_config }}</span>
+                                    <span class="text-[0.65rem] uppercase tracking-wider text-muted font-mono">{{ $record->mode_config }} {{ __('profile.records.seconds') }}</span>
                                     <p class="mt-1 font-mono text-xl font-bold text-brand-bright tabular-nums">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
                                 </div>
                             @endforeach
                         </div>
-                    </div>
+                    @else
+                        <p class="py-2 font-mono text-xs text-muted">{{ __('profile.records.time_empty') }}</p>
+                    @endif
                 </div>
-                @endif
+
+                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
+                    <div class="mb-3">
+                        <h4 class="text-sm font-semibold text-foreground">{{ __('profile.records.words_mode') }}</h4>
+                        <p class="text-xs text-muted font-mono mt-0.5">{{ __('profile.records.words_desc') }}</p>
+                    </div>
+                    @if($wordsRecords->count() > 0)
+                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            @foreach($wordsRecords as $record)
+                                <div class="p-4 border bg-surface/60 border-white/5 rounded-2xl">
+                                    <span class="text-[0.65rem] uppercase tracking-wider text-muted font-mono">{{ $record->mode_config }} {{ __('profile.records.words') }}</span>
+                                    <p class="mt-1 font-mono text-xl font-bold text-gold tabular-nums">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <p class="py-2 font-mono text-xs text-muted">{{ __('profile.records.words_empty') }}</p>
+                    @endif
+                </div>
+
+                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
+                    <div class="mb-3">
+                        <h4 class="text-sm font-semibold text-foreground">{{ __('profile.records.survival_mode') }}</h4>
+                        <p class="text-xs text-muted font-mono mt-0.5">{{ __('profile.records.survival_desc') }}</p>
+                    </div>
+                    @if($survivalRecords->count() > 0)
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            @foreach($survivalRecords as $record)
+                                <div class="p-4 border bg-surface/60 border-white/5 rounded-2xl">
+                                    <span class="text-[0.65rem] uppercase tracking-wider text-muted font-mono">{{ $record->mode_config }} {{ __('profile.records.difficulty') }}</span>
+                                    <p class="mt-1 font-mono text-xl font-bold text-gold tabular-nums">{{ round($record->high_wpm) }} <span class="text-xs font-normal text-foreground">WPM</span></p>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <p class="py-2 font-mono text-xs text-muted">{{ __('profile.records.survival_empty') }}</p>
+                    @endif
+                </div>
             </div>
 
         </div>
