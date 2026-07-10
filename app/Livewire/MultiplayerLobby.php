@@ -642,10 +642,28 @@ class MultiplayerLobby extends Component
             : null;
     }
 
-    /** Waktu server saat render; klien pakai untuk hitung offset jam agar countdown sinkron. */
-    public function getServerNowProperty(): string
+    /**
+     * Sisa milidetik menuju start, dihitung SERVER saat render.
+     *
+     * Ini sengaja bukan "jam server" absolut: membandingkan jam server dengan
+     * Date.now() klien menghitung latensi jaringan sebagai selisih jam, dan
+     * toIso8601String() memotong milidetik (galat sampai 1 detik). Dengan durasi
+     * relatif, jam klien & zona waktu tak lagi relevan -- klien cukup menghitung
+     * mundur sebanyak ini sejak halaman diterima.
+     *
+     * null kalau race belum dijadwalkan.
+     */
+    public function getRaceStartsInMsProperty(): ?int
     {
-        return now()->toIso8601String();
+        $room = $this->roomData;
+
+        if (! $room || ! $room->race_starts_at) {
+            return null;
+        }
+
+        // Boleh negatif -> race sudah lewat titik mulai (mis. pemain refresh di
+        // tengah balapan); klien langsung masuk race tanpa countdown.
+        return (int) round((float) now()->diffInMilliseconds($room->race_starts_at, false));
     }
 
     public function render()
@@ -693,7 +711,10 @@ class MultiplayerLobby extends Component
         $this->hasGivenUp = false;
         $this->resultSnapshot = [];
 
-        SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
+        // toOthers(): host SUDAH masuk 'racing' di baris atas. Tanpa ini host ikut
+        // menerima room.updated-nya sendiri -> Livewire re-render di tengah hitung
+        // mundur -> arena di-morph -> countdown Alpine mulai lagi dari awal.
+        SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
     }
 
     public function checkRoomStatus(): void

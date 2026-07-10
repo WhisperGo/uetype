@@ -237,7 +237,7 @@
                 roomCode: @js($this->roomCode),
                 textToType: @js($this->roomData->text_to_type),
                 raceStartsAt: @js($this->raceStartsAt),
-                serverNow: @js($this->serverNow),
+                raceStartsInMs: @js($this->raceStartsInMs),
                 suddenDeathActive: @js($this->suddenDeathActive),
                 suddenDeathRemaining: @js($this->suddenDeathRemaining),
             })"
@@ -710,9 +710,32 @@
                         // "race baru" (boleh dibersihkan) dari "re-init race yang sama".
                         raceKey: null,
 
+                        // Tenggat countdown pada jam MONOTONIK (performance.now()), bukan
+                        // Date.now(). Disimpan di store, bukan di komponen, supaya morph
+                        // Livewire / re-init Alpine tak pernah mengulang hitung mundur.
+                        deadline: null,
+
+                        /**
+                         * Kunci tenggat SEKALI per race. Panggilan berikutnya untuk race yang
+                         * sama diabaikan, jadi countdown terus berjalan menuju tenggat semula.
+                         * `remainingMs` datang dari server (sisa waktu saat halaman dirender).
+                         */
+                        armCountdown(key, remainingMs) {
+                            if (this.raceKey === key && this.deadline !== null) return;
+                            this.raceKey = key;
+                            this.deadline = performance.now() + remainingMs;
+                        },
+
+                        /** Sisa milidetik menuju start; <= 0 berarti race sudah boleh mulai. */
+                        remainingMs() {
+                            if (this.deadline === null) return 0;
+                            return this.deadline - performance.now();
+                        },
+
                         reset() {
                             this.opponents = {};
                             this.raceKey = null;
+                            this.deadline = null;
                         },
 
                         /**
@@ -725,6 +748,7 @@
                             if (this.raceKey === key) return;
                             this.opponents = {};
                             this.raceKey = key;
+                            this.deadline = null; // race lain -> tenggat lama tak berlaku
                         },
                     });
                 }
@@ -735,10 +759,12 @@
                     myId: config.myId,
                     roomCode: config.roomCode || '',
                     textToType: config.textToType || '',
-                    // Waktu absolut (ms epoch) race mulai, dari server - countdown dihitung mundur ke titik ini agar sinkron antar layar.
+                    // Waktu absolut (ms epoch) race mulai; hanya dipakai sebagai titik awal WPM
+                    // & identitas race, BUKAN untuk countdown (jam klien tak bisa dipercaya).
                     raceStartsAtMs: config.raceStartsAt ? new Date(config.raceStartsAt).getTime() : null,
-                    // offset = jam server saat render - jam lokal; menyelaraskan Date.now() ke jam server agar countdown sinkron antar layar.
-                    clockOffsetMs: config.serverNow ? new Date(config.serverNow).getTime() - Date.now() : 0,
+                    // Sisa waktu menuju start menurut SERVER saat halaman ini dirender.
+                    // null = race belum dijadwalkan.
+                    raceStartsInMs: config.raceStartsInMs ?? null,
                     _countdownInterval: null,
                     words: [],
                     currentWordIndex: 0,
@@ -806,21 +832,31 @@
                         return `${this.roomCode}@${this.raceStartsAtMs ?? 'pending'}`;
                     },
 
-                    // Waktu lokal yang sudah diselaraskan ke jam server (Date.now() + offset).
-                    serverNow() {
-                        return Date.now() + this.clockOffsetMs;
-                    },
-
-                    // Berbasis waktu absolut server, bukan interval lokal, agar semua layar sinkron.
+                    /**
+                     * Hitung mundur ke tenggat yang dikunci di store saat race ini pertama
+                     * kali terlihat. Karena tenggatnya monotonik & di luar komponen, morph
+                     * Livewire atau re-init Alpine hanya melanjutkan hitungan yang sama --
+                     * tidak pernah mengulanginya dari 3.
+                     */
                     startSyncedCountdown() {
-                        const tick = () => {
-                            // Fallback jika server tidak mengirim raceStartsAt.
-                            if (!this.raceStartsAtMs) {
-                                this.beginRace();
-                                return;
-                            }
+                        // Server tak menjadwalkan race -> tak ada yang perlu dihitung mundur.
+                        if (this.raceStartsInMs === null) {
+                            this.beginRace();
+                            return;
+                        }
 
-                            const remainingMs = this.raceStartsAtMs - this.serverNow();
+                        this.$store.race.armCountdown(this.raceKey(), this.raceStartsInMs);
+
+                        // Tenggat sudah lewat saat komponen ini di-mount (mis. arena di-morph
+                        // di tengah balapan): langsung masuk race, jangan tampilkan "3" lagi.
+                        if (this.$store.race.remainingMs() <= 0) {
+                            this.countdown = 'GO!';
+                            this.beginRace();
+                            return;
+                        }
+
+                        const tick = () => {
+                            const remainingMs = this.$store.race.remainingMs();
 
                             if (remainingMs <= 0) {
                                 this.countdown = 'GO!';
