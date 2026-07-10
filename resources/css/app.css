@@ -93,4 +93,17 @@
         transition: transform 0.25s ease-out;
         will-change: transform;
     }
+
+    /* Garis finis: papan catur 2x2 dari satu conic-gradient yang di-tile.
+       Ukuran kotak = setengah lebar pita, jadi selalu 2 kolom berapa pun tingginya. */
+    .race-finish-flag {
+        --square: 6px;
+        background-image: conic-gradient(
+            #fff 0.25turn,
+            #0a0e14 0.25turn 0.5turn,
+            #fff 0.5turn 0.75turn,
+            #0a0e14 0.75turn
+        );
+        background-size: calc(var(--square) * 2) calc(var(--square) * 2);
+    }
 }

@@ -268,28 +268,24 @@
             </template>
 
             @php
-                $laneAccents = [
-                    ['ring' => 'border-brand-bright', 'text' => 'text-brand-bright', 'bar' => 'bg-brand-bright/15', 'edge' => 'border-brand-bright', 'chip' => 'bg-brand-bright/20', 'dot' => 'bg-brand-bright'],
-                    ['ring' => 'border-gold', 'text' => 'text-gold', 'bar' => 'bg-gold/15', 'edge' => 'border-gold', 'chip' => 'bg-gold/20', 'dot' => 'bg-gold'],
-                    ['ring' => 'border-active', 'text' => 'text-active', 'bar' => 'bg-active/15', 'edge' => 'border-active', 'chip' => 'bg-active/20', 'dot' => 'bg-active'],
-                    ['ring' => 'border-secondary-4', 'text' => 'text-secondary-4', 'bar' => 'bg-secondary-4/15', 'edge' => 'border-secondary-4', 'chip' => 'bg-secondary-4/20', 'dot' => 'bg-secondary-4'],
-                    ['ring' => 'border-primary-3', 'text' => 'text-primary-3', 'bar' => 'bg-primary-3/15', 'edge' => 'border-primary-3', 'chip' => 'bg-primary-3/20', 'dot' => 'bg-primary-3'],
-                ];
                 $playerCount = $this->roomData->members->count();
                 $dense = $playerCount >= 4;
+
+                // Progres awal tiap pemain, dipakai rankOf() untuk memeringkat pemain
+                // yang belum sekali pun mengirim payload WebSocket.
+                $laneSeeds = $this->roomData->members
+                    ->mapWithKeys(fn ($m) => [$m->user_id => (int) ($m->progress_percent ?? 0)]);
             @endphp
 
             <!-- KLASEMEN LANGSUNG: LANE PER PEMAIN -->
             <div class="border bg-surface/50 border-border/40 rounded-3xl shadow-xl {{ $dense ? 'p-4 space-y-2' : 'p-6 space-y-3' }}">
                 <span class="text-xs font-mono uppercase tracking-widest text-muted block">{{ __('multiplayer.live_standings') }}</span>
 
-                <div class="bg-background/40 rounded-2xl border border-border/20 {{ $dense ? 'p-3 space-y-2' : 'p-4 space-y-3' }}">
+                {{-- laneSeeds dideklarasikan sekali di sini, lalu diwarisi tiap x-data lane. --}}
+                <div x-data="{ laneSeeds: @js($laneSeeds) }"
+                    class="bg-background/40 rounded-2xl border border-border/20 {{ $dense ? 'p-3 space-y-1' : 'p-4 space-y-1.5' }}">
                     @foreach ($this->roomData->members as $player)
-                        @php
-                            $isSelf = $player->user_id === Auth::id();
-                            $accent = $laneAccents[$loop->index % count($laneAccents)];
-                            $isHostPlayer = $player->user_id === $this->roomData->host_id;
-                        @endphp
+                        @php $isSelf = $player->user_id === Auth::id(); @endphp
                         {{-- Semua lane baca $store.race.opponents[id] seragam (termasuk diri sendiri lewat publishLocal),
                              diisi dari payload WebSocket tanpa re-render Livewire. Nilai Blade hanya seed awal. --}}
                         <div x-data="{
@@ -309,48 +305,77 @@
                                 get isLeader() {
                                     return String($store.race.leaderId()) === String(this.playerId) && this.liveProgress > 0;
                                 },
+                                get liveRank() {
+                                    return $store.race.rankOf(this.playerId, laneSeeds);
+                                },
                                 get runnerTilt() {
                                     const w = Math.min(this.liveWpmValue, 120);
                                     return `rotate(${(w / 120) * -8}deg) scale(${1 + (w / 120) * 0.12})`;
                                 },
-                            }">
-                            <div class="flex justify-between items-center mb-1 text-xs font-mono">
-                                <span class="flex items-center gap-1.5 min-w-0 {{ $isSelf ? $accent['text'].' font-bold' : 'text-muted' }}">
-                                    <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ $accent['dot'] }}"></span>
-                                    <span class="truncate">{{ $player->user->username }}</span>
-                                    @if ($isSelf)
-                                        <span class="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded {{ $accent['chip'] }} {{ $accent['text'] }} shrink-0">{{ __('multiplayer.you') }}</span>
-                                    @endif
-                                    @if ($isHostPlayer)
-                                        <span class="text-[10px] text-muted/70 shrink-0">[{{ __('multiplayer.host') }}]</span>
-                                    @endif
-                                    <span class="text-gold font-bold text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-1" x-show="isLeader && !liveFinished" x-cloak><span class="text-xs leading-none">👑</span>{{ __('multiplayer.leader') }}</span>
-                                    <span class="text-active font-bold ml-1 shrink-0" x-show="liveFinished" x-cloak>{{ __('multiplayer.finished') }}</span>
-                                </span>
-                                <span class="font-mono font-bold shrink-0 {{ $accent['text'] }}"><span x-text="liveWpmValue"></span> WPM</span>
+                            }"
+                            {{-- Lane pemain sendiri disorot penuh (kartu biru), seperti di desain. --}}
+                            class="flex items-center rounded-xl transition-colors duration-300 {{ $dense ? 'gap-3 py-1.5' : 'gap-4 py-2' }} {{ $isSelf ? 'bg-brand/25 border border-gold/70 px-3' : 'border border-transparent px-3' }}">
+
+                            {{-- Peringkat hidup. Pemain yang sudah finis ditandai hijau
+                                 (desain ini tak punya badge "FINISHED" terpisah). --}}
+                            <div class="shrink-0 rounded-md border flex items-center justify-center font-mono font-bold transition-colors duration-300 {{ $dense ? 'w-6 h-6 text-[10px]' : 'w-7 h-7 text-xs' }}"
+                                :class="liveFinished
+                                    ? 'border-active/70 bg-active/15 text-active'
+                                    : 'border-gold/70 bg-gold/10 text-gold'"
+                                x-text="liveRank"></div>
+
+                            {{-- Nama: lebar tetap supaya semua lintasan mulai di x yang sama. --}}
+                            <div class="shrink-0 flex items-center gap-2 font-mono {{ $dense ? 'w-32' : 'w-40' }}">
+                                <span class="truncate {{ $dense ? 'text-xs' : 'text-sm' }} {{ $isSelf ? 'text-foreground font-bold' : 'text-foreground/90' }}">{{ $player->user->username }}</span>
+                                @if ($isSelf)
+                                    <span class="shrink-0 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-gold text-background">{{ __('multiplayer.you') }}</span>
+                                @endif
                             </div>
 
-                            <div class="w-full bg-background rounded-lg relative border overflow-hidden flex items-center transition-all duration-300 {{ $dense ? 'h-7' : 'h-9' }}"
-                                :class="{
-                                    'border-gold/60': isLeader && !liveFinished,
-                                    'border-active/60': liveFinished,
-                                    'border-border/30': !isLeader && !liveFinished,
-                                }">
-                                <div class="absolute right-0 top-0 bottom-0 w-7 bg-elevated/50 border-l border-dashed border-border/50 flex items-center justify-center font-mono text-[9px] text-muted/50 select-none">
-                                    {{ __('multiplayer.finish') }}</div>
+                            {{-- Lintasan: garis tipis + maskot yang menungganginya + bendera finis.
+                                 Bendera ADA DI DALAM lintasan (absolute, kanan), bukan elemen sebelahnya,
+                                 supaya progres 100% benar-benar mendarat di atasnya. --}}
+                            @php
+                                // Setengah lebar maskot: dipakai sebagai padding kiri-kanan lintasan supaya
+                                // maskot (yang di-center pada titik progres) tak terpotong di 0% maupun 100%.
+                                $half = $dense ? 12 : 14;
+                            @endphp
+                            <div class="relative flex-1 min-w-0 flex items-center {{ $dense ? 'h-8' : 'h-10' }}">
 
-                                <div class="h-full transition-all duration-300 flex items-center justify-end relative border-r-2 {{ $accent['bar'] }} {{ $accent['edge'] }}"
-                                    :class="{ 'opacity-100': liveProgress > 0, 'opacity-70': liveProgress === 0 }"
-                                    :style="`width: calc(8% + ${liveProgress}% * 0.86);`">
-                                    <div class="race-runner rounded-md overflow-hidden border-2 bg-surface flex items-center justify-center -mr-1 {{ $accent['ring'] }} {{ $dense ? 'w-6 h-6' : 'w-7 h-7' }}"
-                                        :style="`transform: ${runnerTilt}`">
+                                {{-- Rel: disisipkan $half px di kiri & kanan supaya maskot (yang di-center
+                                     pada titik progres) tak terpotong di 0% maupun 100%. --}}
+                                <div class="absolute rounded-full bg-elevated {{ $dense ? 'h-1' : 'h-1.5' }}"
+                                    style="left: {{ $half }}px; right: {{ $half }}px;"></div>
+
+                                <div class="absolute rounded-full transition-all duration-300 {{ $dense ? 'h-1' : 'h-1.5' }}"
+                                    :class="liveFinished ? 'bg-active' : 'bg-gold'"
+                                    :style="`left: {{ $half }}px; width: calc((100% - {{ $half * 2 }}px) * ${liveProgress} / 100);`"></div>
+
+                                {{-- Bendera finis: tepat di ujung kanan rel (titik 100%). --}}
+                                <div class="race-finish-flag absolute top-0 bottom-0 -translate-x-1/2 rounded-sm {{ $dense ? 'w-2.5' : 'w-3' }}"
+                                    style="left: calc(100% - {{ $half }}px);"
+                                    role="img" aria-label="{{ __('multiplayer.finish') }}"></div>
+
+                                {{-- Maskot di-center pada titik progres (-translate-x-1/2), jadi di 100%
+                                     titik tengahnya persis di atas bendera. z-10 supaya tak tertutup bendera. --}}
+                                <div class="absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 transition-all duration-300"
+                                    :style="`left: calc({{ $half }}px + (100% - {{ $half * 2 }}px) * ${liveProgress} / 100);`">
+                                    <div class="race-runner flex items-center justify-center {{ $dense ? 'w-6 h-6' : 'w-7 h-7' }}"
+                                        :style="`transform: ${runnerTilt}`"
+                                        :class="{ 'opacity-70': liveProgress === 0 && !liveFinished }">
                                         @if ($player->user->avatar)
-                                            <img src="{{ $player->user->avatar }}" alt="{{ $player->user->username }}" referrerpolicy="no-referrer" class="w-full h-full object-cover">
+                                            <img src="{{ $player->user->avatar }}" alt="{{ $player->user->username }}" referrerpolicy="no-referrer" class="w-full h-full object-cover rounded-md">
                                         @else
-                                            <img src="/icon/uetype_mascot.png" alt="{{ $player->user->username }}" class="w-4/5 h-4/5 object-contain">
+                                            <img src="/icon/uetype_mascot.png" alt="{{ $player->user->username }}" class="w-full h-full object-contain">
                                         @endif
                                     </div>
                                 </div>
+                            </div>
+
+                            {{-- WPM --}}
+                            <div class="shrink-0 text-right font-mono {{ $dense ? 'w-14 text-[11px]' : 'w-16 text-xs' }}">
+                                <span class="font-bold text-foreground" x-text="liveWpmValue"></span>
+                                <span class="text-muted"> wpm</span>
                             </div>
                         </div>
                     @endforeach
@@ -657,6 +682,19 @@
                                 }
                             }
                             return bestId;
+                        },
+                        // Peringkat hidup pemain: 1 + jumlah pemain yang progresnya lebih jauh.
+                        // Seri -> peringkat sama (dua pemain di 0% sama-sama peringkat 1).
+                        // seeds = { [userId]: progress } dari Blade, dipakai untuk pemain
+                        // yang belum pernah mengirim payload WebSocket.
+                        rankOf(userId, seeds = {}) {
+                            const at = (id) => this.opponents[id]?.progress ?? seeds[id] ?? 0;
+                            const mine = at(userId);
+                            let ahead = 0;
+                            for (const id of Object.keys(seeds)) {
+                                if (String(id) !== String(userId) && at(id) > mine) ahead++;
+                            }
+                            return ahead + 1;
                         },
                         reset() {
                             this.opponents = {};

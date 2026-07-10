@@ -279,7 +279,8 @@
                                 <div class="{{ $modeColors[$slice['mode']] ?? 'bg-muted' }} rounded-lg px-3 py-2.5 min-w-0 overflow-hidden"
                                     style="flex: {{ max($slice['percent'], 1) }} 1 0%">
                                     <span class="text-x-small text-background font-bold whitespace-nowrap">
-                                        {{ $modeLabel($slice['mode']) }} {{ $slice['percent'] }}%
+                                        {{-- {{ $modeLabel($slice['mode']) }}  --}}
+                                        {{ $slice['percent'] }}%
                                     </span>
                                 </div>
                             @endforeach
