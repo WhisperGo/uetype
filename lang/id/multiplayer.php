@@ -28,7 +28,8 @@ return [
     'im_not_ready' => 'Aku Belum Siap',
     'leave_room' => 'Keluar Ruang',
 
-    'sudden_death' => 'Sudden Death Aktif! Ruang Ditutup Dalam:',
+    'sudden_death' => 'Sudden Death',
+    'room_label' => 'Ruang',
     'race_starting' => 'Balapan Dimulai',
     'mascot_track' => 'Lintasan Balap Maskot',
     'live_standings' => 'Klasemen Langsung',
@@ -43,6 +44,11 @@ return [
     'input_type' => 'Ketik kata ini di sini...',
     'input_wait' => 'Tunggu hitung mundur...',
     'give_up' => 'Give Up',
+    'gave_up_title' => 'Kamu Menyerah',
+    'gave_up_waiting' => 'Menunggu pemain lain menyelesaikan balapan...',
+    'finished_title' => 'Kamu Selesai',
+    'finished_waiting' => 'Menunggu pemain lain menyelesaikan balapan...',
+    'left_room' => 'Sudah keluar ruang',
 
     'match_result' => 'Hasil Pertandingan',
     'room' => 'Ruang :code',

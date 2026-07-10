@@ -26,6 +26,12 @@ class MultiplayerLobby extends Component
 
     public bool $showResultModal = false;
 
+    public bool $hasGivenUp = false;
+
+    public bool $hasFinished = false;
+
+    public array $resultSnapshot = [];
+
     // Durasi sudden death (detik). Konstanta tunggal dipakai checkSuddenDeath() dan
     // getSuddenDeathRemainingProperty() agar selalu sinkron.
     private const SUDDEN_DEATH_SECONDS = 15;
@@ -159,16 +165,23 @@ class MultiplayerLobby extends Component
             $this->step = 'racing';
             $this->showResultModal = false;
             $this->typedText = '';
+            $this->hasGivenUp = false;
+            $this->hasFinished = false;
+            $this->resultSnapshot = [];
         }
 
         if ($room->status === 'finished') {
             $this->showResultModal = true;
+            $this->captureResultSnapshot();
         }
 
         if ($room->status === 'waiting' && $this->step === 'racing') {
             $this->step = 'waiting';
             $this->typedText = '';
             $this->showResultModal = false;
+            $this->hasGivenUp = false;
+            $this->hasFinished = false;
+            $this->resultSnapshot = [];
         }
     }
 
@@ -228,10 +241,16 @@ class MultiplayerLobby extends Component
         $room = Room::where('code', $this->roomCode)->first();
 
         if ($room) {
-            RoomMember::where('room_id', $room->id)->where('user_id', Auth::id())->delete();
+            $leavingUserId = Auth::id();
 
-            if ($room->host_id === Auth::id()) {
+            RoomMember::where('room_id', $room->id)->where('user_id', $leavingUserId)->delete();
+
+            $remaining = RoomMember::where('room_id', $room->id)->count();
+
+            if ($remaining === 0) {
                 $room->delete();
+            } else {
+                $this->reassignHostIfNeeded($room, $leavingUserId);
             }
 
             SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
@@ -242,6 +261,23 @@ class MultiplayerLobby extends Component
         $this->dispatch('leave-room');
     }
 
+    private function reassignHostIfNeeded(Room $room, int $leavingUserId): void
+    {
+        if ($room->host_id !== $leavingUserId) {
+            return;
+        }
+
+        $newHost = RoomMember::where('room_id', $room->id)
+            ->where('user_id', '!=', $leavingUserId)
+            ->orderBy('id', 'asc')
+            ->first();
+
+        if ($newHost) {
+            $room->update(['host_id' => $newHost->user_id]);
+            $newHost->update(['is_ready' => true]);
+        }
+    }
+
     /** Bersihkan seluruh state room & kembali ke halaman create/join. */
     private function resetToChoose(): void
     {
@@ -250,6 +286,8 @@ class MultiplayerLobby extends Component
         $this->step = 'choose';
         $this->typedText = '';
         $this->showResultModal = false;
+        $this->hasGivenUp = false;
+        $this->resultSnapshot = [];
     }
 
     public function updateRaceProgress(int $progressPercent, int $liveWpm, int $accuracy = 100): void
@@ -300,7 +338,7 @@ class MultiplayerLobby extends Component
                 $room->refresh();
                 $suddenDeathJustStarted = true;
             }
-            $this->showResultModal = true;
+            $this->hasFinished = true;
         }
 
         $member->update($updateData);
@@ -333,10 +371,61 @@ class MultiplayerLobby extends Component
             if ($unfinished === 0) {
                 $room->update(['status' => 'finished']);
                 $this->finalizeRace($room->id);
+                $this->captureResultSnapshot();
             }
 
             SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
         }
+    }
+
+    public function giveUp(): void
+    {
+        $room = Room::where('code', $this->roomCode)->first();
+        if (! $room || $room->status !== 'racing') {
+            return;
+        }
+
+        $member = RoomMember::where('room_id', $room->id)->where('user_id', Auth::id())->first();
+
+        if (! $member || ! is_null($member->finished_time_seconds)) {
+            return;
+        }
+
+        $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
+            ->whereNotNull('finished_time_seconds')
+            ->count();
+
+        $member->update([
+            'finished_time_seconds' => 999,
+            'place' => $alreadyFinishedCount + 1,
+        ]);
+
+        $this->hasGivenUp = true;
+
+        if ($alreadyFinishedCount === 0 && ! $room->countdown_started_at) {
+            $room->update(['countdown_started_at' => now()]);
+            $room->refresh();
+
+            SafeBroadcast::run(fn () => broadcast(new SuddenDeathTriggered(
+                $this->roomCode,
+                $room->countdown_started_at->copy()->addSeconds(self::SUDDEN_DEATH_SECONDS)->toIso8601String(),
+            )));
+        }
+
+        $this->dispatch('force-finish');
+
+        $unfinished = RoomMember::where('room_id', $room->id)
+            ->whereNull('finished_time_seconds')
+            ->count();
+
+        if ($unfinished === 0) {
+            $room->update(['status' => 'finished']);
+            $this->finalizeRace($room->id);
+            $this->showResultModal = true;
+            $this->captureResultSnapshot();
+        }
+
+        SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
     }
 
     public function checkSuddenDeath(): void
@@ -366,6 +455,7 @@ class MultiplayerLobby extends Component
 
             $this->finalizeRace($room->id);
             $this->showResultModal = true;
+            $this->captureResultSnapshot();
 
             // Kunci input klien ini sekarang; guard di atas membuat method idempoten
             // meski dipicu beberapa klien sekaligus.
@@ -399,6 +489,9 @@ class MultiplayerLobby extends Component
             $this->step = 'waiting';
             $this->showResultModal = false;
             $this->typedText = '';
+            $this->hasGivenUp = false;
+            $this->hasFinished = false;
+            $this->resultSnapshot = [];
 
             SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
         }
@@ -437,6 +530,34 @@ class MultiplayerLobby extends Component
             ->orderBy('progress_percent', 'desc')
             ->orderByRaw('finished_time_seconds IS NULL, finished_time_seconds ASC')
             ->get();
+    }
+
+    private function captureResultSnapshot(): void
+    {
+        if (! empty($this->resultSnapshot) || ! $this->roomData) {
+            return;
+        }
+
+        $this->resultSnapshot = $this->leaderboardData->map(fn ($member) => [
+            'user_id' => $member->user_id,
+            'username' => $member->user->username,
+            'avatar' => $member->user->avatar,
+            'wpm' => (int) $member->wpm,
+            'accuracy' => $member->accuracy,
+            'finished_time_seconds' => $member->finished_time_seconds,
+            'place' => $member->place,
+        ])->values()->all();
+    }
+
+    public function getStillInRoomUserIdsProperty(): array
+    {
+        $room = Room::where('code', $this->roomCode)->first();
+
+        if (! $room) {
+            return [];
+        }
+
+        return RoomMember::where('room_id', $room->id)->pluck('user_id')->all();
     }
 
     public function getRoomDataForViewProperty(): ?Room
@@ -563,6 +684,8 @@ class MultiplayerLobby extends Component
 
         $this->step = 'racing';
         $this->showResultModal = false;
+        $this->hasGivenUp = false;
+        $this->resultSnapshot = [];
 
         SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
     }

@@ -108,7 +108,7 @@ describe('multiplayer lobby', function () {
         expect($seconds)->toBeLessThanOrEqual(31);
     });
 
-    it('sends the remaining racer back to the choose screen when the host leaves mid-race', function () {
+    it('transfers host to the earliest remaining member when the host leaves', function () {
         Event::fake([RoomUpdated::class]);
 
         $host = User::factory()->create();
@@ -125,18 +125,104 @@ describe('multiplayer lobby', function () {
             RoomMember::create(['room_id' => $room->id, 'user_id' => $u->id, 'is_ready' => true]);
         }
 
-        // Host keluar di tengah balapan -> room dihapus.
         Livewire::actingAs($host)->test(MultiplayerLobby::class)
             ->set('roomCode', 'LEAVE1')
             ->set('step', 'racing')
             ->call('leaveRoom');
 
-        $this->assertDatabaseMissing('rooms', ['code' => 'LEAVE1']);
+        // Room tetap ada, host berpindah ke racer, host lama tak lagi jadi member.
+        $this->assertDatabaseHas('rooms', ['code' => 'LEAVE1', 'host_id' => $racer->id]);
+        $this->assertDatabaseMissing('room_members', ['room_id' => $room->id, 'user_id' => $host->id]);
+        $this->assertDatabaseHas('room_members', ['room_id' => $room->id, 'user_id' => $racer->id, 'is_ready' => true]);
+    });
 
-        // Pemain yang tersisa menerima room-updated: harus balik ke 'choose',
-        // bukan tertinggal di 'racing' tanpa roomData (halaman kosong).
+    it('deletes the room only when the last member leaves', function () {
+        Event::fake([RoomUpdated::class]);
+
+        $host = User::factory()->create();
+
+        $room = Room::create([
+            'code' => 'SOLO01',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'is_ready' => true]);
+
+        Livewire::actingAs($host)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'SOLO01')
+            ->set('step', 'waiting')
+            ->call('leaveRoom');
+
+        $this->assertDatabaseMissing('rooms', ['code' => 'SOLO01']);
+    });
+
+    it('marks the player DNF and keeps the room when giving up mid-race with others still racing', function () {
+        Event::fake([RoomUpdated::class, SuddenDeathTriggered::class]);
+
+        $quitter = User::factory()->create();
+        $racer = User::factory()->create();
+
+        $room = Room::create([
+            'code' => 'GIVEUP',
+            'host_id' => $quitter->id,
+            'status' => 'racing',
+            'text_to_type' => 'the quick brown fox',
+            'race_starts_at' => now()->subSeconds(5),
+        ]);
+        foreach ([$quitter, $racer] as $u) {
+            RoomMember::create(['room_id' => $room->id, 'user_id' => $u->id, 'is_ready' => true, 'progress_percent' => 20]);
+        }
+
+        Livewire::actingAs($quitter)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'GIVEUP')
+            ->set('step', 'racing')
+            ->call('giveUp')
+            ->assertSet('hasGivenUp', true)
+            ->assertSee('You Gave Up')
+            ->assertSee('Waiting for other players');
+
+        // Quitter ditandai DNF (999), tetap jadi member, room tetap racing (racer belum selesai).
+        $this->assertDatabaseHas('room_members', [
+            'room_id' => $room->id,
+            'user_id' => $quitter->id,
+            'finished_time_seconds' => 999,
+        ]);
+        $this->assertDatabaseHas('rooms', ['code' => 'GIVEUP', 'status' => 'racing']);
+        expect($room->fresh()->countdown_started_at)->not->toBeNull();
+    });
+
+    it('finishes the room when the last active player gives up', function () {
+        Event::fake([RoomUpdated::class, SuddenDeathTriggered::class]);
+
+        $quitter = User::factory()->create();
+
+        $room = Room::create([
+            'code' => 'ALLGUP',
+            'host_id' => $quitter->id,
+            'status' => 'racing',
+            'text_to_type' => 'the quick brown fox',
+            'race_starts_at' => now()->subSeconds(5),
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $quitter->id, 'is_ready' => true, 'progress_percent' => 10]);
+
+        Livewire::actingAs($quitter)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'ALLGUP')
+            ->set('step', 'racing')
+            ->call('giveUp')
+            ->assertSet('showResultModal', true);
+
+        $this->assertDatabaseHas('rooms', ['code' => 'ALLGUP', 'status' => 'finished']);
+    });
+
+    it('sends the remaining racer back to the choose screen when the room vanished', function () {
+        Event::fake([RoomUpdated::class]);
+
+        $racer = User::factory()->create();
+
+        // Room sudah tak ada (semua keluar): racer menerima room-updated -> balik 'choose'.
         Livewire::actingAs($racer)->test(MultiplayerLobby::class)
-            ->set('roomCode', 'LEAVE1')
+            ->set('roomCode', 'GONE01')
             ->set('step', 'racing')
             ->call('roomUpdated')
             ->assertSet('step', 'choose')
@@ -155,5 +241,74 @@ describe('multiplayer lobby', function () {
             ->set('step', 'racing')
             ->assertSet('step', 'choose')
             ->assertSee('Create Room');
+    });
+
+    it('shows the finished waiting screen (not a blank page) when finishing before others', function () {
+        Event::fake([RaceProgressUpdated::class, RoomUpdated::class, SuddenDeathTriggered::class]);
+
+        $finisher = User::factory()->create();
+        $racer = User::factory()->create();
+
+        $room = Room::create([
+            'code' => 'WAIT01',
+            'host_id' => $finisher->id,
+            'status' => 'racing',
+            'text_to_type' => 'the quick brown fox',
+            'race_starts_at' => now()->subSeconds(5),
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $finisher->id, 'is_ready' => true, 'progress_percent' => 90]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $racer->id, 'is_ready' => true, 'progress_percent' => 30]);
+
+        // Finisher menyelesaikan teks; racer belum -> room tetap racing.
+        Livewire::actingAs($finisher)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'WAIT01')
+            ->set('step', 'racing')
+            ->call('updateRaceProgress', 100, 80, 100)
+            ->assertSet('hasFinished', true)
+            ->assertSet('showResultModal', false)
+            ->assertSee('You Finished');
+
+        $this->assertDatabaseHas('rooms', ['code' => 'WAIT01', 'status' => 'racing']);
+    });
+
+    it('freezes the result snapshot so leaving does not change the standings', function () {
+        Event::fake([RoomUpdated::class, SuddenDeathTriggered::class]);
+
+        $winner = User::factory()->create(['username' => 'Winner']);
+        $loser = User::factory()->create(['username' => 'Loser']);
+
+        $room = Room::create([
+            'code' => 'FROZEN',
+            'host_id' => $winner->id,
+            'status' => 'racing',
+            'text_to_type' => 'the quick brown fox',
+            'race_starts_at' => now()->subSeconds(5),
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $winner->id, 'is_ready' => true, 'wpm' => 90, 'progress_percent' => 100, 'finished_time_seconds' => 5]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $loser->id, 'is_ready' => true, 'wpm' => 40, 'progress_percent' => 60, 'finished_time_seconds' => 999]);
+
+        $room->update(['status' => 'finished']);
+
+        // Winner membuka result -> snapshot terbentuk berisi 2 pemain.
+        $winnerComp = Livewire::actingAs($winner)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'FROZEN')
+            ->set('step', 'racing')
+            ->call('roomUpdated');
+
+        expect($winnerComp->get('resultSnapshot'))->toHaveCount(2);
+
+        // Loser keluar room -> baris room_members-nya dihapus.
+        Livewire::actingAs($loser)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'FROZEN')
+            ->set('step', 'racing')
+            ->set('showResultModal', true)
+            ->call('leaveRoom');
+
+        $this->assertDatabaseMissing('room_members', ['room_id' => $room->id, 'user_id' => $loser->id]);
+
+        // Snapshot winner tetap 2 pemain (beku), Loser masih tampil di full results (nama diredup).
+        $winnerComp->call('roomUpdated');
+        expect($winnerComp->get('resultSnapshot'))->toHaveCount(2);
+        $winnerComp->assertSee('Loser')->assertSee('Winner');
     });
 });
