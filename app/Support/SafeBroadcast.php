@@ -6,10 +6,10 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Pembungkus broadcast tahan-gagal: kegagalan Reverb/WebSocket tak boleh
- * menggagalkan request inti (logout, kirim pesan, dll). Ganti `broadcast(new X)`
- * dengan `SafeBroadcast::run(fn () => broadcast(new X)->toOthers())`; closure
- * dipakai agar chaining seperti ->toOthers() tetap bisa ditulis di titik panggil.
+ * Fail-safe broadcast wrapper: a Reverb/WebSocket failure must not break the core
+ * request (logout, send message, etc.). Replace `broadcast(new X)` with
+ * `SafeBroadcast::run(fn () => broadcast(new X)->toOthers())`; the closure keeps
+ * chaining like ->toOthers() writable at the call site.
  */
 class SafeBroadcast
 {

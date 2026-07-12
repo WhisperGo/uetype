@@ -9,7 +9,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-/** "Delete for everyone": sisi lain ganti bubble jadi placeholder; channel sama seperti saat dibuat. */
+/** "Delete for everyone": tells the other side to replace the bubble with a placeholder, on the same channel it was sent. */
 class MessageDeleted implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;

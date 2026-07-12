@@ -2,6 +2,10 @@
 
 namespace App\Support;
 
+/**
+ * Catalog of clan emblem icons (SVG paths) and colors, with defaults. The single
+ * source of truth for rendering a clan's badge across the UI.
+ */
 final class ClanEmblem
 {
     public const DEFAULT_ICON = 'shield';

@@ -9,7 +9,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-/** Pesan DM terkirim; channel per-user 'chat.{recipientId}' milik penerima saja (pengirim sudah tahu via optimistic update). */
+/** Delivers a direct message to the recipient only, on 'chat.{recipientId}' (the sender already sees it via optimistic update). */
 class DirectMessageSent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;

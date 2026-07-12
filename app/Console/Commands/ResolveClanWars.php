@@ -5,11 +5,16 @@ namespace App\Console\Commands;
 use App\Services\ClanWarResolver;
 use Illuminate\Console\Command;
 
+/**
+ * Artisan command to settle due Clan Wars manually (expire unaccepted challenges,
+ * close wars past their time). A manual/testing entry point — the normal flow is
+ * triggered on-the-fly when the Clan War page loads (see ClanWarResolver).
+ */
 class ResolveClanWars extends Command
 {
     protected $signature = 'clan-war:resolve';
 
-    protected $description = 'Kadaluarsakan tantangan Clan War yang belum di-accept dan tutup war yang sudah lewat waktunya. Jalur manual/testing -- alur normal sudah dipicu on-the-fly saat halaman Clan War dibuka.';
+    protected $description = 'Expire unaccepted Clan War challenges and close wars past their time. Manual/testing path -- the normal flow is triggered on-the-fly when the Clan War page opens.';
 
     public function handle(ClanWarResolver $resolver): int
     {

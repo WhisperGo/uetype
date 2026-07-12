@@ -2,6 +2,11 @@
 
 namespace App\Support;
 
+/**
+ * Central definition of the UI locales the app supports (interface language),
+ * with the default and a validity check. Distinct from TypingLanguage, which is
+ * about the language of the text being typed.
+ */
 final class Locale
 {
     public const DEFAULT = 'en';

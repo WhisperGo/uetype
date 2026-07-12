@@ -8,7 +8,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-/** Status pertemanan berubah (request/accept/reject/cancel/remove); channel per-user 'friends.{userId}'. */
+/** Notifies a user of a friendship change (request/accept/reject/cancel/remove) on their channel 'friends.{userId}'. */
 class FriendshipUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;

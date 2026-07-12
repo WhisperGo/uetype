@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Text;
 
+/**
+ * Intended admin CRUD for typing texts (list/create/update/delete). Currently a stub.
+ */
 class TextController extends Controller
 {
     public function index()

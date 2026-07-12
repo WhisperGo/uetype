@@ -11,6 +11,11 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
+/**
+ * The Friends page: lists current friends, incoming/outgoing requests, and a
+ * username search to find and add new friends. Reacts to real-time friendship
+ * and presence updates.
+ */
 class Friends extends Component
 {
     // Tab aktif: 'friends' | 'requests' | 'find'

@@ -14,6 +14,10 @@ use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
+/**
+ * The Clans hub: view your own clan, browse/search other clans, and create a new
+ * one. Enforces the active-member cap and handles join/leave/create flows.
+ */
 class Clans extends Component
 {
     // Batas member aktif per clan.

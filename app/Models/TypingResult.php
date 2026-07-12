@@ -8,6 +8,11 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * A saved solo typing session result: net/raw wpm, accuracy, mode, duration and
+ * consistency. The source of a user's personal bests and progress charts.
+ * Immutable once written (no updated_at).
+ */
 class TypingResult extends Model
 {
     public const UPDATED_AT = null;

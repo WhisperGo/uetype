@@ -5,6 +5,9 @@ namespace App\View\Components;
 use Illuminate\View\Component;
 use Illuminate\View\View;
 
+/**
+ * The <x-guest-layout> component wrapping unauthenticated pages (login, register).
+ */
 class GuestLayout extends Component
 {
     /**

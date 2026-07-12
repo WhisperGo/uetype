@@ -3,16 +3,16 @@
 namespace App\Services;
 
 /**
- * Katalog 9 mode wajib Clan War beserta ceiling (poin maksimal) per mode. Satu
- * sumber kebenaran dipakai bersama oleh komponen ClanWar, ClanWarScorer, dan
- * ClanWarResolver. Daftar mode cocok persis dengan TypingEngine::ALLOWED_SUBMODES;
- * kombinasi di luar ini tak bisa diklaim sebagai war attempt.
+ * Catalog of the 9 required Clan War modes and each mode's ceiling (max points).
+ * The single source of truth shared by the ClanWar component, ClanWarScorer, and
+ * ClanWarResolver. The mode list matches TypingEngine::ALLOWED_SUBMODES exactly;
+ * any combination outside it cannot be claimed as a war attempt.
  */
 class ClanWarModeCatalog
 {
     /**
-     * Urutan = urutan tampil di grid. Ceiling naik seiring kesulitan/durasi mode;
-     * Survival Hard tertinggi karena risiko kegagalan total paling besar.
+     * Order = display order in the grid. Ceiling rises with mode difficulty/duration;
+     * Survival Hard is highest because it carries the greatest risk of total failure.
      *
      * @var list<array{mode: string, config: string, ceiling: int}>
      */

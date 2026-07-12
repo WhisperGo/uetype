@@ -12,11 +12,11 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 /**
- * Pemilih lawan Ghost Mode. Komponen terpisah dari TypingEngine, dikoordinasikan
- * dengan Alpine lewat browser event 'ghost-selected'/'ghost-cleared'.
+ * Ghost Mode opponent picker. A separate component from TypingEngine, coordinated
+ * with Alpine via the 'ghost-selected'/'ghost-cleared' browser events.
  *
- * Trust boundary: client hanya mengirim identifier (friendship_id/user_id), tak
- * pernah WPM langsung — selectOpponent() selalu menurunkan ulang WPM dari DB.
+ * Trust boundary: the client only sends an identifier (friendship_id/user_id),
+ * never a WPM directly — selectOpponent() always re-derives the WPM from the DB.
  */
 class GhostPicker extends Component
 {

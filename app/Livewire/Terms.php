@@ -6,9 +6,9 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 /**
- * Sama seperti About & Privacy: statis, tidak ada reactive state. Dibuat
- * sebagai Livewire full-page component supaya {{ $slot }} di
- * layouts/app.blade.php terisi lewat #[Layout(...)] di bawah.
+ * Like About & Privacy: static, no reactive state. Built as a Livewire full-page
+ * component so that {{ $slot }} in layouts/app.blade.php is filled via the
+ * #[Layout(...)] attribute below.
  */
 #[Layout('layouts.app')]
 class Terms extends Component

@@ -11,6 +11,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
+/**
+ * The application's user account. Holds identity (Google/email login),
+ * progression (highest_wpm, total_xp, level), social graph (friends, clan),
+ * and presence. Also the anchor for typing results and achievements.
+ */
 class User extends Authenticatable
 {
     use HasFactory, Notifiable;

@@ -7,6 +7,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
+/**
+ * Shows the "verify your email" prompt, or redirects on if already verified.
+ */
 class EmailVerificationPromptController extends Controller
 {
     /**

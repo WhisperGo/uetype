@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Validates and authenticates a login attempt, with rate limiting to throttle
+ * repeated failures (emitting a Lockout event when the limit is hit).
+ */
 class LoginRequest extends FormRequest
 {
     /**

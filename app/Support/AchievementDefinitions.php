@@ -3,10 +3,11 @@
 namespace App\Support;
 
 /**
- * Sumber kebenaran definisi achievement (di kode, bukan DB). Statis: dihitung dari
- * data existing (typing_results, users.total_xp/highest_wpm), tanpa rule engine
- * atau pelacakan streak/temporal. user_achievements hanya mencatat siapa & kapan.
- * Tiap `check` = closure(array $stats): bool; $stats diturunkan di AchievementService.
+ * Source of truth for achievement definitions (in code, not the DB). Static:
+ * evaluated from existing data (typing_results, users.total_xp/highest_wpm), with
+ * no rule engine or streak/temporal tracking. user_achievements only records who
+ * and when. Each `check` is a closure(array $stats): bool; $stats is derived in
+ * AchievementService.
  */
 class AchievementDefinitions
 {

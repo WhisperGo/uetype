@@ -18,6 +18,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
+/**
+ * The Clan War hub: issue/accept/decline challenges, claim mode slots, and view
+ * the live battle. On mount it lazily resolves any due wars (via ClanWarResolver)
+ * so state is always settled before the page reads it — no scheduler required.
+ */
 class ClanWar extends Component
 {
     // Durasi war setelah tantangan diterima.

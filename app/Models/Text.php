@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * A piece of source material players type: its content, language, mode
+ * (quote/words) and difficulty. Referenced by matches and typing results.
+ */
 class Text extends Model
 {
     protected $fillable = [

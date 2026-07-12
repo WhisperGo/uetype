@@ -5,6 +5,9 @@ namespace App\View\Components;
 use Illuminate\View\Component;
 use Illuminate\View\View;
 
+/**
+ * The <x-app-layout> component wrapping authenticated pages in the main app shell.
+ */
 class AppLayout extends Component
 {
     /**

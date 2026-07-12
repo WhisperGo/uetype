@@ -7,6 +7,10 @@ use App\Enums\ClanRole;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * A user's membership in a clan: their role (leader/member) and status
+ * (pending join request vs. active member).
+ */
 class ClanMember extends Model
 {
     protected $fillable = [

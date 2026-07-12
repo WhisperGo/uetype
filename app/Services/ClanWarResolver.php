@@ -9,13 +9,13 @@ use App\Models\ClanWarModeClaim;
 use App\Support\SafeBroadcast;
 
 /**
- * Menutup Clan War yang sudah waktunya diselesaikan: tantangan Pending yang lewat
- * batas accept jadi Expired, dan war Ongoing yang selesai (lewat ends_at atau early
- * finish karena kedua clan sudah menyelesaikan 9 mode) dihitung dari akumulasi poin
- * mode-klaim lalu power diupdate lewat EloCalculator.
+ * Settles Clan Wars whose time has come: Pending challenges past their accept
+ * deadline become Expired, and Ongoing wars that are done (via ends_at, or an
+ * early finish once both clans complete all 9 modes) are scored from accumulated
+ * mode-claim points and power is updated through EloCalculator.
  *
- * Dipanggil on-the-fly dari App\Livewire\ClanWar::mount(), jadi tak perlu scheduler;
- * command `clan-war:resolve` memanggil method yang sama untuk pemakaian manual.
+ * Called on-the-fly from App\Livewire\ClanWar::mount(), so no scheduler is needed;
+ * the `clan-war:resolve` command invokes the same method for manual use.
  */
 class ClanWarResolver
 {

@@ -12,8 +12,8 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
- * Tombol aksi pertemanan berdiri sendiri untuk halaman profil publik. Membungkus
- * logika kirim/terima/batal/hapus yang sama dengan komponen Friends, tapi untuk satu target user.
+ * Standalone friend-action button for the public profile page. Wraps the same
+ * send/accept/cancel/remove logic as the Friends component, but for a single target user.
  */
 class FriendButton extends Component
 {

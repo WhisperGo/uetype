@@ -8,11 +8,14 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\View\View;
 
+/**
+ * Renders the Achievements page, listing earned and locked achievements.
+ */
 class AchievementController extends Controller
 {
     /**
-     * Halaman Achievements. Achievement dihitung STATIS saat halaman dibuka
-     * (tidak ada job latar belakang) dari data typing_results + users existing.
+     * The Achievements page. Achievements are evaluated STATICALLY when the page
+     * loads (no background jobs) from existing typing_results + users data.
      */
     public function index(Request $request, AchievementService $service): View
     {

@@ -4,6 +4,10 @@ namespace App\Livewire;
 
 use Livewire\Component;
 
+/**
+ * The post-session result screen for a solo run: displays the final wpm, raw wpm,
+ * accuracy, time and mode. A presentational component fed by TypingEngine.
+ */
 class TypingResult extends Component
 {
     public $wpm;

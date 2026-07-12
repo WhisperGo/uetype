@@ -5,6 +5,9 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Volt\Volt;
 
+/**
+ * Registers the directories Livewire Volt scans for single-file components.
+ */
 class VoltServiceProvider extends ServiceProvider
 {
     /**

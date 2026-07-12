@@ -5,9 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * A chat message, either direct (user-to-user) or within a clan channel.
+ * Supports a limited edit window and per-user soft deletes/clears.
+ */
 class Message extends Model
 {
-    // Batas waktu edit pesan setelah dikirim (menit).
+    /** How long after sending a message may still be edited (minutes). */
     public const EDIT_WINDOW_MINUTES = 30;
 
     protected $fillable = [

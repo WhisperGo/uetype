@@ -6,6 +6,10 @@ use App\Enums\ClanRole;
 use App\Models\Clan;
 use Livewire\Component;
 
+/**
+ * A single clan's detail page: shows its profile, active members (leader first),
+ * and stats. Read-oriented view bound to one Clan via route-model binding.
+ */
 class ClanShow extends Component
 {
     public Clan $clan;

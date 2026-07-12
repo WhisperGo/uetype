@@ -5,6 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * Records that a user has unlocked a specific achievement. Write-once: created
+ * when earned and never updated.
+ */
 class UserAchievement extends Model
 {
     public const UPDATED_AT = null;

@@ -2,6 +2,10 @@
 
 namespace App\Support;
 
+/**
+ * Builds the localized "<Page> | <Brand>" browser title for a route, falling
+ * back to the bare brand name for unknown routes.
+ */
 final class PageTitle
 {
     public static function forRoute(?string $routeName): string

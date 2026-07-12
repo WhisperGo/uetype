@@ -4,7 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-/** Teks beku mode Words (satu baris per config 10/25/50/100); semua pemain baca konten identik, cegah celah refresh. */
+/**
+ * Frozen Words-mode text for clan wars (one row per 10/25/50/100 config). Every
+ * player sees identical content, closing the refresh-for-easier-text loophole.
+ */
 class ClanWarFixedText extends Model
 {
     protected $fillable = [

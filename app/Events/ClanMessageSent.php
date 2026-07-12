@@ -9,7 +9,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-/** Pesan chat clan; channel per-clan 'clan-chat.{clanId}' (bukan per-user, semua anggota dengar bersama). */
+/** Broadcasts a new clan chat message on the per-clan channel 'clan-chat.{clanId}', so every member receives it at once. */
 class ClanMessageSent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;

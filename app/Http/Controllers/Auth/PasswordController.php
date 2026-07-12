@@ -8,6 +8,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 
+/**
+ * Updates the authenticated user's password from the account settings.
+ */
 class PasswordController extends Controller
 {
     /**

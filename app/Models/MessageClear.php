@@ -5,7 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** Penanda "clear chat" per-user; soft-hide, bukan hapus pesan asli (lihat migration). */
+/**
+ * Per-user "clear chat" marker: soft-hides history before a timestamp for one
+ * user without deleting the underlying messages (see migration).
+ */
 class MessageClear extends Model
 {
     protected $fillable = [

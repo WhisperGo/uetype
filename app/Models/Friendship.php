@@ -6,6 +6,10 @@ use App\Enums\FriendshipStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * A directed friend relationship between two users (requester -> addressee),
+ * carrying its current status (pending, accepted, rejected, blocked).
+ */
 class Friendship extends Model
 {
     protected $fillable = [

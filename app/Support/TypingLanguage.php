@@ -2,6 +2,10 @@
 
 namespace App\Support;
 
+/**
+ * The languages available for typing practice and the word-list file backing
+ * each one. Distinct from Locale, which governs the UI language.
+ */
 final class TypingLanguage
 {
     public const DEFAULT = 'en';

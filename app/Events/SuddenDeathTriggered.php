@@ -8,7 +8,11 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-/** ShouldBroadcastNow: hitung mundur sudden death perlu sinkron instan tanpa queue worker. */
+/**
+ * Signals that a race has entered sudden-death, carrying the shared end time so
+ * every client counts down to the same instant. Broadcasts now (no queue) so the
+ * countdown stays in sync without a worker.
+ */
 class SuddenDeathTriggered implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;

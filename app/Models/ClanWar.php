@@ -6,6 +6,10 @@ use App\Enums\ClanWarStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * A war challenge between two clans: the pairing, its status, and each side's
+ * Elo power before/after so results can be scored and settled.
+ */
 class ClanWar extends Model
 {
     protected $fillable = [

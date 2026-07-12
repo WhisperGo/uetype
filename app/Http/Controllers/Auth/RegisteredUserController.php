@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Handles new-user registration: shows the form and creates the account.
+ */
 class RegisteredUserController extends Controller
 {
     /** Sign In & Sign Up disatukan: auth Google-only, /register mengarah ke /login. */

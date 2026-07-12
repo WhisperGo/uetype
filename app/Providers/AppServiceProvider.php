@@ -10,6 +10,11 @@ use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Volt\Volt;
 
+/**
+ * Application bootstrap: forces HTTPS behind a proxy, mounts Volt components,
+ * registers the @localtime Blade directive, and injects the localized page title
+ * into the app/guest layouts.
+ */
 class AppServiceProvider extends ServiceProvider
 {
     /**

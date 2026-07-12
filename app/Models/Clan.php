@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * A player clan (guild): its identity (name, tag, emblem), Elo power rating,
+ * members, and war history.
+ */
 class Clan extends Model
 {
     protected $fillable = [

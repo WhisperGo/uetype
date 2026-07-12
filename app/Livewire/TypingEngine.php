@@ -17,6 +17,12 @@ use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
+/**
+ * The core solo typing arena: picks the text for the chosen mode/sub-mode,
+ * receives the finished session from the client, and persists it. WPM/accuracy
+ * are always recomputed server-side (via AntiCheatService) rather than trusted
+ * from the client, then feed personal bests, XP, and achievements.
+ */
 class TypingEngine extends Component
 {
     // Mode Utama: 'time', 'words', 'survival'

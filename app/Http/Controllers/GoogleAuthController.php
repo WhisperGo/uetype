@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 
+/**
+ * Handles Google OAuth sign-in: redirects to Google and processes the callback,
+ * creating or matching a user by their Google identity.
+ */
 class GoogleAuthController extends Controller
 {
     public function redirect()

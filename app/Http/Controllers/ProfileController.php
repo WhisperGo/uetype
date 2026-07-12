@@ -8,10 +8,14 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\View\View;
 
+/**
+ * Serves user profile pages, both the owner's private profile and other users'
+ * public profiles.
+ */
 class ProfileController extends Controller
 {
     /**
-     * Profil sendiri (privat): menampilkan semua field termasuk email, koin, total XP.
+     * The owner's private profile: shows all fields including email, coins, total XP.
      */
     public function me(Request $request): View
     {

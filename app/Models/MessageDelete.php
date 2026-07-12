@@ -5,7 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** Penanda "delete for me" per-pesan: sembunyikan dari user ini saja, baris asli tetap ada untuk lainnya. */
+/**
+ * Per-message "delete for me" marker: hides a message from this user only; the
+ * original row stays intact for everyone else.
+ */
 class MessageDelete extends Model
 {
     protected $fillable = [

@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
+/**
+ * Handles "forgot password": shows the request form and emails a reset link.
+ */
 class PasswordResetLinkController extends Controller
 {
     /**

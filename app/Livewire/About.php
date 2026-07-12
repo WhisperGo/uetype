@@ -6,9 +6,9 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 /**
- * Halaman About statis (tanpa reactive state), dibuat sebagai Livewire component
- * karena layouts/app.blade.php memakai {{ $slot }} yang hanya terisi lewat #[Layout(...)].
- * Data tim & tech stack hardcode di sini, bukan dari database.
+ * Static About page (no reactive state), built as a Livewire component because
+ * layouts/app.blade.php uses {{ $slot }}, which is only filled via #[Layout(...)].
+ * Team and tech-stack data are hardcoded here, not from the database.
  */
 #[Layout('layouts.app')]
 class About extends Component

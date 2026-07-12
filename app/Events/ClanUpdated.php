@@ -8,7 +8,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-/** Status keanggotaan clan berubah (join/accept/reject/kick/leave); channel per-user 'clan.{userId}'. */
+/** Notifies a user of a clan membership change (join/accept/reject/kick/leave) on their channel 'clan.{userId}'. */
 class ClanUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;

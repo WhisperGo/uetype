@@ -4,6 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * A multiplayer race lobby: holds the shared text, its lifecycle status
+ * (waiting/racing/finished) and the countdown/start timestamps that keep every
+ * player's client synchronized.
+ */
 class Room extends Model
 {
     protected $fillable = ['code', 'host_id', 'status', 'text_to_type', 'countdown_started_at', 'race_starts_at'];
@@ -16,12 +21,13 @@ class Room extends Model
         'race_starts_at' => 'datetime',
     ];
 
+    /** The user who created and owns the room. */
     public function host()
     {
-        // Ganti $table menjadi $this
         return $this->belongsTo(User::class, 'host_id');
     }
 
+    /** All players currently in the room. */
     public function members()
     {
         return $this->hasMany(RoomMember::class, 'room_id');

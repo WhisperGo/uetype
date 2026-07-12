@@ -13,12 +13,12 @@ use Livewire\Component;
 
 /**
  * Halaman Statistik: seluruh agregat performa user dari tabel typing_results.
- * Halaman ini menampung statistik yang dulu menumpang di /profile, supaya profil
- * kembali fokus ke identitas saja.
+ * Hosts the statistics that used to live on /profile, so the profile page can go
+ * back to focusing on identity alone.
  *
- * Semua angka diturunkan saat render (tak ada kolom agregat tersimpan), jadi
- * data selalu konsisten dengan typing_results. Rentang grafik ($range) tersimpan
- * di query string agar tautan halaman bisa dibagikan/di-refresh tanpa reset.
+ * Every number is derived at render time (no stored aggregate columns), so the
+ * data is always consistent with typing_results. The chart range ($range) is kept
+ * in the query string so the page URL can be shared/refreshed without resetting.
  */
 #[Layout('layouts.app')]
 class Stats extends Component

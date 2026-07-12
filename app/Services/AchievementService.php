@@ -9,10 +9,10 @@ use App\Support\AchievementDefinitions;
 use Illuminate\Support\Carbon;
 
 /**
- * Evaluasi achievement statis: dihitung dari data yang sudah ada (typing_results +
- * users) saat halaman dibuka, bukan rule engine berjalan terus. Definisi tetap di
- * kode (AchievementDefinitions); tabel user_achievements hanya mencatat unlock
- * pertama (siapa meraih apa & kapan).
+ * Evaluates achievements lazily: computed from existing data (typing_results +
+ * users) when a page loads, not a continuously running rule engine. Definitions
+ * live in code (AchievementDefinitions); the user_achievements table only records
+ * the first unlock (who earned what, and when).
  */
 class AchievementService
 {

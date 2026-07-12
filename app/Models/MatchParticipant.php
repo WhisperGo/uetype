@@ -5,6 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * One user's result within a completed match: their wpm, accuracy, placement,
+ * and finish time. Immutable once written (no updated_at).
+ */
 class MatchParticipant extends Model
 {
     public const UPDATED_AT = null;

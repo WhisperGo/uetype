@@ -9,6 +9,10 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
+/**
+ * The account settings page: lets the signed-in user change their username
+ * (with a confirmation guard) and manage account-level preferences.
+ */
 class Settings extends Component
 {
     public string $username = '';

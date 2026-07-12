@@ -5,11 +5,15 @@ namespace App\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 
+/**
+ * Handles online-presence heartbeats used to show friends' online/offline status.
+ */
 class PresenceController extends Controller
 {
     /**
-     * Heartbeat presence, dipanggil klien berkala untuk menandai user masih aktif.
-     * Hanya update last_seen_at, dan pada transisi offline->online menyiarkan ke teman.
+     * Presence heartbeat, called periodically by the client to mark the user as
+     * still active. Updates last_seen_at, and on an offline->online transition
+     * broadcasts the change to the user's friends.
      */
     public function heartbeat(): JsonResponse
     {

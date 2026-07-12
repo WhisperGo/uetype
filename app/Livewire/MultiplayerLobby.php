@@ -15,6 +15,12 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
+/**
+ * The multiplayer race lobby and arena: create/join a room, ready up, run the
+ * synchronized countdown, then race. Persists each player's live progress with a
+ * server-recomputed Net WPM (never trusting the client), broadcasts room/race
+ * state, and finalizes placements and XP when the race ends.
+ */
 class MultiplayerLobby extends Component
 {
     public string $step = 'choose';

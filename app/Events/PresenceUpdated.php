@@ -9,8 +9,9 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Status online/offline user berubah; channel per-user 'friends.{friendId}' tiap teman.
- * Sengaja hanya dikirim saat status benar-benar berubah, bukan tiap heartbeat.
+ * Notifies each friend that a user's online/offline status changed, on their
+ * 'friends.{friendId}' channel. Sent only on an actual status flip, not on
+ * every heartbeat.
  */
 class PresenceUpdated implements ShouldBroadcastNow
 {

@@ -8,11 +8,14 @@ use App\Models\ClanWar as ClanWarModel;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
+/**
+ * The clan leaderboard: ranks all clans by Elo power. Read-only.
+ */
 class ClanLeaderboard extends Component
 {
     /**
-     * Peringkat semua clan berdasarkan power (Elo) tertinggi, lengkap dengan
-     * jumlah member aktif & jumlah kemenangan war. Read-only.
+     * Ranks all clans by highest power (Elo), together with their active-member
+     * count and war-win count. Read-only.
      */
     public function getRankingProperty()
     {

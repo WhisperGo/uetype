@@ -5,6 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * A player's claim on one mode/config slot in a clan war — records who plays
+ * which challenge for their clan and their contributed result.
+ */
 class ClanWarModeClaim extends Model
 {
     protected $fillable = [

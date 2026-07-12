@@ -9,7 +9,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-/** Pesan diedit; channel sama seperti saat dibuat, sisi lain update bubble + label "(edited)". */
+/** Broadcasts an edited message so the other side updates the bubble and shows the "(edited)" label, on the original channel. */
 class MessageEdited implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;

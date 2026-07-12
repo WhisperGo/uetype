@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * A completed or in-progress typing match (1v1 or group), recording the host,
+ * the text raced on, timing, and each participant's result.
+ */
 class Matches extends Model
 {
     protected $fillable = [
