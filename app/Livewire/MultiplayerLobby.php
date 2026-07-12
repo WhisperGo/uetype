@@ -7,6 +7,7 @@ use App\Events\RoomUpdated;
 use App\Events\SuddenDeathTriggered;
 use App\Models\Room;
 use App\Models\RoomMember;
+use App\Services\AntiCheatService;
 use App\Support\SafeBroadcast;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
@@ -290,7 +291,14 @@ class MultiplayerLobby extends Component
         $this->resultSnapshot = [];
     }
 
-    public function updateRaceProgress(int $progressPercent, int $liveWpm, int $accuracy = 100): void
+    /**
+     * Catatan integritas: parameter $liveWpm dari client SENGAJA tidak dipakai untuk
+     * angka resmi. Server menghitung ulang Net WPM sendiri (karakter benar / waktu) via
+     * AntiCheatService -- selaras dengan mode solo (TypingEngine::saveResult) -- supaya
+     * ketik ngasal-cepat (WPM tinggi, akurasi rendah) tak bisa menyulap rekor.
+     * $liveWpm tetap ada demi kompatibilitas payload client yang sudah ada.
+     */
+    public function updateRaceProgress(int $progressPercent, int $liveWpm = 0, int $accuracy = 100): void
     {
         $room = Room::where('code', $this->roomCode)->first();
         if (! $room || $room->status !== 'racing') {
@@ -307,9 +315,29 @@ class MultiplayerLobby extends Component
         $progressPercent = min(100, max(0, $progressPercent));
         $accuracy = min(100, max(0, $accuracy));
 
+        // Net WPM otoritatif: diturunkan dari progres (progress% x panjang teks = karakter
+        // benar, pola sama dengan finalizeRace) dan durasi race di server, BUKAN dari WPM
+        // client. Karakter salah tak menambah progres, jadi ini otomatis "net".
+        $textLength = mb_strlen($room->text_to_type);
+        $correctChars = (int) round(($progressPercent / 100) * $textLength);
+
+        $raceStart = $room->race_starts_at ?? $room->updated_at;
+        $durationSeconds = max(0.0, (float) $raceStart->diffInSeconds(now(), true));
+
+        // Rumus Net WPM sama persis dengan mode solo (satu sumber kebenaran).
+        // totalChars = correctChars: progress hanya naik dari karakter benar, jadi net WPM
+        // tak bisa dipompa dengan ketik ngasal.
+        $wpmCheck = app(AntiCheatService::class)->check($correctChars, $correctChars, $durationSeconds);
+
+        // Yang MENOLAK hanyalah sinyal mustahil (WPM > batas manusiawi / karakter tak
+        // konsisten). Throughput rendah / durasi pendek itu keadaan wajar di awal & pemain
+        // lambat -- WPM-nya memang kecil, bukan curang -- jadi angkanya dipakai apa adanya.
+        $cheatReasons = array_intersect($wpmCheck['reasons'], ['wpm_too_high', 'char_count_inconsistent']);
+        $netWpm = empty($cheatReasons) ? (int) round($wpmCheck['net_wpm']) : 0;
+
         $updateData = [
             'progress_percent' => $progressPercent,
-            'wpm' => $liveWpm,
+            'wpm' => $netWpm,
             'accuracy' => $accuracy,
         ];
 
@@ -322,8 +350,7 @@ class MultiplayerLobby extends Component
             // Durasi tempuh = sekarang - race_starts_at (titik countdown selesai);
             // fallback ke updated_at hanya kalau race_starts_at kosong.
             // absolute: true -> cegah hasil negatif.
-            $raceStart = $room->race_starts_at ?? $room->updated_at;
-            $updateData['finished_time_seconds'] = (int) round($raceStart->diffInSeconds(now(), true));
+            $updateData['finished_time_seconds'] = (int) round($durationSeconds);
 
             $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
                 ->whereNotNull('finished_time_seconds')
@@ -347,7 +374,7 @@ class MultiplayerLobby extends Component
         // klien lain cukup baca & geser maskot di Alpine store tanpa round-trip server.
         SafeBroadcast::run(fn () => broadcast(new RaceProgressUpdated($this->roomCode, Auth::id(), [
             'progress_percent' => $progressPercent,
-            'wpm' => $liveWpm,
+            'wpm' => $netWpm,
             'accuracy' => $accuracy,
             'finished' => $justFinished,
         ]))->toOthers());

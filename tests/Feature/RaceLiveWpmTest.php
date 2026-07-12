@@ -22,8 +22,9 @@ function racingMember(User $user): RoomMember
         'code' => 'WPM123',
         'host_id' => $user->id,
         'status' => 'racing',
-        'text_to_type' => 'aa bb cc',
-        'race_starts_at' => now()->subSeconds(10),
+        // Tepat 100 karakter -> progress% == jumlah karakter benar (matematika bersih).
+        'text_to_type' => str_repeat('ab cde ', 14).'ab', // 14*7 + 2 = 100
+        'race_starts_at' => now()->subSeconds(60),
     ]);
 
     return RoomMember::create([
@@ -39,14 +40,17 @@ it('updates wpm on the server without moving progress', function () {
     $user = User::factory()->create();
     $member = racingMember($user);
 
-    // Ticker mengirim progres yang SEDANG BERLAKU (40) dengan WPM baru (60).
+    // Ticker mengirim progres yang SEDANG BERLAKU (40). WPM client (60) DIABAIKAN;
+    // server menghitung ulang Net WPM sendiri dari progres + durasi race.
     Livewire::actingAs($user)->test(MultiplayerLobby::class)
         ->set('roomCode', 'WPM123')->set('step', 'racing')
         ->call('updateRaceProgress', 40, 60, 98);
 
     $member->refresh();
 
-    expect($member->wpm)->toBe(60)
+    // 100 char text, 40% -> 40 correct chars; race mulai 60 dtk lalu -> 1 menit.
+    // Net WPM = (40 / 5) / 1 = 8. Bukan 60 (angka client).
+    expect($member->wpm)->toBe(8)
         ->and($member->progress_percent)->toBe(40);
 });
 
