@@ -60,5 +60,22 @@ return [
     ],
     'no_distribution' => 'No tests yet.',
 
-    'multiplayer_soon' => 'Multiplayer statistics are coming soon.',
+    'multiplayer' => [
+        'empty' => 'No races yet. Finish a multiplayer race to see your stats here.',
+        'card' => [
+            'races' => 'Races',
+            'win_rate' => 'Win Rate',
+            'avg_wpm' => 'Avg WPM',
+            'best_wpm' => 'Best WPM',
+            'avg_accuracy' => 'Avg Accuracy',
+        ],
+        'placements' => 'Placement Distribution',
+        'place_prefix' => '#',
+        'recent_matches' => 'Recent Matches',
+        'th_place' => 'Place',
+        'th_wpm' => 'WPM',
+        'th_accuracy' => 'Accuracy',
+        'th_players' => 'Players',
+        'th_date' => 'Date',
+    ],
 ];

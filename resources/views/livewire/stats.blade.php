@@ -47,6 +47,22 @@
             // Kolom `mode` bisa memuat nilai enum yang belum punya terjemahan;
             // pakai teks mentahnya daripada membocorkan kunci lang ke layar.
             $modeLabel = fn (string $m) => Lang::has('stats.mode.' . $m) ? __('stats.mode.' . $m) : ucfirst($m);
+
+            // Sama seperti multiplayer-lobby.blade.php: sufiks ordinal hanya dipakai locale
+            // Inggris (Indonesia pakai "ke-N" polos, lihat stats.multiplayer.place_prefix).
+            $placeOrdinal = function (int $place) {
+                if (app()->getLocale() !== 'en') {
+                    return __('stats.multiplayer.place_prefix') . $place;
+                }
+                $suffix = match ($place) {
+                    1 => 'st',
+                    2 => 'nd',
+                    3 => 'rd',
+                    default => 'th',
+                };
+
+                return $place . $suffix;
+            };
         @endphp
 
         {{-- Tab halaman: Solo (terisi) vs Multiplayer (belum ada datanya). --}}
@@ -313,10 +329,97 @@
         </div>
 
         {{-- ===================== TAB: MULTIPLAYER ===================== --}}
-        <div x-show="tab === 'multiplayer'" x-transition.opacity style="display: none;">
-            <div class="rounded-2xl border border-border bg-surface/40 px-5 py-16 text-center text-small text-muted">
-                {{ __('stats.multiplayer_soon') }}
-            </div>
+        <div x-show="tab === 'multiplayer'" x-transition.opacity style="display: none;" class="space-y-8">
+            @if ($multiplayerStats['total_races'] === 0)
+                <div class="rounded-2xl border border-border bg-surface/40 px-5 py-16 text-center text-small text-muted">
+                    {{ __('stats.multiplayer.empty') }}
+                </div>
+            @else
+                {{-- ===== Activity ===== --}}
+                <section>
+                    <h2 class="text-h6 font-bold text-foreground mb-4">{{ __('stats.activity') }}</h2>
+
+                    @php
+                        $mpCards = [
+                            ['label' => __('stats.multiplayer.card.races'), 'value' => number_format($multiplayerStats['total_races'])],
+                            ['label' => __('stats.multiplayer.card.win_rate'), 'value' => $multiplayerStats['win_rate'] . '%'],
+                            ['label' => __('stats.multiplayer.card.avg_wpm'), 'value' => $multiplayerStats['avg_wpm']],
+                            ['label' => __('stats.multiplayer.card.best_wpm'), 'value' => $multiplayerStats['best_wpm']],
+                            ['label' => __('stats.multiplayer.card.avg_accuracy'), 'value' => $multiplayerStats['avg_accuracy'] . '%'],
+                        ];
+
+                        $placeColors = [1 => 'bg-gold', 2 => 'bg-brand-bright', 3 => 'bg-brand'];
+                    @endphp
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                        @foreach ($mpCards as $card)
+                            <div class="rounded-2xl border border-border bg-surface/40 px-4 py-4">
+                                <p class="text-h6 font-bold text-foreground tabular-nums">{{ $card['value'] }}</p>
+                                <p class="text-x-small text-muted mt-1">{{ $card['label'] }}</p>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    {{-- Placement Distribution: sama pola dengan Mode Distribution di tab Solo. --}}
+                    <div class="mt-4 rounded-2xl border border-border bg-surface/40 p-4 sm:p-5">
+                        <h3 class="text-small text-foreground mb-3">{{ __('stats.multiplayer.placements') }}</h3>
+
+                        @if (empty($placementDistribution))
+                            <p class="py-4 text-small text-muted">{{ __('stats.no_distribution') }}</p>
+                        @else
+                            <div class="flex gap-1.5 mb-3">
+                                @foreach ($placementDistribution as $slice)
+                                    <div class="{{ $placeColors[$slice['place']] ?? 'bg-muted' }} rounded-lg px-3 py-2.5 min-w-0 overflow-hidden"
+                                        style="flex: {{ max($slice['percent'], 1) }} 1 0%">
+                                        <span class="text-x-small text-background font-bold whitespace-nowrap">
+                                            {{ $slice['percent'] }}%
+                                        </span>
+                                    </div>
+                                @endforeach
+                            </div>
+                            <div class="flex flex-wrap gap-x-5 gap-y-1.5">
+                                @foreach ($placementDistribution as $slice)
+                                    <span class="inline-flex items-center gap-2 text-x-small text-muted">
+                                        <span class="w-2 h-2 rounded-full {{ $placeColors[$slice['place']] ?? 'bg-muted' }}"></span>
+                                        {{ $placeOrdinal($slice['place']) }} {{ $slice['percent'] }}%
+                                    </span>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </section>
+
+                {{-- ===== Recent Matches ===== --}}
+                <section>
+                    <h2 class="text-h6 font-bold text-foreground mb-4">{{ __('stats.multiplayer.recent_matches') }}</h2>
+
+                    <div class="rounded-2xl border border-border bg-surface/40 overflow-x-auto">
+                        <table class="w-full text-small">
+                            <thead>
+                                <tr class="border-b border-border text-x-small text-muted uppercase tracking-wider">
+                                    <th class="text-left px-4 py-3 font-normal">{{ __('stats.multiplayer.th_place') }}</th>
+                                    <th class="text-left px-4 py-3 font-normal">{{ __('stats.multiplayer.th_wpm') }}</th>
+                                    <th class="text-left px-4 py-3 font-normal">{{ __('stats.multiplayer.th_accuracy') }}</th>
+                                    <th class="text-left px-4 py-3 font-normal">{{ __('stats.multiplayer.th_players') }}</th>
+                                    <th class="text-left px-4 py-3 font-normal">{{ __('stats.multiplayer.th_date') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($recentMatches as $match)
+                                    <tr class="border-b border-border last:border-0">
+                                        <td class="px-4 py-3 font-bold {{ $match->place === 1 ? 'text-gold' : 'text-foreground' }}">
+                                            {{ $placeOrdinal($match->place) }}
+                                        </td>
+                                        <td class="px-4 py-3 text-foreground tabular-nums">{{ $match->wpm }}</td>
+                                        <td class="px-4 py-3 text-foreground tabular-nums">{{ $match->accuracy }}%</td>
+                                        <td class="px-4 py-3 text-muted tabular-nums">{{ $match->player_count }}</td>
+                                        <td class="px-4 py-3 text-muted">@localtime($match->created_at, 'M j, Y')</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            @endif
         </div>
     </div>
 

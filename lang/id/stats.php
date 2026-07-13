@@ -60,5 +60,22 @@ return [
     ],
     'no_distribution' => 'Belum ada tes.',
 
-    'multiplayer_soon' => 'Statistik multiplayer akan segera hadir.',
+    'multiplayer' => [
+        'empty' => 'Belum ada balapan. Selesaikan satu balapan multiplayer untuk melihat statistikmu di sini.',
+        'card' => [
+            'races' => 'Balapan',
+            'win_rate' => 'Persentase Menang',
+            'avg_wpm' => 'Rata-rata WPM',
+            'best_wpm' => 'WPM Terbaik',
+            'avg_accuracy' => 'Rata-rata Akurasi',
+        ],
+        'placements' => 'Distribusi Peringkat',
+        'place_prefix' => 'ke-',
+        'recent_matches' => 'Balapan Terakhir',
+        'th_place' => 'Peringkat',
+        'th_wpm' => 'WPM',
+        'th_accuracy' => 'Akurasi',
+        'th_players' => 'Pemain',
+        'th_date' => 'Tanggal',
+    ],
 ];
