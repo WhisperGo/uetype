@@ -150,3 +150,35 @@ clear-chat) — bukan versi terbatas. Yang dipangkas hanyalah **ukuran jendela**
 `OVERLAY_PAGE_SIZE = 15` (vs `Chat::PAGE_SIZE = 30`) dan picker kontak dibatasi 8 kontak
 terbaru (`getRecentContactsProperty()`), karena drawer memang bukan tempat untuk browsing
 riwayat panjang — itu tugas halaman `/chat`.
+
+### 4.7 Sembunyi saat sesi test/balapan aktif
+
+Tombol chat (dan drawer) **disembunyikan tepat saat user sedang mengetik atau balapan**, supaya
+tak menutupi area ketik atau memecah fokus — lalu muncul lagi saat sesi selesai. Sinyalnya adalah
+window event **`test-activity`** dengan `{ active: bool }`:
+
+- **Solo** ([`typing-engine.blade.php`](../../resources/views/livewire/typing-engine.blade.php)):
+  `active:true` saat keystroke pertama (`isStarted` jadi true), `active:false` di `finish()` dan
+  di `resetProgress()` (restart/ganti mode di tengah sesi).
+- **Multiplayer** ([`multiplayer-lobby.blade.php`](../../resources/views/livewire/multiplayer-lobby.blade.php)):
+  blok arena (`step === 'racing'`, mencakup countdown 3-2-1) punya `x-data` kecil yang emit
+  `active:true` di `init()` dan `active:false` di `destroy()` — jadi otomatis kembali saat race
+  selesai / result modal muncul / keluar room.
+
+`chatOverlayDock` mendengarkan `test-activity` → set `hidden` + tutup drawer. Karena overlay
+bertahan lintas `wire:navigate`, ada juga listener `livewire:navigated` yang me-reset `hidden`
+(sesi test halaman lama sudah berakhir begitu pindah halaman). Sinyalnya berbasis **aktivitas
+nyata**, bukan sekadar route — jadi di halaman `/typing` yang masih idle (belum mengetik) tombol
+tetap tampil.
+
+### 4.8 Bubble bisa digeser (drag) dengan clamp ke layar
+
+Tombol chat bisa dipindah lewat drag (`chatOverlayDock`, pointer events). Aturannya:
+
+- Posisi disimpan di `window.__chatOverlayPos` supaya **tak lompat balik ke sudut** saat
+  `wire:navigate`.
+- `clampToViewport()` menjaga bubble **selalu utuh di dalam layar** (min `MARGIN=20px` dari tiap
+  tepi), dijalankan ulang saat drag maupun `resize`.
+- Drawer (`panelStyle()`) menempel ke posisi bubble lalu ikut di-clamp: buka ke atas kalau ruang
+  bawah kurang, geser kiri kalau mepet kanan — **kotak chat tak pernah melewati batas layar**.
+- `dragged` membedakan klik (buka/tutup) vs geser (>4px) supaya drag tak sengaja men-toggle drawer.

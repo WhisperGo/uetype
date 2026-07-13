@@ -231,6 +231,9 @@
         {{-- Logika Alpine ada di komponen 'raceArena' (lihat @assets), bukan inline di x-data. --}}
         {{-- Sudden death disinkron via WebSocket + clock lokal; saat 0, lockRace() panggil checkSuddenDeath() sekali. --}}
         @php $arenaDense = $this->roomData->members->count() >= 4; @endphp
+        {{-- Sembunyikan overlay chat selama arena balapan tampil; kembalikan saat blok ini
+             hilang (race selesai / result modal / keluar room). --}}
+        <div x-data="{ init() { window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: true } })); }, destroy() { window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: false } })); } }"></div>
         <div wire:key="race-arena-{{ $this->roomCode }}" class="{{ $arenaDense ? 'space-y-4' : 'space-y-6' }}"
             x-data="raceArena({
                 myId: @js(Auth::id()),

@@ -1,29 +1,32 @@
-<div x-data="{ open: @entangle('open') }" class="font-mono">
-    {{-- Tombol toggle: selalu tampil, badge unread DM. @entangle('open') menyinkron
-         nilai ke server (memicu render konten segar) — jadi cukup Alpine, tak perlu
-         wire:click tambahan (akan jadi toggle ganda yang saling meniadakan). --}}
-    <button @click="open = ! open"
-        class="fixed z-[56] bottom-5 right-5 w-14 h-14 rounded-full bg-gold hover:bg-gold/90 text-background shadow-xl flex items-center justify-center transition"
+<div x-data="chatOverlayDock(@entangle('open'))" class="font-mono">
+    {{-- Tombol toggle (bisa digeser): sembunyi saat sesi test/balapan aktif.
+         @entangle('open') menyinkron nilai ke server (memicu render konten segar). --}}
+    <button x-show="!hidden" x-cloak x-ref="bubble"
+        @pointerdown="startDrag($event)"
+        @click="if (!dragged) open = ! open"
+        :style="bubbleStyle()"
+        class="fixed z-[56] w-14 h-14 rounded-full bg-gold hover:bg-gold/90 text-background shadow-xl flex items-center justify-center transition-colors touch-none select-none cursor-grab active:cursor-grabbing"
         aria-label="{{ __('chat.title') }}">
-        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <svg class="w-6 h-6 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8-1.17 0-2.29-.2-3.32-.56L3 21l1.56-4.68C3.57 15.19 3 13.65 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
         @if ($this->unreadCount > 0)
-            <span class="absolute -top-1 -right-1 px-1.5 py-0.5 min-w-[1.25rem] text-center font-mono text-[0.65rem] font-bold text-background bg-danger rounded-full border-2 border-background">
+            <span class="absolute -top-1 -right-1 px-1.5 py-0.5 min-w-[1.25rem] text-center font-mono text-[0.65rem] font-bold text-background bg-danger rounded-full border-2 border-background pointer-events-none">
                 {{ $this->unreadCount > 9 ? '9+' : $this->unreadCount }}
             </span>
         @endif
     </button>
 
-    {{-- Drawer --}}
-    <div x-show="open" x-cloak
+    {{-- Drawer: menempel di posisi bubble, dijaga tetap di dalam layar. --}}
+    <div x-show="open && !hidden" x-cloak x-ref="panel"
         x-transition:enter="transition ease-out duration-200"
         x-transition:enter-start="opacity-0 translate-y-4"
         x-transition:enter-end="opacity-100 translate-y-0"
         x-transition:leave="transition ease-in duration-150"
         x-transition:leave-start="opacity-100 translate-y-0"
         x-transition:leave-end="opacity-0 translate-y-4"
-        class="fixed z-[55] bottom-24 right-5 w-96 max-w-[calc(100vw-2.5rem)] h-[32rem] max-h-[70vh] bg-surface border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        :style="panelStyle()"
+        class="fixed z-[55] w-96 max-w-[calc(100vw-2.5rem)] h-[32rem] max-h-[70vh] bg-surface border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
         @if ($activeMode === null)
             {{-- PICKER --}}
@@ -548,4 +551,113 @@
             });
         </script>
     @endscript
+
+    {{-- Komponen dock: posisi bubble (draggable + clamp ke layar) & hide saat sesi test.
+         Didaftarkan sekali via alpine:init; state posisi disimpan di window agar
+         bertahan lintas wire:navigate (bubble tak "lompat" balik ke sudut). --}}
+    <script>
+        if (!window.__chatOverlayDockRegistered) {
+            window.__chatOverlayDockRegistered = true;
+            document.addEventListener('alpine:init', () => {
+                const BUBBLE = 56;   // ukuran tombol (w-14 h-14)
+                const MARGIN = 20;   // jarak minimum dari tepi layar (setara bottom-5/right-5)
+
+                window.Alpine.data('chatOverlayDock', (open) => ({
+                    open,
+                    hidden: false,
+                    dragged: false,
+                    // Posisi kiri-atas bubble (px). null = pakai default sudut kanan-bawah.
+                    pos: window.__chatOverlayPos || null,
+                    _drag: null,
+
+                    init() {
+                        this.place();
+                        window.addEventListener('resize', () => this.clampToViewport());
+
+                        // Sembunyikan saat sesi ketik/balapan aktif; tutup drawer juga.
+                        window.addEventListener('test-activity', (e) => {
+                            this.hidden = !!(e.detail && e.detail.active);
+                            if (this.hidden) this.open = false;
+                        });
+                        // Ganti halaman: reset hide (sesi test halaman lama sudah berakhir).
+                        document.addEventListener('livewire:navigated', () => { this.hidden = false; });
+                    },
+
+                    // Default: sudut kanan-bawah, dihitung dari ukuran layar saat ini.
+                    place() {
+                        if (!this.pos) {
+                            this.pos = {
+                                x: window.innerWidth - BUBBLE - MARGIN,
+                                y: window.innerHeight - BUBBLE - MARGIN,
+                            };
+                        }
+                        this.clampToViewport();
+                    },
+
+                    // Jaga bubble selalu utuh di dalam viewport.
+                    clampToViewport() {
+                        if (!this.pos) return;
+                        const maxX = window.innerWidth - BUBBLE - MARGIN;
+                        const maxY = window.innerHeight - BUBBLE - MARGIN;
+                        this.pos.x = Math.max(MARGIN, Math.min(this.pos.x, maxX));
+                        this.pos.y = Math.max(MARGIN, Math.min(this.pos.y, maxY));
+                        window.__chatOverlayPos = this.pos;
+                    },
+
+                    startDrag(e) {
+                        this.dragged = false;
+                        const startX = e.clientX, startY = e.clientY;
+                        const originX = this.pos.x, originY = this.pos.y;
+
+                        const move = (ev) => {
+                            const dx = ev.clientX - startX;
+                            const dy = ev.clientY - startY;
+                            // Anggap "drag" hanya kalau geseran cukup jauh (>4px), supaya
+                            // klik biasa tetap membuka/menutup drawer.
+                            if (Math.abs(dx) > 4 || Math.abs(dy) > 4) this.dragged = true;
+                            this.pos = { x: originX + dx, y: originY + dy };
+                            this.clampToViewport();
+                        };
+                        const up = () => {
+                            window.removeEventListener('pointermove', move);
+                            window.removeEventListener('pointerup', up);
+                            // Reset flag drag di tick berikutnya agar @click sempat membacanya.
+                            setTimeout(() => { this.dragged = false; }, 0);
+                        };
+                        window.addEventListener('pointermove', move);
+                        window.addEventListener('pointerup', up);
+                    },
+
+                    bubbleStyle() {
+                        if (!this.pos) return '';
+                        return `left:${this.pos.x}px; top:${this.pos.y}px; right:auto; bottom:auto;`;
+                    },
+
+                    // Drawer menempel ke bubble, lalu di-clamp agar tak keluar layar.
+                    // Buka ke atas kalau ruang di bawah kurang; geser kiri kalau mepet kanan.
+                    panelStyle() {
+                        if (!this.pos) return '';
+                        const gap = 12;
+                        const panel = this.$refs.panel;
+                        const pw = panel?.offsetWidth || Math.min(384, window.innerWidth - MARGIN * 2);
+                        const ph = panel?.offsetHeight || Math.min(512, window.innerHeight * 0.7);
+
+                        // Kanan-selaraskan drawer dengan bubble; clamp horizontal.
+                        let left = this.pos.x + BUBBLE - pw;
+                        left = Math.max(MARGIN, Math.min(left, window.innerWidth - pw - MARGIN));
+
+                        // Default buka ke atas bubble; kalau tak muat, buka ke bawah.
+                        let top = this.pos.y - gap - ph;
+                        if (top < MARGIN) {
+                            const below = this.pos.y + BUBBLE + gap;
+                            top = (below + ph <= window.innerHeight - MARGIN) ? below : MARGIN;
+                        }
+                        top = Math.max(MARGIN, Math.min(top, window.innerHeight - ph - MARGIN));
+
+                        return `left:${left}px; top:${top}px; right:auto; bottom:auto;`;
+                    },
+                }));
+            });
+        }
+    </script>
 </div>

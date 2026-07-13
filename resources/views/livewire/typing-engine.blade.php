@@ -534,6 +534,9 @@
                     this.startTime = null;
                     this.isStarted = false;
                     this.isFinished = false;
+
+                    // Reset (mis. restart / ganti mode di tengah sesi) -> overlay chat tampil lagi.
+                    window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: false } }));
                     this.timer = (this.currentMain === 'time') ? parseInt(this.currentSub) : 0;
                     this.wpm = 0;
                     this.rawWpm = 0;
@@ -970,6 +973,9 @@
                         this.startTime = Date.now();
                         this.scrollToTypeArea();
 
+                        // Sembunyikan overlay chat selama sesi ketik berjalan.
+                        window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: true } }));
+
                         // Survival: loop drain ~100ms agar tekanan terasa mulus (drain & game over di staminaTick).
                         if (this.currentMain === 'survival') {
                             this.lastTickTime = this.startTime;
@@ -1146,6 +1152,8 @@
 
                 finish() {
                     this.isFinished = true;
+                    // Sesi ketik selesai — tampilkan lagi overlay chat.
+                    window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: false } }));
                     clearInterval(this.timerInterval);
                     if (this.staminaInterval) {
                         clearInterval(this.staminaInterval);
