@@ -1,8 +1,9 @@
 # WPM Tinggi, Akurasi Rendah — Apakah Hasilnya Valid?
 
-**Status:** Draf diskusi tim — belum diimplementasikan
-**Dibuat:** 2026-07-12
-**Konteks:** Ditemukan saat review sistem multiplayer race, tapi berlaku juga untuk mode solo.
+**Status:** ✅ Diimplementasikan (commit `f37cb9c` — "feat (multiplayer): reject invalid race results from stats")
+**Dibuat:** 2026-07-12 · **Diimplementasikan:** 2026-07-13
+**Konteks:** Ditemukan saat review sistem multiplayer race. Tim memilih Opsi A (Net WPM,
+diselaraskan dengan mode solo) dari analisis di bawah, ditambah anti-cheat gate.
 
 ---
 
@@ -29,9 +30,9 @@ huruf acak secepat mungkin — berlawanan dengan tujuan game latihan mengetik.
   benar"**, bukan "ketik dengan benar secepat mungkin".
 - Membandingkan dua pemain dengan WPM sama tapi akurasi 95% vs 40% sebagai "setara" tidak adil.
 
-## 4. Kondisi Kode Saat Ini (sudah dicek langsung)
+## 4. Kondisi Sebelum Perbaikan (temuan awal)
 
-Ternyata **mode solo dan mode multiplayer sudah tidak konsisten** satu sama lain:
+Ternyata **mode solo dan mode multiplayer tidak konsisten** satu sama lain:
 
 ### Mode Solo — sudah punya sebagian besar solusinya
 
@@ -48,20 +49,19 @@ Ternyata **mode solo dan mode multiplayer sudah tidak konsisten** satu sama lain
 
 Jadi **mode solo pada dasarnya sudah menerapkan "Net WPM" dan sudah punya anti-cheat gate.**
 
-### Mode Multiplayer — belum punya perlindungan ini
+### Mode Multiplayer — belum punya perlindungan ini (sebelum `f37cb9c`)
 
-- [`MultiplayerLobby::updateRaceProgress()`](../app/Livewire/MultiplayerLobby.php#L293) menyimpan
-  `wpm` **langsung dari client** (`int $liveWpm` — parameter dari browser pemain sendiri), tanpa
-  dihitung ulang server dan **tanpa validasi**.
+- `MultiplayerLobby::updateRaceProgress()` menyimpan `wpm` **langsung dari client**
+  (`int $liveWpm` — parameter dari browser pemain sendiri), tanpa dihitung ulang server dan
+  **tanpa validasi**.
 - Tidak ada pembagian `net_wpm` vs `raw_wpm` — hanya satu kolom `wpm`.
-- [`finalizeRace()`](../app/Livewire/MultiplayerLobby.php#L188) memang sudah memanggil `addExp()`
-  dengan `accuracy` sebagai pengali (jadi EXP multiplayer sudah "adil" seperti solo) — **tapi**
-  urutan menang (`place`) dan `wpm` yang tersimpan di riwayat pertandingan tidak melalui
-  Net WPM/anti-cheat sama sekali.
+- `finalizeRace()` memang sudah memanggil `addExp()` dengan `accuracy` sebagai pengali (jadi EXP
+  multiplayer sudah "adil" seperti solo) — **tapi** urutan menang (`place`) dan `wpm` yang
+  tersimpan di riwayat pertandingan tidak melalui Net WPM/anti-cheat sama sekali.
 - Artinya: di multiplayer, pemain bisa mengetik ngasal, dapat `wpm` tinggi yang **client-supplied**
   dan tak diverifikasi, dan itu tercatat di `match_result`/riwayat sebagai angka resmi.
 
-## 5. Opsi Perbaikan
+## 5. Opsi yang Dipertimbangkan
 
 | Opsi | Cara Kerja | Kelebihan | Kekurangan |
 |---|---|---|---|
@@ -69,32 +69,66 @@ Jadi **mode solo pada dasarnya sudah menerapkan "Net WPM" dan sudah punya anti-c
 | **B. Minimum accuracy gate** | PB/leaderboard hanya menerima hasil dengan akurasi ≥ ambang batas (mis. 90%) | Simpel untuk diimplementasi | Hasil di bawah ambang batas "hilang" begitu saja meski WPM tinggi; ambang batas terasa sewenang-wenang |
 | **C. Skor gabungan** | Ranking pakai `score = wpm * (accuracy / 100)` atau fungsi weighted lain | Fleksibel untuk tuning leaderboard | WPM asli tetap perlu ditampilkan terpisah agar tidak membingungkan pemain; berpotensi predictable-gaming kalau bobotnya salah |
 
-### Rekomendasi: Opsi A, dikombinasikan dengan pola anti-cheat yang sudah ada
+Tim memilih **Opsi A**, dikombinasikan dengan anti-cheat gate ala mode solo. Opsi B dan C tidak
+dipakai: B membuang hasil pemain di bawah ambang batas begitu saja, C butuh tuning bobot yang
+rawan predictable-gaming.
 
-1. **Samakan multiplayer dengan solo**: `updateRaceProgress()`/finalisasi race hitung ulang WPM di
-   server dari `correctChars` (bisa diturunkan dari `progress_percent × panjang teks`, pola yang
-   sama persis yang sudah dipakai `finalizeRace()` untuk EXP) dan durasi race — bukan menerima
-   `wpm` mentah dari client.
-2. Simpan sebagai Net WPM (karakter benar saja) — konsisten dengan `highest_wpm` di mode solo,
-   supaya PB lintas mode punya arti yang sama.
-3. Opsional: terapkan `AntiCheatService` yang sudah ada juga ke jalur multiplayer, supaya WPM di
-   atas batas manusiawi (>300) atau throughput mustahil ditolak di kedua mode dengan aturan yang
-   sama persis — tidak perlu servis baru, tinggal dipanggil ulang.
-4. Akurasi tetap ditampilkan terpisah di UI sebagai info tambahan (sudah begitu sekarang), bukan
-   disembunyikan di balik satu angka gabungan — pemain tetap bisa lihat "aku cepat tapi banyak
-   salah" secara eksplisit.
+## 6. Implementasi (`f37cb9c`)
 
-## 6. Yang Perlu Didiskusikan Tim
+### a. Net WPM otoritatif dihitung server, bukan dari client
 
-- Apakah PB/leaderboard multiplayer perlu diselaraskan dengan solo (Net WPM), atau tim mau
-  pendekatan berbeda untuk multiplayer (mis. karena real-time race punya dinamika sosial yang
-  beda dari solo practice)?
-- Kalau Opsi A dipilih: apakah `place` (urutan menang) race tetap berdasarkan
-  `finished_time_seconds` (siapa tercepat selesai, sudah begitu sekarang — lihat
-  `finalizeRace()`), atau ingin ikut mempertimbangkan akurasi juga?
-- Apakah anti-cheat gate (menolak sesi) juga diinginkan di multiplayer, atau cukup Net WPM saja
-  tanpa penolakan?
+[`updateRaceProgress()`](../app/Livewire/MultiplayerLobby.php#L351) tidak lagi memakai `$liveWpm`
+dari client untuk angka resmi. Parameter itu tetap ada di signature (kompatibilitas payload) tapi
+diabaikan untuk perhitungan:
+
+1. `correctChars` diturunkan dari `progress_percent × panjang teks` — otomatis "net" karena
+   progress hanya naik dari karakter yang diketik **benar** (karakter salah tak menambah progres).
+2. `durationSeconds` dihitung dari `race_starts_at` sampai sekarang, di server.
+3. `AntiCheatService::check($correctChars, $correctChars, $durationSeconds)` dipanggil dengan
+   `totalChars == correctChars` — rumus **persis sama** dengan mode solo
+   (`TypingEngine::saveResult()`), satu sumber kebenaran untuk Net WPM di kedua mode.
+4. Hanya sinyal curang murni (`wpm_too_high`, `char_count_inconsistent`) yang menolak angka WPM
+   (jadi `0`) — throughput rendah/durasi pendek **tidak** dianggap curang (itu wajar untuk pemain
+   lambat atau awal race), sesuai temuan di §3 bahwa tim tidak ingin gerbang yang terlalu agresif.
+
+### b. Hasil akhir digerbang sebelum masuk riwayat & EXP
+
+[`finalizeRace()`](../app/Livewire/MultiplayerLobby.php#L195) memanggil
+[`isValidRaceResult()`](../app/Livewire/MultiplayerLobby.php#L261) (memakai `AntiCheatService`
+yang sama) sebelum menulis hasil:
+
+- **Valid** → EXP diberikan (`addExp()`, sudah dibobot akurasi seperti sebelumnya) dan baris baru
+  ditulis ke `MultiplayerMatchHistory` (riwayat pertandingan permanen).
+- **Tidak valid** → **tidak** dapat EXP, **tidak** ditulis ke `MultiplayerMatchHistory` sama
+  sekali — jadi rata-rata WPM pemain di statistik tidak bisa dirusak oleh satu hasil ngasal.
+- DNF/menyerah tetap tercatat seperti biasa (throughput rendah bukan sinyal curang, sesuai poin a).
+
+### c. Kolom & UI baru
+
+- Migrasi `..._add_result_recorded_to_room_members_table.php` menambah kolom boolean
+  `room_members.result_recorded`, di-cast di [`RoomMember`](../app/Models/RoomMember.php).
+- Layar hasil pertandingan menampilkan catatan **"Hasil ini tidak lolos validasi dan tidak dicatat
+  ke statistikmu"** (`multiplayer.result_invalid`, en+id) kalau `result_recorded === false` untuk
+  pemain yang sedang login — transparan ke pemain, bukan penolakan diam-diam.
+
+### d. Cakupan
+
+- [`tests/Feature/MultiplayerStatsTest.php`](../tests/Feature/MultiplayerStatsTest.php) menguji
+  jalur gagal (WPM mustahil → tidak masuk `MultiplayerMatchHistory`, EXP 0, `result_recorded`
+  false) dan jalur normal/DNF tetap tercatat.
+
+## 7. Jawaban atas Pertanyaan Diskusi Sebelumnya
+
+- **PB/leaderboard multiplayer diselaraskan dengan solo?** Ya — Net WPM dengan rumus
+  `AntiCheatService` yang sama persis.
+- **`place` tetap berdasarkan `finished_time_seconds`?** Ya, tidak diubah — urutan menang tetap
+  murni siapa tercepat selesai; akurasi tidak ikut memengaruhi `place`, hanya memengaruhi apakah
+  hasilnya *tercatat* (valid/tidak) dan besaran EXP.
+- **Anti-cheat gate juga diinginkan?** Ya — diimplementasikan sebagai gerbang di `finalizeRace()`
+  (bukan menolak real-time saat race berlangsung, supaya race tidak terganggu di tengah jalan;
+  gerbang hanya berlaku saat hasil akhir difinalisasi).
 
 ---
 
-*Dokumen ini murni analisis & proposal — belum ada perubahan kode yang dibuat.*
+*Status akhir: selesai diimplementasikan & diuji. Dokumen ini kini berfungsi sebagai catatan
+desain, bukan lagi proposal terbuka.*

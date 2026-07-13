@@ -53,5 +53,7 @@ Sebelum membaca per fitur, tiga prinsip ini muncul terus dan menjelaskan banyak 
 | 12 | Multi-bahasa (Konten & UI) | [localization.md](localization.md) |
 
 Dokumen lain yang relevan:
+- [`../PROJECT_OVERVIEW.md`](../PROJECT_OVERVIEW.md) — peta menyeluruh proyek: tech
+  stack, arsitektur, skema database lengkap, seluruh route, testing, tooling.
 - [`../design-system.md`](../design-system.md) — token warna, tipografi, komponen UI.
 - [`../wpm-accuracy-integrity.md`](../wpm-accuracy-integrity.md) — analisis integritas WPM vs akurasi.
