@@ -55,7 +55,6 @@ return [
     'mode' => [
         'time' => 'Time',
         'words' => 'Words',
-        'quote' => 'Quote',
         'survival' => 'Survival',
     ],
     'no_distribution' => 'No tests yet.',

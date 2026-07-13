@@ -3,11 +3,10 @@
 namespace App\Enums;
 
 /**
- * Source style of a typing text: a coherent quote/sentence, or a random
- * stream of individual words.
+ * Source style of a typing text. Currently only a random stream of individual
+ * words is used.
  */
 enum TextMode: string
 {
-    case Quote = 'quote';
     case Words = 'words';
 }

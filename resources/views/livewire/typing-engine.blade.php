@@ -92,7 +92,7 @@
                         :class="currentMain === 'survival' ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">{{ __('typing.survival') }}</button>
                 </div>
 
-                <!-- Row 2: Config (Standard → Time/Words/Quote + durasi; Survival → difficulty) -->
+                <!-- Row 2: Config (Standard → Time/Words + durasi; Survival → difficulty) -->
                 <div class="flex flex-wrap items-center justify-center gap-1.5 min-h-[34px] text-small font-mono"
                     role="group" aria-label="{{ __('typing.aria.mode_config') }}">
                     <!-- STANDARD: pemilih tipe + sub-konfigurasi -->

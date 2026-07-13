@@ -55,7 +55,6 @@ return [
     'mode' => [
         'time' => 'Waktu',
         'words' => 'Kata',
-        'quote' => 'Kutipan',
         'survival' => 'Survival',
     ],
     'no_distribution' => 'Belum ada tes.',

@@ -57,7 +57,6 @@ new class extends Component
                 <option value="all">{{ __('history.filter_all') }}</option>
                 <option value="time">Time</option>
                 <option value="words">Words</option>
-                <option value="quote">Quote</option>
                 <option value="survival">Survival</option>
                 <option value="ghost">Ghost</option>
             </select>

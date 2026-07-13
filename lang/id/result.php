@@ -4,7 +4,6 @@ return [
     'mode' => [
         'time' => 'Time · :config' . 's',
         'words' => 'Words · :config',
-        'quote' => 'Quote',
         'survival' => 'Survival · :config',
     ],
 

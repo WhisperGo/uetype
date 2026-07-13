@@ -68,7 +68,7 @@ it('does not offer ghost mode for survival', function () {
 
 /**
  * Ghost hanya sah di time/words. Klien tak dipercaya: walau mengirim ghostWpm,
- * server harus mengabaikannya di survival/quote.
+ * server harus mengabaikannya di survival.
  */
 it('ignores ghost data sent by the client while in survival mode', function () {
     $user = User::factory()->create();
@@ -104,9 +104,10 @@ it('tells the client to clear the ghost when switching to a non-eligible mode', 
         ->assertDispatched('ghost-cleared');
 });
 
-it('normalizes an unknown quote mode to the safe time default', function () {
+it('normalizes an unknown mode (e.g. the removed quote mode) to the safe time default', function () {
     $user = User::factory()->create();
 
+    // 'quote' mode was removed; the client sending it must fall back safely.
     Livewire::actingAs($user)->test(TypingEngine::class)
         ->call('setMode', 'quote', null)
         ->assertSet('mainMode', 'time')

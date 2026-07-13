@@ -13,7 +13,6 @@
             $modeLabel = match ($mode) {
                 'time' => __('result.mode.time', ['config' => $subMode]),
                 'words' => __('result.mode.words', ['config' => $subMode]),
-                'quote' => __('result.mode.quote'),
                 'survival' => __('result.mode.survival', ['config' => ucfirst($subMode)]),
                 default => ucfirst($mode) . ' · ' . $subMode,
             };

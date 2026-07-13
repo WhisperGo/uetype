@@ -41,7 +41,6 @@
                 'words' => 'bg-brand',
                 'time' => 'bg-brand-bright',
                 'survival' => 'bg-gold',
-                'quote' => 'bg-gold/60',
             ];
 
             // Kolom `mode` bisa memuat nilai enum yang belum punya terjemahan;
