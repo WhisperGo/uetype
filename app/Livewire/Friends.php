@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Enums\FriendshipStatus;
 use App\Events\FriendshipUpdated;
 use App\Models\Friendship;
+use App\Models\TypingResult;
 use App\Models\User;
 use App\Support\SafeBroadcast;
 use Illuminate\Support\Facades\Auth;
@@ -156,22 +157,66 @@ class Friends extends Component
     {
         $me = Auth::id();
 
-        return Friendship::with(['requester', 'addressee'])
+        $friendships = Friendship::with(['requester', 'addressee'])
             ->where('status', FriendshipStatus::Accepted)
             ->where(fn ($q) => $q->where('requester_id', $me)->orWhere('addressee_id', $me))
             ->latest('updated_at')
-            ->get()
-            ->map(function (Friendship $f) use ($me) {
-                $friend = $f->requester_id === $me ? $f->addressee : $f->requester;
+            ->get();
 
-                return [
-                    'friendship_id' => $f->id,
-                    'user' => $friend,
-                    'online' => $friend?->isOnline() ?? false,
-                ];
-            })
+        $friends = $friendships
+            ->map(fn (Friendship $f) => [
+                'friendship_id' => $f->id,
+                'user' => $f->requester_id === $me ? $f->addressee : $f->requester,
+            ])
             ->filter(fn ($row) => $row['user'] !== null)
             ->values();
+
+        $ghostConfigsByUser = $this->ghostConfigsFor($friends->pluck('user.id')->all());
+
+        return $friends->map(fn ($row) => [
+            'friendship_id' => $row['friendship_id'],
+            'user' => $row['user'],
+            'online' => $row['user']->isOnline(),
+            'ghost_configs' => $ghostConfigsByUser[$row['user']->id] ?? [],
+        ]);
+    }
+
+    /**
+     * Config per teman yang PUNYA rekor ghost (net_wpm > 0, mode time/words), untuk
+     * membangun submenu Race Ghost yang hanya menampilkan pilihan yang benar-benar
+     * ada lawannya. Satu query batch untuk seluruh daftar teman (bukan per baris).
+     *
+     * @param  array<int, int>  $userIds
+     * @return array<int, array{time: list<string>, words: list<string>}>
+     */
+    private function ghostConfigsFor(array $userIds): array
+    {
+        if (empty($userIds)) {
+            return [];
+        }
+
+        $timeOrder = ['15', '30', '60', '120'];
+        $wordsOrder = ['10', '25', '50', '100'];
+
+        $rows = TypingResult::whereIn('user_id', $userIds)
+            ->whereIn('mode', ['time', 'words'])
+            ->where('net_wpm', '>', 0)
+            ->whereNotNull('mode_config')
+            ->select('user_id', 'mode', 'mode_config')
+            ->groupBy('user_id', 'mode', 'mode_config')
+            ->get();
+
+        $map = [];
+
+        foreach ($rows as $row) {
+            $mode = $row->mode instanceof \App\Enums\TypingMode ? $row->mode->value : (string) $row->mode;
+            $map[$row->user_id][$mode][] = (string) $row->mode_config;
+        }
+
+        return collect($map)->map(fn ($modes) => [
+            'time' => array_values(array_intersect($timeOrder, $modes['time'] ?? [])),
+            'words' => array_values(array_intersect($wordsOrder, $modes['words'] ?? [])),
+        ])->all();
     }
 
     public function getIncomingRequestsProperty()

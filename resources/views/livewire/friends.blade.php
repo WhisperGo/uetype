@@ -39,7 +39,8 @@
         @if ($this->friendsList->count() > 0)
             <div class="space-y-3">
                 @foreach ($this->friendsList as $row)
-                    <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl hover:border-white/10 transition group">
+                    @php $friendWpm = (float) ($row['user']->highest_wpm ?? 0); @endphp
+                    <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl hover:border-white/10 transition group" wire:key="friend-{{ $row['friendship_id'] }}">
                         <a href="{{ route('profile.show', $row['user']) }}" wire:navigate class="flex items-center gap-4 flex-1 min-w-0">
                             <x-friend-avatar :user="$row['user']" :online="$row['online']" />
                             <div class="flex-1 min-w-0">
@@ -55,20 +56,94 @@
                                 @endif
                             </div>
                         </a>
+
+                        <div class="shrink-0 hidden sm:flex flex-col items-end font-mono leading-tight">
+                            @if ($friendWpm > 0)
+                                <span class="text-sm font-bold text-gold tabular-nums">{{ __('friends.wpm_short', ['wpm' => rtrim(rtrim(number_format($friendWpm, 1), '0'), '.')]) }}</span>
+                            @endif
+                            <span class="text-[0.65rem] uppercase tracking-wider text-muted">{{ __('friends.level', ['level' => $row['user']->levelData()['level']]) }}</span>
+                        </div>
+
                         <a href="{{ route('chat.index', ['mode' => 'dm', 'with' => $row['user']->username]) }}" wire:navigate
                             class="px-3 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition shrink-0">
                             {{ __('friends.chat') }}
                         </a>
-                        <button wire:click="removeFriend({{ $row['friendship_id'] }})"
-                            wire:confirm="{{ __('friends.confirm_remove', ['name' => $row['user']->username]) }}"
-                            class="opacity-0 group-hover:opacity-100 px-3 py-1.5 font-mono text-xs text-red-400/80 border border-red-900/40 rounded-lg hover:bg-red-950/30 transition">
-                            {{ __('friends.remove') }}
-                        </button>
-                        <a href="{{ route('profile.show', $row['user']) }}" wire:navigate class="text-muted hover:text-foreground transition shrink-0" aria-label="{{ __('friends.view_profile', ['name' => $row['user']->username]) }}">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                            </svg>
-                        </a>
+
+                        <div class="shrink-0 relative" x-data="{ open: false, ghost: false }" @click.outside="open = false; ghost = false" @keydown.escape="open = false; ghost = false">
+                            <button type="button" @click="open = !open; ghost = false"
+                                aria-label="{{ __('friends.actions') }}"
+                                class="p-1.5 rounded-lg text-muted hover:text-foreground hover:bg-white/5 transition">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v.01M12 12v.01M12 19v.01" />
+                                </svg>
+                            </button>
+
+                            <div x-show="open" x-cloak
+                                x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="opacity-0 scale-95"
+                                x-transition:enter-end="opacity-100 scale-100"
+                                x-transition:leave="transition ease-in duration-100"
+                                x-transition:leave-start="opacity-100 scale-100"
+                                x-transition:leave-end="opacity-0 scale-95"
+                                class="absolute right-0 top-full z-50 mt-1 w-60 origin-top-right rounded-xl border border-white/10 bg-surface shadow-lg ring-1 ring-black/20 overflow-hidden py-1">
+
+                                <a href="{{ route('profile.show', $row['user']) }}" wire:navigate
+                                    class="block px-4 py-2.5 text-xs font-bold text-foreground whitespace-nowrap hover:bg-white/5 transition">
+                                    {{ __('friends.menu_view_profile') }}
+                                </a>
+
+                                @php
+                                    $ghostConfigs = $row['ghost_configs'] ?? [];
+                                    $ghostTime = $ghostConfigs['time'] ?? [];
+                                    $ghostWords = $ghostConfigs['words'] ?? [];
+                                    $hasGhost = ! empty($ghostTime) || ! empty($ghostWords);
+                                @endphp
+                                @if ($hasGhost)
+                                    <button type="button" @click="ghost = !ghost"
+                                        class="w-full flex items-center justify-between px-4 py-2.5 text-xs font-bold text-foreground whitespace-nowrap hover:bg-white/5 transition text-left">
+                                        <span>{{ __('friends.race_ghost') }}</span>
+                                        <span class="text-muted tabular-nums" x-text="ghost ? '-' : '+'"></span>
+                                    </button>
+
+                                    <div x-show="ghost" x-cloak class="border-t border-white/5 bg-background/40 px-3 py-2 space-y-2">
+                                        @if (! empty($ghostTime))
+                                            <div>
+                                                <p class="text-[0.6rem] uppercase tracking-widest text-muted mb-1.5">{{ __('friends.race_ghost_time') }}</p>
+                                                <div class="flex flex-wrap gap-1">
+                                                    @foreach ($ghostTime as $t)
+                                                        <a href="{{ route('typing') }}?ghost={{ $row['user']->id }}&mode=time&config={{ $t }}" wire:navigate
+                                                            class="px-2 py-1 rounded-md text-[0.7rem] font-bold tabular-nums text-muted hover:text-foreground hover:bg-white/5 border border-white/10 transition">{{ $t }}</a>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @endif
+                                        @if (! empty($ghostWords))
+                                            <div>
+                                                <p class="text-[0.6rem] uppercase tracking-widest text-muted mb-1.5">{{ __('friends.race_ghost_words') }}</p>
+                                                <div class="flex flex-wrap gap-1">
+                                                    @foreach ($ghostWords as $w)
+                                                        <a href="{{ route('typing') }}?ghost={{ $row['user']->id }}&mode=words&config={{ $w }}" wire:navigate
+                                                            class="px-2 py-1 rounded-md text-[0.7rem] font-bold tabular-nums text-muted hover:text-foreground hover:bg-white/5 border border-white/10 transition">{{ $w }}</a>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @endif
+                                    </div>
+                                @else
+                                    <div class="flex items-center justify-between gap-4 px-4 py-2.5 text-xs font-bold text-muted whitespace-nowrap cursor-default">
+                                        <span>{{ __('friends.race_ghost') }}</span>
+                                        <span class="text-[0.65rem] font-medium normal-case text-muted/70">{{ __('friends.race_ghost_none') }}</span>
+                                    </div>
+                                @endif
+
+                                <button type="button" wire:click="removeFriend({{ $row['friendship_id'] }})"
+                                    wire:confirm="{{ __('friends.confirm_remove', ['name' => $row['user']->username]) }}"
+                                    @click="open = false"
+                                    class="block w-full px-4 py-2.5 text-xs font-bold text-danger whitespace-nowrap hover:bg-danger/10 transition text-left border-t border-white/5">
+                                    {{ __('friends.menu_remove') }}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 @endforeach
             </div>

@@ -18,6 +18,15 @@ return [
     'remove' => 'Remove',
     'confirm_remove' => 'Remove :name from your friends list?',
 
+    'actions' => 'Actions',
+    'menu_view_profile' => 'View Profile',
+    'menu_remove' => 'Remove Friend',
+    'race_ghost' => 'Race Ghost',
+    'race_ghost_none' => 'No records yet',
+    'race_ghost_time' => 'Time',
+    'race_ghost_words' => 'Words',
+    'wpm_short' => ':wpm wpm',
+
     'empty_friends_title' => 'No friends yet',
     'empty_friends_body' => 'Search for friends by username to get started',
     'find_friends' => 'Find Friends',
