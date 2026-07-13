@@ -81,13 +81,14 @@
             </div>
 
             <!-- ===== STATISTIK ===== -->
-            <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 @php
                     $cards = [
                         ['label' => __('profile.card.highest_wpm'), 'value' => rtrim(rtrim(number_format($user->highest_wpm, 1), '0'), '.'), 'accent' => 'text-brand-bright'],
                         ['label' => __('profile.card.avg_wpm'), 'value' => $stats['avg_wpm'], 'accent' => 'text-gold'],
                         ['label' => __('profile.card.avg_accuracy'), 'value' => $stats['avg_accuracy'].'%', 'accent' => 'text-gold'],
                         ['label' => __('profile.card.total_tests'), 'value' => $stats['total_matches'], 'accent' => 'text-foreground'],
+                        ['label' => __('profile.card.total_time'), 'value' => $timeLabel, 'accent' => 'text-foreground'],
                     ];
                 @endphp
                 @foreach($cards as $card)
@@ -96,29 +97,6 @@
                         <p class="text-3xl font-bold font-mono tabular-nums {{ $card['accent'] }}">{{ $card['value'] }}</p>
                     </div>
                 @endforeach
-            </div>
-
-            <div class="grid grid-cols-2 gap-3 {{ $isPublic ? 'lg:grid-cols-3' : 'lg:grid-cols-4' }}">
-                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                    <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ __('profile.card.total_time') }}</p>
-                    <p class="font-mono text-2xl font-bold text-foreground tabular-nums">{{ $timeLabel }}</p>
-                </div>
-                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                    <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ __('profile.card.best_wpm') }}</p>
-                    <p class="font-mono text-2xl font-bold text-brand-bright tabular-nums">{{ $stats['best_wpm'] }}</p>
-                </div>
-                <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                    <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ __('profile.card.level') }}</p>
-                    <p class="font-mono text-2xl font-bold text-gold tabular-nums">{{ $stats['level'] }}</p>
-                </div>
-
-                {{-- Kartu privat: hanya profil sendiri. --}}
-                @if(! $isPublic)
-                    <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl">
-                        <p class="text-xs uppercase tracking-[0.15em] text-muted font-mono mb-1">{{ __('profile.card.xp') }}</p>
-                        <p class="font-mono text-2xl font-bold text-gold tabular-nums">{{ $user->total_xp ?? 0 }}</p>
-                    </div>
-                @endif
             </div>
 
             {{-- Statistik lengkap (grafik, rekor per mode, aktivitas) ada di /stats;
