@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Events\RaceProgressUpdated;
 use App\Events\RoomUpdated;
 use App\Events\SuddenDeathTriggered;
+use App\Models\MultiplayerMatchHistory;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Services\AntiCheatService;
@@ -206,10 +207,14 @@ class MultiplayerLobby extends Component
             ->get();
 
         foreach ($members as $index => $member) {
-            $updateData = ['place' => $index + 1];
+            $place = $index + 1;
+            $updateData = ['place' => $place];
 
             // EXP sekali per pemain: xp_earned null = belum diberi (aman dari double-award
-            // lewat fast-path "semua finish" maupun checkSuddenDeath).
+            // lewat fast-path "semua finish" maupun checkSuddenDeath). rooms/room_members
+            // dihapus begitu semua pemain keluar, jadi baris riwayat permanen ditulis di
+            // sini juga -- satu-satunya titik semua kolom final (place, wpm, akurasi, xp)
+            // sudah settled sebelum room bisa lenyap.
             if (is_null($member->xp_earned) && $member->user) {
                 // correctChars diturunkan dari progress% x panjang teks (room_members tak
                 // menyimpan jumlah karakter benar), lalu pakai rumus sama dengan mode solo.
@@ -218,6 +223,17 @@ class MultiplayerLobby extends Component
 
                 $xp = $member->user->addExp($correctChars, (float) $member->accuracy);
                 $updateData['xp_earned'] = $xp;
+
+                MultiplayerMatchHistory::create([
+                    'user_id' => $member->user_id,
+                    'room_code' => $room?->code ?? '',
+                    'place' => $place,
+                    'player_count' => $members->count(),
+                    'wpm' => (int) $member->wpm,
+                    'accuracy' => (float) $member->accuracy,
+                    'finished_time_seconds' => $member->finished_time_seconds,
+                    'xp_earned' => $xp,
+                ]);
             }
 
             $member->update($updateData);
