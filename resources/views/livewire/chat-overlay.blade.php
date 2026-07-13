@@ -3,7 +3,6 @@
          @entangle('open') menyinkron nilai ke server (memicu render konten segar). --}}
     <button x-show="!hidden" x-cloak x-ref="bubble"
         @pointerdown="startDrag($event)"
-        @click="if (!dragged) open = ! open"
         :style="bubbleStyle()"
         class="fixed z-[56] w-14 h-14 rounded-full bg-gold hover:bg-gold/90 text-background shadow-xl flex items-center justify-center transition-colors touch-none select-none cursor-grab active:cursor-grabbing"
         aria-label="{{ __('chat.title') }}">
@@ -565,10 +564,8 @@
                 window.Alpine.data('chatOverlayDock', (open) => ({
                     open,
                     hidden: false,
-                    dragged: false,
                     // Posisi kiri-atas bubble (px). null = pakai default sudut kanan-bawah.
                     pos: window.__chatOverlayPos || null,
-                    _drag: null,
 
                     init() {
                         this.place();
@@ -604,33 +601,50 @@
                         window.__chatOverlayPos = this.pos;
                     },
 
+                    // Satu-satunya penentu buka/tutup: keputusan diambil di pointerup, BUKAN
+                    // lewat event click sintetis (yang bisa balapan / tak konsisten antar
+                    // browser). Kalau selama gesture pointer bergeser >4px = drag (chat tak
+                    // di-toggle); kalau diam = tap (toggle). Jadi menggeser TIDAK PERNAH
+                    // membuka/menutup chat.
                     startDrag(e) {
-                        this.dragged = false;
+                        // Hanya tombol kiri; abaikan klik kanan/tengah.
+                        if (e.button !== undefined && e.button !== 0) return;
+                        e.preventDefault();
+
+                        const btn = this.$refs.bubble;
                         const startX = e.clientX, startY = e.clientY;
                         const originX = this.pos.x, originY = this.pos.y;
+                        let moved = false;
+
+                        // Pointer capture: semua pointermove/up dialihkan ke tombol ini,
+                        // meski kursor keluar dari tombol saat menggeser.
+                        try { btn.setPointerCapture(e.pointerId); } catch (_) {}
 
                         const move = (ev) => {
                             const dx = ev.clientX - startX;
                             const dy = ev.clientY - startY;
-                            // Anggap "drag" hanya kalau geseran cukup jauh (>4px), supaya
-                            // klik biasa tetap membuka/menutup drawer.
-                            if (Math.abs(dx) > 4 || Math.abs(dy) > 4) this.dragged = true;
+                            if (!moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) moved = true;
+                            if (!moved) return;
                             this.pos = { x: originX + dx, y: originY + dy };
                             this.clampToViewport();
                         };
-                        const up = () => {
+                        const up = (ev) => {
                             window.removeEventListener('pointermove', move);
                             window.removeEventListener('pointerup', up);
-                            // Reset flag drag di tick berikutnya agar @click sempat membacanya.
-                            setTimeout(() => { this.dragged = false; }, 0);
+                            try { btn.releasePointerCapture(ev.pointerId); } catch (_) {}
+                            // Tap (tak menggeser) -> toggle chat. Drag -> tak melakukan apa-apa.
+                            if (!moved) this.open = ! this.open;
                         };
                         window.addEventListener('pointermove', move);
                         window.addEventListener('pointerup', up);
                     },
 
+                    // Object-form :style (bukan string) supaya Alpine MERGE properti posisi
+                    // dan tak menimpa `display` yang dikelola x-show — kalau string, x-show
+                    // yang menyembunyikan bubble/panel akan ter-clobber tiap :style re-run.
                     bubbleStyle() {
-                        if (!this.pos) return '';
-                        return `left:${this.pos.x}px; top:${this.pos.y}px; right:auto; bottom:auto;`;
+                        if (!this.pos) return {};
+                        return { left: this.pos.x + 'px', top: this.pos.y + 'px', right: 'auto', bottom: 'auto' };
                     },
 
                     // Drawer menempel ke bubble, lalu di-clamp agar tak keluar layar.
@@ -654,7 +668,7 @@
                         }
                         top = Math.max(MARGIN, Math.min(top, window.innerHeight - ph - MARGIN));
 
-                        return `left:${left}px; top:${top}px; right:auto; bottom:auto;`;
+                        return { left: left + 'px', top: top + 'px', right: 'auto', bottom: 'auto' };
                     },
                 }));
             });

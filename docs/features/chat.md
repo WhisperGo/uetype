@@ -181,4 +181,19 @@ Tombol chat bisa dipindah lewat drag (`chatOverlayDock`, pointer events). Aturan
   tepi), dijalankan ulang saat drag maupun `resize`.
 - Drawer (`panelStyle()`) menempel ke posisi bubble lalu ikut di-clamp: buka ke atas kalau ruang
   bawah kurang, geser kiri kalau mepet kanan — **kotak chat tak pernah melewati batas layar**.
-- `dragged` membedakan klik (buka/tutup) vs geser (>4px) supaya drag tak sengaja men-toggle drawer.
+- **Buka/tutup diputuskan di `pointerup`, bukan lewat event `click`.** Selama gesture, kalau
+  pointer bergeser >4px = drag (chat tak di-toggle sama sekali); kalau diam = tap (toggle).
+  `pointerdown` memanggil `e.preventDefault()` supaya klik native tak ikut memicu toggle kedua.
+  Ini menghindari balapan/ketidakkonsistenan event `click` sintetis antar-browser — jadi
+  menggeser **tak pernah** membuka chat, dan menutup setelah dipindah **cukup satu klik**.
+
+### 4.9 Gotcha: `:style` string meng-clobber `x-show`
+
+Bug halus yang sempat bikin drag selalu membuka chat: kalau satu elemen punya **`x-show`**
+sekaligus **`:style` bentuk string**, tiap kali `:style` dievaluasi ulang (mis. saat `pos`
+berubah selama drag) ia **menimpa seluruh atribut `style`**, termasuk `display:none` yang dikelola
+`x-show` — jadi panel/bubble muncul padahal `open`/`hidden` bilang harus sembunyi. Solusinya:
+`bubbleStyle()`/`panelStyle()` mengembalikan **objek** (`{ left, top, right, bottom }`), bukan
+string. Alpine me-*merge* `:style` bentuk objek per-properti sehingga `display` milik `x-show`
+tak tersentuh. (Diverifikasi end-to-end lewat puppeteer di app nyata: drag, tap, tap-tutup,
+drag-saat-terbuka, plus hide-saat-test — semua lolos.)
