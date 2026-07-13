@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
-Route::get('/', TypingEngine::class)->name('home');
+Route::redirect('/', '/typing')->name('home');
 
 // Mesin ketik solo & halaman hasilnya terbuka untuk tamu (sama seperti '/'):
 // TypingEngine menjaga tiap akses Auth dengan Auth::check(), dan TypingResult
