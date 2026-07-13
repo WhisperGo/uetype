@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use Binafy\LaravelUserMonitoring\Traits\Actionable;
 use Illuminate\Database\Eloquent\Model;
 
 /** A race lobby: shared text, status, and countdown/start timestamps. */
 class Room extends Model
 {
+    // Action monitoring: log create/update/delete room (binafy/laravel-user-monitoring).
+    use Actionable;
+
     protected $fillable = ['code', 'host_id', 'status', 'text_to_type', 'countdown_started_at', 'race_starts_at'];
 
     // Kolom waktu WAJIB di-cast ke datetime supaya selalu jadi objek Carbon, bukan

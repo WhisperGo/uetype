@@ -2,12 +2,17 @@
 
 namespace App\Models;
 
+use Binafy\LaravelUserMonitoring\Traits\Actionable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** A chat message (direct or clan), with an edit window and soft delete/clear. */
 class Message extends Model
 {
+    // Action monitoring: log create/update/delete pesan (binafy/laravel-user-monitoring).
+    // on_read dimatikan di config supaya baca massal (paginasi chat) tak membanjiri log.
+    use Actionable;
+
     /** How long after sending a message may still be edited (minutes). */
     public const EDIT_WINDOW_MINUTES = 30;
 

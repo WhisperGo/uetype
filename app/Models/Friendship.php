@@ -3,12 +3,16 @@
 namespace App\Models;
 
 use App\Enums\FriendshipStatus;
+use Binafy\LaravelUserMonitoring\Traits\Actionable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** A directed friend relationship (requester -> addressee) with its status. */
 class Friendship extends Model
 {
+    // Action monitoring: log create/update/delete pertemanan (binafy/laravel-user-monitoring).
+    use Actionable;
+
     protected $fillable = [
         'requester_id',
         'addressee_id',

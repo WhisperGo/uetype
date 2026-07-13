@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ClanMemberStatus;
 use App\Enums\ClanWarStatus;
+use Binafy\LaravelUserMonitoring\Traits\Actionable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,6 +12,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** A player clan (guild): identity, Elo power, members, and war history. */
 class Clan extends Model
 {
+    // Action monitoring: log create/update/delete clan (binafy/laravel-user-monitoring).
+    use Actionable;
+
     protected $fillable = [
         'name',
         'tag',
