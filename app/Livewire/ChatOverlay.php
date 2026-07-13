@@ -15,45 +15,43 @@ use App\Support\SafeBroadcast;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
-use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * The chat page for direct messages and clan channels: active conversation,
- * paginated history, send/edit/delete, driven by the Message* broadcast events.
+ * Chat overlay/drawer: mounted once, globally, in layouts.app (outside the
+ * Livewire slot, alongside the toast components) so it survives wire:navigate
+ * and is reachable from any page. Same feature set as the full Chat page
+ * (reply/edit/delete/clear-chat), but state is plain (no #[Url]) so opening
+ * it never rewrites the host page's query string — that's the full /chat
+ * page's job, and stays reachable via the "Buka penuh" link.
  */
-class Chat extends Component
+class ChatOverlay extends Component
 {
     use GuardsChatAccess;
 
-    public const PAGE_SIZE = 30;
+    public const OVERLAY_PAGE_SIZE = 15;
 
-    // Mode percakapan aktif: 'dm' | 'clan'. Null = tampilan inbox saja.
-    #[Url(as: 'mode')]
+    public bool $open = false;
+
+    // Mode percakapan aktif: 'dm' | 'clan'. Null = tampilan picker kontak.
     public ?string $activeMode = null;
 
-    // Username teman yang percakapannya sedang dibuka (mode 'dm').
-    #[Url(as: 'with')]
     public ?string $withUsername = null;
 
     public string $body = '';
 
-    // Offset paginasi manual untuk "load more" (scroll-ke-atas).
     public int $loadedOlder = 0;
 
-    // Kontrol modal "Clear Chat" (pilihan cakupan: semua / lebih lama dari N hari).
     public bool $showClearModal = false;
 
     public string $clearScope = 'all'; // 'all' | 'days'
 
     public int $clearDays = 7;
 
-    // Edit inline: id pesan yang sedang diedit (null = tak ada) + draftnya.
     public ?int $editingId = null;
 
     public string $editBody = '';
 
-    // Reply: id pesan yang sedang dibalas (null = kirim pesan biasa).
     public ?int $replyingToId = null;
 
     /** Listener Echo untuk pesan baru; body kosong karena action apa pun memicu re-render. */
@@ -63,7 +61,12 @@ class Chat extends Component
         //
     }
 
-    // ---- AKSI: NAVIGASI ----
+    // ---- AKSI: BUKA/TUTUP ----
+
+    public function toggleOverlay(): void
+    {
+        $this->open = ! $this->open;
+    }
 
     public function openDm(string $username): void
     {
@@ -93,7 +96,8 @@ class Chat extends Component
         $this->body = '';
     }
 
-    public function closeConversation(): void
+    /** Kembali ke picker kontak tanpa menutup drawer. */
+    public function backToPicker(): void
     {
         $this->activeMode = null;
         $this->withUsername = null;
@@ -103,14 +107,16 @@ class Chat extends Component
 
     public function loadOlder(): void
     {
-        $this->loadedOlder += self::PAGE_SIZE;
+        $this->loadedOlder += self::OVERLAY_PAGE_SIZE;
     }
 
     // ---- AKSI: KIRIM PESAN ----
 
     /**
      * Kirim pesan. Body diterima sebagai argumen agar input UI langsung dikosongkan
-     * tanpa menunggu round-trip. $body opsional, fallback ke $this->body.
+     * tanpa menunggu round-trip. $body opsional, fallback ke $this->body. Jalur UI
+     * nyata memakai fetch() (window.chatOverlaySend) untuk latensi; method ini
+     * tetap ada sebagai fallback/tercakup test.
      */
     public function sendMessage(?string $body = null): void
     {
@@ -144,7 +150,6 @@ class Chat extends Component
             return null;
         }
 
-        // Pastikan pesan yang dibalas memang milik percakapan yang sama.
         if ($this->activeMode === 'clan') {
             return $target->clan_id === $this->myClan?->id ? $target->id : null;
         }
@@ -186,7 +191,6 @@ class Chat extends Component
     {
         $message = Message::find($messageId);
 
-        // Hanya boleh reply pesan yang boleh dilihat & belum dihapus-untuk-semua.
         if (! $message || ! $this->canSeeMessage($message) || $message->isDeletedForEveryone()) {
             return;
         }
@@ -202,7 +206,6 @@ class Chat extends Component
 
     // ---- AKSI: EDIT & DELETE PESAN ----
 
-    /** Buka form edit inline (hanya pengirim, belum dihapus-untuk-semua, dalam jendela edit). */
     public function startEdit(int $messageId): void
     {
         $message = Message::find($messageId);
@@ -247,7 +250,6 @@ class Chat extends Component
         SafeBroadcast::run(fn () => broadcast(new MessageEdited($message)));
     }
 
-    /** "Delete for everyone": ganti isi jadi placeholder untuk semua. Hanya pengirim. */
     public function deleteForEveryone(int $messageId): void
     {
         $message = Message::find($messageId);
@@ -263,7 +265,6 @@ class Chat extends Component
         SafeBroadcast::run(fn () => broadcast(new MessageDeleted($message)));
     }
 
-    /** "Delete for me": sembunyikan hanya dari user ini, tetap ada untuk orang lain. */
     public function deleteForMe(int $messageId): void
     {
         $message = Message::find($messageId);
@@ -301,11 +302,7 @@ class Chat extends Component
     }
 
     // ---- DATA (computed) ----
-    // getMyMembershipProperty()/getMyClanProperty() dan gerbang keamanan
-    // (isAcceptedFriend/canSeeMessage/markDmAsRead) hidup di GuardsChatAccess,
-    // dipakai bersama dengan ChatOverlay.
 
-    /** Teman yang sedang dibuka percakapannya, null kalau tak valid/bukan teman. */
     public function getActiveFriendProperty(): ?User
     {
         if ($this->activeMode !== 'dm' || ! $this->withUsername) {
@@ -321,13 +318,9 @@ class Chat extends Component
         return $friend;
     }
 
-    /**
-     * Riwayat pesan percakapan aktif, disaring visibleTo() (pesan yang di-clear user
-     * ini tak muncul lagi tapi tetap ada di DB untuk lawan bicara). Diurutkan lama->baru.
-     */
     public function getMessagesProperty()
     {
-        $take = self::PAGE_SIZE + $this->loadedOlder;
+        $take = self::OVERLAY_PAGE_SIZE + $this->loadedOlder;
 
         if ($this->activeMode === 'dm') {
             $friend = $this->activeFriend;
@@ -364,7 +357,6 @@ class Chat extends Component
         return collect();
     }
 
-    /** Pesan yang sedang dibalas (preview di atas input), null kalau tak valid. */
     public function getReplyingToProperty(): ?Message
     {
         if (! $this->replyingToId) {
@@ -390,15 +382,15 @@ class Chat extends Component
                 ->count();
         }
 
-        return $total > (self::PAGE_SIZE + $this->loadedOlder);
+        return $total > (self::OVERLAY_PAGE_SIZE + $this->loadedOlder);
     }
 
     /**
-     * Inbox DM: satu baris per teman yang pernah ditukar pesan, diurutkan pesan
-     * terakhir. Hanya teman berstatus accepted (pertemanan putus -> hilang dari
-     * inbox, riwayat tetap ada di DB).
+     * Picker kontak: versi ringkas inbox DM Chat::getConversationsProperty(),
+     * dibatasi ke N kontak paling baru diajak bicara (bukan inbox penuh --
+     * itu tugas halaman /chat).
      */
-    public function getConversationsProperty()
+    public function getRecentContactsProperty()
     {
         $me = Auth::id();
 
@@ -433,18 +425,19 @@ class Chat extends Component
                     'online' => $friend->isOnline(),
                 ];
             })
-            // Percakapan tanpa pesan ditaruh di bawah.
             ->sortByDesc(fn ($row) => $row['lastMessage']?->created_at ?? Carbon::createFromTimestamp(0))
+            ->take(8)
             ->values();
     }
 
-    public function getTotalUnreadProperty(): int
+    /** Unread DM global (badge tombol toggle). Clan chat tak punya read-tracking. */
+    public function getUnreadCountProperty(): int
     {
         return Message::where('recipient_id', Auth::id())->whereNull('read_at')->count();
     }
 
     public function render()
     {
-        return view('livewire.chat')->layout('layouts.app');
+        return view('livewire.chat-overlay');
     }
 }

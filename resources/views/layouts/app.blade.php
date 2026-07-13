@@ -310,13 +310,20 @@
                             },
                             // Baca URL: percakapan mana yang sedang dibuka (agar toast-nya dilewati).
                             isViewingDm(username) {
-                                if (!location.pathname.endsWith('/chat')) return false;
-                                const p = new URLSearchParams(location.search);
-                                return p.get('mode') === 'dm' && p.get('with') === username;
+                                if (location.pathname.endsWith('/chat')) {
+                                    const p = new URLSearchParams(location.search);
+                                    if (p.get('mode') === 'dm' && p.get('with') === username) return true;
+                                }
+                                // Overlay global juga bisa sedang membuka thread yang sama.
+                                const s = window.__chatOverlayState;
+                                return !!(s && s.open && s.mode === 'dm' && s.withUsername === username);
                             },
                             isViewingClan() {
-                                if (!location.pathname.endsWith('/chat')) return false;
-                                return new URLSearchParams(location.search).get('mode') === 'clan';
+                                if (location.pathname.endsWith('/chat')) {
+                                    if (new URLSearchParams(location.search).get('mode') === 'clan') return true;
+                                }
+                                const s = window.__chatOverlayState;
+                                return !!(s && s.open && s.mode === 'clan');
                             },
                             push(n) {
                                 const id = ++this._seq;
@@ -330,6 +337,14 @@
                     });
                 }
             </script>
+
+            {{-- ===== CHAT OVERLAY GLOBAL =====
+                 Drawer chat yang bisa dibuka dari halaman mana pun, mounted
+                 sekali di sini (di luar {{ '{{ $slot }}' }}) supaya bertahan
+                 lintas wire:navigate seperti toast di atas. Echo tetap hanya
+                 di-subscribe oleh chatToasts(); overlay ini mendengarkan event
+                 window yang sama (message-received-remote/-mutated-remote). --}}
+            <livewire:chat-overlay />
 
             {{-- ===== HEARTBEAT PRESENCE =====
                  Ping ringan ke /heartbeat tiap ~30 detik menandai user masih

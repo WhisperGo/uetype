@@ -83,3 +83,70 @@ menyegarkan daftar pesan. Lihat [friends-presence.md](friends-presence.md#36).
 - Body maksimal **2000 karakter** (dicek server).
 - Paginasi manual `PAGE_SIZE = 30` dengan offset `loadedOlder` untuk scroll-ke-atas — menghindari
   memuat seluruh riwayat sekaligus.
+
+## 4. Overlay Global (Chat Bubble)
+
+**Komponen:** [`App\Livewire\ChatOverlay`](../../app/Livewire/ChatOverlay.php) — mounted
+sekali via `<livewire:chat-overlay />` di [`layouts/app.blade.php`](../../resources/views/layouts/app.blade.php),
+di luar `{{ $slot }}`, sama seperti tiga toast global (`friendToasts`/`clanToasts`/`chatToasts`).
+
+Drawer chat yang bisa dibuka dari halaman mana pun (tombol bulat kanan-bawah) untuk balas cepat,
+tanpa meninggalkan halaman yang sedang dibuka. Halaman `/chat` penuh tetap ada untuk riwayat
+panjang & browsing multi-percakapan — ini **penambahan**, bukan pengganti.
+
+### 4.1 Kenapa komponen Livewire terpisah, bukan `Chat` yang di-mount dua kali
+
+`Chat::$activeMode`/`$withUsername` adalah `#[Url]`-bound (justifikasi §2.6: shareable/bookmarkable).
+Me-mount `Chat` sekali lagi sebagai overlay global akan membuat dua instance memperebutkan siapa
+yang mengontrol query string halaman — terutama saat overlay dibuka di halaman `/chat` itu sendiri.
+`ChatOverlay` adalah kelas terpisah dengan properti polos (tanpa `#[Url]`): membuka drawer di
+halaman mana pun **tidak pernah** mengubah URL halaman itu. Konsekuensinya: thread yang dibuka
+lewat overlay tidak bisa dibagikan/di-bookmark — untuk itu overlay selalu punya link
+**"Buka penuh →"** yang mengarah ke `/chat?mode=...&with=...` (properti overlay yang sama).
+
+### 4.2 Guard keamanan dipakai bersama lewat trait
+
+Sebelum overlay ada, logika "siapa boleh DM siapa" sudah terduplikasi 2x (`Chat` dan
+`ChatController`, alasan §2.1). Menambah overlay akan jadi salinan ke-3 — sebagai gantinya,
+`isAcceptedFriend`/`canSeeMessage`/`markDmAsRead`/`sendDmMessage`/`sendClanMessageAs` diekstrak
+ke [`GuardsChatAccess`](../../app/Livewire/Concerns/GuardsChatAccess.php), dipakai oleh `Chat`
+dan `ChatOverlay`. `ChatController` tetap terpisah seperti sebelumnya (bukan kelas Livewire,
+alasan latensi tak berubah).
+
+### 4.3 Realtime: overlay tidak subscribe Echo sendiri
+
+`chatToasts()` di layout tetap **satu-satunya** subscriber `chat.{id}`/`clan-chat.{id}`, dan
+tetap me-relay lewat window `CustomEvent` (`message-received-remote`, `message-mutated-remote`).
+`chat-overlay.blade.php` mendengarkan event relay yang sama — persis seperti `chat.blade.php` —
+supaya tak ada listener Echo dobel atau toast dobel.
+
+Fungsi window global overlay diberi nama **berbeda** dari milik halaman penuh
+(`window.chatOverlaySend` vs `window.chatSend`, dst.) karena kedua script bisa sama-sama termuat
+di halaman `/chat` sekaligus overlay aktif — nama yang sama akan saling menimpa `window.*` dan
+salah satunya bisa memanggil `$wire` komponen yang salah.
+
+### 4.4 Supresi toast: `window.__chatOverlayState`
+
+`chatToasts()`'s `isViewingDm`/`isViewingClan` awalnya hanya mengecek `location.pathname`/`search`
+(apakah halaman `/chat` sedang membuka thread ini). Diperluas dengan kondisi tambahan yang membaca
+`window.__chatOverlayState = { open, mode, withUsername }` — ditulis oleh `chat-overlay.blade.php`
+lewat `$wire.$watch(...)` tiap kali drawer dibuka/ditutup/ganti thread. Bukan `Alpine.store()`
+(hanya dipakai sekali di seluruh proyek, page-scoped) — mengikuti idiom `window.*` global +
+`window.__xRegistered` guard yang sudah dipakai toast-toast lain.
+
+### 4.5 Cakupan: DM saja untuk badge unread
+
+Tombol toggle overlay menampilkan badge `unreadCount` — hitungan yang sama dengan
+`Chat::getTotalUnreadProperty()` (`Message::where('recipient_id', ...)->whereNull('read_at')`).
+**Ini hanya mencakup DM.** Clan chat tidak punya kolom read-tracking per user sama sekali di
+skema saat ini, jadi badge unread untuk pesan clan di luar cakupan — akan butuh migrasi baru
+(mis. `clan_message_reads` atau `last_read_message_id` per `clan_members`) kalau suatu saat
+diperlukan.
+
+### 4.6 Full parity, ukuran ringkas
+
+Overlay punya fitur yang sama dengan halaman penuh (reply, edit, delete-for-me/everyone,
+clear-chat) — bukan versi terbatas. Yang dipangkas hanyalah **ukuran jendela**:
+`OVERLAY_PAGE_SIZE = 15` (vs `Chat::PAGE_SIZE = 30`) dan picker kontak dibatasi 8 kontak
+terbaru (`getRecentContactsProperty()`), karena drawer memang bukan tempat untuk browsing
+riwayat panjang — itu tugas halaman `/chat`.

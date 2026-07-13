@@ -28,6 +28,9 @@ return [
 
     'back_to_inbox' => 'Back',
 
+    'open_full' => 'Open full',
+    'close' => 'Close',
+
     'you' => 'You',
 
     'not_friends' => 'You can only chat with accepted friends.',

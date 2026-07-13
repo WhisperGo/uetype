@@ -28,6 +28,9 @@ return [
 
     'back_to_inbox' => 'Kembali',
 
+    'open_full' => 'Buka penuh',
+    'close' => 'Tutup',
+
     'you' => 'Kamu',
 
     'not_friends' => 'Kamu hanya bisa chat dengan teman yang sudah accepted.',
