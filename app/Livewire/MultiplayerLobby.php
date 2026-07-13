@@ -220,23 +220,52 @@ class MultiplayerLobby extends Component
                 $progress = max(0, min(100, (int) $member->progress_percent));
                 $correctChars = (int) round(($progress / 100) * $textLength);
 
-                $xp = $member->user->addExp($correctChars, (float) $member->accuracy);
-                $updateData['xp_earned'] = $xp;
+                // Gerbang validitas sama seperti mode solo: hasil yang tak masuk akal
+                // (WPM mustahil, karakter tak konsisten, durasi mustahil) DITOLAK -- tak
+                // ditulis ke riwayat & tak dapat EXP, supaya average WPM pemain tak rusak.
+                $isValid = $this->isValidRaceResult($member, $correctChars);
+                $updateData['result_recorded'] = $isValid;
 
-                MultiplayerMatchHistory::create([
-                    'user_id' => $member->user_id,
-                    'room_code' => $room?->code ?? '',
-                    'place' => $place,
-                    'player_count' => $members->count(),
-                    'wpm' => (int) $member->wpm,
-                    'accuracy' => (float) $member->accuracy,
-                    'finished_time_seconds' => $member->finished_time_seconds,
-                    'xp_earned' => $xp,
-                ]);
+                if ($isValid) {
+                    $xp = $member->user->addExp($correctChars, (float) $member->accuracy);
+                    $updateData['xp_earned'] = $xp;
+
+                    MultiplayerMatchHistory::create([
+                        'user_id' => $member->user_id,
+                        'room_code' => $room?->code ?? '',
+                        'place' => $place,
+                        'player_count' => $members->count(),
+                        'wpm' => (int) $member->wpm,
+                        'accuracy' => (float) $member->accuracy,
+                        'finished_time_seconds' => $member->finished_time_seconds,
+                        'xp_earned' => $xp,
+                    ]);
+                } else {
+                    // Tetap tandai xp_earned (0) agar guard idempoten di atas tak
+                    // memproses ulang pemain ini pada pemanggilan finalizeRace berikutnya.
+                    $updateData['xp_earned'] = 0;
+                }
             }
 
             $member->update($updateData);
         }
+    }
+
+    /**
+     * Server-side validity gate for a finished race result, reusing AntiCheatService.
+     * Only genuine cheat signals reject (impossible WPM / inconsistent chars) --
+     * NOT low throughput/short duration, which are normal for a DNF or slow finish
+     * (those stay recorded, matching the "anti-cheat only" rule). totalChars ==
+     * correctChars because race progress only advances on correct characters.
+     */
+    private function isValidRaceResult(RoomMember $member, int $correctChars): bool
+    {
+        $duration = (float) ($member->finished_time_seconds ?? 0);
+
+        $reasons = app(AntiCheatService::class)
+            ->check($correctChars, $correctChars, $duration)['reasons'];
+
+        return empty(array_intersect($reasons, ['wpm_too_high', 'char_count_inconsistent']));
     }
 
     public function toggleReady(): void
@@ -608,6 +637,8 @@ class MultiplayerLobby extends Component
             'accuracy' => $member->accuracy,
             'finished_time_seconds' => $member->finished_time_seconds,
             'place' => $member->place,
+            // false = ditolak anti-cheat (tak masuk statistik); null = belum difinalisasi.
+            'result_recorded' => $member->result_recorded,
         ])->values()->all();
     }
 

@@ -510,6 +510,17 @@
                     <span class="text-muted/40">-</span>
                     <span>{!! __('multiplayer.you_placed', ['rank' => '<strong class="text-foreground font-bold">'.$myRank.(app()->getLocale() === 'en' ? $suffix : '').'</strong>']) !!}</span>
                 </div>
+
+                {{-- Hasil ditolak validasi server: tidak dicatat ke statistik (average WPM tak rusak). --}}
+                @php $me = $results->firstWhere('user_id', Auth::id()); @endphp
+                @if ($me && $me->result_recorded === false)
+                    <div class="mt-2 flex items-center gap-2 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-x-small font-mono text-danger">
+                        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
+                        </svg>
+                        <span>{{ __('multiplayer.result_invalid') }}</span>
+                    </div>
+                @endif
             </div>
 
             <!-- VISUAL PODIUM 3 TERATAS -->

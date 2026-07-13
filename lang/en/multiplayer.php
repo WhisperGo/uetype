@@ -53,6 +53,7 @@ return [
     'match_result' => 'Match Result',
     'room' => 'Room :code',
     'you_placed' => 'You placed :rank',
+    'result_invalid' => 'This result failed validation and was not recorded to your stats.',
     'you' => 'YOU',
     'full_results' => 'Full Results',
     'th_place' => 'Place',

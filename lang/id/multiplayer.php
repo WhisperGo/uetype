@@ -53,6 +53,7 @@ return [
     'match_result' => 'Hasil Pertandingan',
     'room' => 'Ruang :code',
     'you_placed' => 'Kamu peringkat ke-:rank',
+    'result_invalid' => 'Hasil ini tidak lolos validasi dan tidak dicatat ke statistikmu.',
     'you' => 'KAMU',
     'full_results' => 'Hasil Lengkap',
     'th_place' => 'Peringkat',

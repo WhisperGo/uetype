@@ -82,6 +82,59 @@ it('survives the room being deleted afterwards, unlike room_members', function (
     expect(MultiplayerMatchHistory::where('user_id', $winner->id)->exists())->toBeTrue();
 });
 
+it('does not record an invalid (anti-cheat) result to history, protecting the wpm average', function () {
+    // 100% of a 100-char text finished in 1 second -> ~1200 WPM, impossible.
+    $cheater = User::factory()->create();
+    $honest = User::factory()->create();
+
+    $room = Room::create([
+        'code' => 'CHEAT1',
+        'host_id' => $cheater->id,
+        'status' => 'finished',
+        'text_to_type' => str_repeat('ab cde ', 14).'ab', // 100 chars
+        'race_starts_at' => now()->subSeconds(30),
+    ]);
+
+    RoomMember::create(['room_id' => $room->id, 'user_id' => $cheater->id, 'is_ready' => true, 'wpm' => 1200, 'accuracy' => 100, 'progress_percent' => 100, 'finished_time_seconds' => 1]);
+    RoomMember::create(['room_id' => $room->id, 'user_id' => $honest->id, 'is_ready' => true, 'wpm' => 55, 'accuracy' => 96, 'progress_percent' => 100, 'finished_time_seconds' => 22]);
+
+    Livewire::actingAs($cheater)->test(MultiplayerLobby::class)
+        ->set('roomCode', $room->code)->set('step', 'racing')
+        ->call('finalizeRace', $room->id);
+
+    // Cheater's impossible result is rejected: no history row, no XP, flagged.
+    expect(MultiplayerMatchHistory::where('user_id', $cheater->id)->exists())->toBeFalse()
+        ->and(RoomMember::where('user_id', $cheater->id)->first()->result_recorded)->toBeFalse()
+        ->and((int) RoomMember::where('user_id', $cheater->id)->first()->xp_earned)->toBe(0);
+
+    // Honest player's plausible result is still recorded.
+    expect(MultiplayerMatchHistory::where('user_id', $honest->id)->exists())->toBeTrue()
+        ->and(RoomMember::where('user_id', $honest->id)->first()->result_recorded)->toBeTrue();
+});
+
+it('still records a plausible DNF / gave-up result (low throughput is not cheating)', function () {
+    // A gave-up player has low progress and the 999s sentinel: low throughput, but
+    // that is a legitimate DNF, not a cheat, so it stays recorded.
+    $quitter = User::factory()->create();
+
+    $room = Room::create([
+        'code' => 'DNF001',
+        'host_id' => $quitter->id,
+        'status' => 'finished',
+        'text_to_type' => str_repeat('ab cde ', 14).'ab',
+        'race_starts_at' => now()->subSeconds(30),
+    ]);
+
+    RoomMember::create(['room_id' => $room->id, 'user_id' => $quitter->id, 'is_ready' => true, 'wpm' => 20, 'accuracy' => 90, 'progress_percent' => 15, 'finished_time_seconds' => 999]);
+
+    Livewire::actingAs($quitter)->test(MultiplayerLobby::class)
+        ->set('roomCode', $room->code)->set('step', 'racing')
+        ->call('finalizeRace', $room->id);
+
+    expect(MultiplayerMatchHistory::where('user_id', $quitter->id)->exists())->toBeTrue()
+        ->and(RoomMember::where('user_id', $quitter->id)->first()->result_recorded)->toBeTrue();
+});
+
 it('aggregates multiplayer stats from match history', function () {
     $user = User::factory()->create();
 

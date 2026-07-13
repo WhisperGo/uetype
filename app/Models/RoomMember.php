@@ -10,6 +10,11 @@ class RoomMember extends Model
     protected $fillable = [
         'room_id', 'user_id', 'is_ready', 'progress_percent',
         'wpm', 'accuracy', 'finished_time_seconds', 'place', 'xp_earned',
+        'result_recorded',
+    ];
+
+    protected $casts = [
+        'result_recorded' => 'boolean',
     ];
 
     /** The user this membership belongs to. */
