@@ -2,28 +2,28 @@
 
 namespace App\Support;
 
-/**
- * Central definition of the UI locales the app supports (interface language),
- * with the default and a validity check. Distinct from TypingLanguage, which is
- * about the language of the text being typed.
- */
+/** Supported UI locales (interface language); distinct from TypingLanguage. */
 final class Locale
 {
     public const DEFAULT = 'en';
 
     public const SUPPORTED = ['en', 'id'];
 
+    /** Whether a locale code is supported. */
     public static function isSupported(?string $locale): bool
     {
         return in_array($locale, self::SUPPORTED, true);
     }
 
+    /** The locale if supported, else the default. */
     public static function resolve(?string $locale): string
     {
         return self::isSupported($locale) ? $locale : self::DEFAULT;
     }
 
     /**
+     * Human-readable label for each supported locale.
+     *
      * @return array<string, string>
      */
     public static function labels(): array

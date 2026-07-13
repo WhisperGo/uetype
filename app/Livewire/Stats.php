@@ -14,13 +14,8 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * Halaman Statistik: seluruh agregat performa user dari tabel typing_results.
- * Hosts the statistics that used to live on /profile, so the profile page can go
- * back to focusing on identity alone.
- *
- * Every number is derived at render time (no stored aggregate columns), so the
- * data is always consistent with typing_results. The chart range ($range) is kept
- * in the query string so the page URL can be shared/refreshed without resetting.
+ * The Stats page: solo and multiplayer performance aggregates, all derived at
+ * render time (no stored aggregate columns). Chart range is kept in the URL.
  */
 #[Layout('layouts.app')]
 class Stats extends Component

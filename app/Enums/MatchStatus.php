@@ -2,10 +2,7 @@
 
 namespace App\Enums;
 
-/**
- * Lifecycle state of a typing match: waiting for players, actively racing,
- * or completed.
- */
+/** State of a match: waiting, in progress, or finished. */
 enum MatchStatus: string
 {
     case Waiting = 'waiting';

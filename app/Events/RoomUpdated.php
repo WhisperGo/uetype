@@ -8,10 +8,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-/**
- * Signals a room lifecycle change (member joined/left, ready state, race start,
- * finish) on 'room.{roomCode}', prompting every client to re-render the lobby.
- */
+/** Signals a room lifecycle change on 'room.{roomCode}' to re-render the lobby. */
 class RoomUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;

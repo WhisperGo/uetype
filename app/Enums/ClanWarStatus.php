@@ -2,10 +2,7 @@
 
 namespace App\Enums;
 
-/**
- * Lifecycle state of a clan war challenge: from a pending/declined invite,
- * through an ongoing battle, to finished — or expired if never accepted in time.
- */
+/** State of a clan war: pending, declined, ongoing, finished, or expired. */
 enum ClanWarStatus: string
 {
     case Pending = 'pending';

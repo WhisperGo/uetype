@@ -8,10 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-/**
- * A player clan (guild): its identity (name, tag, emblem), Elo power rating,
- * members, and war history.
- */
+/** A player clan (guild): identity, Elo power, members, and war history. */
 class Clan extends Model
 {
     protected $fillable = [
@@ -29,6 +26,7 @@ class Clan extends Model
 
     public const POWER_PER_LEVEL = 100;
 
+    /** Clan level derived from a power value (level 1 at BASE_POWER). */
     public static function levelFromPower(int $power): int
     {
         $level = (int) floor(($power - self::BASE_POWER) / self::POWER_PER_LEVEL) + 1;
@@ -36,13 +34,14 @@ class Clan extends Model
         return max(1, $level);
     }
 
+    /** Power needed to reach a given level. */
     public static function powerToReachLevel(int $level): int
     {
         return self::BASE_POWER + (max(1, $level) - 1) * self::POWER_PER_LEVEL;
     }
 
     /**
-     * Data level untuk presentasi; pola sama seperti User::levelData().
+     * Level breakdown for display; same shape as User::levelData().
      *
      * @return array{level:int, power:int, progress:int, needed:int, next_level:int}
      */
@@ -63,22 +62,25 @@ class Clan extends Model
         ];
     }
 
+    /** The user who leads the clan. */
     public function leader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'leader_id');
     }
 
+    /** All members (any status). */
     public function members(): HasMany
     {
         return $this->hasMany(ClanMember::class);
     }
 
+    /** Only approved (active) members. */
     public function activeMembers(): HasMany
     {
         return $this->members()->where('status', ClanMemberStatus::Active);
     }
 
-    /** War Pending/Ongoing yang melibatkan clan ini (penantang atau tertantang); null = bebas. */
+    /** The clan's current pending/ongoing war (either side), or null if free. */
     public function activeWar(): ?ClanWar
     {
         return ClanWar::where(function ($q) {
@@ -89,7 +91,7 @@ class Clan extends Model
             ->first();
     }
 
-    /** Riwayat war selesai yang melibatkan clan ini (dua arah), terbaru dulu. */
+    /** Finished wars involving this clan (either side), newest first. */
     public function finishedWars(int $limit = 20)
     {
         return ClanWar::with(['challenger', 'opponent'])
@@ -104,7 +106,7 @@ class Clan extends Model
     }
 
     /**
-     * Ringkasan ClanWar dari sudut pandang clan ini (hasil dibalik kalau kita opponent).
+     * War summary from this clan's perspective (result flipped if we're the opponent).
      *
      * @return array{result: string, opponent: Clan, delta: int}
      */

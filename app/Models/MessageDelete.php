@@ -5,10 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * Per-message "delete for me" marker: hides a message from this user only; the
- * original row stays intact for everyone else.
- */
+/** Per-message "delete for me" marker: hides a message from one user only. */
 class MessageDelete extends Model
 {
     protected $fillable = [
@@ -16,17 +13,19 @@ class MessageDelete extends Model
         'message_id',
     ];
 
+    /** The user who hid the message. */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** The hidden message. */
     public function message(): BelongsTo
     {
         return $this->belongsTo(Message::class);
     }
 
-    /** firstOrCreate: idempoten, klik dua kali tak error/menumpuk. */
+    /** Hide a message for a user; idempotent (double-click never errors/stacks). */
     public static function hide(int $userId, int $messageId): void
     {
         static::firstOrCreate([

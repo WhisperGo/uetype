@@ -2,9 +2,7 @@
 
 namespace App\Enums;
 
-/**
- * A user's role within a clan: the leader (full control) or an ordinary member.
- */
+/** A user's role in a clan: leader or member. */
 enum ClanRole: string
 {
     case Leader = 'leader';

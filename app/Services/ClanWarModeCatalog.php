@@ -2,12 +2,7 @@
 
 namespace App\Services;
 
-/**
- * Catalog of the 9 required Clan War modes and each mode's ceiling (max points).
- * The single source of truth shared by the ClanWar component, ClanWarScorer, and
- * ClanWarResolver. The mode list matches TypingEngine::ALLOWED_SUBMODES exactly;
- * any combination outside it cannot be claimed as a war attempt.
- */
+/** The 9 required Clan War modes and their point ceilings; the single source of truth. */
 class ClanWarModeCatalog
 {
     /**
@@ -28,12 +23,13 @@ class ClanWarModeCatalog
         ['mode' => 'survival', 'config' => 'hard', 'ceiling' => 150],
     ];
 
-    /** Time/Words: WPM di mana poin mode mencapai ceiling penuh (di-cap di atas ini). */
+    /** Time/Words: WPM at which points hit the full ceiling (capped above this). */
     public const WPM_SCALE = 150;
 
-    /** Survival: durasi bertahan (detik) di mana poin mencapai ceiling penuh. */
+    /** Survival: survived duration (seconds) at which points hit the full ceiling. */
     public const SURVIVAL_SECONDS_SCALE = 90;
 
+    /** The point ceiling for a mode/config, or null if not a valid war mode. */
     public static function ceilingFor(string $mode, string $config): ?int
     {
         foreach (self::MODES as $m) {
@@ -45,6 +41,7 @@ class ClanWarModeCatalog
         return null;
     }
 
+    /** Whether a mode/config is a claimable war mode. */
     public static function isValidMode(string $mode, string $config): bool
     {
         return self::ceilingFor($mode, $config) !== null;

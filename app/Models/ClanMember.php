@@ -7,10 +7,7 @@ use App\Enums\ClanRole;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * A user's membership in a clan: their role (leader/member) and status
- * (pending join request vs. active member).
- */
+/** A user's clan membership: their role and status. */
 class ClanMember extends Model
 {
     protected $fillable = [
@@ -25,11 +22,13 @@ class ClanMember extends Model
         'status' => ClanMemberStatus::class,
     ];
 
+    /** The clan being joined. */
     public function clan(): BelongsTo
     {
         return $this->belongsTo(Clan::class);
     }
 
+    /** The member user. */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

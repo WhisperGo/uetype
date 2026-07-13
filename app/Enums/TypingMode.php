@@ -2,10 +2,7 @@
 
 namespace App\Enums;
 
-/**
- * Game mode a typing session is played in: fixed time, fixed word count,
- * endless survival, or racing against a recorded ghost.
- */
+/** Mode a typing session runs in: time, words, survival, or ghost. */
 enum TypingMode: string
 {
     case Time = 'time';

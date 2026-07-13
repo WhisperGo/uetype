@@ -6,10 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A permanent record of one player's result in a finished multiplayer race:
- * place, opponent count, wpm, accuracy, finish time and XP earned. Written once
- * by MultiplayerLobby::finalizeRace(), before the room (rooms/room_members) can
- * be deleted. Backs the Multiplayer tab on the Stats page.
+ * A permanent record of one player's finished-race result (place, wpm, accuracy).
+ * Written by MultiplayerLobby::finalizeRace() before the room is deleted; backs
+ * the Stats page Multiplayer tab.
  */
 class MultiplayerMatchHistory extends Model
 {

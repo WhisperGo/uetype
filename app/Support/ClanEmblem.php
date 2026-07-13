@@ -2,10 +2,7 @@
 
 namespace App\Support;
 
-/**
- * Catalog of clan emblem icons (SVG paths) and colors, with defaults. The single
- * source of truth for rendering a clan's badge across the UI.
- */
+/** Catalog of clan emblem icons and colors; the source of truth for badges. */
 final class ClanEmblem
 {
     public const DEFAULT_ICON = 'shield';
@@ -42,38 +39,46 @@ final class ClanEmblem
         'rose' => '#F43F70',
     ];
 
+    /** All available icon keys. */
     public static function iconKeys(): array
     {
         return array_keys(self::ICONS);
     }
 
+    /** All available color keys. */
     public static function colorKeys(): array
     {
         return array_keys(self::COLORS);
     }
 
+    /** Whether an icon key exists. */
     public static function isValidIcon(?string $key): bool
     {
         return $key !== null && array_key_exists($key, self::ICONS);
     }
 
+    /** Whether a color key exists. */
     public static function isValidColor(?string $key): bool
     {
         return $key !== null && array_key_exists($key, self::COLORS);
     }
 
+    /** SVG path for an icon key, falling back to the default. */
     public static function iconPath(?string $key): string
     {
         return self::ICONS[self::isValidIcon($key) ? $key : self::DEFAULT_ICON];
     }
 
+    /** Hex color for a color key, falling back to the default. */
     public static function colorHex(?string $key): string
     {
         return self::COLORS[self::isValidColor($key) ? $key : self::DEFAULT_COLOR];
     }
 
     /**
-     * @return array<string, string>  peta key ikon -> path SVG untuk grid pemilih.
+     * Icon key -> SVG path map, for the picker grid.
+     *
+     * @return array<string, string>
      */
     public static function icons(): array
     {
@@ -81,7 +86,9 @@ final class ClanEmblem
     }
 
     /**
-     * @return array<string, string>  peta key warna -> hex untuk swatch pemilih.
+     * Color key -> hex map, for the picker swatches.
+     *
+     * @return array<string, string>
      */
     public static function colors(): array
     {

@@ -18,10 +18,9 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * The core solo typing arena: picks the text for the chosen mode/sub-mode,
- * receives the finished session from the client, and persists it. WPM/accuracy
- * are always recomputed server-side (via AntiCheatService) rather than trusted
- * from the client, then feed personal bests, XP, and achievements.
+ * The core solo typing arena: picks the text, receives the finished session, and
+ * persists it. WPM/accuracy are recomputed server-side (AntiCheatService), never
+ * trusted from the client, then feed personal bests, XP, and achievements.
  */
 class TypingEngine extends Component
 {

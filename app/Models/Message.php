@@ -5,10 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * A chat message, either direct (user-to-user) or within a clan channel.
- * Supports a limited edit window and per-user soft deletes/clears.
- */
+/** A chat message (direct or clan), with an edit window and soft delete/clear. */
 class Message extends Model
 {
     /** How long after sending a message may still be edited (minutes). */
@@ -31,43 +28,49 @@ class Message extends Model
         'deleted_for_everyone_at' => 'datetime',
     ];
 
+    /** The user who sent the message. */
     public function sender(): BelongsTo
     {
         return $this->belongsTo(User::class, 'sender_id');
     }
 
+    /** The direct-message recipient (null for clan messages). */
     public function recipient(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recipient_id');
     }
 
+    /** The clan this message belongs to (null for direct messages). */
     public function clan(): BelongsTo
     {
         return $this->belongsTo(Clan::class);
     }
 
-    /** Null kalau bukan reply, atau pesan aslinya sudah dihapus dari DB. */
+    /** The message being replied to; null if not a reply or the original is gone. */
     public function replyTo(): BelongsTo
     {
         return $this->belongsTo(Message::class, 'reply_to_id');
     }
 
+    /** Whether this is a clan message rather than a direct message. */
     public function isClanMessage(): bool
     {
         return $this->clan_id !== null;
     }
 
+    /** Whether the message has been edited. */
     public function isEdited(): bool
     {
         return $this->edited_at !== null;
     }
 
+    /** Whether the message was deleted for everyone. */
     public function isDeletedForEveryone(): bool
     {
         return $this->deleted_for_everyone_at !== null;
     }
 
-    /** Hanya pengirim, belum dihapus-untuk-semua, dan masih dalam EDIT_WINDOW_MINUTES. */
+    /** Editable only by the sender, not deleted-for-all, still within EDIT_WINDOW_MINUTES. */
     public function canBeEditedBy(int $userId): bool
     {
         return $this->sender_id === $userId
@@ -75,13 +78,13 @@ class Message extends Model
             && $this->created_at->gt(now()->subMinutes(self::EDIT_WINDOW_MINUTES));
     }
 
-    /** "Delete for everyone" hanya boleh oleh pengirim & belum dihapus. */
+    /** "Delete for everyone" is allowed only by the sender and if not already deleted. */
     public function canBeDeletedForEveryoneBy(int $userId): bool
     {
         return $this->sender_id === $userId && ! $this->isDeletedForEveryone();
     }
 
-    /** Scope: semua pesan DM antara dua user (kedua arah). */
+    /** Scope: all direct messages between two users (both directions). */
     public function scopeBetween($query, int $userA, int $userB)
     {
         return $query->whereNull('clan_id')->where(function ($q) use ($userA, $userB) {
@@ -93,15 +96,13 @@ class Message extends Model
         });
     }
 
-    /**
-     * Scope: semua pesan chat clan tertentu.
-     */
+    /** Scope: all messages in a given clan channel. */
     public function scopeInClan($query, int $clanId)
     {
         return $query->where('clan_id', $clanId);
     }
 
-    /** Scope: sembunyikan pesan di-clear oleh $userId (soft-hide; baris tetap ada untuk partisipan lain). */
+    /** Scope: hide messages this user cleared/deleted-for-me (rows stay for others). */
     public function scopeVisibleTo($query, int $userId, ?int $otherUserId = null, ?int $clanId = null)
     {
         // "Delete for me" per-pesan: sembunyikan untuk user ini saja, tetap ada untuk lainnya.

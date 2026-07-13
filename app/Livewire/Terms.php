@@ -5,11 +5,7 @@ namespace App\Livewire;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
-/**
- * Like About & Privacy: static, no reactive state. Built as a Livewire full-page
- * component so that {{ $slot }} in layouts/app.blade.php is filled via the
- * #[Layout(...)] attribute below.
- */
+/** Static Terms page; a full-page Livewire component (like About/Privacy). */
 #[Layout('layouts.app')]
 class Terms extends Component
 {

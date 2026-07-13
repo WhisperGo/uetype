@@ -22,10 +22,7 @@ class ProfileController extends Controller
         return view('profile.show', $this->profilePayload($request->user()));
     }
 
-    /**
-     * Profil publik milik user lain: tanpa field privat (email, koin, total XP).
-     * Kalau membuka profil sendiri lewat rute ini, arahkan ke profil penuh sendiri.
-     */
+    /** Another user's public profile (no private fields); redirects to own if it's you. */
     public function show(Request $request, User $user): View
     {
         if ($request->user() && $request->user()->id === $user->id) {
@@ -36,8 +33,7 @@ class ProfileController extends Controller
     }
 
     /**
-     * Rakit data agregat sebuah profil dari hasil ketik tersimpan. Dipakai bersama
-     * oleh profil sendiri & publik; $public menentukan field privat disertakan atau tidak.
+     * Build a profile's display payload; $public toggles whether private fields are included.
      *
      * @return array<string, mixed>
      */

@@ -4,10 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-/**
- * Frozen Words-mode text for clan wars (one row per 10/25/50/100 config). Every
- * player sees identical content, closing the refresh-for-easier-text loophole.
- */
+/** Frozen Words-mode text for clan wars, identical for every player per config. */
 class ClanWarFixedText extends Model
 {
     protected $fillable = [
@@ -16,7 +13,7 @@ class ClanWarFixedText extends Model
         'content',
     ];
 
-    /** Null jika belum ada; pemanggil fallback ke generate biasa agar layar tak pernah kosong. */
+    /** Frozen content for a Words config; null lets the caller fall back to generation. */
     public static function forWords(string $config): ?string
     {
         return static::query()

@@ -5,10 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * Per-user "clear chat" marker: soft-hides history before a timestamp for one
- * user without deleting the underlying messages (see migration).
- */
+/** Per-user "clear chat" marker: soft-hides history before a timestamp. */
 class MessageClear extends Model
 {
     protected $fillable = [
@@ -22,22 +19,25 @@ class MessageClear extends Model
         'cleared_before' => 'datetime',
     ];
 
+    /** The user who cleared the chat. */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** The other party of the cleared DM conversation. */
     public function otherUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'other_user_id');
     }
 
+    /** The clan whose channel was cleared. */
     public function clan(): BelongsTo
     {
         return $this->belongsTo(Clan::class);
     }
 
-    /** updateOrCreate: clear berulang menaikkan batas cleared_before, bukan menumpuk baris. */
+    /** Clear a DM conversation; repeats just raise cleared_before, never stack rows. */
     public static function clearDm(int $userId, int $otherUserId, ?\DateTimeInterface $before = null): void
     {
         static::updateOrCreate(
@@ -46,6 +46,7 @@ class MessageClear extends Model
         );
     }
 
+    /** Clear a clan channel; repeats just raise cleared_before, never stack rows. */
     public static function clearClan(int $userId, int $clanId, ?\DateTimeInterface $before = null): void
     {
         static::updateOrCreate(

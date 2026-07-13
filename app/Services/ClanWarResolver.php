@@ -9,22 +9,20 @@ use App\Models\ClanWarModeClaim;
 use App\Support\SafeBroadcast;
 
 /**
- * Settles Clan Wars whose time has come: Pending challenges past their accept
- * deadline become Expired, and Ongoing wars that are done (via ends_at, or an
- * early finish once both clans complete all 9 modes) are scored from accumulated
- * mode-claim points and power is updated through EloCalculator.
- *
- * Called on-the-fly from App\Livewire\ClanWar::mount(), so no scheduler is needed;
- * the `clan-war:resolve` command invokes the same method for manual use.
+ * Settles due Clan Wars: expires unaccepted challenges and scores finished wars
+ * (via ends_at or early finish), updating power through EloCalculator. Called
+ * on-the-fly from ClanWar::mount() (no scheduler); also the `clan-war:resolve` command.
  */
 class ClanWarResolver
 {
+    /** Expire unaccepted challenges and settle any finished wars. */
     public function resolveDue(): void
     {
         $this->expirePendingChallenges();
         $this->resolveFinishedWars();
     }
 
+    /** Mark Pending challenges past their accept deadline as Expired. */
     private function expirePendingChallenges(): void
     {
         ClanWar::where('status', ClanWarStatus::Pending)
@@ -32,9 +30,10 @@ class ClanWarResolver
             ->update(['status' => ClanWarStatus::Expired]);
     }
 
+    /** Score and close Ongoing wars that are due, updating both clans' power. */
     private function resolveFinishedWars(): void
     {
-        // Tutup war Ongoing yang sudah lewat waktu atau early finish.
+        // Close Ongoing wars that are past their time or finished early.
         $ongoing = ClanWar::where('status', ClanWarStatus::Ongoing)->get();
 
         foreach ($ongoing as $war) {
@@ -76,7 +75,7 @@ class ClanWarResolver
         }
     }
 
-    /** Beri tahu kedua leader hasil war lewat toast real-time; sudut pandang tiap sisi dibalik dengan benar. */
+    /** Notify both leaders of the result via real-time toast (each side's view flipped). */
     private function notifyResult(ClanWar $war, string $result, int $deltaChallenger, int $deltaOpponent): void
     {
         $label = fn (string $r) => match ($r) {
@@ -102,12 +101,13 @@ class ClanWarResolver
         ])));
     }
 
+    /** Format a delta with an explicit +/- sign. */
     private function signed(int $n): string
     {
         return ($n >= 0 ? '+' : '').$n;
     }
 
-    /** War beres lebih cepat kalau kedua clan sudah submit seluruh 9 mode; tak perlu menunggu ends_at. */
+    /** True once both clans submitted all 9 modes, allowing an early finish before ends_at. */
     private function bothClansFinishedAllModes(ClanWar $war): bool
     {
         $target = count(ClanWarModeCatalog::MODES);
@@ -116,6 +116,7 @@ class ClanWarResolver
             && $this->submittedCount($war->id, $war->opponent_clan_id) >= $target;
     }
 
+    /** How many modes a clan has actually submitted (played) in a war. */
     private function submittedCount(int $clanWarId, int $clanId): int
     {
         return ClanWarModeClaim::where('clan_war_id', $clanWarId)
@@ -124,7 +125,7 @@ class ClanWarResolver
             ->count();
     }
 
-    /** Total poin war: jumlah `points` klaim mode yang sudah disubmit; klaim terkunci tapi belum dikerjakan bernilai 0. */
+    /** A clan's total war points: sum of submitted claims' points (locked-but-unplayed = 0). */
     private function clanWarPoints(int $clanWarId, int $clanId): float
     {
         return (float) ClanWarModeClaim::where('clan_war_id', $clanWarId)

@@ -13,10 +13,7 @@ use Livewire\Component;
  */
 class ClanLeaderboard extends Component
 {
-    /**
-     * Ranks all clans by highest power (Elo), together with their active-member
-     * count and war-win count. Read-only.
-     */
+    /** All clans ranked by power, with active-member and war-win counts. */
     public function getRankingProperty()
     {
         $clans = Clan::withCount('activeMembers as members_count')

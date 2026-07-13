@@ -6,10 +6,7 @@ use App\Enums\ClanWarStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * A war challenge between two clans: the pairing, its status, and each side's
- * Elo power before/after so results can be scored and settled.
- */
+/** A war between two clans: pairing, status, and each side's Elo before/after. */
 class ClanWar extends Model
 {
     protected $fillable = [
@@ -33,11 +30,13 @@ class ClanWar extends Model
         'ends_at' => 'datetime',
     ];
 
+    /** The clan that issued the challenge. */
     public function challenger(): BelongsTo
     {
         return $this->belongsTo(Clan::class, 'challenger_clan_id');
     }
 
+    /** The clan that was challenged. */
     public function opponent(): BelongsTo
     {
         return $this->belongsTo(Clan::class, 'opponent_clan_id');

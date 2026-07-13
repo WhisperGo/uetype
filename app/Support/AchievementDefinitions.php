@@ -3,15 +3,14 @@
 namespace App\Support;
 
 /**
- * Source of truth for achievement definitions (in code, not the DB). Static:
- * evaluated from existing data (typing_results, users.total_xp/highest_wpm), with
- * no rule engine or streak/temporal tracking. user_achievements only records who
- * and when. Each `check` is a closure(array $stats): bool; $stats is derived in
- * AchievementService.
+ * Source of truth for achievement definitions (in code, not the DB). Each `check`
+ * is a closure(array $stats): bool, evaluated from data derived in AchievementService.
  */
 class AchievementDefinitions
 {
     /**
+     * All achievement definitions.
+     *
      * @return array<int, array{
      *   key:string, title:string, description:string, category:string,
      *   icon_value:string, icon_unit:string, check:callable

@@ -4,10 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-/**
- * A single player's participation in a multiplayer race room: their live race
- * state (progress, wpm, accuracy), final placement, and XP earned.
- */
+/** A player in a race room: live race state, final placement, and XP earned. */
 class RoomMember extends Model
 {
     protected $fillable = [

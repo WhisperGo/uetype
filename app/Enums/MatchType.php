@@ -2,9 +2,7 @@
 
 namespace App\Enums;
 
-/**
- * Shape of a match: a head-to-head duel (1v1) or a multi-player group race.
- */
+/** Shape of a match: a 1v1 duel or a group race. */
 enum MatchType: string
 {
     case OneVsOne = '1v1';

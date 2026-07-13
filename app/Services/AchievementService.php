@@ -17,7 +17,7 @@ use Illuminate\Support\Carbon;
 class AchievementService
 {
     /**
-     * Hitung metrik yang dibutuhkan semua aturan, dalam SATU lintasan query murah.
+     * Compute every metric the rules need in one cheap query pass.
      *
      * @return array{highest_wpm:float, level:int, total_tests:int, total_chars:int, perfect_runs:int}
      */
@@ -35,8 +35,7 @@ class AchievementService
     }
 
     /**
-     * Kembalikan daftar achievement lengkap dengan status earned + tanggal unlock.
-     * Sekaligus mencatat unlock baru (Pendekatan B) untuk yang baru terpenuhi.
+     * List all achievements with earned status + unlock date, recording new unlocks.
      *
      * @return array{
      *   items: array<int, array{key:string,title:string,description:string,category:string,icon_value:string,icon_unit:string,earned:bool,unlocked_at:?Carbon}>,
@@ -50,7 +49,7 @@ class AchievementService
         $stats = $this->computeStats($user);
         $definitions = AchievementDefinitions::all();
 
-        // Catatan unlock yang sudah ada, untuk tanggal "diraih pada".
+        // Existing unlock records, for the "unlocked at" date.
         $existing = UserAchievement::where('user_id', $user->id)
             ->get()
             ->keyBy('achievement_key');
@@ -65,7 +64,7 @@ class AchievementService
             $record = $existing->get($def['key']);
             $unlockedAt = $record?->unlocked_at;
 
-            // Baru terpenuhi & belum pernah dicatat: catat unlock sekarang.
+            // Newly met and never recorded: log the unlock now.
             if ($earned && ! $record) {
                 UserAchievement::create([
                     'user_id' => $user->id,

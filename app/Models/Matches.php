@@ -8,10 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-/**
- * A completed or in-progress typing match (1v1 or group), recording the host,
- * the text raced on, timing, and each participant's result.
- */
+/** A typing match (1v1 or group): host, text, timing, and participants. */
 class Matches extends Model
 {
     protected $fillable = [
@@ -32,16 +29,19 @@ class Matches extends Model
         'ended_at' => 'datetime',
     ];
 
+    /** The user who created the match. */
     public function host(): BelongsTo
     {
         return $this->belongsTo(User::class, 'host_user_id');
     }
 
+    /** The text raced on (null when the text was generated). */
     public function text(): BelongsTo
     {
         return $this->belongsTo(Text::class);
     }
 
+    /** All players in the match. */
     public function participants(): HasMany
     {
         return $this->hasMany(MatchParticipant::class, 'match_id');

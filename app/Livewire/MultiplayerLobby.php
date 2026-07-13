@@ -17,10 +17,9 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
- * The multiplayer race lobby and arena: create/join a room, ready up, run the
- * synchronized countdown, then race. Persists each player's live progress with a
- * server-recomputed Net WPM (never trusting the client), broadcasts room/race
- * state, and finalizes placements and XP when the race ends.
+ * The multiplayer race lobby and arena: create/join, ready up, run the synced
+ * countdown, then race. Persists a server-recomputed Net WPM (never the client's),
+ * broadcasts room/race state, and finalizes placements and XP at the end.
  */
 class MultiplayerLobby extends Component
 {

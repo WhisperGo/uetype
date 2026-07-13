@@ -5,11 +5,7 @@ namespace App\Livewire;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
-/**
- * Static About page (no reactive state), built as a Livewire component because
- * layouts/app.blade.php uses {{ $slot }}, which is only filled via #[Layout(...)].
- * Team and tech-stack data are hardcoded here, not from the database.
- */
+/** Static About page (team & tech stack hardcoded); a full-page Livewire component. */
 #[Layout('layouts.app')]
 class About extends Component
 {

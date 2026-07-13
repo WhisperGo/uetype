@@ -5,10 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * One user's result within a completed match: their wpm, accuracy, placement,
- * and finish time. Immutable once written (no updated_at).
- */
+/** One user's result in a match (wpm, accuracy, placement); write-once. */
 class MatchParticipant extends Model
 {
     public const UPDATED_AT = null;
@@ -28,11 +25,13 @@ class MatchParticipant extends Model
         'finished_at' => 'datetime',
     ];
 
+    /** The match this result belongs to. */
     public function match(): BelongsTo
     {
         return $this->belongsTo(Matches::class, 'match_id');
     }
 
+    /** The player this result belongs to. */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

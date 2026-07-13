@@ -2,10 +2,7 @@
 
 namespace App\Enums;
 
-/**
- * Lifecycle state of a friendship request between two users: from a pending
- * invite through accepted/rejected, or a hard block.
- */
+/** State of a friendship: pending, accepted, rejected, or blocked. */
 enum FriendshipStatus: string
 {
     case Pending = 'pending';

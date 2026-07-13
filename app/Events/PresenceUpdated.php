@@ -8,11 +8,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-/**
- * Notifies each friend that a user's online/offline status changed, on their
- * 'friends.{friendId}' channel. Sent only on an actual status flip, not on
- * every heartbeat.
- */
+/** Notifies a friend of a user's online/offline flip on 'friends.{friendId}'. */
 class PresenceUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;

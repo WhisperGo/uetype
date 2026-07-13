@@ -22,9 +22,8 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * The chat page for both direct messages and clan channels. Handles the active
- * conversation, paginated history, sending/editing/deleting, and per-user
- * clear/delete markers, driven in real time by the Message* broadcast events.
+ * The chat page for direct messages and clan channels: active conversation,
+ * paginated history, send/edit/delete, driven by the Message* broadcast events.
  */
 class Chat extends Component
 {

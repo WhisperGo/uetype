@@ -2,32 +2,27 @@
 
 namespace App\Services;
 
-/**
- * Sanity check server-side untuk hasil mengetik. Tidak percaya angka WPM/accuracy
- * dari client: server menghitung ulang dari karakter & durasi, lalu menolak sesi
- * yang tidak masuk akal sebelum disimpan/masuk leaderboard.
- */
+/** Server-side sanity check: recomputes wpm/accuracy and rejects impossible sessions. */
 class AntiCheatService
 {
-    /** Batas WPM manusiawi; di atas ini hampir pasti palsu (rekor dunia ~210-230). */
+    /** Human WPM ceiling; above this is almost certainly fake (world record ~210-230). */
     private const MAX_HUMAN_WPM = 300;
 
-    /** Durasi minimum (detik) agar sebuah sesi dianggap bermakna. */
+    /** Minimum session duration (seconds) to be considered meaningful. */
     private const MIN_DURATION_SECONDS = 1.0;
 
     /**
-     * Throughput minimum (karakter/detik) agar dianggap aktivitas mengetik nyata, bukan
-     * sesi idle/dipalsukan (durasi besar, input sepele). Krusial untuk survival, di mana
-     * duration_seconds sendiri adalah metrik leaderboard. ~0.5 cps ≈ 6 WPM.
+     * Minimum throughput (chars/sec) for real typing vs. an idle/faked session. Crucial
+     * for survival, where duration_seconds is itself the leaderboard metric. ~0.5 cps ≈ 6 WPM.
      */
     private const MIN_CHARS_PER_SECOND = 0.5;
 
     /**
-     * Periksa kewajaran sebuah hasil sesi.
+     * Check a session for plausibility and return its recomputed metrics.
      *
-     * @param  int    $correctChars   Jumlah karakter benar (untuk Net WPM).
-     * @param  int    $totalChars     Jumlah seluruh karakter diketik (untuk Raw WPM & accuracy).
-     * @param  float  $durationSeconds Durasi sesi dalam detik.
+     * @param  int  $correctChars  Correct characters (for Net WPM).
+     * @param  int  $totalChars  All characters typed (for Raw WPM & accuracy).
+     * @param  float  $durationSeconds  Session duration in seconds.
      * @return array{valid: bool, net_wpm: float, raw_wpm: float, accuracy: float, reasons: array<string>}
      */
     public function check(int $correctChars, int $totalChars, float $durationSeconds): array

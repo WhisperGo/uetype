@@ -5,10 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * Records that a user has unlocked a specific achievement. Write-once: created
- * when earned and never updated.
- */
+/** Records that a user unlocked a specific achievement; write-once. */
 class UserAchievement extends Model
 {
     public const UPDATED_AT = null;
@@ -24,6 +21,7 @@ class UserAchievement extends Model
         'unlocked_at' => 'datetime',
     ];
 
+    /** The user who unlocked the achievement. */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
