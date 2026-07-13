@@ -122,7 +122,7 @@
                                 {{ __('stats.xp_progress', ['progress' => number_format($levelData['progress']), 'needed' => number_format($levelData['needed'])]) }}
                             </div>
                             <div class="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                                <div class="h-full rounded-full bg-foreground transition-all" style="width: {{ $pct }}%"></div>
+                                <div class="h-full rounded-full bg-gold transition-all" style="width: {{ $pct }}%"></div>
                             </div>
                         </div>
 

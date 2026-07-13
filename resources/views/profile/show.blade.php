@@ -66,7 +66,7 @@
                                 <span>{{ __('profile.level', ['level' => $stats['level'] + 1]) }}</span>
                             </div>
                             <div class="h-2 overflow-hidden rounded-full bg-white/5">
-                                <div class="h-full rounded-full bg-gradient-to-r from-brand to-gold" style="width: {{ $stats['level_needed'] > 0 ? ($stats['level_progress'] / $stats['level_needed']) * 100 : 0 }}%"></div>
+                                <div class="h-full rounded-full bg-gold" style="width: {{ $stats['level_needed'] > 0 ? ($stats['level_progress'] / $stats['level_needed']) * 100 : 0 }}%"></div>
                             </div>
                         </div>
 
