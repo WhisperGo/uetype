@@ -17,8 +17,5 @@ return [
         'avg_accuracy' => 'Average Accuracy',
         'total_tests' => 'Total Tests',
         'total_time' => 'Total Time',
-        'level' => 'Level',
-        'xp' => 'XP',
-        'best_wpm' => 'Best WPM',
     ],
 ];

@@ -261,7 +261,7 @@
             </div>
 
             <!-- Kontainer 3 Baris -->
-            <div class="relative overflow-hidden text-fluid-type tracking-tight select-none outline-none"
+            <div x-ref="typeArea" class="relative overflow-hidden text-fluid-type tracking-tight select-none outline-none"
                 style="max-height: 4.875em;">
 
                 <!-- SINGLE SMOOTH CURSOR -->
@@ -397,6 +397,8 @@
                 scrollOffset: 0,
                 lineHeight: 0,
                 positionFrame: null,
+                _onViewportResize: null,
+                _resizeFrame: null,
                 caretInstant: true,
                 caretAnim: null,
                 caretDrawn: false,
@@ -464,6 +466,21 @@
                         this.resetForNewText(payload.text ?? '');
                     });
                     this.modeChangedCleanup = typeof cleanup === 'function' ? cleanup : null;
+
+                    this._onViewportResize = () => {
+                        if (this._resizeFrame) cancelAnimationFrame(this._resizeFrame);
+                        this._resizeFrame = requestAnimationFrame(() => {
+                            this._resizeFrame = null;
+                            this.scrollToTypeArea();
+                        });
+                    };
+                    window.addEventListener('resize', this._onViewportResize);
+
+                    this.$nextTick(() => this.scrollToTypeArea());
+                },
+
+                scrollToTypeArea() {
+                    this.$refs.typeArea?.scrollIntoView({ block: 'center', behavior: 'smooth' });
                 },
 
                 // Ghost hanya sah di time/words. Kalau state global tersisa dari mode
@@ -691,6 +708,14 @@
                     if (this.modeChangedCleanup) {
                         this.modeChangedCleanup();
                         this.modeChangedCleanup = null;
+                    }
+                    if (this._onViewportResize) {
+                        window.removeEventListener('resize', this._onViewportResize);
+                        this._onViewportResize = null;
+                    }
+                    if (this._resizeFrame) {
+                        cancelAnimationFrame(this._resizeFrame);
+                        this._resizeFrame = null;
                     }
                     this.stopRuntime();
                 },
@@ -943,6 +968,7 @@
                     if (!this.isStarted) {
                         this.isStarted = true;
                         this.startTime = Date.now();
+                        this.scrollToTypeArea();
 
                         // Survival: loop drain ~100ms agar tekanan terasa mulus (drain & game over di staminaTick).
                         if (this.currentMain === 'survival') {

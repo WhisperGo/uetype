@@ -17,8 +17,5 @@ return [
         'avg_accuracy' => 'Rata-rata Akurasi',
         'total_tests' => 'Total Tes',
         'total_time' => 'Total Waktu',
-        'level' => 'Level',
-        'xp' => 'XP',
-        'best_wpm' => 'Best WPM',
     ],
 ];

@@ -47,7 +47,6 @@ class ProfileController extends Controller
             'total_matches' => (clone $base)->count(),
             'avg_wpm' => round((float) (clone $base)->avg('net_wpm'), 1),
             'avg_accuracy' => round((float) (clone $base)->avg('accuracy'), 1),
-            'best_wpm' => round((float) (clone $base)->max('net_wpm'), 1),
         ];
 
         $stats['total_seconds'] = (int) (clone $base)->sum('duration_seconds');
