@@ -568,6 +568,20 @@ class MultiplayerLobby extends Component
         return $room;
     }
 
+    public function getOrderedMembersProperty()
+    {
+        $room = $this->roomData;
+
+        if (! $room) {
+            return collect();
+        }
+
+        return $room->members
+            ->sortBy('id')
+            ->sortByDesc(fn ($member) => $member->user_id === $room->host_id)
+            ->values();
+    }
+
     public function getLeaderboardDataProperty()
     {
         if (! $this->roomData) {

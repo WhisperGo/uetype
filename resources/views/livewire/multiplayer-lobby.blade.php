@@ -155,7 +155,7 @@
                 <div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
                     @foreach (range(0, 4) as $i)
                         @php
-                            $member = $this->roomData->members->values()->get($i);
+                            $member = $this->orderedMembers->get($i);
                         @endphp
                         @if ($member)
                             <div
