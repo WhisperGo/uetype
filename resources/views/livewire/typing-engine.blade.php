@@ -7,10 +7,14 @@
     }"
         @keydown.window="
             syncCapsLock($event);
+            const ae = document.activeElement;
+            const editing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable);
             if($event.key === 'Tab') {
                 $event.preventDefault();
                 document.getElementById('restartButton')?.focus();
-            } else if (document.activeElement.tagName !== 'BUTTON') {
+            } else if (ae && ae.tagName !== 'BUTTON' && !editing) {
+                // Jangan tangkap ketikan saat fokus di field lain (mis. input chat overlay) —
+                // biar ketikannya masuk ke sana saja, tak bocor ke area typing di belakang.
                 handleInput($event);
             }
         "
