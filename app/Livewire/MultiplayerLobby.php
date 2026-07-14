@@ -49,6 +49,12 @@ class MultiplayerLobby extends Component
     // agar semua klien sinkron.
     private const COUNTDOWN_SECONDS = 3;
 
+    // Kapasitas terpisah: pembalap dan penonton dibatasi masing-masing 5. Konstanta
+    // tunggal supaya join/toggle/guard tak memakai angka ajaib yang tersebar.
+    public const MAX_PLAYERS = 5;
+
+    public const MAX_SPECTATORS = 5;
+
     public function createRoom(): void
     {
         $user = Auth::user();
@@ -67,6 +73,7 @@ class MultiplayerLobby extends Component
         RoomMember::create([
             'room_id' => $room->id,
             'user_id' => $user->id,
+            'role' => RoomMember::ROLE_PLAYER,
             'is_ready' => true,
             'progress_percent' => 0,
             'wpm' => 0,
@@ -113,15 +120,23 @@ class MultiplayerLobby extends Component
             return;
         }
 
-        if ($room->members()->count() >= 5) {
+        // Room "penuh" hanya untuk pembalap: slot pemain ke-6+ tidak ditolak, melainkan
+        // diarahkan jadi penonton (luapan otomatis). Room baru dianggap penuh untuk
+        // menonton hanya kalau kuota penonton juga habis.
+        $playersFull = $room->players()->count() >= self::MAX_PLAYERS;
+
+        if ($playersFull && $room->spectators()->count() >= self::MAX_SPECTATORS) {
             session()->flash('error', __('multiplayer.error_room_full'));
 
             return;
         }
 
+        $role = $playersFull ? RoomMember::ROLE_SPECTATOR : RoomMember::ROLE_PLAYER;
+
         RoomMember::updateOrCreate(
             ['room_id' => $room->id, 'user_id' => Auth::id()],
             [
+                'role' => $role,
                 'is_ready' => false,
                 'progress_percent' => 0,
                 'wpm' => 0,
@@ -188,8 +203,11 @@ class MultiplayerLobby extends Component
         $room = Room::find($roomId);
         $textLength = $room ? mb_strlen($room->text_to_type) : 0;
 
+        // Hanya pembalap yang difinalisasi: penonton tak punya place/XP dan tak boleh
+        // mencemari urutan podium maupun jumlah pemain di riwayat.
         $members = RoomMember::with('user')
             ->where('room_id', $roomId)
+            ->where('role', RoomMember::ROLE_PLAYER)
             // ->orderBy('wpm', 'desc')
             ->orderBy('finished_time_seconds', 'asc')
             ->orderBy('progress_percent', 'desc')
@@ -321,6 +339,64 @@ class MultiplayerLobby extends Component
         }
     }
 
+    /**
+     * Berpindah peran pembalap <-> penonton, hanya saat room masih 'waiting'.
+     *
+     * Host boleh jadi penonton (host_id terpisah dari role): ia tetap pengendali
+     * yang memegang "Mulai Balapan", cuma tak ikut membalap. Karena itu tak perlu
+     * reassign host di sini. Guard kapasitas per sisi (5 pemain / 5 penonton).
+     */
+    public function toggleSpectator(): void
+    {
+        $room = Room::where('code', $this->roomCode)->first();
+
+        if (! $room || $room->status !== 'waiting') {
+            return;
+        }
+
+        $member = RoomMember::where('room_id', $room->id)->where('user_id', Auth::id())->first();
+
+        if (! $member) {
+            return;
+        }
+
+        if ($member->isSpectator()) {
+            if ($room->players()->count() >= self::MAX_PLAYERS) {
+                session()->flash('error', __('multiplayer.error_players_full'));
+
+                return;
+            }
+
+            // Kembali jadi pembalap: reset state race & ready. Host yang kembali jadi
+            // pembalap tetap auto-ready (konsisten dengan createRoom).
+            $member->update([
+                'role' => RoomMember::ROLE_PLAYER,
+                'is_ready' => $room->host_id === Auth::id(),
+                'progress_percent' => 0,
+                'wpm' => 0,
+                'accuracy' => 100,
+                'finished_time_seconds' => null,
+                'place' => null,
+                'xp_earned' => null,
+            ]);
+        } else {
+            if ($room->spectators()->count() >= self::MAX_SPECTATORS) {
+                session()->flash('error', __('multiplayer.error_spectators_full'));
+
+                return;
+            }
+
+            $member->update([
+                'role' => RoomMember::ROLE_SPECTATOR,
+                'is_ready' => false,
+            ]);
+        }
+
+        $this->forgetRoomCache();
+
+        SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
+    }
+
     public function leaveRoom(): void
     {
         $room = Room::where('code', $this->roomCode)->first();
@@ -352,14 +428,21 @@ class MultiplayerLobby extends Component
             return;
         }
 
+        // Host baru diutamakan dari pembalap (mereka yang benar-benar bertanding);
+        // hanya kalau tak ada pembalap tersisa, penonton jadi host-penonton.
         $newHost = RoomMember::where('room_id', $room->id)
             ->where('user_id', '!=', $leavingUserId)
+            ->orderByRaw("role = '".RoomMember::ROLE_PLAYER."' DESC")
             ->orderBy('id', 'asc')
             ->first();
 
         if ($newHost) {
             $room->update(['host_id' => $newHost->user_id]);
-            $newHost->update(['is_ready' => true]);
+
+            // is_ready hanya bermakna untuk pembalap; host-penonton tak perlu di-ready-kan.
+            if ($newHost->isPlayer()) {
+                $newHost->update(['is_ready' => true]);
+            }
         }
     }
 
@@ -439,6 +522,7 @@ class MultiplayerLobby extends Component
             $updateData['finished_time_seconds'] = (int) round($durationSeconds);
 
             $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
+                ->where('role', RoomMember::ROLE_PLAYER)
                 ->whereNotNull('finished_time_seconds')
                 ->count();
 
@@ -473,6 +557,7 @@ class MultiplayerLobby extends Component
         if ($justFinished) {
             // Fast-path: kalau semua peserta sudah finish, tutup room tanpa menunggu timeout.
             $unfinished = RoomMember::where('room_id', $room->id)
+                ->where('role', RoomMember::ROLE_PLAYER)
                 ->whereNull('finished_time_seconds')
                 ->count();
 
@@ -500,6 +585,7 @@ class MultiplayerLobby extends Component
         }
 
         $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
+            ->where('role', RoomMember::ROLE_PLAYER)
             ->whereNotNull('finished_time_seconds')
             ->count();
 
@@ -521,6 +607,7 @@ class MultiplayerLobby extends Component
         $this->dispatch('force-finish');
 
         $unfinished = RoomMember::where('room_id', $room->id)
+            ->where('role', RoomMember::ROLE_PLAYER)
             ->whereNull('finished_time_seconds')
             ->count();
 
@@ -552,8 +639,10 @@ class MultiplayerLobby extends Component
         if ($secondsPassed >= self::SUDDEN_DEATH_SECONDS) {
             $room->update(['status' => 'finished']);
 
-            // Peringkat default (DNF) untuk pemain yang belum selesai.
+            // Peringkat default (DNF) untuk pemain yang belum selesai. Hanya pembalap:
+            // penonton memang tak punya finished_time_seconds dan bukan DNF.
             RoomMember::where('room_id', $room->id)
+                ->where('role', RoomMember::ROLE_PLAYER)
                 ->whereNull('finished_time_seconds')
                 ->update([
                     'finished_time_seconds' => RoomMember::DNF_SENTINEL_SECONDS,
@@ -648,6 +737,7 @@ class MultiplayerLobby extends Component
         unset($this->roomData, $this->leaderboardData);
     }
 
+    /** Pembalap saja, terurut (host dulu): mengisi grid slot pemain. */
     public function getOrderedMembersProperty()
     {
         $room = $this->roomData;
@@ -657,9 +747,45 @@ class MultiplayerLobby extends Component
         }
 
         return $room->members
+            ->where('role', RoomMember::ROLE_PLAYER)
             ->sortBy('id')
             ->sortByDesc(fn ($member) => $member->user_id === $room->host_id)
             ->values();
+    }
+
+    /** Penonton di room ini (host-penonton dulu), untuk daftar & badge. */
+    public function getSpectatorsProperty()
+    {
+        $room = $this->roomData;
+
+        if (! $room) {
+            return collect();
+        }
+
+        return $room->members
+            ->where('role', RoomMember::ROLE_SPECTATOR)
+            ->sortByDesc(fn ($member) => $member->user_id === $room->host_id)
+            ->sortBy('id')
+            ->values();
+    }
+
+    public function getSpectatorCountProperty(): int
+    {
+        return $this->spectators->count();
+    }
+
+    /** True kalau user saat ini adalah penonton di room ini. */
+    public function getIsSpectatorProperty(): bool
+    {
+        $room = $this->roomData;
+
+        if (! $room) {
+            return false;
+        }
+
+        return (bool) $room->members
+            ->firstWhere('user_id', Auth::id())
+            ?->isSpectator();
     }
 
     /**
@@ -677,7 +803,9 @@ class MultiplayerLobby extends Component
             return collect();
         }
 
+        // Hanya pembalap: podium & tabel hasil tak memuat penonton.
         return $this->roomData->members()
+            ->where('role', RoomMember::ROLE_PLAYER)
             ->with('user')
             ->orderBy('wpm', 'desc')
             ->orderBy('progress_percent', 'desc')
@@ -760,7 +888,11 @@ class MultiplayerLobby extends Component
             return false;
         }
 
-        $participants = $room->members->where('user_id', '!=', $room->host_id);
+        // Hanya pembalap non-host yang perlu ready. Kalau host jadi penonton, ia bukan
+        // pembalap sehingga semua pembalap ikut dihitung -- semuanya wajib ready.
+        $participants = $room->members
+            ->where('role', RoomMember::ROLE_PLAYER)
+            ->where('user_id', '!=', $room->host_id);
 
         return $participants->count() > 0 && $participants->where('is_ready', false)->count() === 0;
     }
@@ -840,6 +972,14 @@ class MultiplayerLobby extends Component
         $room = Room::where('code', $this->roomCode)->first();
 
         if (! $room || $room->host_id !== Auth::id()) {
+            return;
+        }
+
+        // Tak boleh mulai balapan tanpa pembalap: host bisa jadi penonton, dan jika
+        // semua orang penonton, tak ada yang bertanding.
+        if ($room->players()->count() === 0) {
+            session()->flash('error', __('multiplayer.error_no_players'));
+
             return;
         }
 

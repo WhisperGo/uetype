@@ -147,9 +147,42 @@
             </div>
 
             <div>
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex justify-between items-center mb-4 gap-3">
                     <h3 class="text-xs uppercase tracking-widest text-muted font-mono font-bold">{{ __('multiplayer.players') }}</h3>
-                    <span class="text-xs font-mono text-gold font-bold">{{ __('multiplayer.joined', ['count' => $this->roomData->members->count()]) }}</span>
+                    <div class="flex items-center gap-3">
+                        @if ($this->spectatorCount > 0)
+                            <div class="relative" x-data="{ open: false }">
+                                <button type="button" x-on:click="open = !open" x-on:mouseenter="open = true" x-on:mouseleave="open = false"
+                                    class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border/40 bg-foreground/5 hover:bg-foreground/10 transition">
+                                    <span class="text-sm leading-none">&#128065;</span>
+                                    <span class="text-[11px] font-mono font-bold text-muted">{{ __('multiplayer.spectators_watching', ['count' => $this->spectatorCount]) }}</span>
+                                </button>
+                                <div x-show="open" x-cloak x-transition.opacity
+                                    x-on:mouseenter="open = true" x-on:mouseleave="open = false"
+                                    class="absolute right-0 z-30 mt-2 w-56 p-3 rounded-xl border border-border/40 bg-elevated shadow-xl">
+                                    <span class="block text-[10px] font-mono uppercase tracking-widest text-muted mb-2">{{ __('multiplayer.spectator_list_title') }}</span>
+                                    <div class="space-y-1.5 max-h-48 overflow-y-auto">
+                                        @foreach ($this->spectators as $spectator)
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-6 h-6 rounded-md overflow-hidden bg-foreground/5 flex items-center justify-center shrink-0">
+                                                    @if ($spectator->user->avatar)
+                                                        <img src="{{ $spectator->user->avatar }}" referrerpolicy="no-referrer" class="w-full h-full object-cover">
+                                                    @else
+                                                        <img src="/icon/uetype_mascot.png" alt="{{ $spectator->user->username }}" class="w-4/5 h-4/5 object-contain">
+                                                    @endif
+                                                </div>
+                                                <span class="font-mono text-xs text-foreground/90 truncate">{{ $spectator->user->username }}</span>
+                                                @if ($spectator->user_id === $this->roomData->host_id)
+                                                    <span class="text-[9px] font-mono font-bold uppercase tracking-wider text-gold shrink-0">{{ __('multiplayer.host') }}</span>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+                        <span class="text-xs font-mono text-gold font-bold">{{ __('multiplayer.joined', ['count' => $this->orderedMembers->count()]) }}</span>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
@@ -197,9 +230,14 @@
             <div class="space-y-1">
                 <div class="h-2 w-full bg-background rounded-full overflow-hidden border border-border/30">
                     <div class="h-full bg-gold transition-all duration-300"
-                        style="width: {{ ($this->roomData->members->count() / 5) * 100 }}%"></div>
+                        style="width: {{ ($this->orderedMembers->count() / \App\Livewire\MultiplayerLobby::MAX_PLAYERS) * 100 }}%"></div>
                 </div>
             </div>
+
+            @php
+                $playersFull = $this->orderedMembers->count() >= \App\Livewire\MultiplayerLobby::MAX_PLAYERS;
+                $spectatorsFull = $this->spectatorCount >= \App\Livewire\MultiplayerLobby::MAX_SPECTATORS;
+            @endphp
 
             <div class="pt-6 border-t border-border/30 flex flex-wrap gap-3 sm:gap-4">
                 @if ($this->isHost)
@@ -208,12 +246,31 @@
                         {{ __('multiplayer.start_race') }}
                     </button>
                     @if (!$this->allReady)
-                        <span class="text-xs font-mono text-muted self-center">{{ __('multiplayer.waiting_ready') }}</span>
+                        <span class="text-xs font-mono text-muted self-center">{{ $this->orderedMembers->isEmpty() ? __('multiplayer.no_players_to_start') : __('multiplayer.waiting_ready') }}</span>
                     @endif
-                @else
+                @elseif (!$this->isSpectator)
                     <button wire:click="toggleReady"
                         class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? 'bg-active text-background hover:bg-active-5' : 'bg-gold hover:bg-secondary-7 text-background' }}">
                         {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? __('multiplayer.im_not_ready') : __('multiplayer.im_ready') }}
+                    </button>
+                @else
+                    <span class="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-border/40 bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider text-muted">
+                        <span class="text-base leading-none">&#128065;</span>{{ __('multiplayer.you_are_spectating') }}
+                    </span>
+                @endif
+
+                {{-- Toggle peran: tersedia untuk semua (termasuk host) hanya saat waiting. --}}
+                @if ($this->isSpectator)
+                    <button wire:click="toggleSpectator" @disabled($playersFull)
+                        class="px-6 py-3 bg-transparent border border-gold/50 text-gold hover:bg-gold/10 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        @if ($playersFull) title="{{ __('multiplayer.players_full') }}" @endif>
+                        {{ __('multiplayer.become_player') }}
+                    </button>
+                @else
+                    <button wire:click="toggleSpectator" @disabled($spectatorsFull)
+                        class="px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        @if ($spectatorsFull) title="{{ __('multiplayer.spectators_full') }}" @endif>
+                        {{ __('multiplayer.become_spectator') }}
                     </button>
                 @endif
 
@@ -230,13 +287,20 @@
         {{-- wire:key stabil: state Alpine (raceStarted/countdown/progress) tak reset lintas re-render. --}}
         {{-- Logika Alpine ada di komponen 'raceArena' (lihat @assets), bukan inline di x-data. --}}
         {{-- Sudden death disinkron via WebSocket + clock lokal; saat 0, lockRace() panggil checkSuddenDeath() sekali. --}}
-        @php $arenaDense = $this->roomData->members->count() >= 4; @endphp
+        {{-- Penonton ikut render arena (countdown + lane pembalap), tapi tanpa input ketik.
+             myId=null memberi tahu raceArena untuk melewati semua jalur emit/publish lokal. --}}
+        @php
+            $isSpectator = $this->isSpectator;
+            $racers = $this->orderedMembers;
+        @endphp
+        @php $arenaDense = $racers->count() >= 4; @endphp
         {{-- Sembunyikan overlay chat selama arena balapan tampil; kembalikan saat blok ini
              hilang (race selesai / result modal / keluar room). --}}
         <div x-data="{ init() { window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: true } })); }, destroy() { window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: false } })); } }"></div>
         <div wire:key="race-arena-{{ $this->roomCode }}" class="{{ $arenaDense ? 'space-y-4' : 'space-y-6' }}"
             x-data="raceArena({
-                myId: @js(Auth::id()),
+                myId: @js($isSpectator ? null : Auth::id()),
+                isSpectator: @js($isSpectator),
                 roomCode: @js($this->roomCode),
                 textToType: @js($this->roomData->text_to_type),
                 raceStartsAt: @js($this->raceStartsAt),
@@ -257,8 +321,15 @@
                 @else
                     <span></span>
                 @endif
-                <span class="font-mono text-[11px] uppercase tracking-widest text-muted shrink-0">
-                    {{ __('multiplayer.room_label') }} <span class="text-gold font-bold">- {{ $this->roomCode }}</span>
+                <span class="flex items-center gap-3 shrink-0">
+                    @if ($this->spectatorCount > 0)
+                        <span class="flex items-center gap-1.5 font-mono text-[11px] text-muted">
+                            <span class="text-sm leading-none">&#128065;</span>{{ __('multiplayer.spectators_watching', ['count' => $this->spectatorCount]) }}
+                        </span>
+                    @endif
+                    <span class="font-mono text-[11px] uppercase tracking-widest text-muted">
+                        {{ __('multiplayer.room_label') }} <span class="text-gold font-bold">- {{ $this->roomCode }}</span>
+                    </span>
                 </span>
             </div>
 
@@ -272,12 +343,12 @@
             </template>
 
             @php
-                $playerCount = $this->roomData->members->count();
+                $playerCount = $racers->count();
                 $dense = $playerCount >= 4;
 
                 // Progres awal tiap pemain, dipakai rankOf() untuk memeringkat pemain
-                // yang belum sekali pun mengirim payload WebSocket.
-                $laneSeeds = $this->roomData->members
+                // yang belum sekali pun mengirim payload WebSocket. Hanya pembalap.
+                $laneSeeds = $racers
                     ->mapWithKeys(fn ($m) => [$m->user_id => (int) ($m->progress_percent ?? 0)]);
             @endphp
 
@@ -303,8 +374,8 @@
                         $store.race.startClock();
                     "
                     class="bg-background/40 rounded-2xl border border-border/20 {{ $dense ? 'p-3 space-y-1' : 'p-4 space-y-1.5' }}">
-                    @foreach ($this->roomData->members as $player)
-                        @php $isSelf = $player->user_id === Auth::id(); @endphp
+                    @foreach ($racers as $player)
+                        @php $isSelf = ! $isSpectator && $player->user_id === Auth::id(); @endphp
                         {{-- Semua lane baca $store.race.opponents[id] seragam (termasuk diri sendiri lewat publishLocal),
                              diisi dari payload WebSocket tanpa re-render Livewire. Nilai Blade hanya seed awal. --}}
                         <div x-data="{
@@ -426,7 +497,7 @@
                 </div>
             </div>
 
-            @if (! $hasGivenUp && ! $hasFinished)
+            @if (! $isSpectator && ! $hasGivenUp && ! $hasFinished)
                 <!-- CONTAINER UTAMA TEKS (VISUAL HIGH-RESPONSIVE TYPERACER STYLE) -->
                 <div class="border bg-surface/40 border-border/40 rounded-3xl shadow-xl {{ $dense ? 'p-5 space-y-4' : 'p-8 space-y-6' }}"
                     :class="{ 'race-typo': hasError }">
@@ -471,13 +542,18 @@
                     </div>
                 </div>
             @else
-                <!-- LAYAR TUNGGU: PEMAIN SUDAH SELESAI ATAU MENYERAH, MENONTON SISA BALAPAN -->
+                <!-- LAYAR TUNGGU: PENONTON, ATAU PEMAIN YANG SUDAH SELESAI / MENYERAH -->
+                @php
+                    $watchTitle = $isSpectator ? __('multiplayer.spectating_title') : ($hasGivenUp ? __('multiplayer.gave_up_title') : __('multiplayer.finished_title'));
+                    $watchDesc = $isSpectator ? __('multiplayer.spectating_desc') : ($hasGivenUp ? __('multiplayer.gave_up_waiting') : __('multiplayer.finished_waiting'));
+                    $watchColor = $isSpectator ? 'text-gold' : ($hasGivenUp ? 'text-danger' : 'text-active');
+                @endphp
                 <div class="border bg-surface/40 border-border/40 rounded-3xl shadow-xl p-8 flex flex-col items-center text-center gap-4">
-                    <span class="text-fluid-title font-mono font-black uppercase tracking-wider {{ $hasGivenUp ? 'text-danger' : 'text-active' }}">
-                        {{ $hasGivenUp ? __('multiplayer.gave_up_title') : __('multiplayer.finished_title') }}
+                    <span class="text-fluid-title font-mono font-black uppercase tracking-wider {{ $watchColor }}">
+                        {{ $watchTitle }}
                     </span>
                     <p class="text-sm font-mono text-muted max-w-sm">
-                        {{ $hasGivenUp ? __('multiplayer.gave_up_waiting') : __('multiplayer.finished_waiting') }}
+                        {{ $watchDesc }}
                     </p>
                     <button wire:click="leaveRoom"
                         class="mt-2 px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition">
@@ -511,7 +587,13 @@
                 <div class="flex items-center gap-2 text-xs font-mono text-muted uppercase tracking-widest">
                     <span>{{ __('multiplayer.room', ['code' => $this->roomCode]) }}</span>
                     <span class="text-muted/40">-</span>
-                    <span>{!! __('multiplayer.you_placed', ['rank' => '<strong class="text-foreground font-bold">'.$myRank.(app()->getLocale() === 'en' ? $suffix : '').'</strong>']) !!}</span>
+                    @if ($this->isSpectator)
+                        <span class="flex items-center gap-1.5">
+                            <span class="text-sm leading-none">&#128065;</span>{{ __('multiplayer.you_spectated') }}
+                        </span>
+                    @else
+                        <span>{!! __('multiplayer.you_placed', ['rank' => '<strong class="text-foreground font-bold">'.$myRank.(app()->getLocale() === 'en' ? $suffix : '').'</strong>']) !!}</span>
+                    @endif
                 </div>
 
                 {{-- Hasil ditolak validasi server: tidak dicatat ke statistik (average WPM tak rusak). --}}
@@ -657,7 +739,7 @@
 
             <!-- PANEL PROGRESS REPORT XP (data nyata dari getMyXpResultProperty) -->
             @php
-                $xp = $this->myXpResult;
+                $xp = $this->isSpectator ? null : $this->myXpResult;
                 $lvl = $xp['level'] ?? null;
                 $xpProgress = $lvl['progress'] ?? 0;
                 $xpNeeded = $lvl['needed'] ?? 0;
@@ -837,6 +919,9 @@
                     countdown: 3,
                     raceStarted: false,
                     myId: config.myId,
+                    // Penonton: ikut render arena (countdown + lane pembalap) tapi tak pernah
+                    // mengetik, meng-emit progress, atau menyerah. Semua jalur input dijaga ini.
+                    isSpectator: !!config.isSpectator,
                     roomCode: config.roomCode || '',
                     textToType: config.textToType || '',
                     // Waktu absolut (ms epoch) race mulai; hanya dipakai sebagai titik awal WPM
@@ -893,10 +978,13 @@
                             this.countdown = 'GO!';
                             this.startTime = Date.now();
                             this.startSuddenDeathClock();
-                            this.startWpmTicker();
-                            this.$nextTick(() => {
-                                if (this.$refs.typeInput) this.$refs.typeInput.focus();
-                            });
+                            // Penonton tak mengetik: tak perlu WPM lokal maupun fokus input.
+                            if (!this.isSpectator) {
+                                this.startWpmTicker();
+                                this.$nextTick(() => {
+                                    if (this.$refs.typeInput) this.$refs.typeInput.focus();
+                                });
+                            }
                         } else {
                             // Hitung mundur ke race_starts_at server: waktu absolut sama di semua layar.
                             this.startSyncedCountdown();
@@ -964,6 +1052,8 @@
                         if (this.raceStarted) return;
                         this.raceStarted = true;
                         this.startTime = this.raceStartsAtMs ?? Date.now();
+                        // Penonton hanya menonton: tak ada WPM lokal maupun fokus input.
+                        if (this.isSpectator) return;
                         this.startWpmTicker();
                         this.$nextTick(() => {
                             if (this.$refs.typeInput) this.$refs.typeInput.focus();

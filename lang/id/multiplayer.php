@@ -66,5 +66,20 @@ return [
 
     'error_code_length' => 'Kode harus 6 digit lengkap!',
     'error_room_not_found' => 'Kamar tidak ditemukan atau game sudah dimulai.',
-    'error_room_full' => 'Kamar sudah penuh! Maksimal 5 pemain.',
+    'error_room_full' => 'Kamar sudah penuh! Maksimal 5 pemain dan 5 penonton.',
+    'error_players_full' => 'Semua 5 slot pemain sudah terisi.',
+    'error_spectators_full' => 'Semua 5 slot penonton sudah terisi.',
+    'error_no_players' => 'Butuh minimal satu pemain untuk memulai balapan.',
+
+    'become_spectator' => 'Jadi Penonton',
+    'become_player' => 'Jadi Pemain',
+    'you_are_spectating' => 'Menonton',
+    'spectators_watching' => ':count menonton',
+    'spectator_list_title' => 'Penonton',
+    'players_full' => 'Slot pemain penuh (5/5).',
+    'spectators_full' => 'Slot penonton penuh (5/5).',
+    'no_players_to_start' => 'Belum ada pemain untuk memulai balapan.',
+    'spectating_title' => 'Kamu Sedang Menonton',
+    'spectating_desc' => 'Menonton balapan secara langsung. Nikmati pertandingannya!',
+    'you_spectated' => 'Kamu menonton pertandingan ini',
 ];

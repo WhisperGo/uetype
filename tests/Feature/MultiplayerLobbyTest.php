@@ -312,3 +312,112 @@ describe('multiplayer lobby', function () {
         $winnerComp->assertSee('Loser')->assertSee('Winner');
     });
 });
+
+describe('multiplayer spectators', function () {
+    it('lets a member toggle to spectator and back while waiting', function () {
+        Event::fake([RoomUpdated::class]);
+
+        $host = User::factory()->create();
+        $member = User::factory()->create();
+
+        $room = Room::create([
+            'code' => 'SPEC01',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $member->id, 'role' => 'player', 'is_ready' => false]);
+
+        $comp = Livewire::actingAs($member)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'SPEC01')
+            ->set('step', 'waiting');
+
+        $comp->call('toggleSpectator');
+        $this->assertDatabaseHas('room_members', ['room_id' => $room->id, 'user_id' => $member->id, 'role' => 'spectator']);
+
+        $comp->call('toggleSpectator');
+        $this->assertDatabaseHas('room_members', ['room_id' => $room->id, 'user_id' => $member->id, 'role' => 'player']);
+    });
+
+    it('does not let spectators hold up finish detection or receive a placement', function () {
+        Event::fake([RaceProgressUpdated::class, RoomUpdated::class, SuddenDeathTriggered::class]);
+
+        $racer = User::factory()->create();
+        $spectator = User::factory()->create();
+
+        $room = Room::create([
+            'code' => 'SPEC02',
+            'host_id' => $racer->id,
+            'status' => 'racing',
+            'text_to_type' => 'the quick brown fox',
+            'race_starts_at' => now()->subSeconds(5),
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $racer->id, 'role' => 'player', 'is_ready' => true, 'progress_percent' => 90]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $spectator->id, 'role' => 'spectator', 'is_ready' => false]);
+
+        // Satu-satunya pembalap finish -> race harus benar-benar selesai meski penonton
+        // masih punya finished_time_seconds = null (kalau tak difilter, ini menahannya).
+        Livewire::actingAs($racer)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'SPEC02')
+            ->set('step', 'racing')
+            ->call('updateRaceProgress', 100, 80, 100)
+            ->assertSet('hasFinished', true);
+
+        // Room benar-benar ditutup: penonton (finished_time_seconds=null) tak menahannya.
+        $this->assertDatabaseHas('rooms', ['code' => 'SPEC02', 'status' => 'finished']);
+
+        // Penonton tak pernah diberi place/XP dan tak ditandai DNF.
+        $spectatorRow = RoomMember::where('room_id', $room->id)->where('user_id', $spectator->id)->first();
+        expect($spectatorRow->place)->toBeNull();
+        expect($spectatorRow->xp_earned)->toBeNull();
+        expect($spectatorRow->finished_time_seconds)->toBeNull();
+    });
+
+    it('overflows the sixth joiner into a spectator once players are full', function () {
+        Event::fake([RoomUpdated::class]);
+
+        $host = User::factory()->create();
+        $room = Room::create([
+            'code' => 'SPEC03',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+
+        // 5 pembalap penuh.
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+        foreach (range(1, 4) as $i) {
+            RoomMember::create(['room_id' => $room->id, 'user_id' => User::factory()->create()->id, 'role' => 'player', 'is_ready' => true]);
+        }
+
+        $sixth = User::factory()->create();
+        Livewire::actingAs($sixth)->test(MultiplayerLobby::class)
+            ->set('joinCodeInput', str_split('SPEC03'))
+            ->call('joinRoom')
+            ->assertSet('step', 'waiting');
+
+        $this->assertDatabaseHas('room_members', ['room_id' => $room->id, 'user_id' => $sixth->id, 'role' => 'spectator']);
+    });
+
+    it('refuses to start a race when everyone is a spectator', function () {
+        Event::fake([RoomUpdated::class]);
+
+        $host = User::factory()->create();
+        $room = Room::create([
+            'code' => 'SPEC04',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'spectator', 'is_ready' => false]);
+
+        Livewire::actingAs($host)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'SPEC04')
+            ->set('step', 'waiting')
+            ->call('startRace');
+
+        // Room tetap waiting: tak ada pembalap untuk memulai.
+        $this->assertDatabaseHas('rooms', ['code' => 'SPEC04', 'status' => 'waiting']);
+    });
+});

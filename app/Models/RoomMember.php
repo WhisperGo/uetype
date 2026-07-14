@@ -19,8 +19,12 @@ class RoomMember extends Model
      */
     public const DNF_SENTINEL_SECONDS = 999;
 
+    public const ROLE_PLAYER = 'player';
+
+    public const ROLE_SPECTATOR = 'spectator';
+
     protected $fillable = [
-        'room_id', 'user_id', 'is_ready', 'progress_percent',
+        'room_id', 'user_id', 'role', 'is_ready', 'progress_percent',
         'wpm', 'accuracy', 'finished_time_seconds', 'place', 'xp_earned',
         'result_recorded',
     ];
@@ -39,6 +43,18 @@ class RoomMember extends Model
     public function realFinishedSeconds(): ?int
     {
         return $this->isDnf() ? null : $this->finished_time_seconds;
+    }
+
+    /** Penonton: menonton live, tak masuk klasemen/place/XP. */
+    public function isSpectator(): bool
+    {
+        return $this->role === self::ROLE_SPECTATOR;
+    }
+
+    /** Pembalap: ikut race, klasemen, place, dan XP. */
+    public function isPlayer(): bool
+    {
+        return ! $this->isSpectator();
     }
 
     /** The user this membership belongs to. */

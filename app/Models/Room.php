@@ -27,9 +27,21 @@ class Room extends Model
         return $this->belongsTo(User::class, 'host_id');
     }
 
-    /** All players currently in the room. */
+    /** All members currently in the room (players + spectators). */
     public function members()
     {
         return $this->hasMany(RoomMember::class, 'room_id');
+    }
+
+    /** Members yang ikut balapan: masuk klasemen, place, dan XP. */
+    public function players()
+    {
+        return $this->members()->where('role', RoomMember::ROLE_PLAYER);
+    }
+
+    /** Members yang hanya menonton: tak masuk perhitungan finish/place/XP. */
+    public function spectators()
+    {
+        return $this->members()->where('role', RoomMember::ROLE_SPECTATOR);
     }
 }
