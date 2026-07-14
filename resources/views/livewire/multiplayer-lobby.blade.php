@@ -239,45 +239,62 @@
                 $spectatorsFull = $this->spectatorCount >= \App\Livewire\MultiplayerLobby::MAX_SPECTATORS;
             @endphp
 
-            <div class="pt-6 border-t border-border/30 flex flex-wrap gap-3 sm:gap-4">
-                @if ($this->isHost)
-                    <button wire:click="startRace" @disabled(!$this->allReady)
-                        class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->allReady ? 'bg-gold hover:bg-secondary-7 text-background shadow-md' : 'bg-elevated text-muted cursor-not-allowed border border-border/30' }}">
-                        {{ __('multiplayer.start_race') }}
-                    </button>
-                    @if (!$this->allReady)
-                        <span class="text-xs font-mono text-muted self-center">{{ $this->orderedMembers->isEmpty() ? __('multiplayer.no_players_to_start') : __('multiplayer.waiting_ready') }}</span>
-                    @endif
-                @elseif (!$this->isSpectator)
-                    <button wire:click="toggleReady"
-                        class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? 'bg-active text-background hover:bg-active-5' : 'bg-gold hover:bg-secondary-7 text-background' }}">
-                        {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? __('multiplayer.im_not_ready') : __('multiplayer.im_ready') }}
-                    </button>
-                @else
-                    <span class="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-border/40 bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider text-muted">
-                        <span class="text-base leading-none">&#128065;</span>{{ __('multiplayer.you_are_spectating') }}
-                    </span>
-                @endif
+            <div class="pt-6 border-t border-border/30 space-y-3">
+                {{-- Baris tombol: aksi primer di kiri, aksi sekunder didorong ke kanan. --}}
+                <div class="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
+                    {{-- KIRI: aksi primer sesuai peran (Mulai / Siap / badge Menonton). --}}
+                    <div class="flex flex-wrap items-center gap-3 sm:gap-4">
+                        @if ($this->isHost)
+                            <button wire:click="startRace" @disabled(!$this->allReady)
+                                class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->allReady ? 'bg-gold hover:bg-secondary-7 text-background shadow-md' : 'bg-elevated text-muted cursor-not-allowed border border-border/30' }}">
+                                {{ __('multiplayer.start_race') }}
+                            </button>
+                        @elseif (!$this->isSpectator)
+                            <button wire:click="toggleReady"
+                                class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? 'bg-active text-background hover:bg-active-5' : 'bg-gold hover:bg-secondary-7 text-background' }}">
+                                {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? __('multiplayer.im_not_ready') : __('multiplayer.im_ready') }}
+                            </button>
+                        @else
+                            <span class="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-border/40 bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider text-muted">
+                                <span class="text-base leading-none">&#128065;</span>{{ __('multiplayer.you_are_spectating') }}
+                            </span>
+                        @endif
+                    </div>
 
-                {{-- Toggle peran: tersedia untuk semua (termasuk host) hanya saat waiting. --}}
-                @if ($this->isSpectator)
-                    <button wire:click="toggleSpectator" @disabled($playersFull)
-                        class="px-6 py-3 bg-transparent border border-gold/50 text-gold hover:bg-gold/10 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
-                        @if ($playersFull) title="{{ __('multiplayer.players_full') }}" @endif>
-                        {{ __('multiplayer.become_player') }}
-                    </button>
-                @else
-                    <button wire:click="toggleSpectator" @disabled($spectatorsFull)
-                        class="px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
-                        @if ($spectatorsFull) title="{{ __('multiplayer.spectators_full') }}" @endif>
-                        {{ __('multiplayer.become_spectator') }}
-                    </button>
-                @endif
+                    {{-- KANAN: aksi sekunder (toggle peran + keluar). Toggle tersedia untuk
+                         semua termasuk host, hanya saat waiting. --}}
+                    <div class="flex flex-wrap items-center gap-3 sm:gap-4">
+                        @if ($this->isSpectator)
+                            <button wire:click="toggleSpectator" @disabled($playersFull)
+                                class="px-6 py-3 bg-transparent border border-gold/50 text-gold hover:bg-gold/10 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                @if ($playersFull) title="{{ __('multiplayer.players_full') }}" @endif>
+                                {{ __('multiplayer.become_player') }}
+                            </button>
+                        @else
+                            <button wire:click="toggleSpectator" @disabled($spectatorsFull)
+                                class="px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                @if ($spectatorsFull) title="{{ __('multiplayer.spectators_full') }}" @endif>
+                                {{ __('multiplayer.become_spectator') }}
+                            </button>
+                        @endif
 
-                <button wire:click="leaveRoom"
-                    class="px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition">
-                    {{ __('multiplayer.leave_room') }}
-                </button>
+                        <button wire:click="leaveRoom"
+                            class="px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition">
+                            {{ __('multiplayer.leave_room') }}
+                        </button>
+                    </div>
+                </div>
+
+                {{-- Baris hint status: menjelaskan kenapa "Mulai" belum aktif. Titik netral
+                     berdenyut agar terbaca sebagai petunjuk, bukan tombol. --}}
+                @if ($this->isHost && !$this->allReady)
+                    <div class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-muted animate-pulse"></span>
+                        <span class="text-xs font-mono text-muted">
+                            {{ $this->orderedMembers->isEmpty() ? __('multiplayer.no_players_to_start') : __('multiplayer.waiting_ready') }}
+                        </span>
+                    </div>
+                @endif
             </div>
         </div>
     @endif
