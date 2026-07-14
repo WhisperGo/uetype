@@ -41,6 +41,12 @@ class TypingEngine extends Component
 
     public $textToType;
 
+    // Teks "Retry" (mode words) untuk request ini saja: di-pull dari session di mount(),
+    // dipakai generateText() menggantikan perakitan acak. Properti privat (bukan public
+    // Livewire) supaya tak dipersistensi antar-request -- retry berikutnya via restart()
+    // tetap menghasilkan teks acak, tak lengket.
+    private ?string $retryText = null;
+
     public string $contentLang = TypingLanguage::DEFAULT;
 
     public int $typingSessionKey = 0;
@@ -103,7 +109,31 @@ class TypingEngine extends Component
             $this->resolveGhostDeepLink();
         }
 
+        // Retry (mode words): pull sekali pakai. Hanya jalur solo -- war-lock menang,
+        // sama seperti ghost deep-link. Mode/config diikutkan supaya "ulang yang tadi"
+        // benar-benar sama, bukan preferensi terakhir.
+        if (! $this->warLock) {
+            $this->applyRetryFromSession();
+        }
+
         $this->generateText();
+    }
+
+    /**
+     * Pasang teks retry dari session (sekali pakai) bila valid: mode words + teks ada.
+     * generateText() lalu memakai $retryText ketimbang merakit teks acak baru.
+     */
+    private function applyRetryFromSession(): void
+    {
+        $retry = session()->pull('typing_retry');
+
+        if (! is_array($retry) || ($retry['mode'] ?? null) !== 'words' || empty($retry['text'])) {
+            return;
+        }
+
+        $this->mainMode = 'words';
+        $this->subMode = (string) ($retry['subMode'] ?? $this->subMode);
+        $this->retryText = (string) $retry['text'];
     }
 
     /**
@@ -339,6 +369,17 @@ class TypingEngine extends Component
     {
         $this->typingSessionKey++;
 
+        // Retry (mode words): pakai teks sesi sebelumnya yang identik, bukan dirakit acak.
+        // Hanya di-set di mount() untuk jalur solo (war-lock menang), dan hanya sekali --
+        // restart()/setMode() memanggil generateText() dengan $retryText sudah null lagi.
+        if ($this->retryText !== null) {
+            $this->textId = null;
+            $this->textToType = $this->retryText;
+            $this->retryText = null;
+
+            return;
+        }
+
         // Clan War mode Words pakai teks TETAP (identik untuk semua pemain di config yang
         // sama) demi keadilan, bukan dirakit acak. Time/Survival war cukup restart-nya
         // yang diblokir.
@@ -514,6 +555,9 @@ class TypingEngine extends Component
             'time' => $duration,
             'mode' => $this->mainMode,
             'subMode' => $this->subMode,
+            // Teks sesi ini disimpan agar result page bisa menawarkan "Retry" -- mengulang
+            // rangkaian kata yang sama persis (hanya bermakna untuk mode words).
+            'textToType' => $this->textToType,
             'score' => $score, // survival: karakter benar (stat sampingan); null untuk mode lain
             'totalKeystrokes' => $totalKeystrokes,
             'correctKeystrokes' => $correctKeystrokes,

@@ -249,13 +249,15 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
                         </svg>
                     </a>
-                    @unless ($isSurvival)
-                        <a href="/typing"
+                    {{-- Retry hanya untuk Words: mengulang rangkaian kata yang sama persis
+                         (lewat retry() -> session typing_retry), berbeda dari Next Test yang acak. --}}
+                    @if ($mode === 'words' && $textToType)
+                        <button type="button" wire:click="retry"
                             class="inline-flex items-center justify-center h-12 px-6 rounded-2xl bg-surface border border-white/5 text-foreground/80 hover:text-foreground hover:border-white/10 font-mono font-semibold text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-border transition"
                             title="{{ __('result.retry_title') }}">
                             {{ __('result.retry_title') }}
-                        </a>
-                    @endunless
+                        </button>
+                    @endif
                 </div>
             </div>
 

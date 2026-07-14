@@ -54,6 +54,8 @@ class TypingResult extends Component
 
     public $ghostResult;
 
+    public $textToType;
+
     public function mount()
     {
         $result = session('typing_result');
@@ -84,6 +86,27 @@ class TypingResult extends Component
         $this->survivalPreviousBest = $result['survivalPreviousBest'] ?? null;
         $this->isSurvivalPersonalBest = $result['isSurvivalPersonalBest'] ?? false;
         $this->ghostResult = $result['ghostResult'] ?? null;
+        $this->textToType = $result['textToType'] ?? null;
+    }
+
+    /**
+     * Ulang tantangan yang sama persis (hanya mode words): titipkan teks + mode sesi
+     * ini ke session lalu kembali ke /typing, yang akan memakainya sekali pakai
+     * ketimbang merakit teks acak baru. Berbeda dari "Next Test" yang selalu acak.
+     */
+    public function retry()
+    {
+        if ($this->mode !== 'words' || ! $this->textToType) {
+            return $this->redirect(route('typing'), navigate: true);
+        }
+
+        session()->put('typing_retry', [
+            'text' => $this->textToType,
+            'mode' => $this->mode,
+            'subMode' => $this->subMode,
+        ]);
+
+        return $this->redirect(route('typing'), navigate: true);
     }
 
     public function render()
