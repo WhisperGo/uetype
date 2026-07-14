@@ -1,6 +1,6 @@
 <div
-    class="text-muted font-mono selection:bg-brand selection:text-foreground outline-none">
-    <div wire:key="typing-app-{{ $mainMode }}-{{ $subMode }}-{{ $typingSessionKey }}" x-data="{
+    class="flex flex-col flex-1 text-muted font-mono selection:bg-brand selection:text-foreground outline-none">
+    <div wire:key="typing-app-{{ $mainMode }}-{{ $subMode }}-{{ $typingSessionKey }}" class="flex flex-col flex-1" x-data="{
         currentMain: @entangle('mainMode'),
         currentSub: @entangle('subMode'),
         ...typingGame(@js($textToType))
@@ -37,7 +37,7 @@
                 })()
             };`"></div>
 
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10 pb-12 sm:pb-16">
+        <div class="w-full max-w-5xl mx-auto my-auto px-4 sm:px-6 lg:px-8 py-6">
 
             @if (session('result_rejected'))
                 <div
@@ -265,7 +265,7 @@
             </div>
 
             <!-- Kontainer 3 Baris -->
-            <div x-ref="typeArea" class="relative overflow-hidden text-fluid-type tracking-tight select-none outline-none"
+            <div class="relative overflow-hidden text-fluid-type tracking-tight select-none outline-none"
                 style="max-height: 4.875em;">
 
                 <!-- SINGLE SMOOTH CURSOR -->
@@ -403,8 +403,6 @@
                 containerTop: null,
                 caretHeight: 0,
                 positionFrame: null,
-                _onViewportResize: null,
-                _resizeFrame: null,
                 caretInstant: true,
                 caretDrawn: false,
                 _caretDurFrame: null,
@@ -472,21 +470,6 @@
                         this.resetForNewText(payload.text ?? '');
                     });
                     this.modeChangedCleanup = typeof cleanup === 'function' ? cleanup : null;
-
-                    this._onViewportResize = () => {
-                        if (this._resizeFrame) cancelAnimationFrame(this._resizeFrame);
-                        this._resizeFrame = requestAnimationFrame(() => {
-                            this._resizeFrame = null;
-                            this.scrollToTypeArea();
-                        });
-                    };
-                    window.addEventListener('resize', this._onViewportResize);
-
-                    this.$nextTick(() => this.scrollToTypeArea());
-                },
-
-                scrollToTypeArea() {
-                    this.$refs.typeArea?.scrollIntoView({ block: 'center', behavior: 'smooth' });
                 },
 
                 // Ghost hanya sah di time/words. Kalau state global tersisa dari mode
@@ -719,14 +702,6 @@
                     if (this.modeChangedCleanup) {
                         this.modeChangedCleanup();
                         this.modeChangedCleanup = null;
-                    }
-                    if (this._onViewportResize) {
-                        window.removeEventListener('resize', this._onViewportResize);
-                        this._onViewportResize = null;
-                    }
-                    if (this._resizeFrame) {
-                        cancelAnimationFrame(this._resizeFrame);
-                        this._resizeFrame = null;
                     }
                     this.stopRuntime();
                 },
@@ -980,7 +955,6 @@
                     if (!this.isStarted) {
                         this.isStarted = true;
                         this.startTime = Date.now();
-                        this.scrollToTypeArea();
 
                         // Sembunyikan overlay chat selama sesi ketik berjalan.
                         window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: true } }));
