@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a0595eae812c0d6a5abb1eca95bfb464",
+    "content-hash": "5507fa6d5054c88f42bb10060f8cbcc3",
     "packages": [
         {
             "name": "binafy/laravel-user-monitoring",

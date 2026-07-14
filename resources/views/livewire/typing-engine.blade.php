@@ -270,7 +270,7 @@
 
                 <!-- SINGLE SMOOTH CURSOR -->
                 <div x-ref="caret" x-show="!isFinished"
-                    class="absolute top-0 left-0 w-[0.1em] h-[1.2em] z-20 rounded [transform-origin:top_left] [will-change:transform] [transition:background-color_150ms_ease-out]"
+                    class="absolute top-0 left-0 w-[0.1em] h-[1.2em] z-20 rounded [transform-origin:top_left] [will-change:transform] [transition:transform_var(--caret-dur,100ms)_var(--caret-ease,linear),background-color_150ms_ease-out]"
                     :style="{
                         backgroundColor: (currentMain === 'survival' && isStarted && !isFinished)
                             ? (staminaPct > 50 ? 'rgb(var(--color-brand-bright))' : (staminaPct > 25 ? 'rgb(var(--color-gold))' : 'rgb(var(--color-danger))'))
@@ -400,12 +400,14 @@
                 timerInterval: null,
                 scrollOffset: 0,
                 lineHeight: 0,
+                containerTop: null,
+                caretHeight: 0,
                 positionFrame: null,
                 _onViewportResize: null,
                 _resizeFrame: null,
                 caretInstant: true,
-                caretAnim: null,
                 caretDrawn: false,
+                _caretDurFrame: null,
                 currentWordIndex: 0,
                 wordBounds: [],
                 extraChars: {},
@@ -549,6 +551,8 @@
                     this.cursorTop = 0;
                     this.scrollOffset = 0;
                     this.lineHeight = 0;
+                    this.containerTop = null;
+                    this.caretHeight = 0;
                     this.isTyping = false;
 
                     // Preset survival diambil dari currentSub (easy|medium|hard).
@@ -745,9 +749,9 @@
                         cancelAnimationFrame(this.positionFrame);
                         this.positionFrame = null;
                     }
-                    if (this.caretAnim) {
-                        this.caretAnim.cancel();
-                        this.caretAnim = null;
+                    if (this._caretDurFrame) {
+                        cancelAnimationFrame(this._caretDurFrame);
+                        this._caretDurFrame = null;
                     }
                 },
 
@@ -858,23 +862,29 @@
 
                     if (!activeEl) return;
 
+                    if (this.containerTop === null || !this.lineHeight || !this.caretHeight) {
+                        const firstChar = document.getElementById('char-0');
+                        if (firstChar) {
+                            if (this.containerTop === null) this.containerTop = firstChar.offsetTop;
+                            if (!this.lineHeight) this.lineHeight = firstChar.offsetHeight;
+                        }
+                        if (!this.caretHeight) {
+                            this.caretHeight = this.$refs.caret?.offsetHeight || activeEl.offsetHeight;
+                        }
+                    }
+
                     const left = activeEl.offsetLeft;
                     const top = activeEl.offsetTop;
                     const width = activeEl.offsetWidth;
+                    const height = activeEl.offsetHeight;
 
-                    const firstChar = document.getElementById('char-0');
-                    const containerTop = firstChar ? firstChar.offsetTop : 0;
-                    if (!this.lineHeight && firstChar) {
-                        this.lineHeight = firstChar.offsetHeight;
-                    }
-
-                    const caretHeight = this.$refs.caret?.offsetHeight || activeEl.offsetHeight;
-                    const targetTop = top + ((activeEl.offsetHeight - caretHeight) / 2);
+                    const caretHeight = this.caretHeight || height;
+                    const targetTop = top + ((height - caretHeight) / 2);
 
                     this.cursorLeft = isEnd ? left + width : left;
                     this.cursorTop = targetTop;
 
-                    const currentTop = top - containerTop;
+                    const currentTop = top - (this.containerTop || 0);
                     const lh = this.lineHeight || 48;
                     this.scrollOffset = currentTop >= lh * 2 ? currentTop - lh : 0;
 
@@ -887,23 +897,18 @@
 
                     const target = `translate(${targetLeft}px, ${targetTop}px)`;
 
-                    if (this.caretAnim) {
-                        try { this.caretAnim.commitStyles(); } catch (e) {}
-                        this.caretAnim.cancel();
-                        this.caretAnim = null;
-                    }
-
                     if (instant || !this.caretDrawn) {
+                        if (this._caretDurFrame) cancelAnimationFrame(this._caretDurFrame);
+                        el.style.setProperty('--caret-dur', '0ms');
                         el.style.transform = target;
                         this.caretDrawn = true;
+                        this._caretDurFrame = requestAnimationFrame(() => {
+                            this._caretDurFrame = null;
+                            el.style.removeProperty('--caret-dur');
+                        });
                         return;
                     }
 
-                    const from = getComputedStyle(el).transform;
-                    this.caretAnim = el.animate(
-                        [{ transform: from }, { transform: target }],
-                        { duration: 85, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' }
-                    );
                     el.style.transform = target;
                 },
 
