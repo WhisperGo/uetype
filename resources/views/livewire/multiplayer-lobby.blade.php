@@ -1,10 +1,4 @@
 <div class="max-w-5xl px-4 mx-auto py-6 sm:px-6 lg:px-8 text-foreground">
-    @if (session()->has('error'))
-        <div class="p-4 mb-6 text-sm text-danger bg-danger/10 border border-danger/40 rounded-2xl">
-            {{ session('error') }}
-        </div>
-    @endif
-
     <!-- ===== 1. HALAMAN PILIH: CREATE OR JOIN ROOM ===== -->
     @if ($this->step === 'choose')
         <div class="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24 items-stretch mt-10 relative w-full">
@@ -81,6 +75,15 @@
                     class="px-8 py-3 border border-border/40 text-foreground hover:bg-foreground/5 font-mono font-semibold uppercase tracking-wider rounded-xl transition duration-200">
                     {{ __('multiplayer.join_room') }}
                 </button>
+
+                @if (session()->has('error'))
+                    <p class="mt-4 flex items-center justify-center gap-1.5 font-mono text-xs text-danger">
+                        <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
+                        </svg>
+                        <span>{{ session('error') }}</span>
+                    </p>
+                @endif
             </div>
         </div>
 
