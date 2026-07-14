@@ -51,6 +51,7 @@ Sebelum membaca per fitur, tiga prinsip ini muncul terus dan menjelaskan banyak 
 | 10 | Clan War & Elo Power | [clan-war.md](clan-war.md) |
 | 11 | Autentikasi (Google + Username) | [auth.md](auth.md) |
 | 12 | Multi-bahasa (Konten & UI) | [localization.md](localization.md) |
+| 13 | Monitoring Aktivitas Pengguna | [monitoring.md](monitoring.md) |
 
 Dokumen lain yang relevan:
 - [`../PROJECT_OVERVIEW.md`](../PROJECT_OVERVIEW.md) — peta menyeluruh proyek: tech

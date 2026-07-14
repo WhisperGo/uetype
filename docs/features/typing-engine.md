@@ -104,6 +104,19 @@ route terpisah (`/result`) yang membaca dari session. Ini membuat halaman ketik 
 hasil **decoupled** — hasil bisa di-refresh tanpa menyimpan ulang, dan tamu pun bisa melihat
 hasilnya tanpa menulis ke DB.
 
+### 3.7 Input ditangkap global, tapi tak "bocor" dari field lain
+
+Ketikan ditangkap lewat listener global `@keydown.window` (bukan input tersembunyi) supaya
+pemain bisa langsung mengetik tanpa harus klik area teks dulu. Konsekuensinya: listener ini
+menyala untuk **setiap** keystroke di halaman — termasuk saat fokus ada di field lain seperti
+**input chat overlay**.
+
+**Justifikasi guard:** sebelum memanggil `handleInput()`, dicek `document.activeElement`. Kalau
+fokus sedang di `INPUT` / `TEXTAREA` / elemen `contenteditable`, keystroke **dilewati** — biar
+masuk ke field itu saja dan tak ikut men-trigger tes ketik di belakang. Tanpa guard ini,
+mengetik pesan di overlay chat akan sekaligus memulai & mengisi paragraf typing. Lihat
+[chat.md](chat.md#47-sembunyi-saat-sesi-testbalapan-aktif).
+
 ## 4. Integrasi dengan Fitur Lain
 
 - **Ghost Mode** (`?ghost=...`): deep-link dari leaderboard memasang lawan ghost. Lihat

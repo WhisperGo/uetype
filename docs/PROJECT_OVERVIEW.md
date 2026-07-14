@@ -263,6 +263,7 @@ fitur — itu sudah didokumentasikan detail di `docs/features/`:
 | 10 | Clan War & Elo Power | [clan-war.md](features/clan-war.md) |
 | 11 | Autentikasi (Google + Username) | [auth.md](features/auth.md) |
 | 12 | Multi-bahasa | [localization.md](features/localization.md) |
+| 13 | Monitoring Aktivitas Pengguna | [monitoring.md](features/monitoring.md) |
 
 Dokumen terkait lain:
 - [`design-system.md`](design-system.md) — token warna, tipografi, komponen UI

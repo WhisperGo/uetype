@@ -1,0 +1,324 @@
+# UeType — Game Latihan Mengetik
+
+UeType adalah aplikasi web **game latihan mengetik** (typing test) bergaya
+Monkeytype/TypeRacer, dilengkapi mode **balapan multiplayer real-time**, sistem
+**clan (guild)** dengan **perang antar-clan**, **chat** (DM & clan), **pertemanan**
+dengan status online/offline, **achievement**, **leveling (XP)**, **leaderboard**,
+serta **panel monitoring** aktivitas pengguna.
+
+Dibangun dengan **Laravel 12 + Livewire 4 + Alpine.js + Tailwind CSS**, dengan
+**Laravel Reverb** (WebSocket) sebagai tulang punggung fitur real-time.
+
+> Dokumentasi teknis lebih dalam ada di [`docs/PROJECT_OVERVIEW.md`](docs/PROJECT_OVERVIEW.md)
+> (arsitektur, skema database, route) dan [`docs/features/`](docs/features/README.md)
+> (penjelasan per fitur beserta alasan desainnya).
+
+---
+
+## Daftar Isi
+
+1. [Fitur](#fitur)
+2. [Teknologi](#teknologi)
+3. [Spesifikasi Minimum](#spesifikasi-minimum)
+4. [Instalasi Offline](#instalasi-offline)
+5. [Menjalankan Aplikasi](#menjalankan-aplikasi)
+6. [Akun Uji Coba (Dev Login)](#akun-uji-coba-dev-login)
+7. [Panel Monitoring](#panel-monitoring)
+8. [Testing](#testing)
+9. [Struktur Proyek](#struktur-proyek)
+10. [Troubleshooting](#troubleshooting)
+
+---
+
+## Fitur
+
+### Mengetik (Solo)
+- **Mode Time** — ketik sebanyak mungkin dalam 15 / 30 / 60 / 120 detik.
+- **Mode Words** — ketik 10 / 25 / 50 / 100 kata secepat mungkin.
+- **Mode Survival** — stamina berkurang seiring waktu; skor = berapa lama bertahan.
+- **Ghost Mode** — balapan melawan rekor: diri sendiri, teman, atau entri leaderboard.
+- **Dua bahasa konten** (Inggris / Indonesia) yang bisa dipilih terpisah dari bahasa UI.
+- **Anti-cheat**: WPM & akurasi dihitung ulang di server (Net WPM), sesi tak masuk
+  akal ditolak. Lihat [`docs/features/anti-cheat-wpm.md`](docs/features/anti-cheat-wpm.md).
+
+### Multiplayer Race (Real-time)
+- Buat / gabung ruang lewat **kode 6 digit** (maks. 5 pemain).
+- **Countdown 3-2-1 tersinkron** di semua layar, lalu balapan bersama.
+- Progres & maskot lawan bergerak **real-time** lewat WebSocket.
+- **Sudden death** (masa tenggang setelah pemenang pertama finis).
+- Riwayat pertandingan permanen + statistik (win rate, placement, dsb).
+
+### Sosial
+- **Chat** DM & clan: kirim, **reply**, **edit** (jendela 30 menit), **hapus**
+  (untuk diri / untuk semua), **clear chat**, plus **overlay chat** yang bisa dibuka
+  dari halaman mana pun & digeser bebas.
+- **Pertemanan**: kirim/terima/tolak permintaan; **status online/offline** real-time.
+- **Notifikasi toast** lintas halaman (teman, clan, chat).
+
+### Clan & Clan War
+- **Clan (guild)** hingga 20 anggota, dengan emblem/warna/deskripsi kustom.
+- Sistem **power (Elo)** dan level clan.
+- **Clan War**: pertempuran 1v1 antar-clan di grid 9-mode, diselesaikan dengan Elo.
+- **Leaderboard clan** berdasarkan power.
+
+### Progres & Statistik
+- **Level & XP** — XP dari karakter benar × pengali akurasi (adil: ngasal-cepat tak menang).
+- **Achievement** — 15 pencapaian di 5 kategori (WPM, jumlah tes, level, akurasi, karakter).
+- **Halaman Stats** — grafik WPM/akurasi, distribusi mode, statistik multiplayer.
+- **Leaderboard global** per mode/konfigurasi/rentang waktu.
+
+### Autentikasi
+- **Login Google** (OAuth via Socialite) + alur pilih username.
+- Register/login klasik (email + password), reset password, verifikasi email.
+
+### Monitoring (Admin)
+- **Visit monitoring** (kunjungan halaman), **action monitoring** (create/update/delete
+  model penting), **authentication monitoring** (login/logout). Dashboard tersedia di
+  `/user-monitoring/*` dengan auto-refresh 10 detik.
+
+---
+
+## Teknologi
+
+| Lapisan | Teknologi |
+|---|---|
+| Backend | PHP 8.2+, Laravel 12 |
+| UI reaktif | Livewire 4 + Volt |
+| Interaksi klien | Alpine.js 3 |
+| Styling | Tailwind CSS 3 |
+| Real-time | Laravel Reverb (WebSocket, protokol Pusher) + Laravel Echo |
+| OAuth | Laravel Socialite (Google) |
+| Grafik | Chart.js |
+| Build tool | Vite 6 |
+| Testing | Pest 4 |
+| Monitoring | binafy/laravel-user-monitoring |
+
+---
+
+## Spesifikasi Minimum
+
+### Perangkat Lunak (wajib)
+| Komponen | Versi minimum | Catatan |
+|---|---|---|
+| **PHP** | **8.2** | Ekstensi wajib: `pdo_mysql`, `mbstring`, `openssl`, `ctype`, `json`, `bcmath`, `fileinfo`, `tokenizer`, `curl`, `xml` |
+| **Composer** | 2.x | Manajer paket PHP |
+| **Node.js** | **18 LTS+** (disarankan 20 LTS) | Untuk build aset frontend |
+| **npm** | 9+ | Ikut Node |
+| **MySQL / MariaDB** | MySQL 8.0+ / MariaDB 10.6+ | Bisa lewat Laragon/XAMPP |
+
+> Cara termudah di Windows: pakai **Laragon** (sudah membundel PHP 8.2+, MySQL, dan
+> Composer). Proyek ini dikembangkan dengan Laragon (`c:\laragon\www\agile`).
+
+### Perangkat Keras (disarankan minimum untuk pengembangan lancar)
+| Komponen | Minimum | Nyaman |
+|---|---|---|
+| CPU | 2 core | 4 core |
+| RAM | 4 GB | 8 GB+ (karena menjalankan PHP + MySQL + Reverb + Vite bersamaan) |
+| Penyimpanan | 2 GB kosong | 5 GB+ (vendor + node_modules cukup besar) |
+| OS | Windows 10 / macOS / Linux | — |
+
+### Browser (untuk memakai aplikasi)
+Browser modern yang mendukung WebSocket & Alpine.js: **Chrome/Edge 90+**,
+**Firefox 90+**, atau **Safari 15+**.
+
+---
+
+## Instalasi Offline
+
+Panduan ini mengasumsikan **paket sudah tersedia lokal** (`vendor/` dan
+`node_modules/` sudah ada, atau ada cache Composer/npm), sehingga tak perlu koneksi
+internet. Kalau `vendor/`/`node_modules/` **belum ada**, jalankan `composer install`
+dan `npm install` sekali saat masih online, lalu sisanya bisa offline.
+
+### 1. Salin proyek
+Letakkan folder proyek di web root (mis. `c:\laragon\www\agile`).
+
+### 2. Buat file environment
+Salin `.env.example` menjadi `.env`:
+```bash
+cp .env.example .env
+```
+
+### 3. Sesuaikan `.env`
+Proyek ini memakai **MySQL** (bukan SQLite default). Ubah bagian database:
+```env
+APP_NAME=UeType
+APP_ENV=local
+APP_URL=http://localhost:8000
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=webprogramming
+DB_USERNAME=root
+DB_PASSWORD=
+
+BROADCAST_CONNECTION=reverb
+REVERB_APP_ID=my-app-id
+REVERB_APP_KEY=my-app-key
+REVERB_APP_SECRET=my-app-secret
+REVERB_HOST=127.0.0.1
+REVERB_PORT=8080
+REVERB_SCHEME=http
+```
+> **PENTING:** `REVERB_APP_ID/KEY/SECRET` harus diisi (nilai apa saja yang konsisten).
+> Nilai `VITE_REVERB_*` di bawahnya sudah mewarisi otomatis dari `REVERB_*`.
+
+### 4. Buat database
+Buat database MySQL kosong bernama **`webprogramming`** (sesuai `DB_DATABASE` di atas),
+mis. via phpMyAdmin/HeidiSQL/CLI:
+```sql
+CREATE DATABASE webprogramming CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### 5. Install dependency (jika belum)
+```bash
+composer install
+npm install
+```
+
+### 6. Generate app key
+```bash
+php artisan key:generate
+```
+
+### 7. Migrasi & seed data awal
+```bash
+php artisan migrate --seed
+```
+Ini membuat semua tabel (termasuk tabel monitoring) **dalam urutan yang benar** dan
+mengisi data awal: bahasa, teks, user dummy, riwayat multiplayer dummy.
+
+### 8. Build aset frontend
+```bash
+npm run build
+```
+> **PENTING (real-time):** Nilai `VITE_REVERB_*` di-*bake* ke bundle JS saat build.
+> Kalau Anda mengubah `REVERB_HOST` (mis. ke IP LAN agar bisa diakses perangkat lain),
+> **wajib `npm run build` ulang**, atau koneksi WebSocket di browser gagal diam-diam.
+
+---
+
+## Menjalankan Aplikasi
+
+Fitur real-time (multiplayer, chat, presence) butuh **tiga proses** berjalan bersamaan.
+Buka **3 terminal**:
+
+**Terminal 1 — web server:**
+```bash
+php artisan serve
+```
+Akses di `http://127.0.0.1:8000`.
+
+**Terminal 2 — Reverb (WebSocket server):**
+```bash
+php artisan reverb:start
+```
+Wajib jalan untuk chat, multiplayer race, dan notifikasi real-time.
+
+**Terminal 3 — Vite (opsional, untuk dev dengan hot-reload):**
+```bash
+npm run dev
+```
+> Kalau sudah `npm run build` (langkah 8), terminal 3 ini **tidak wajib** —
+> aplikasi memakai aset statis hasil build.
+
+> Alternatif praktis: `composer run dev` menjalankan server + queue + log + Vite
+> sekaligus dalam satu perintah (tapi Reverb tetap dijalankan terpisah).
+
+---
+
+## Akun Uji Coba (Dev Login)
+
+Di environment `local`, tersedia jalur login instan tanpa password (butuh seeder sudah
+dijalankan — sudah termasuk di `php artisan migrate --seed`):
+
+- `http://127.0.0.1:8000/dev-login` — login sebagai user dummy utama.
+- `http://127.0.0.1:8000/dev-login2` — login sebagai user dummy kedua (berguna untuk
+  menguji chat/multiplayer dua akun sekaligus di dua browser/incognito).
+
+Akun dummy: `dummy@uetype.test`.
+
+---
+
+## Panel Monitoring
+
+Dashboard monitoring aktivitas (perlu login):
+
+- `/user-monitoring/visits-monitoring` — kunjungan halaman.
+- `/user-monitoring/actions-monitoring` — aksi create/update/delete pada model penting
+  (Clan, Room, Message, Friendship).
+- `/user-monitoring/authentications-monitoring` — riwayat login/logout.
+
+Data dicatat **real-time** ke database; tampilan dashboard **auto-refresh tiap 10 detik**
+(bisa dimatikan lewat toggle di pojok kanan atas).
+
+---
+
+## Testing
+
+Proyek memakai **Pest**. Jalankan seluruh test:
+```bash
+php artisan test
+```
+Menjalankan sebagian:
+```bash
+php artisan test tests/Feature/ChatOverlayTest.php
+```
+Cek gaya kode (linter):
+```bash
+vendor/bin/pint
+```
+
+> Catatan: beberapa test yang menyiarkan event butuh Reverb — kalau Reverb tak jalan,
+> test broadcasting bisa gagal karena tak bisa konek ke port 8080 (bukan bug aplikasi).
+
+---
+
+## Struktur Proyek
+
+```
+app/
+  Livewire/        Komponen UI (TypingEngine, MultiplayerLobby, Chat, ChatOverlay, Clans, ...)
+  Services/        Logika domain (AntiCheatService, EloCalculator, ClanWar*, ...)
+  Events/          Payload broadcast real-time (RoomUpdated, RaceProgressUpdated, ...)
+  Models/          Model Eloquent
+  Http/            Controller & middleware
+config/            Konfigurasi (termasuk reverb.php, user-monitoring.php)
+database/
+  migrations/      Skema database
+  seeders/         Data awal & dummy
+resources/
+  views/livewire/  Blade untuk komponen Livewire
+  js/, css/        Aset frontend (echo.js untuk Reverb)
+routes/            web.php, auth.php, channels.php, user-monitoring.php
+tests/             Test Pest (Feature & Unit)
+docs/              Dokumentasi teknis (PROJECT_OVERVIEW.md, features/)
+```
+
+---
+
+## Troubleshooting
+
+**`Table 'users' doesn't exist` / migrasi berhenti di tengah**
+Jalankan ulang dari awal: `php artisan migrate:fresh --seed`. Pastikan database
+`webprogramming` sudah dibuat dan `DB_*` di `.env` benar.
+
+**Chat/multiplayer tidak real-time / countdown tak muncul di perangkat lain**
+1. Pastikan `php artisan reverb:start` berjalan.
+2. Kalau `REVERB_HOST` diubah (mis. ke IP LAN), **`npm run build` ulang** lalu
+   hard-refresh browser (`Ctrl+Shift+R`).
+3. Pastikan firewall mengizinkan port Reverb (default `8080`) untuk koneksi masuk.
+
+**Perubahan Blade/JS tak muncul**
+Bersihkan cache view: `php artisan view:clear`, lalu hard-refresh browser.
+
+**Login Google gagal**
+Isi kredensial Google OAuth di `.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+`GOOGLE_REDIRECT_URI`). Untuk uji lokal cepat, gunakan `/dev-login` saja.
+
+---
+
+*Untuk detail arsitektur, skema database lengkap, dan penjelasan tiap fitur beserta
+alasan desainnya, lihat [`docs/PROJECT_OVERVIEW.md`](docs/PROJECT_OVERVIEW.md) dan
+[`docs/features/`](docs/features/README.md).*
