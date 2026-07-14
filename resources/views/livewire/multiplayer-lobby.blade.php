@@ -250,9 +250,10 @@
                                 {{ __('multiplayer.start_race') }}
                             </button>
                         @elseif (!$this->isSpectator)
+                            @php $meReady = $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready; @endphp
                             <button wire:click="toggleReady"
-                                class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? 'bg-active text-background hover:bg-active-5' : 'bg-gold hover:bg-secondary-7 text-background' }}">
-                                {{ $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready ? __('multiplayer.im_not_ready') : __('multiplayer.im_ready') }}
+                                class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $meReady ? 'bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5' : 'bg-gold hover:bg-secondary-7 text-background' }}">
+                                {{ $meReady ? __('multiplayer.cancel_ready') : __('multiplayer.im_ready') }}
                             </button>
                         @else
                             <span class="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-border/40 bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider text-muted">

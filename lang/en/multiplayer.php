@@ -25,7 +25,7 @@ return [
     'start_race' => 'Start Race',
     'waiting_ready' => 'Waiting for all participants to be ready...',
     'im_ready' => "I'm Ready",
-    'im_not_ready' => "I'm Not Ready",
+    'cancel_ready' => 'Cancel Ready',
     'leave_room' => 'Leave Room',
 
     'sudden_death' => 'Sudden Death',

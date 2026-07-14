@@ -25,7 +25,7 @@ return [
     'start_race' => 'Mulai Balapan',
     'waiting_ready' => 'Menunggu semua peserta siap...',
     'im_ready' => 'Aku Siap',
-    'im_not_ready' => 'Aku Belum Siap',
+    'cancel_ready' => 'Batal Siap',
     'leave_room' => 'Keluar Ruang',
 
     'sudden_death' => 'Sudden Death',
