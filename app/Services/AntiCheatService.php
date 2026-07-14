@@ -18,7 +18,71 @@ class AntiCheatService
     private const MIN_CHARS_PER_SECOND = 0.5;
 
     /**
+     * Sinyal yang MUSTAHIL secara fisik: tak ada manusia yang bisa menghasilkannya,
+     * jadi ini indikasi manipulasi -- berlaku di semua mode, solo maupun race.
+     */
+    private const IMPOSSIBLE_REASONS = [
+        'wpm_too_high',
+        'char_count_inconsistent',
+        'accuracy_impossible',
+    ];
+
+    /** Sesi kosong: bukan sesi nyata, tak layak disimpan (tapi juga bukan "curang"). */
+    private const EMPTY_SESSION_REASONS = [
+        'no_input',
+        'duration_too_short',
+    ];
+
+    /**
+     * Apakah alasan-alasan ini menandakan MANIPULASI (bukan sekadar sesi lemah)?
+     *
+     * Dipakai jalur multiplayer: pemain yang menyerah / lambat tetap dicatat ke
+     * riwayat, hanya yang angkanya mustahil yang dibuang.
+     *
+     * @param  array<string>  $reasons
+     */
+    public function isCheating(array $reasons): bool
+    {
+        return ! empty(array_intersect($reasons, self::IMPOSSIBLE_REASONS));
+    }
+
+    /**
+     * Apakah hasil sesi SOLO harus ditolak (tak disimpan, tak dapat EXP)?
+     *
+     * Sengaja TIDAK memakai flag `valid` mentah. `valid` menjawab "apakah sesi ini
+     * lolos semua sanity-check", yang mencampur dua hal berbeda: kecurangan dan
+     * sekadar-lambat. Memakainya sebagai gerbang membuat PENGETIK LAMBAT SUNGGUHAN
+     * (throughput di bawah ambang, mis. pemula 5 WPM di mode time 60) kehilangan
+     * hasil dan EXP-nya -- persis kebalikan dari tujuan anti-cheat.
+     *
+     * Throughput rendah hanya bermakna curang di SURVIVAL, karena hanya di sanalah
+     * durasi adalah metrik papan peringkat: diam saja -> durasi panjang -> juara.
+     * Di time durasi sudah dikunci oleh mode; di words durasi panjang justru
+     * menurunkan WPM. Mengulur waktu di dua mode itu merugikan diri sendiri, jadi
+     * tak ada yang perlu dijaga.
+     *
+     * @param  array<string>  $reasons
+     * @param  string  $mode  'time' | 'words' | 'survival'
+     */
+    public function rejectsSoloResult(array $reasons, string $mode): bool
+    {
+        if ($this->isCheating($reasons)) {
+            return true;
+        }
+
+        if (! empty(array_intersect($reasons, self::EMPTY_SESSION_REASONS))) {
+            return true;
+        }
+
+        return $mode === 'survival'
+            && in_array('throughput_too_low', $reasons, true);
+    }
+
+    /**
      * Check a session for plausibility and return its recomputed metrics.
+     *
+     * Catatan: `valid` = "lolos SEMUA sanity-check". Itu bukan sinonim dari "tidak
+     * curang" -- untuk memutuskan tolak/terima, pakai rejectsSoloResult()/isCheating().
      *
      * @param  int  $correctChars  Correct characters (for Net WPM).
      * @param  int  $totalChars  All characters typed (for Raw WPM & accuracy).

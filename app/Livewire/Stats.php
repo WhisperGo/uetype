@@ -153,8 +153,20 @@ class Stats extends Component
      */
     private function multiplayerStats(int $userId): array
     {
-        $base = MultiplayerMatchHistory::where('user_id', $userId);
-        $total = (clone $base)->count();
+        // Enam angka, satu query (dulu: count/count/avg/max/avg = 5 query terpisah
+        // atas tabel & filter yang sama). Jumlah menang dihitung lewat SUM(CASE...),
+        // jadi tak perlu query kedua hanya untuk menyaring place = 1.
+        $agg = MultiplayerMatchHistory::where('user_id', $userId)
+            ->selectRaw('
+                COUNT(*) as total_races,
+                COALESCE(SUM(CASE WHEN place = 1 THEN 1 ELSE 0 END), 0) as wins,
+                AVG(wpm) as avg_wpm,
+                MAX(wpm) as best_wpm,
+                AVG(accuracy) as avg_accuracy
+            ')
+            ->first();
+
+        $total = (int) $agg->total_races;
 
         if ($total === 0) {
             return [
@@ -167,15 +179,15 @@ class Stats extends Component
             ];
         }
 
-        $wins = (clone $base)->where('place', 1)->count();
+        $wins = (int) $agg->wins;
 
         return [
             'total_races' => $total,
             'wins' => $wins,
             'win_rate' => (int) round(($wins / $total) * 100),
-            'avg_wpm' => (int) round((float) (clone $base)->avg('wpm')),
-            'best_wpm' => (int) (clone $base)->max('wpm'),
-            'avg_accuracy' => round((float) (clone $base)->avg('accuracy'), 1),
+            'avg_wpm' => (int) round((float) $agg->avg_wpm),
+            'best_wpm' => (int) $agg->best_wpm,
+            'avg_accuracy' => round((float) $agg->avg_accuracy, 1),
         ];
     }
 
@@ -225,16 +237,24 @@ class Stats extends Component
     public function render(AchievementService $achievements)
     {
         $user = Auth::user();
-        $base = TypingResult::where('user_id', $user->id);
 
-        $totalSeconds = (int) (clone $base)->sum('duration_seconds');
+        // Lima agregat atas tabel & filter yang PERSIS SAMA -> satu query, bukan lima.
+        $agg = TypingResult::where('user_id', $user->id)
+            ->selectRaw('
+                COUNT(*) as total_tests,
+                COALESCE(SUM(duration_seconds), 0) as total_seconds,
+                COALESCE(SUM(correct_chars), 0) as total_chars,
+                AVG(accuracy) as avg_accuracy,
+                AVG(net_wpm) as avg_wpm
+            ')
+            ->first();
 
         $activity = [
-            'total_seconds' => $totalSeconds,
-            'total_tests' => (clone $base)->count(),
-            'avg_accuracy' => round((float) (clone $base)->avg('accuracy'), 1),
-            'avg_wpm' => (int) round((float) (clone $base)->avg('net_wpm')),
-            'total_chars' => (int) (clone $base)->sum('correct_chars'),
+            'total_seconds' => (int) $agg->total_seconds,
+            'total_tests' => (int) $agg->total_tests,
+            'avg_accuracy' => round((float) $agg->avg_accuracy, 1),
+            'avg_wpm' => (int) round((float) $agg->avg_wpm),
+            'total_chars' => (int) $agg->total_chars,
         ];
 
         return view('livewire.stats', [

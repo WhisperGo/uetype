@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /*
@@ -44,7 +45,25 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Jumlah query yang dijalankan selama $callback. Dipakai untuk MENGUNCI budget
+ * query sebuah halaman: kalau nanti ada yang menambahkan N+1, test-nya gagal.
+ *
+ * Bukan sekadar alat ukur sekali pakai -- ini jaring pengaman permanen terhadap
+ * regresi performa, yang tak bisa ditangkap oleh test fungsional biasa (halaman
+ * dengan 500 query tetap "lulus" kalau outputnya benar).
+ */
+function countQueries(Closure $callback): int
 {
-    // ..
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    try {
+        $callback();
+
+        return count(DB::getQueryLog());
+    } finally {
+        DB::disableQueryLog();
+        DB::flushQueryLog();
+    }
 }

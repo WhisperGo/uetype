@@ -256,27 +256,22 @@ class Friends extends Component
 
         $me = Auth::user();
 
-        return User::where('id', '!=', $me->id)
+        $candidates = User::where('id', '!=', $me->id)
             ->where('username', 'like', '%'.$term.'%')
             ->orderBy('username')
             ->limit(15)
-            ->get()
-            ->map(function (User $u) use ($me) {
-                $friendship = $me->friendshipWith($u->id);
+            ->get();
 
-                $relation = 'none';
-                $friendshipId = $friendship?->id;
+        // Status relasi untuk SEMUA kandidat dalam satu query. Dulu friendshipWith()
+        // dipanggil per baris -> 15 hasil pencarian = 15 query, tiap kali user mengetik
+        // di kotak cari.
+        $relations = Friendship::relationMapFor($me->id, $candidates->pluck('id')->all());
 
-                if ($friendship) {
-                    if ($friendship->status === FriendshipStatus::Accepted) {
-                        $relation = 'friends';
-                    } elseif ($friendship->status === FriendshipStatus::Pending) {
-                        $relation = $friendship->requester_id === $me->id ? 'sent' : 'incoming';
-                    }
-                }
-
-                return ['user' => $u, 'relation' => $relation, 'friendship_id' => $friendshipId];
-            });
+        return $candidates->map(fn (User $u) => [
+            'user' => $u,
+            'relation' => $relations[$u->id]['relation'] ?? 'none',
+            'friendship_id' => $relations[$u->id]['friendship_id'] ?? null,
+        ]);
     }
 
     public function render()

@@ -9,10 +9,12 @@ use App\Models\MultiplayerMatchHistory;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Services\AntiCheatService;
+use App\Services\TextGeneratorService;
 use App\Support\SafeBroadcast;
+use App\Support\TypingLanguage;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -74,39 +76,23 @@ class MultiplayerLobby extends Component
 
         $this->roomCode = $code;
         $this->step = 'waiting';
+        $this->forgetRoomCache();
 
         $this->dispatch('subscribe-room', room: $code);
     }
 
-    /** Merakit kalimat acak dari wordlist JSON (dipakai createRoom() dan playAgain()). */
+    /**
+     * Teks satu balapan. Dulu method ini merakit sendiri dari wordlist -- salinan
+     * logika TypingEngine, tapi HARDCODE indonesian.json. Akibatnya multiplayer tak
+     * pernah mendukung bahasa Inggris, padahal solo mendukung; itu bug fitur yang
+     * lahir dari duplikasi kode. Sekarang keduanya memakai TextGeneratorService yang
+     * sama, jadi bahasa konten pemain ikut dihormati di sini.
+     */
     private function generateRaceText(): string
     {
-        $textToType = "And i know we were perfect but i never felt this way for no one and i just can't imagine how you could be so okay now that I gone guess you did mean what you wrote in that song about me cause you said forever now i drive alone past";
-
-        $path = base_path('database/data/indonesian.json');
-
-        if (File::exists($path)) {
-            $jsonString = File::get($path);
-            $data = json_decode($jsonString, true);
-
-            if (is_array($data) && isset($data['words']) && is_array($data['words'])) {
-                $wordsArray = $data['words'];
-                shuffle($wordsArray);
-
-                $limit = 45;
-                $selectedWords = [];
-
-                while (count($selectedWords) < $limit) {
-                    shuffle($wordsArray);
-                    $needed = $limit - count($selectedWords);
-                    $selectedWords = array_merge($selectedWords, array_slice($wordsArray, 0, $needed));
-                }
-
-                $textToType = implode(' ', $selectedWords);
-            }
-        }
-
-        return $textToType;
+        return app(TextGeneratorService::class)->forRace(
+            TypingLanguage::resolve(session('typing_preferences')['contentLang'] ?? null)
+        );
     }
 
     public function joinRoom(): void
@@ -146,6 +132,7 @@ class MultiplayerLobby extends Component
 
         $this->roomCode = $code;
         $this->step = 'waiting';
+        $this->forgetRoomCache();
 
         $this->dispatch('subscribe-room', room: $code);
 
@@ -155,6 +142,10 @@ class MultiplayerLobby extends Component
     #[On('room-updated')]
     public function roomUpdated()
     {
+        // Event ini dipicu perubahan dari pemain LAIN -> apa pun yang sempat
+        // ter-cache di request ini sudah basi.
+        $this->forgetRoomCache();
+
         $room = Room::where('code', $this->roomCode)->first();
 
         // Room hilang (host keluar / room dibubarkan): kembalikan pemain yang
@@ -237,7 +228,11 @@ class MultiplayerLobby extends Component
                         'player_count' => $members->count(),
                         'wpm' => (int) $member->wpm,
                         'accuracy' => (float) $member->accuracy,
-                        'finished_time_seconds' => $member->finished_time_seconds,
+                        // Sentinel DNF (999) TAK BOLEH lewat ke riwayat permanen: di sini
+                        // kolomnya bermakna "durasi tempuh", dan 999 akan dibaca sebagai
+                        // durasi sungguhan oleh statistik apa pun yang merata-ratakannya.
+                        'finished_time_seconds' => $member->realFinishedSeconds(),
+                        'dnf' => $member->isDnf(),
                         'xp_earned' => $xp,
                     ]);
                 } else {
@@ -249,6 +244,41 @@ class MultiplayerLobby extends Component
 
             $member->update($updateData);
         }
+
+        // place/xp/result_recorded baru saja berubah -> snapshot & view harus membaca ulang.
+        $this->forgetRoomCache();
+    }
+
+    /**
+     * Nyalakan timer sudden death kalau belum menyala. Mengembalikan true HANYA pada
+     * pemanggilan yang benar-benar menyalakannya (pemanggil itulah yang broadcast).
+     *
+     * Syaratnya cuma satu -- "timer belum menyala" -- dan sengaja TIDAK bertanya
+     * "apakah saya pemain pertama yang finish". Pertanyaan kedua itu dulu ikut jadi
+     * syarat, dan berbahaya: hitungan finish dibaca SEBELUM status finish pemain ini
+     * ditulis, jadi kalau sudah ada yang tercatat finish tapi timer belum sempat
+     * menyala, pemain berikutnya gagal syarat "pertama" -> timer tak pernah menyala
+     * -> checkSuddenDeath() selalu return -> pemain sisa menggantung selamanya.
+     *
+     * Update bersyarat `whereNull(...)` membuatnya atomik: dari dua request paralel,
+     * hanya satu yang dapat affected-rows = 1, jadi timer tak bisa di-reset oleh
+     * pemain kedua. Pola yang sama dipakai TypingEngine::attachToWarClaim().
+     */
+    private function startSuddenDeathIfNeeded(Room $room): bool
+    {
+        $claimed = Room::where('id', $room->id)
+            ->whereNull('countdown_started_at')
+            ->update(['countdown_started_at' => now()]);
+
+        if (! $claimed) {
+            return false;
+        }
+
+        // Muat ulang supaya pemanggil bisa membaca countdown_started_at yang baru
+        // (dipakai untuk menghitung deadline yang di-broadcast).
+        $room->refresh();
+
+        return true;
     }
 
     /**
@@ -262,10 +292,12 @@ class MultiplayerLobby extends Component
     {
         $duration = (float) ($member->finished_time_seconds ?? 0);
 
-        $reasons = app(AntiCheatService::class)
-            ->check($correctChars, $correctChars, $duration)['reasons'];
+        $antiCheat = app(AntiCheatService::class);
+        $reasons = $antiCheat->check($correctChars, $correctChars, $duration)['reasons'];
 
-        return empty(array_intersect($reasons, ['wpm_too_high', 'char_count_inconsistent']));
+        // Daftar sinyal "mustahil" hidup di AntiCheatService, bukan disalin ke sini:
+        // satu definisi kecurangan, dipakai race maupun solo.
+        return ! $antiCheat->isCheating($reasons);
     }
 
     public function toggleReady(): void
@@ -282,6 +314,8 @@ class MultiplayerLobby extends Component
             $member->update([
                 'is_ready' => ! $member->is_ready,
             ]);
+
+            $this->forgetRoomCache();
 
             SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
         }
@@ -339,6 +373,8 @@ class MultiplayerLobby extends Component
         $this->showResultModal = false;
         $this->hasGivenUp = false;
         $this->resultSnapshot = [];
+
+        $this->forgetRoomCache();
     }
 
     /**
@@ -377,13 +413,13 @@ class MultiplayerLobby extends Component
         // Rumus Net WPM sama persis dengan mode solo (satu sumber kebenaran).
         // totalChars = correctChars: progress hanya naik dari karakter benar, jadi net WPM
         // tak bisa dipompa dengan ketik ngasal.
-        $wpmCheck = app(AntiCheatService::class)->check($correctChars, $correctChars, $durationSeconds);
+        $antiCheat = app(AntiCheatService::class);
+        $wpmCheck = $antiCheat->check($correctChars, $correctChars, $durationSeconds);
 
         // Yang MENOLAK hanyalah sinyal mustahil (WPM > batas manusiawi / karakter tak
         // konsisten). Throughput rendah / durasi pendek itu keadaan wajar di awal & pemain
         // lambat -- WPM-nya memang kecil, bukan curang -- jadi angkanya dipakai apa adanya.
-        $cheatReasons = array_intersect($wpmCheck['reasons'], ['wpm_too_high', 'char_count_inconsistent']);
-        $netWpm = empty($cheatReasons) ? (int) round($wpmCheck['net_wpm']) : 0;
+        $netWpm = $antiCheat->isCheating($wpmCheck['reasons']) ? 0 : (int) round($wpmCheck['net_wpm']);
 
         $updateData = [
             'progress_percent' => $progressPercent,
@@ -408,17 +444,12 @@ class MultiplayerLobby extends Component
 
             $updateData['place'] = $alreadyFinishedCount + 1;
 
-            if ($alreadyFinishedCount === 0 && ! $room->countdown_started_at) {
-                $room->update([
-                    'countdown_started_at' => now(),
-                ]);
-                $room->refresh();
-                $suddenDeathJustStarted = true;
-            }
+            $suddenDeathJustStarted = $this->startSuddenDeathIfNeeded($room);
             $this->hasFinished = true;
         }
 
         $member->update($updateData);
+        $this->forgetRoomCache();
 
         // Gerakan maskot lawan: payload langsung lewat WebSocket (channel race.{code}),
         // klien lain cukup baca & geser maskot di Alpine store tanpa round-trip server.
@@ -473,16 +504,14 @@ class MultiplayerLobby extends Component
             ->count();
 
         $member->update([
-            'finished_time_seconds' => 999,
+            'finished_time_seconds' => RoomMember::DNF_SENTINEL_SECONDS,
             'place' => $alreadyFinishedCount + 1,
         ]);
+        $this->forgetRoomCache();
 
         $this->hasGivenUp = true;
 
-        if ($alreadyFinishedCount === 0 && ! $room->countdown_started_at) {
-            $room->update(['countdown_started_at' => now()]);
-            $room->refresh();
-
+        if ($this->startSuddenDeathIfNeeded($room)) {
             SafeBroadcast::run(fn () => broadcast(new SuddenDeathTriggered(
                 $this->roomCode,
                 $room->countdown_started_at->copy()->addSeconds(self::SUDDEN_DEATH_SECONDS)->toIso8601String(),
@@ -527,8 +556,10 @@ class MultiplayerLobby extends Component
             RoomMember::where('room_id', $room->id)
                 ->whereNull('finished_time_seconds')
                 ->update([
-                    'finished_time_seconds' => 999, // Penanda DNF (Did Not Finish)
+                    'finished_time_seconds' => RoomMember::DNF_SENTINEL_SECONDS,
                 ]);
+
+            $this->forgetRoomCache();
 
             $this->finalizeRace($room->id);
             $this->showResultModal = true;
@@ -570,11 +601,26 @@ class MultiplayerLobby extends Component
             $this->hasFinished = false;
             $this->resultSnapshot = [];
 
+            $this->forgetRoomCache();
+
             SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
         }
     }
 
-    public function getRoomDataProperty(): ?Room
+    /**
+     * Room + member + host, sekali muat per request.
+     *
+     * #[Computed] wajib di sini: properti ini dibaca dari SEMBILAN tempat berbeda
+     * (orderedMembers, isHost, allReady, suddenDeathActive, suddenDeathRemaining,
+     * raceStartsAt, raceStartsInMs, myXpResult, captureResultSnapshot) plus view.
+     * Getter gaya lama tak di-cache Livewire, jadi query dengan eager-load ini
+     * dijalankan ulang tiap kali dibaca -- di komponen yang polling saat balapan.
+     *
+     * Cache-nya dibuang lewat forgetRoomCache() setiap kali komponen ini mengubah
+     * room/room_members, supaya render setelah aksi tak memakai data basi.
+     */
+    #[Computed]
+    public function roomData(): ?Room
     {
         if (
             ($this->step !== 'waiting' && $this->step !== 'racing')
@@ -596,6 +642,12 @@ class MultiplayerLobby extends Component
         return $room;
     }
 
+    /** Buang cache room setelah room/room_members berubah di request ini. */
+    private function forgetRoomCache(): void
+    {
+        unset($this->roomData, $this->leaderboardData);
+    }
+
     public function getOrderedMembersProperty()
     {
         $room = $this->roomData;
@@ -610,13 +662,23 @@ class MultiplayerLobby extends Component
             ->values();
     }
 
-    public function getLeaderboardDataProperty()
+    /**
+     * Papan hasil balapan, terurut.
+     *
+     * with('user') itu wajib: query ini memuat ULANG members (bukan memakai yang sudah
+     * di-eager-load di roomData), dan captureResultSnapshot() membaca $member->user
+     * untuk tiap baris -- tanpa eager load itu satu query per pemain. Terjaring oleh
+     * Model::preventLazyLoading(), bukan oleh mata.
+     */
+    #[Computed]
+    public function leaderboardData()
     {
         if (! $this->roomData) {
-            return [];
+            return collect();
         }
 
         return $this->roomData->members()
+            ->with('user')
             ->orderBy('wpm', 'desc')
             ->orderBy('progress_percent', 'desc')
             ->orderByRaw('finished_time_seconds IS NULL, finished_time_seconds ASC')
@@ -803,6 +865,8 @@ class MultiplayerLobby extends Component
         $this->showResultModal = false;
         $this->hasGivenUp = false;
         $this->resultSnapshot = [];
+
+        $this->forgetRoomCache();
 
         // toOthers(): host SUDAH masuk 'racing' di baris atas. Tanpa ini host ikut
         // menerima room.updated-nya sendiri -> Livewire re-render di tengah hitung

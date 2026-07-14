@@ -7,12 +7,13 @@ use App\Models\ClanWarFixedText;
 use App\Models\ClanWarModeClaim;
 use App\Models\TypingResult;
 use App\Models\User;
+use App\Services\AchievementService;
 use App\Services\AntiCheatService;
 use App\Services\ClanWarScorer;
+use App\Services\TextGeneratorService;
 use App\Support\TypingLanguage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -285,10 +286,18 @@ class TypingEngine extends Component
         );
     }
 
-    // Ganti bahasa konten yang diketik, terpisah dari bahasa UI. Boleh kapan saja,
-    // termasuk saat war-lock (tak mengubah mode/skor).
+    // Ganti bahasa konten yang diketik, terpisah dari bahasa UI.
     public function setContentLang($lang)
     {
+        // War-lock: teks tak boleh di-reroll saat war attempt. restart() sudah menutup
+        // jalur "refresh sampai dapat kata pendek", tapi generateText() juga terpanggil
+        // dari sini -- tanpa gerbang ini pemain tinggal bolak-balik ganti bahasa untuk
+        // mengacak ulang teksnya, celah yang sama persis lewat pintu lain. Sekali klaim,
+        // satu teks, satu kesempatan.
+        if ($this->warClaimId !== null && $this->resolveWarClaim()) {
+            return;
+        }
+
         $this->contentLang = TypingLanguage::resolve($lang);
 
         session()->put('typing_preferences', [
@@ -347,43 +356,12 @@ class TypingEngine extends Component
             }
         }
 
-        {
-            // Time/words/survival: teks dirakit acak dari wordlist JSON sesuai bahasa konten.
-            $this->textId = null;
+        // Time/words/survival: teks dirakit acak dari wordlist sesuai bahasa konten.
+        // (textId selalu null -- teks ini tak berasal dari tabel `texts`.)
+        $this->textId = null;
 
-            $path = TypingLanguage::wordlistPath($this->contentLang);
-
-            if (File::exists($path)) {
-                $jsonString = File::get($path);
-                $data = json_decode($jsonString, true);
-
-                if (is_array($data) && isset($data['words']) && is_array($data['words'])) {
-                    $wordsArray = $data['words'];
-                    shuffle($wordsArray);
-
-                    // words = jumlah yang dipilih; survival butuh stok panjang (tanpa batas
-                    // waktu/kata); time cukup 350 kata.
-                    $limit = match ($this->mainMode) {
-                        'words' => (int) $this->subMode,
-                        'survival' => 500,
-                        default => 350,
-                    };
-
-                    $selectedWords = [];
-                    while (count($selectedWords) < $limit) {
-                        shuffle($wordsArray);
-                        $needed = $limit - count($selectedWords);
-                        $selectedWords = array_merge($selectedWords, array_slice($wordsArray, 0, $needed));
-                    }
-
-                    $this->textToType = mb_strtolower(implode(' ', $selectedWords));
-                } else {
-                    $this->textToType = 'error: struktur file json tidak valid';
-                }
-            } else {
-                $this->textToType = 'error: file wordlist tidak ditemukan';
-            }
-        }
+        $this->textToType = app(TextGeneratorService::class)
+            ->forSoloMode($this->mainMode, (string) $this->subMode, $this->contentLang);
     }
 
     public function saveResult(
@@ -417,7 +395,9 @@ class TypingEngine extends Component
 
         // Server hitung ulang WPM/akurasi dari karakter & durasi (bukan percaya client);
         // sesi yang tak masuk akal ditolak, bukan disimpan.
-        $check = app(AntiCheatService::class)->check(
+        $antiCheat = app(AntiCheatService::class);
+
+        $check = $antiCheat->check(
             $correctKeystrokes,
             $totalKeystrokes,
             $duration,
@@ -428,8 +408,11 @@ class TypingEngine extends Component
         $finalRawWpm = $check['raw_wpm'];
         $finalAccuracy = $check['accuracy'];
 
-        // Sesi tidak valid: tolak, jangan simpan/beri EXP/naikkan rekor.
-        if (! $check['valid']) {
+        // Tolak hanya yang MEMANG layak ditolak (curang / sesi kosong / ngulur waktu di
+        // survival). Dulu gerbangnya `! $check['valid']`, yang ikut membuang hasil
+        // PENGETIK LAMBAT sungguhan -- throughput rendah itu lambat, bukan curang, dan
+        // di time/words durasi tak bisa dipompa untuk keuntungan apa pun.
+        if ($antiCheat->rejectsSoloResult($check['reasons'], $this->mainMode)) {
             session()->flash('result_rejected', __('typing.result_rejected'));
 
             return $this->redirect(route('typing'), navigate: true);
@@ -500,7 +483,14 @@ class TypingEngine extends Component
             });
 
             // Snapshot setelah XP masuk: level & progres untuk ditampilkan di halaman result.
-            $levelData = $user->fresh()->levelData();
+            $user = $user->fresh();
+            $levelData = $user->levelData();
+
+            // Catat achievement DI SINI -- di titik prestasinya benar-benar terjadi.
+            // Dulu pencatatan menumpang render halaman Stats/Achievements, jadi pemain
+            // yang tak pernah membukanya tak pernah tercatat, dan halaman GET jadi
+            // punya efek samping tulis.
+            app(AchievementService::class)->syncUnlocks($user);
         }
 
         // Ghost Mode: perbandingan ghost-vs-player efemeral (session-only), tidak ditulis

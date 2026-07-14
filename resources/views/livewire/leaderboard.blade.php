@@ -53,74 +53,99 @@ $sendRequest = function (int $userId) {
     FriendshipUpdated::dispatch($userId, $payload);
 };
 
-$leaderboard = computed(function () {
-    $metric = ($this->currentTab === 'survival') ? 'duration_seconds' : 'net_wpm';
+// Metrik peringkat per tab: survival dinilai dari LAMA BERTAHAN, mode lain dari WPM.
+$metricFor = fn (string $tab) => $tab === 'survival' ? 'duration_seconds' : 'net_wpm';
 
-    $subQuery = TypingResult::select('user_id', DB::raw("MAX({$metric}) as best_score"))
-        ->where('mode', $this->currentTab)
-        ->where('mode_config', $this->currentConfig);
+// Filter dasar (mode + config + timeframe aktif). Satu sumber kebenaran yang
+// dipakai papan DAN perhitungan rank, supaya keduanya tak mungkin memfilter
+// dengan aturan yang berbeda.
+//
+// State dioper eksplisit sebagai argumen, bukan lewat $this: closure biasa di
+// Volt TIDAK di-bind ke komponen (hanya action & computed yang di-bind), jadi
+// $this di sini akan fatal.
+$scoped = function (string $tab, string $config, string $timeframe) {
+    $q = TypingResult::where('mode', $tab)->where('mode_config', $config);
 
-    if ($this->timeframe === 'daily') {
-        $subQuery->where('created_at', '>=', now()->startOfDay());
+    if ($timeframe === 'daily') {
+        $q->where('created_at', '>=', now()->startOfDay());
     }
 
-    $subQuery->groupBy('user_id');
+    return $q;
+};
 
+// Rekor terbaik per user di scope aktif.
+$bestPerUser = fn (string $metric, string $tab, string $config, string $timeframe) => $scoped($tab, $config, $timeframe)
+    ->select('user_id', DB::raw("MAX({$metric}) as best_score"))
+    ->groupBy('user_id');
+
+$leaderboard = computed(function () use ($metricFor, $bestPerUser) {
+    $metric = $metricFor($this->currentTab);
+
+    // GROUP BY di query LUAR itu wajib, bukan hiasan: join mencocokkan
+    // `tr.{metric} = pb.best_score`, jadi user yang punya DUA hasil dengan skor
+    // identik (mudah terjadi -- net_wpm cuma 2 desimal) akan menghasilkan dua
+    // baris, menggandakan dirinya di papan DAN menggeser pemain lain keluar dari
+    // top 10. Grouping menjamin satu baris per user secara struktural.
     $rows = TypingResult::from('typing_results as tr')
-        ->joinSub($subQuery, 'pb', function ($join) use ($metric) {
+        ->joinSub($bestPerUser($metric, $this->currentTab, $this->currentConfig, $this->timeframe), 'pb', function ($join) use ($metric) {
             $join->on('tr.user_id', '=', 'pb.user_id')
                  ->on("tr.{$metric}", '=', 'pb.best_score');
         })
         ->join('users', 'tr.user_id', '=', 'users.id')
-        ->select('users.username', 'users.avatar', 'tr.user_id', DB::raw("pb.best_score as score"), 'tr.accuracy')
+        ->groupBy('tr.user_id', 'users.username', 'users.avatar', 'pb.best_score')
+        ->select(
+            'tr.user_id',
+            'users.username',
+            'users.avatar',
+            DB::raw('pb.best_score as score'),
+            // Akurasi dari sesi rekornya; kalau beberapa sesi seri di skor yang
+            // sama, ambil yang paling akurat sebagai pemecah seri.
+            DB::raw('MAX(tr.accuracy) as accuracy'),
+        )
         ->orderBy('score', 'desc')
-        ->orderBy('tr.accuracy', 'desc')
+        ->orderBy('accuracy', 'desc')
         ->limit(10)
         ->get();
 
     $me = Auth::user();
 
-    return $rows->map(function ($row) use ($me) {
-        $relation = 'none';
+    if (! $me) {
+        return $rows->each(fn ($row) => $row->relation = 'none');
+    }
 
-        if ($me && (int) $row->user_id !== $me->id) {
-            $friendship = $me->friendshipWith((int) $row->user_id);
+    // Status relasi untuk SEMUA baris dalam satu query (dulu: satu query per
+    // baris lewat friendshipWith() -> 10 query tiap ganti tab/config).
+    $relations = Friendship::relationMapFor($me->id, $rows->pluck('user_id')->all());
 
-            if ($friendship) {
-                if ($friendship->status === FriendshipStatus::Accepted) {
-                    $relation = 'friends';
-                } elseif ($friendship->status === FriendshipStatus::Pending) {
-                    $relation = $friendship->requester_id === $me->id ? 'sent' : 'incoming';
-                }
-            }
-        }
-
-        $row->relation = $relation;
-
-        return $row;
+    return $rows->each(function ($row) use ($relations) {
+        $row->relation = $relations[(int) $row->user_id]['relation'] ?? 'none';
     });
 });
 
-$userRank = computed(function () {
+$userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
     if (!Auth::check()) return null;
 
-    $metric = ($this->currentTab === 'survival') ? 'duration_seconds' : 'net_wpm';
+    $metric = $metricFor($this->currentTab);
 
-    $rankQuery = TypingResult::select('user_id', DB::raw("MAX({$metric}) as best_score"))
-        ->where('mode', $this->currentTab)
-        ->where('mode_config', $this->currentConfig);
+    // Rekor SAYA di mode/config ini. Belum pernah main -> tak punya peringkat.
+    $myBest = $scoped($this->currentTab, $this->currentConfig, $this->timeframe)
+        ->where('user_id', Auth::id())
+        ->max($metric);
 
-    if ($this->timeframe === 'daily') {
-        $rankQuery->where('created_at', '>=', now()->startOfDay());
+    if ($myBest === null) {
+        return 'Unranked';
     }
 
-    $ranks = $rankQuery->groupBy('user_id')
-        ->orderBy('best_score', 'desc')
-        ->pluck('user_id')
-        ->toArray();
+    // Peringkat = jumlah user yang rekornya LEBIH TINGGI dari rekor saya, + 1.
+    // Dihitung DI DATABASE lewat COUNT: yang kembali ke PHP cuma satu angka.
+    // (Dulu: pluck() menarik SATU BARIS PER USER ke memori PHP lalu array_search
+    //  -- 10.000 user = 10.000 baris ditarik, setiap kali user ganti tab.)
+    $better = DB::query()
+        ->fromSub($bestPerUser($metric, $this->currentTab, $this->currentConfig, $this->timeframe), 'pb')
+        ->where('pb.best_score', '>', $myBest)
+        ->count();
 
-    $index = array_search(Auth::id(), $ranks);
-    return $index !== false ? $index + 1 : 'Unranked';
+    return $better + 1;
 });
 
 ?>

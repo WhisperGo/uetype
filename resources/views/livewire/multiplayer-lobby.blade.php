@@ -641,7 +641,7 @@
                                     <td class="py-4 px-3 sm:px-5 text-gold font-bold">{{ $rank->wpm }} wpm</td>
                                     <td class="py-4 px-5">{{ $rank->accuracy ?? 97.0 }}%</td>
                                     <td class="py-4 px-5">
-                                        @if ($rank->finished_time_seconds && $rank->finished_time_seconds != 999)
+                                        @if ($rank->finished_time_seconds && $rank->finished_time_seconds != \App\Models\RoomMember::DNF_SENTINEL_SECONDS)
                                             {{ sprintf('%02d:%02d', floor($rank->finished_time_seconds / 60), $rank->finished_time_seconds % 60) }}
                                         @else
                                             {{-- DNF: jangan tampilkan waktu palsu. --}}

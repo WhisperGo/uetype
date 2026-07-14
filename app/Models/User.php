@@ -8,6 +8,8 @@ use App\Events\PresenceUpdated;
 use App\Support\SafeBroadcast;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -251,31 +253,47 @@ class User extends Authenticatable
      * Tak ada kolom clan_id di tabel users -- keanggotaan diturunkan lewat
      * pivot clan_members, mengikuti pola currentRoom() di atas.
      */
-    public function clanMembership(): ?ClanMember
+    public function activeClanMembership(): HasOne
     {
-        return ClanMember::where('user_id', $this->id)
-            ->where('status', ClanMemberStatus::Active)
-            ->first();
+        return $this->hasOne(ClanMember::class)
+            ->where('status', ClanMemberStatus::Active);
     }
 
     /**
-     * Accessor (BUKAN relasi) supaya $user->clan di profile view mengembalikan
-     * clan aktif user ini. Harus lewat accessor, bukan method clan(): Eloquent
-     * memperlakukan $user->clan sebagai magic-property lookup yang jatuh ke
-     * __call('clan', []) kalau ada method bernama sama, lalu memvalidasi hasilnya
-     * HARUS instance Relation -- jadi method biasa akan meledak di sini.
+     * Clan aktif user ini, lewat pivot clan_members.
+     *
+     * RELASI SEJATI, bukan accessor. Dulu ini `getClanAttribute()` yang memanggil
+     * method biasa `clanMembership()`, dan itu punya dua akibat buruk:
+     *
+     *  1. TAK ADA CACHE. Tiap kali `$user->clan` (atau `$user->clan_role`) dibaca,
+     *     query-nya jalan LAGI. layouts/app.blade.php membacanya dua kali di layout
+     *     global -> 4 query tambahan di SETIAP halaman situs.
+     *  2. MUSTAHIL DI-EAGER-LOAD. `User::with('clan')` akan meledak, karena Eloquent
+     *     menuntut sebuah instance Relation. Jadi daftar user mana pun yang
+     *     menampilkan clan otomatis N+1, tanpa cara apa pun untuk menghindarinya.
+     *
+     * Sebagai relasi, Eloquent menyimpan hasilnya di $relations setelah akses
+     * pertama (jadi berkali-kali dibaca = satu query) DAN `with('clan')` bekerja.
      */
-    public function getClanAttribute(): ?Clan
+    public function clan(): HasOneThrough
     {
-        return $this->clanMembership()?->clan;
+        return $this->hasOneThrough(
+            Clan::class,
+            ClanMember::class,
+            'user_id',   // FK di clan_members -> users
+            'id',        // PK di clans
+            'id',        // PK lokal di users
+            'clan_id',   // FK di clan_members -> clans
+        )->where('clan_members.status', ClanMemberStatus::Active);
     }
 
     /**
      * Accessor supaya $user->clan_role dipakai apa adanya di profile view
      * tanpa kolom tersimpan -- diturunkan dari role pada clan_members.
+     * Membaca lewat relasi activeClanMembership, jadi ikut ter-cache.
      */
     public function getClanRoleAttribute(): ?string
     {
-        return $this->clanMembership()?->role?->value;
+        return $this->activeClanMembership?->role?->value;
     }
 }
