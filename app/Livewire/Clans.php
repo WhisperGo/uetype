@@ -11,6 +11,7 @@ use App\Support\ClanEmblem;
 use App\Support\SafeBroadcast;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -53,14 +54,31 @@ class Clans extends Component
         }
     }
 
-    /** Listener Echo clan.{me}; body kosong karena action apa pun memicu re-render. */
+    /**
+     * Listener Echo clan.{me}: perubahan datang dari user LAIN (mis. leader menyetujui
+     * permintaan gabung saya), jadi cache computed harus dibuang -- kalau tidak,
+     * re-render-nya cuma memutar ulang data lama dari request ini.
+     */
     #[On('clan-updated')]
     public function refreshClan(): void
     {
-        //
+        $this->forgetClanCache();
     }
 
     // ---- AKSI ----
+
+    /**
+     * Buang cache computed setelah keanggotaan berubah.
+     *
+     * #[Computed] menge-cache per REQUEST, dan view dirender SESUDAH aksi jalan --
+     * jadi tanpa ini, aksi yang mengubah keanggotaan (buat/gabung/keluar/approve)
+     * akan dirender ulang memakai nilai basi dari sebelum perubahan. Harus dipanggil
+     * di setiap aksi yang menyentuh clan_members.
+     */
+    private function forgetClanCache(): void
+    {
+        unset($this->myMembership, $this->myClan, $this->myClanMembers, $this->pendingRequests, $this->browseClans);
+    }
 
     public function createClan(): void
     {
@@ -103,6 +121,8 @@ class Clans extends Component
         $this->newEmblem = ClanEmblem::DEFAULT_ICON;
         $this->newEmblemColor = ClanEmblem::DEFAULT_COLOR;
         $this->tab = 'my-clan';
+
+        $this->forgetClanCache();
     }
 
     public function sendJoinRequest(int $clanId): void
@@ -132,6 +152,8 @@ class Clans extends Component
             'status' => ClanMemberStatus::Pending,
         ]);
 
+        $this->forgetClanCache();
+
         $this->notify($clan->leader_id, [
             'type' => 'request',
             'message' => Auth::user()->username.' meminta bergabung ke '.$clan->name,
@@ -153,6 +175,8 @@ class Clans extends Component
 
         $member->update(['status' => ClanMemberStatus::Active]);
 
+        $this->forgetClanCache();
+
         $this->notify($member->user_id, [
             'type' => 'accepted',
             'message' => 'Permintaanmu bergabung ke '.$member->clan->name.' diterima',
@@ -168,6 +192,8 @@ class Clans extends Component
 
         $userId = $member->user_id;
         $member->delete();
+
+        $this->forgetClanCache();
 
         $this->notify($userId);
     }
@@ -187,6 +213,8 @@ class Clans extends Component
         $userId = $member->user_id;
         $member->delete();
 
+        $this->forgetClanCache();
+
         $this->notify($userId);
     }
 
@@ -204,6 +232,8 @@ class Clans extends Component
 
         $leaderId = $membership->clan->leader_id;
         $membership->delete();
+
+        $this->forgetClanCache();
 
         $this->notify($leaderId);
     }
@@ -223,8 +253,16 @@ class Clans extends Component
     }
 
     // ---- DATA (computed) ----
+    //
+    // #[Computed] penting di sini, bukan kosmetik: getter gaya lama
+    // (getMyMembershipProperty) TIDAK di-cache Livewire, jadi query yang sama
+    // dijalankan ulang tiap kali propertinya dibaca. myMembership dibaca dari
+    // mount(), createClan(), myClan, myClanMembers, pendingRequests, dan view --
+    // 5-6 query identik per render. #[Computed] menge-cache-nya per request.
+    // Nama akses di view tak berubah ($this->myClan), jadi tak ada view yang perlu disentuh.
 
-    public function getMyMembershipProperty(): ?ClanMember
+    #[Computed]
+    public function myMembership(): ?ClanMember
     {
         return ClanMember::with('clan')
             ->where('user_id', Auth::id())
@@ -232,12 +270,14 @@ class Clans extends Component
             ->first();
     }
 
-    public function getMyClanProperty(): ?Clan
+    #[Computed]
+    public function myClan(): ?Clan
     {
         return $this->myMembership?->clan;
     }
 
-    public function getMyClanMembersProperty()
+    #[Computed]
+    public function myClanMembers()
     {
         if (! $this->myClan) {
             return collect();
@@ -246,7 +286,8 @@ class Clans extends Component
         return $this->myClan->activeMembers()->with('user')->orderBy('role')->get();
     }
 
-    public function getPendingRequestsProperty()
+    #[Computed]
+    public function pendingRequests()
     {
         if (! $this->myClan || $this->myMembership->role !== ClanRole::Leader) {
             return collect();
@@ -259,7 +300,8 @@ class Clans extends Component
             ->get();
     }
 
-    public function getBrowseClansProperty()
+    #[Computed]
+    public function browseClans()
     {
         $term = trim($this->search);
 
@@ -269,19 +311,26 @@ class Clans extends Component
             $query->where('name', 'like', '%'.$term.'%');
         }
 
-        return $query->orderBy('name')->limit(20)->get()
-            ->map(function (Clan $clan) {
-                $membership = ClanMember::where('clan_id', $clan->id)
-                    ->where('user_id', Auth::id())
-                    ->first();
+        $clans = $query->orderBy('name')->limit(20)->get();
 
-                $relation = 'none';
-                if ($membership) {
-                    $relation = $membership->status === ClanMemberStatus::Active ? 'member' : 'pending';
-                }
+        // Status keanggotaan SAYA untuk semua clan sekaligus (dulu: satu query per
+        // baris -> 20 clan = 20 query hanya untuk memilih label tombolnya).
+        $myMemberships = ClanMember::where('user_id', Auth::id())
+            ->whereIn('clan_id', $clans->pluck('id'))
+            ->get()
+            ->keyBy('clan_id');
 
-                return ['clan' => $clan, 'relation' => $relation];
-            });
+        return $clans->map(function (Clan $clan) use ($myMemberships) {
+            $membership = $myMemberships->get($clan->id);
+
+            $relation = match (true) {
+                $membership === null => 'none',
+                $membership->status === ClanMemberStatus::Active => 'member',
+                default => 'pending',
+            };
+
+            return ['clan' => $clan, 'relation' => $relation];
+        });
     }
 
     public function render()

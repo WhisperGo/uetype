@@ -62,3 +62,69 @@ it('does not flag throughput for a fast short burst', function () {
     expect($result['valid'])->toBeTrue()
         ->and($result['reasons'])->not->toContain('throughput_too_low');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Gerbang penolakan (B5)
+|--------------------------------------------------------------------------
+| `valid` menjawab "apakah sesi ini sempurna secara sanity-check", BUKAN
+| "apakah pemainnya curang". Dua hal itu dulu dicampur: TypingEngine menolak
+| hasil apa pun yang `valid === false`, sehingga PENGETIK LAMBAT (throughput
+| rendah) ikut dibuang hasilnya -- padahal lambat bukan curang.
+|
+| Throughput rendah hanya jadi sinyal curang di SURVIVAL, karena di sanalah
+| durasi = metrik papan (diam saja -> durasi panjang -> juara). Di time durasi
+| dikunci mode; di words durasi panjang justru MENURUNKAN wpm. Jadi di dua mode
+| itu, throughput rendah = pemain lambat, dan hasilnya harus tetap disimpan.
+*/
+
+it('flags impossible signals as cheating regardless of mode', function () {
+    $superhuman = $this->service->check(correctChars: 2000, totalChars: 2000, durationSeconds: 5.0);
+    $inconsistent = $this->service->check(correctChars: 100, totalChars: 80, durationSeconds: 30.0);
+
+    expect($this->service->isCheating($superhuman['reasons']))->toBeTrue()
+        ->and($this->service->isCheating($inconsistent['reasons']))->toBeTrue();
+});
+
+it('does not call a slow typist a cheater', function () {
+    // 25 karakter dalam 60 detik = 0.42 cps (~5 WPM). Lambat, tapi manusiawi.
+    $result = $this->service->check(correctChars: 25, totalChars: 25, durationSeconds: 60.0);
+
+    expect($result['reasons'])->toContain('throughput_too_low')
+        ->and($this->service->isCheating($result['reasons']))->toBeFalse();
+});
+
+it('keeps a slow time-mode session instead of throwing it away', function () {
+    // Pemula di mode time 60: hasilnya HARUS tersimpan (dulu dibuang mentah-mentah).
+    $result = $this->service->check(correctChars: 25, totalChars: 25, durationSeconds: 60.0);
+
+    expect($this->service->rejectsSoloResult($result['reasons'], 'time'))->toBeFalse();
+});
+
+it('keeps a slow words-mode session', function () {
+    $result = $this->service->check(correctChars: 25, totalChars: 25, durationSeconds: 60.0);
+
+    expect($this->service->rejectsSoloResult($result['reasons'], 'words'))->toBeFalse();
+});
+
+it('still rejects the survival idle-to-inflate-duration cheat', function () {
+    // Klaim bertahan 600 detik dengan 10 karakter demi menjuarai papan durasi.
+    $result = $this->service->check(correctChars: 10, totalChars: 10, durationSeconds: 600.0);
+
+    expect($this->service->rejectsSoloResult($result['reasons'], 'survival'))->toBeTrue();
+});
+
+it('rejects superhuman wpm in every solo mode', function () {
+    $result = $this->service->check(correctChars: 2000, totalChars: 2000, durationSeconds: 5.0);
+
+    expect($this->service->rejectsSoloResult($result['reasons'], 'time'))->toBeTrue()
+        ->and($this->service->rejectsSoloResult($result['reasons'], 'words'))->toBeTrue()
+        ->and($this->service->rejectsSoloResult($result['reasons'], 'survival'))->toBeTrue();
+});
+
+it('rejects an empty session in every solo mode', function () {
+    $result = $this->service->check(correctChars: 0, totalChars: 0, durationSeconds: 30.0);
+
+    expect($this->service->rejectsSoloResult($result['reasons'], 'time'))->toBeTrue()
+        ->and($this->service->rejectsSoloResult($result['reasons'], 'survival'))->toBeTrue();
+});

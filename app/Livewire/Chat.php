@@ -412,27 +412,22 @@ class Chat extends Component
             return collect();
         }
 
-        return User::query()
-            ->whereIn('id', $friendIds)
-            ->get()
-            ->map(function (User $friend) use ($me) {
-                $lastMessage = Message::between($me, $friend->id)
-                    ->visibleTo($me, otherUserId: $friend->id)
-                    ->latest('id')
-                    ->first();
+        $friends = User::query()->whereIn('id', $friendIds)->get();
 
-                $unreadCount = Message::where('sender_id', $friend->id)
-                    ->where('recipient_id', $me)
-                    ->whereNull('read_at')
-                    ->count();
+        // Pesan terakhir & jumlah belum dibaca untuk SEMUA teman sekaligus: dua query,
+        // bukan tiga query per teman (pesan terakhir + lookup MessageClear di dalam
+        // visibleTo() + hitungan unread). Inbox 30 teman: ~90 query -> 2.
+        $ids = $friends->pluck('id')->all();
+        $lastMessages = Message::lastPerConversation($me, $ids);
+        $unreadCounts = Message::unreadCountsFrom($me, $ids);
 
-                return [
-                    'user' => $friend,
-                    'lastMessage' => $lastMessage,
-                    'unreadCount' => $unreadCount,
-                    'online' => $friend->isOnline(),
-                ];
-            })
+        return $friends
+            ->map(fn (User $friend) => [
+                'user' => $friend,
+                'lastMessage' => $lastMessages->get($friend->id),
+                'unreadCount' => (int) ($unreadCounts->get($friend->id) ?? 0),
+                'online' => $friend->isOnline(),
+            ])
             // Percakapan tanpa pesan ditaruh di bawah.
             ->sortByDesc(fn ($row) => $row['lastMessage']?->created_at ?? Carbon::createFromTimestamp(0))
             ->values();

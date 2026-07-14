@@ -22,11 +22,13 @@ class MultiplayerMatchHistory extends Model
         'wpm',
         'accuracy',
         'finished_time_seconds',
+        'dnf',
         'xp_earned',
     ];
 
     protected $casts = [
         'accuracy' => 'decimal:2',
+        'dnf' => 'boolean',
     ];
 
     /** The player this match result belongs to. */

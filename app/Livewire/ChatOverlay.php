@@ -404,27 +404,25 @@ class ChatOverlay extends Component
             return collect();
         }
 
-        return User::query()
-            ->whereIn('id', $friendIds)
-            ->get()
-            ->map(function (User $friend) use ($me) {
-                $lastMessage = Message::between($me, $friend->id)
-                    ->visibleTo($me, otherUserId: $friend->id)
-                    ->latest('id')
-                    ->first();
+        $friends = User::query()->whereIn('id', $friendIds)->get();
 
-                $unreadCount = Message::where('sender_id', $friend->id)
-                    ->where('recipient_id', $me)
-                    ->whereNull('read_at')
-                    ->count();
+        // Dua query untuk SELURUH daftar, bukan tiga query per teman (pesan terakhir +
+        // lookup MessageClear di dalam visibleTo() + hitungan unread).
+        //
+        // Overlay ini dirender di layout GLOBAL -- jadi N+1 di sini dibayar oleh SETIAP
+        // halaman situs, bukan cuma /chat. Dengan 20 teman itu 60 query tambahan di tiap
+        // klik, di halaman mana pun.
+        $ids = $friends->pluck('id')->all();
+        $lastMessages = Message::lastPerConversation($me, $ids);
+        $unreadCounts = Message::unreadCountsFrom($me, $ids);
 
-                return [
-                    'user' => $friend,
-                    'lastMessage' => $lastMessage,
-                    'unreadCount' => $unreadCount,
-                    'online' => $friend->isOnline(),
-                ];
-            })
+        return $friends
+            ->map(fn (User $friend) => [
+                'user' => $friend,
+                'lastMessage' => $lastMessages->get($friend->id),
+                'unreadCount' => (int) ($unreadCounts->get($friend->id) ?? 0),
+                'online' => $friend->isOnline(),
+            ])
             ->sortByDesc(fn ($row) => $row['lastMessage']?->created_at ?? Carbon::createFromTimestamp(0))
             ->take(8)
             ->values();

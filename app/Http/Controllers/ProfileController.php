@@ -41,15 +41,23 @@ class ProfileController extends Controller
     {
         // Profil fokus identitas: cuma ringkasan. Grafik, rekor per mode, & aktivitas
         // lengkap ada di halaman /stats (App\Livewire\Stats).
-        $base = TypingResult::where('user_id', $user->id);
+        //
+        // Empat agregat atas tabel & filter yang sama -> satu query, bukan empat.
+        $agg = TypingResult::where('user_id', $user->id)
+            ->selectRaw('
+                COUNT(*) as total_matches,
+                AVG(net_wpm) as avg_wpm,
+                AVG(accuracy) as avg_accuracy,
+                COALESCE(SUM(duration_seconds), 0) as total_seconds
+            ')
+            ->first();
 
         $stats = [
-            'total_matches' => (clone $base)->count(),
-            'avg_wpm' => round((float) (clone $base)->avg('net_wpm'), 1),
-            'avg_accuracy' => round((float) (clone $base)->avg('accuracy'), 1),
+            'total_matches' => (int) $agg->total_matches,
+            'avg_wpm' => round((float) $agg->avg_wpm, 1),
+            'avg_accuracy' => round((float) $agg->avg_accuracy, 1),
+            'total_seconds' => (int) $agg->total_seconds,
         ];
-
-        $stats['total_seconds'] = (int) (clone $base)->sum('duration_seconds');
 
         // Level diturunkan dari total_xp lewat satu sumber kebenaran (User::levelData()).
         $levelData = $user->levelData();

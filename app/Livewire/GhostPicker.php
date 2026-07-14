@@ -83,13 +83,22 @@ class GhostPicker extends Component
             ->where('mode_config', $this->subMode)
             ->groupBy('user_id');
 
+        // GROUP BY di query luar wajib: join mencocokkan `tr.net_wpm = pb.best_score`,
+        // jadi user dengan DUA hasil ber-net_wpm identik akan muncul dua kali di
+        // daftar lawan ghost (dan menggeser kandidat lain keluar dari 10 besar).
         return TypingResult::from('typing_results as tr')
             ->joinSub($subQuery, 'pb', function ($join) {
                 $join->on('tr.user_id', '=', 'pb.user_id')
                     ->on('tr.net_wpm', '=', 'pb.best_score');
             })
             ->join('users', 'tr.user_id', '=', 'users.id')
-            ->select('users.id as user_id', 'users.username', DB::raw('pb.best_score as wpm'), 'tr.accuracy')
+            ->groupBy('users.id', 'users.username', 'pb.best_score')
+            ->select(
+                'users.id as user_id',
+                'users.username',
+                DB::raw('pb.best_score as wpm'),
+                DB::raw('MAX(tr.accuracy) as accuracy'),
+            )
             ->where('pb.best_score', '>', 0)
             ->orderBy('wpm', 'desc')
             ->limit(10)
