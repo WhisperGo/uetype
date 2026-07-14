@@ -71,6 +71,7 @@
                             class="w-12 h-14 text-center font-mono text-xl font-bold uppercase bg-background border border-border/40 rounded-xl focus:border-brand-bright focus:ring-0 text-foreground"
                             x-on:paste="distribute($event)"
                             x-on:input="$el.value = $el.value.toUpperCase()"
+                            x-on:keydown.enter.prevent="syncBoxes(); $wire.joinRoom()"
                             x-on:keydown.backspace="backspace($event)"
                             x-on:keyup="if($event.key !== 'Backspace' && $el.value.length == 1 && {{ $index }} < 5) { $el.nextElementSibling.focus() }" />
                     @endforeach
