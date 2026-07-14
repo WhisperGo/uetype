@@ -111,7 +111,7 @@
 
                     <div class="flex-1 min-w-0">
                         <h1 class="text-h5 font-bold text-foreground truncate">{{ $user->username }}</h1>
-                        <p class="text-x-small text-muted mt-0.5">
+                        <p class="text-x-small text-muted mt-2">
                             {{ __('stats.level') }} <span class="text-foreground font-bold">{{ $levelData['level'] }}</span>
                         </p>
 
