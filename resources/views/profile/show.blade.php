@@ -61,9 +61,8 @@
                         </p>
 
                         <div class="max-w-xs mt-3">
-                            <div class="flex justify-between text-[0.65rem] text-muted font-mono mb-1">
+                            <div class="flex justify-end text-[0.65rem] text-muted font-mono mb-1">
                                 <span>{{ $stats['level_progress'] }} / {{ $stats['level_needed'] }} XP</span>
-                                <span>{{ __('profile.level', ['level' => $stats['level'] + 1]) }}</span>
                             </div>
                             <div class="h-2 overflow-hidden rounded-full bg-white/5">
                                 <div class="h-full rounded-full bg-gold" style="width: {{ $stats['level_needed'] > 0 ? ($stats['level_progress'] / $stats['level_needed']) * 100 : 0 }}%"></div>
