@@ -7,7 +7,7 @@ return [
     'sections' => [
         [
             'title' => '1. Acceptance of terms',
-            'body' => 'By creating an account or using uetype, you agree to these terms. If you don\'t agree, please don\'t use the service.',
+            'body' => 'By creating an account or using UeType, you agree to these terms. If you don\'t agree, please don\'t use the service.',
         ],
         [
             'title' => '2. Your account',
@@ -23,7 +23,7 @@ return [
         ],
         [
             'title' => '5. Service availability',
-            'body' => 'uetype is a student project provided "as is," without guarantees of uptime, and features (including Ghost mode) may change or be added over time.',
+            'body' => 'UeType is a student project provided "as is," without guarantees of uptime, and features (including Ghost mode) may change or be added over time.',
         ],
         [
             'title' => '6. Termination',
@@ -31,7 +31,7 @@ return [
         ],
         [
             'title' => '7. Changes to these terms',
-            'body' => 'We may update these terms as uetype evolves. Continued use after changes means you accept the updated terms.',
+            'body' => 'We may update these terms as UeType evolves. Continued use after changes means you accept the updated terms.',
         ],
         [
             'title' => '8. Contact',

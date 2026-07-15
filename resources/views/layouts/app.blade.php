@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ $pageTitle ?? config('app.name', 'UEType') }}</title>
+    <title>{{ $pageTitle ?? config('app.name', 'UeType') }}</title>
     @include('partials.favicon')
 
     <!-- Fonts: JetBrains Mono untuk semua teks readable; Pixelify Sans & Press Start 2P untuk aksen game -->
@@ -44,7 +44,7 @@
 
         <footer class="border-t border-white/5">
             <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-x-small text-muted">
-                <span>&copy; 2026 uetype</span>
+                <span>&copy; 2026 UeType</span>
                 <nav class="flex items-center gap-6">
                     <a href="/about" class="hover:text-foreground transition-colors">About</a>
                     <a href="/privacy-policy" class="hover:text-foreground transition-colors">Privacy</a>

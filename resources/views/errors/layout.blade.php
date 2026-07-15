@@ -14,7 +14,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>{{ ($code ?? __('errors.error')) . ' · ' . config('app.name', 'UEType') }}</title>
+    <title>{{ ($code ?? __('errors.error')) . ' · ' . config('app.name', 'UeType') }}</title>
     @include('partials.favicon')
 
     <link rel="preconnect" href="https://fonts.googleapis.com">

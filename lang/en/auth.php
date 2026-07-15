@@ -9,13 +9,13 @@ return [
     'continue_google' => 'Continue with Google',
     'privacy_prefix' => 'By continuing, you agree to',
     'privacy_link' => 'the privacy policy',
-    'privacy_suffix' => 'of UETYPE.',
+    'privacy_suffix' => 'of UeType.',
 
     'username' => [
         'step' => 'One more step',
         'title_start' => 'Choose your',
         'title_accent' => 'username',
-        'subtitle' => 'This name will appear on your UETYPE profile and leaderboards.',
+        'subtitle' => 'This name will appear on your UeType profile and leaderboards.',
         'label' => 'Username',
         'placeholder' => 'e.g. typing_knight',
         'hint' => 'At least 3 characters - letters, numbers, dashes, and underscores only.',

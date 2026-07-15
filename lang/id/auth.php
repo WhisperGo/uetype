@@ -9,13 +9,13 @@ return [
     'continue_google' => 'Lanjutkan dengan Google',
     'privacy_prefix' => 'Dengan lanjut, kamu menyetujui',
     'privacy_link' => 'kebijakan privasi',
-    'privacy_suffix' => 'UETYPE.',
+    'privacy_suffix' => 'UeType.',
 
     'username' => [
         'step' => 'Satu langkah lagi',
         'title_start' => 'Pilih',
         'title_accent' => 'username',
-        'subtitle' => 'Nama ini akan tampil di profil dan papan skor UETYPE.',
+        'subtitle' => 'Nama ini akan tampil di profil dan papan skor UeType.',
         'label' => 'Nama pengguna',
         'placeholder' => 'contoh: ksatria_ketik',
         'hint' => 'Minimal 3 karakter - hanya huruf, angka, strip, dan garis bawah.',

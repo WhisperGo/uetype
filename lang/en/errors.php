@@ -21,6 +21,6 @@ return [
 
     '503' => [
         'title' => 'Be right back',
-        'message' => 'uetype is down for maintenance. We\'ll be back shortly.',
+        'message' => 'UeType is down for maintenance. We\'ll be back shortly.',
     ],
 ];

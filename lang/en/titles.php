@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'brand' => 'UEType',
+    'brand' => 'UeType',
     'template' => ':page | :brand',
 
     'pages' => [

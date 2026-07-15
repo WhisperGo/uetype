@@ -21,6 +21,6 @@ return [
 
     '503' => [
         'title' => 'Sebentar ya',
-        'message' => 'uetype sedang dalam pemeliharaan. Kami akan segera kembali.',
+        'message' => 'UeType sedang dalam pemeliharaan. Kami akan segera kembali.',
     ],
 ];

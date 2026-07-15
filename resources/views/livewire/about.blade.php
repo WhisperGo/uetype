@@ -17,7 +17,7 @@
             </p>
         </div>
 
-        {{-- What is uetype --}}
+        {{-- What is UeType --}}
         <div class="mb-10">
             <h2 class="text-x-small font-mono uppercase tracking-[0.25em] text-muted mb-3">
                 {{ __('about.what_is') }}

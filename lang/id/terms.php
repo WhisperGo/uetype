@@ -7,7 +7,7 @@ return [
     'sections' => [
         [
             'title' => '1. Penerimaan ketentuan',
-            'body' => 'Dengan membuat akun atau menggunakan uetype, kamu menyetujui ketentuan ini. Jika tidak setuju, mohon jangan gunakan layanan ini.',
+            'body' => 'Dengan membuat akun atau menggunakan UeType, kamu menyetujui ketentuan ini. Jika tidak setuju, mohon jangan gunakan layanan ini.',
         ],
         [
             'title' => '2. Akunmu',
@@ -23,7 +23,7 @@ return [
         ],
         [
             'title' => '5. Ketersediaan layanan',
-            'body' => 'uetype adalah proyek mahasiswa yang disediakan "apa adanya", tanpa jaminan ketersediaan, dan fitur (termasuk mode Ghost) dapat berubah atau ditambahkan seiring waktu.',
+            'body' => 'UeType adalah proyek mahasiswa yang disediakan "apa adanya", tanpa jaminan ketersediaan, dan fitur (termasuk mode Ghost) dapat berubah atau ditambahkan seiring waktu.',
         ],
         [
             'title' => '6. Penghentian',
@@ -31,7 +31,7 @@ return [
         ],
         [
             'title' => '7. Perubahan ketentuan',
-            'body' => 'Kami dapat memperbarui ketentuan ini seiring perkembangan uetype. Penggunaan berkelanjutan setelah perubahan berarti kamu menerima ketentuan yang diperbarui.',
+            'body' => 'Kami dapat memperbarui ketentuan ini seiring perkembangan UeType. Penggunaan berkelanjutan setelah perubahan berarti kamu menerima ketentuan yang diperbarui.',
         ],
         [
             'title' => '8. Kontak',
