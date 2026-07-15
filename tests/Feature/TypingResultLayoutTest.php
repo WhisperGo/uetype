@@ -25,7 +25,7 @@ it('keeps the original survival game-over card layout (separate from solo 2-colu
 
     $response->assertOk()
         ->assertSee('game over')
-        ->assertSee('play again')
+        ->assertSee(__('result.play_again_title'))
         ->assertSee('drain events')
         ->assertDontSee('error heatmap'); // heatmap hanya untuk cabang non-survival
 });

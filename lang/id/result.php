@@ -39,11 +39,8 @@ return [
     'chart_stamina' => 'stamina',
     'chart_performance' => 'performa',
 
-    'play_again' => 'main lagi',
     'play_again_title' => 'Main Lagi',
-    'next_test' => 'tes berikutnya',
     'next_test_title' => 'Tes Berikutnya',
-    'retry' => 'ulangi',
     'retry_title' => 'Ulangi Tes',
 
     'error_heatmap' => 'heatmap kesalahan',
