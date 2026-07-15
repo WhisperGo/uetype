@@ -8,12 +8,15 @@
     "require": {
         "php": "^8.2",
         "binafy/laravel-user-monitoring": "^1.2",
+        "blade-ui-kit/blade-icons": "^1.10",
         "laravel/framework": "^12.0",
         "laravel/reverb": "^1.0",
         "laravel/socialite": "^5.28",
         "laravel/tinker": "^2.10.1",
         "livewire/livewire": "^4.2",
-        "livewire/volt": "^1.10"
+        "livewire/volt": "^1.10",
+        "owenvoke/blade-fontawesome": "^3.3",
+        "ublabs/blade-simple-icons": "^0.205.0"
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "^4.2",

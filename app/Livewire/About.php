@@ -21,7 +21,17 @@ class About extends Component
             ['key' => 'kevin', 'name' => 'Kevin Fernando', 'role' => 'QA & Testing', 'photo' => '/images/team/kevin.png'],
         ];
 
-        $stack = ['Laravel', 'MySQL', 'Tailwind CSS', 'Alpine.js', 'Vite'];
+        // Tiap item: label + komponen Blade Icon (Simple Icons, prefix `simpleicon`).
+        // `color` = warna brand resmi untuk ikon; ikon SVG mewarisi via currentColor.
+        $stack = [
+            ['name' => 'Laravel', 'icon' => 'simpleicon-laravel', 'color' => '#FF2D20'],
+            ['name' => 'Livewire', 'icon' => 'simpleicon-livewire', 'color' => '#FB70A9'],
+            ['name' => 'Alpine.js', 'icon' => 'simpleicon-alpinedotjs', 'color' => '#8BC0D0'],
+            ['name' => 'Tailwind CSS', 'icon' => 'simpleicon-tailwindcss', 'color' => '#06B6D4'],
+            ['name' => 'Vite', 'icon' => 'simpleicon-vite', 'color' => '#646CFF'],
+            ['name' => 'PHP', 'icon' => 'simpleicon-php', 'color' => '#777BB4'],
+            ['name' => 'MySQL', 'icon' => 'simpleicon-mysql', 'color' => '#4479A1'],
+        ];
 
         return view('livewire.about', compact('team', 'stack'));
     }

@@ -123,8 +123,10 @@
             <div class="flex flex-wrap gap-2">
                 @foreach ($stack as $tech)
                     <span
-                        class="px-3 py-1.5 rounded-full border border-border bg-surface text-x-small font-mono text-muted">
-                        {{ $tech }}
+                        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-surface text-x-small font-mono text-muted">
+                        <x-dynamic-component :component="$tech['icon']" class="w-4 h-4 shrink-0"
+                            style="color: {{ $tech['color'] }}" />
+                        {{ $tech['name'] }}
                     </span>
                 @endforeach
             </div>
