@@ -44,11 +44,11 @@
                         <div class="flex flex-wrap items-center gap-3">
                             <h1 class="font-mono text-2xl font-bold text-foreground">{{ $user->username }}</h1>
                             @if($user->clan)
-                                <span class="px-2 py-0.5 rounded-md bg-brand/15 text-brand-bright text-xs font-mono font-semibold">
+                                <span class="px-2 py-0.5 rounded-md bg-white/5 text-muted text-xs font-mono font-semibold">
                                     [{{ $user->clan->tag }}] {{ ucfirst($user->clan_role ?? __('profile.clan_role_member')) }}
                                 </span>
                             @endif
-                            <span class="px-2 py-0.5 rounded-md bg-white/5 text-muted text-xs font-mono">{{ __('profile.level', ['level' => $stats['level']]) }}</span>
+                            <span class="px-2 py-0.5 rounded-md bg-brand/25 text-muted text-xs font-mono">{{ __('profile.level', ['level' => $stats['level']]) }}</span>
                         </div>
 
                         {{-- Email hanya di profil sendiri (privat). --}}
