@@ -31,6 +31,14 @@ class About extends Component
             ['name' => 'Vite', 'icon' => 'simpleicon-vite', 'color' => '#646CFF'],
             ['name' => 'PHP', 'icon' => 'simpleicon-php', 'color' => '#777BB4'],
             ['name' => 'MySQL', 'icon' => 'simpleicon-mysql', 'color' => '#4479A1'],
+            // Reverb tak punya ikon sendiri di Simple Icons — pakai logo Laravel (bagian dari ekosistemnya).
+            ['name' => 'Laravel Reverb', 'icon' => 'simpleicon-laravel', 'color' => '#FF2D20'],
+            // color=null => logo Chart.js dua warna (pink + biru), bukan monokrom.
+            ['name' => 'Chart.js', 'icon' => 'icon-chartjs-color', 'color' => null],
+            // Login sosial memakai Socialite dengan provider Google OAuth.
+            // color=null => pakai logo Google 4-warna asli (komponen icon-google-color),
+            // bukan ikon monokrom Simple Icons yang cuma bisa satu warna.
+            ['name' => 'Google OAuth', 'icon' => 'icon-google-color', 'color' => null],
         ];
 
         return view('livewire.about', compact('team', 'stack'));
