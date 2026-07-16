@@ -29,8 +29,8 @@ test('the page title is localized to the active locale', function () {
     expect(PageTitle::forRoute('leaderboard'))->toBe('Papan Peringkat | UeType');
 });
 
-test('the home page renders the brand title', function () {
-    $this->get('/')->assertSee('<title>UeType</title>', false);
+test('the typing page renders the brand title', function () {
+    $this->get('/typing')->assertSee('<title>UeType</title>', false);
 });
 
 test('a livewire full-page renders its localized title', function () {

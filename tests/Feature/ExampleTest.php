@@ -1,7 +1,5 @@
 <?php
 
-it('returns a successful response', function () {
-    $response = $this->get('/');
-
-    $response->assertStatus(200);
+it('redirects the root to the typing page', function () {
+    $this->get('/')->assertRedirect('/typing');
 });

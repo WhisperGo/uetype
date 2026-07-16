@@ -5,17 +5,17 @@ use App\Models\User;
 use function Pest\Laravel\actingAs;
 
 /**
- * Mode solo terbuka untuk tamu: '/' dan '/typing' memakai komponen yang sama,
- * jadi keduanya harus bisa diakses tanpa login. Tamu mengetik & melihat hasil,
- * hanya tak mendapat XP/rekor.
+ * Mode solo terbuka untuk tamu: '/' me-redirect ke '/typing', dan '/typing'
+ * harus bisa diakses tanpa login. Tamu mengetik & melihat hasil, hanya tak
+ * mendapat XP/rekor.
  */
 it('lets a guest open the solo typing page without being redirected to login', function () {
     // Sebelum perbaikan: '/typing' ada di grup middleware auth -> 302 ke /login.
     $this->get('/typing')->assertOk();
 });
 
-it('lets a guest open the home page (same component as /typing)', function () {
-    $this->get('/')->assertOk();
+it('redirects the home page to the solo typing page', function () {
+    $this->get('/')->assertRedirect('/typing');
 });
 
 it('still lets an authenticated user open the solo typing page', function () {

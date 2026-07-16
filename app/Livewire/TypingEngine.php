@@ -14,6 +14,7 @@ use App\Services\TextGeneratorService;
 use App\Support\TypingLanguage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -23,6 +24,7 @@ use Livewire\Component;
  * persists it. WPM/accuracy are recomputed server-side (AntiCheatService), never
  * trusted from the client, then feed personal bests, XP, and achievements.
  */
+#[Layout('layouts.app')]
 class TypingEngine extends Component
 {
     // Mode Utama: 'time', 'words', 'survival'
