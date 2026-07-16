@@ -1,6 +1,6 @@
 <div
-    class="flex flex-col flex-1 text-muted font-mono selection:bg-brand selection:text-foreground outline-none">
-    <div wire:key="typing-app-{{ $mainMode }}-{{ $subMode }}-{{ $typingSessionKey }}" class="flex flex-col flex-1" x-data="{
+    class="flex flex-col flex-1 min-h-full text-muted font-mono selection:bg-brand selection:text-foreground outline-none">
+    <div wire:key="typing-app-{{ $mainMode }}-{{ $subMode }}-{{ $typingSessionKey }}" class="flex flex-col flex-1 justify-center min-h-0" x-data="{
         currentMain: @entangle('mainMode'),
         currentSub: @entangle('subMode'),
         ...typingGame(@js($textToType))
@@ -37,7 +37,7 @@
                 })()
             };`"></div>
 
-        <div class="w-full max-w-5xl mx-auto my-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="w-full max-w-5xl mx-auto shrink-0 px-4 sm:px-6 lg:px-8 py-6">
 
             @if (session('result_rejected'))
                 <div
@@ -341,7 +341,7 @@
             </div>
             </div>
 
-            <div class="mt-12 flex justify-center">
+            <div class="mt-8 flex justify-center">
                 {{-- War-lock: restart dinonaktifkan (satu klaim = satu kesempatan). Gerbangnya di server. --}}
                 @if ($warLock)
                     <div class="flex flex-col items-center gap-1.5 select-none">
