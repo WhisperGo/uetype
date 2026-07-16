@@ -301,14 +301,33 @@
                 style="max-height: 4.875em;">
 
                 <!-- SINGLE SMOOTH CURSOR -->
-                <div x-ref="caret" x-show="!isFinished"
-                    class="absolute top-0 left-0 w-[0.1em] h-[1.2em] z-20 rounded [transform-origin:top_left] [will-change:transform] [transition:transform_var(--caret-dur,100ms)_var(--caret-ease,linear),background-color_150ms_ease-out]"
+                <div x-ref="caret" x-show="!isFinished" wire:ignore
+                    class="absolute top-0 left-0 w-[0.1em] h-[1.2em] z-20 rounded [transform-origin:top_left] [will-change:transform]"
+                    {{-- Posisi caret di-bind REAKTIF lewat transform (bukan el.style.transform imperatif).
+                         Kenapa: dulu moveCaret() men-set transform langsung ke DOM. Tiap kali Livewire
+                         me-render ulang lalu morph, inline style itu DIHAPUS morphdom (HTML server tak
+                         punya transform) -> caret balik ke (0,0) = atas baris, dan tak ada yang memasang
+                         ulang karena wire:key tak berubah (bukan remount). Ini yang terjadi saat pindah
+                         ke Survival: setMode() men-dispatch 'ghost-cleared', komponen mendengarnya via
+                         #[On('ghost-cleared')] -> round-trip KEDUA -> morph -> transform caret terhapus.
+                         (Standard lewat jalur applyGhostRestore yang biasanya tak dispatch, jadi aman.)
+                         Perbaikan dua lapis: (1) wire:ignore -> Livewire tak pernah menyentuh elemen ini
+                         saat morph; (2) transform reaktif -> Alpine selalu memasangnya dari cursorLeft/
+                         cursorTop, tak pernah "hilang". --}}
                     :style="{
                         backgroundColor: (currentMain === 'survival' && isStarted && !isFinished)
                             ? (staminaPct > 50 ? 'rgb(var(--color-brand-bright))' : (staminaPct > 25 ? 'rgb(var(--color-gold))' : 'rgb(var(--color-danger))'))
-                            : 'rgb(var(--color-brand-bright))'
+                            : 'rgb(var(--color-brand-bright))',
+                        transform: `translate(${cursorLeft}px, ${cursorTop - scrollOffset}px)`
                     }"
-                    :class="isTyping ? '' : 'animate-[caret-flash-smooth_1s_infinite]'">
+                    {{-- Transisi transform HANYA saat mengetik: kursor meluncur mulus antar-karakter cuma
+                         ketika user aktif mengetik (isTyping=true). Di luar itu (mount awal, reset, ganti
+                         mode/bahasa) transisinya TIDAK ADA -> perubahan transform reaktif jadi INSTAN,
+                         tak ada "meluncur ke atas" saat pindah Standard -> Survival. resetProgress
+                         meng-set isTyping=false, jadi tiap reset dijamin instan. --}}
+                    :class="isTyping
+                        ? '[transition:transform_100ms_linear,background-color_150ms_ease-out]'
+                        : 'animate-[caret-flash-smooth_1s_infinite]'">
                 </div>
 
                 <div x-ref="textContainer"
@@ -625,10 +644,23 @@
 
                     this.caretInstant = true;
                     this.caretDrawn = false;
-                    this.$nextTick(() => {
+                    // Gambar caret dengan RETRY antar-frame sampai benar-benar tergambar.
+                    // Kenapa retry: sesudah remount ganti mode, char-0 kadang BELUM ter-render saat
+                    // draw pertama -> updatePosition() return awal (activeEl null) -> moveCaret tak
+                    // pernah jalan -> transform:translate() TAK PERNAH di-set -> caret nyangkut di 0,0
+                    // (pojok kiri-atas baris). Ini paling sering di Survival karena DOM-nya jauh lebih
+                    // berat (16 sel stamina x-for) sehingga layout teks telat satu-dua frame; Standard
+                    // yang ringan hampir selalu sukses di draw pertama. caretDrawn baru true setelah
+                    // moveCaret sungguh menggambar, jadi kita ulang tiap frame (maks 12 ~200ms) sampai
+                    // char-0 ada & caret tergambar. caretInstant tetap true -> semua penempatan ini
+                    // instan (tanpa transisi), sesuai gate isTyping di kelas caret.
+                    const drawWhenReady = (retries) => {
                         this.updatePosition();
-                        requestAnimationFrame(() => { this.caretInstant = false; });
-                    });
+                        if (!this.caretDrawn && retries > 0) {
+                            requestAnimationFrame(() => drawWhenReady(retries - 1));
+                        }
+                    };
+                    this.$nextTick(() => drawWhenReady(12));
                 },
 
                 wordHasError(wordIndex) {
@@ -885,7 +917,17 @@
                             if (!this.lineHeight) this.lineHeight = firstChar.offsetHeight;
                         }
                         if (!this.caretHeight) {
-                            this.caretHeight = this.$refs.caret?.offsetHeight || activeEl.offsetHeight;
+                            // Tinggi caret = 1.2em (kelas h-[1.2em]) DIHITUNG dari font-size ter-resolusi,
+                            // BUKAN diukur via offsetHeight. Alasan: sesudah remount ganti mode, DOM
+                            // Survival jauh lebih berat (16 sel stamina x-for) sehingga layout caret belum
+                            // jadi saat diukur -> offsetHeight 0. Fallback `caretHeight || height` lalu
+                            // memakai tinggi KARAKTER (line-height 1.6em), bukan 1.2em, jadi pemusatan
+                            // (height - caretHeight)/2 = 0 -> caret nempel ke ATAS baris (naik) & terlihat
+                            // beda dengan Standard (yang sempat terukur benar). getComputedStyle font-size
+                            // selalu ter-resolusi tanpa menunggu layout, jadi nilainya identik di semua
+                            // mode & anti-race. (Kalau kelas tinggi caret diubah, sesuaikan 1.2 di sini.)
+                            const fs = parseFloat(getComputedStyle(this.$refs.caret || activeEl).fontSize);
+                            if (fs) this.caretHeight = fs * 1.2;
                         }
                     }
 
@@ -904,28 +946,11 @@
                     const lh = this.lineHeight || 48;
                     this.scrollOffset = currentTop >= lh * 2 ? currentTop - lh : 0;
 
-                    this.moveCaret(this.cursorLeft, this.cursorTop - this.scrollOffset, this.caretInstant);
-                },
-
-                moveCaret(targetLeft, targetTop, instant) {
-                    const el = this.$refs.caret;
-                    if (!el) return;
-
-                    const target = `translate(${targetLeft}px, ${targetTop}px)`;
-
-                    if (instant || !this.caretDrawn) {
-                        if (this._caretDurFrame) cancelAnimationFrame(this._caretDurFrame);
-                        el.style.setProperty('--caret-dur', '0ms');
-                        el.style.transform = target;
-                        this.caretDrawn = true;
-                        this._caretDurFrame = requestAnimationFrame(() => {
-                            this._caretDurFrame = null;
-                            el.style.removeProperty('--caret-dur');
-                        });
-                        return;
-                    }
-
-                    el.style.transform = target;
+                    // Transform caret di-render REAKTIF via :style pada elemen caret (cursorLeft/cursorTop).
+                    // Di sini cukup tandai bahwa caret sudah berhasil diposisikan (char-0 ketemu) supaya
+                    // retry drawWhenReady() di resetProgress berhenti. Instan/meluncur ditentukan gate
+                    // isTyping di :class caret, bukan lagi flag imperatif.
+                    this.caretDrawn = true;
                 },
 
                 schedulePositionUpdate() {
@@ -996,6 +1021,11 @@
                     if (!this.isStarted) {
                         this.isStarted = true;
                         this.startTime = Date.now();
+
+                        // Mulai mengetik -> caret baru boleh meluncur mulus antar-karakter.
+                        // Sebelum titik ini caretInstant tetap true (di-set di resetProgress) supaya
+                        // penempatan awal / reset / ganti mode selalu instan, tanpa animasi meluncur.
+                        this.caretInstant = false;
 
                         // Sembunyikan overlay chat selama sesi ketik berjalan.
                         window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: true } }));
