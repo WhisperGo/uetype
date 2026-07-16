@@ -526,7 +526,8 @@ class TypingEngine extends Component
         if ($antiCheat->rejectsSoloResult($check['reasons'], $this->mainMode)) {
             session()->flash('result_rejected', __('typing.result_rejected'));
 
-            return $this->redirect(route('typing'), navigate: true);
+            // Full-load (lihat catatan di redirect result): hindari SPA-restore yang merusak.
+            return $this->redirect(route('typing'));
         }
 
         $consistency = $this->computeConsistency($wpmHistory);
@@ -647,7 +648,10 @@ class TypingEngine extends Component
         ]);
         session()->save();
 
-        $this->redirect(route('typing.result'), navigate: true);
+        // Muat-halaman-penuh (TANPA navigate:true): keluar /typing via SPA membuat tombol
+        // Back me-restore snapshot mesin ketik -> @entangle undefined & $wire basi (tak bisa
+        // ketik / stats kosong / finish menggantung). Full-load bikin Back memuat ulang bersih.
+        $this->redirect(route('typing.result'));
     }
 
     // Consistency: seberapa stabil WPM sepanjang sesi (dari wpmHistory per-detik). 100% =
