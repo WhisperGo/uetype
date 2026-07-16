@@ -3,10 +3,12 @@
 return [
     'standard' => 'Standard',
     'survival' => 'Survival',
+    'survival_login' => 'Login untuk buka Survival',
     'ghost' => 'Ghost',
     'ghost_pick' => '+ Lawan Ghost',
     'ghost_change' => 'Ubah',
     'ghost_clear' => 'Lepas',
+    'ghost_login' => '+ Lawan Ghost',
 
     'type_time' => 'Time',
     'type_words' => 'Words',

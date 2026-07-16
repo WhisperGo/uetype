@@ -91,10 +91,10 @@ class TypingEngine extends Component
             $this->warClaimId = null;
 
             // Pulihkan preferensi sebelumnya jika ada (hanya untuk sesi solo biasa).
+            // Lewat normalizeMode supaya nilai liar / survival-untuk-guest ikut ditolak.
             if (session()->has('typing_preferences')) {
                 $prefs = session('typing_preferences');
-                $this->mainMode = $prefs['mode'] ?? 'time';
-                $this->subMode = $prefs['subMode'] ?? '30';
+                [$this->mainMode, $this->subMode] = $this->normalizeMode($prefs['mode'] ?? 'time', $prefs['subMode'] ?? '30');
             }
         }
 
@@ -184,6 +184,14 @@ class TypingEngine extends Component
      */
     private function applyGhostRestore(): void
     {
+        // Ghost dikunci untuk guest: leaderboard ditutup untuk tamu, jadi ghost tak
+        // boleh bocor lewat pintu ini -- bahkan bila ghost_selection dipalsukan.
+        if (! Auth::check()) {
+            $this->ghostActive = false;
+
+            return;
+        }
+
         if (! $this->isGhostEligibleMode()) {
             $this->ghostActive = false;
 
@@ -314,6 +322,12 @@ class TypingEngine extends Component
     private function normalizeMode($main, $sub): array
     {
         if (! array_key_exists($main, self::ALLOWED_SUBMODES)) {
+            return ['time', '30'];
+        }
+
+        // Survival dikunci untuk guest (butuh login): normalisasi ke Standard default.
+        // Choke point tunggal -> setMode & restore preferensi sama-sama tertutup.
+        if ($main === 'survival' && ! Auth::check()) {
             return ['time', '30'];
         }
 

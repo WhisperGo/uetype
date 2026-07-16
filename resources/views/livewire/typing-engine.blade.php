@@ -22,9 +22,12 @@
         x-on:ghost-selected.window="if (ghostEligible()) { window.__uetypeGhostSelection = { active: true, wpm: $event.detail.wpm, label: $event.detail.label }; ghostActive = true; ghostWpm = $event.detail.wpm; ghostLabel = $event.detail.label; ghostCharIndex = 0; ghostFinished = false; ghostFinishTime = null; $nextTick(() => { const pos = getCharPosition(0); if (pos) { ghostCursorLeft = pos.left; ghostCursorTop = pos.top; } if (isStarted) startGhostAnimationLoop(); }) }"
         x-on:ghost-cleared.window="window.__uetypeGhostSelection = null; ghostActive = false; ghostWpm = 0; ghostLabel = ''; stopGhostAnimationLoop();">
 
-        {{-- GhostPicker: komponen Livewire terpisah; wire:key men-scope ulang daftarnya per mode. --}}
-        <livewire:ghost-picker :main-mode="$mainMode" :sub-mode="$subMode"
-            wire:key="ghost-picker-{{ $mainMode }}-{{ $subMode }}" />
+        {{-- GhostPicker: komponen Livewire terpisah; wire:key men-scope ulang daftarnya per mode.
+             Hanya di-mount untuk user login -- ghost dikunci untuk guest (leaderboard ditutup). --}}
+        @auth
+            <livewire:ghost-picker :main-mode="$mainMode" :sub-mode="$subMode"
+                wire:key="ghost-picker-{{ $mainMode }}-{{ $subMode }}" />
+        @endauth
 
         <div x-cloak aria-hidden="true"
             class="fixed inset-0 z-40 pointer-events-none transition-opacity duration-300 [will-change:opacity]"
@@ -89,11 +92,23 @@
                         class="px-3 sm:px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand"
                         :class="['time','words'].includes(currentMain) ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">{{ __('typing.standard') }}</button>
 
-                    <button type="button" aria-label="{{ __('typing.aria.mode_survival') }}"
-                        :aria-pressed="currentMain === 'survival'"
-                        @click.prevent="currentMain='survival'; currentSub='medium'; $wire.setMode('survival','medium'); $el.blur()"
-                        class="px-3 sm:px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                        :class="currentMain === 'survival' ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">{{ __('typing.survival') }}</button>
+                    @auth
+                        <button type="button" aria-label="{{ __('typing.aria.mode_survival') }}"
+                            :aria-pressed="currentMain === 'survival'"
+                            @click.prevent="currentMain='survival'; currentSub='medium'; $wire.setMode('survival','medium'); $el.blur()"
+                            class="px-3 sm:px-[18px] py-[7px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                            :class="currentMain === 'survival' ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">{{ __('typing.survival') }}</button>
+                    @endauth
+                    @guest
+                        {{-- Guest: Survival dikunci. Tetap tampil (biar tahu ada mode ini) tapi mengarah ke login. --}}
+                        <a href="{{ route('login') }}" wire:navigate
+                            aria-label="{{ __('typing.aria.mode_survival') }}" title="{{ __('typing.survival_login') }}"
+                            class="inline-flex items-center gap-1.5 px-3 sm:px-[18px] py-[7px] rounded-md text-small font-mono font-bold text-muted hover:text-foreground transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand">
+                            <svg class="w-3.5 h-3.5 shrink-0 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            {{ __('typing.survival') }}</a>
+                    @endguest
                 </div>
 
                 <!-- Row 2: Config (Standard → Time/Words + durasi; Survival → difficulty) -->
@@ -155,6 +170,13 @@
                 <template x-if="['time','words'].includes(currentMain)">
                     <div class="flex items-center justify-center gap-2 text-small font-mono" role="group"
                         aria-label="{{ __('typing.aria.mode_ghost') }}">
+                        @guest
+                            {{-- Guest: ghost dikunci. CTA mengarah ke login, bukan picker. --}}
+                            <a href="{{ route('login') }}" wire:navigate
+                                class="px-3 py-[6px] rounded-md border border-border text-muted hover:text-foreground transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand">
+                                {{ __('typing.ghost_login') }}</a>
+                        @endguest
+                        @auth
                         <template x-if="!ghostActive">
                             <button type="button"
                                 @click.prevent="$dispatch('open-modal', 'ghost-picker'); $el.blur()"
@@ -179,6 +201,7 @@
                                     {{ __('typing.ghost_clear') }}</button>
                             </div>
                         </template>
+                        @endauth
                     </div>
                 </template>
 

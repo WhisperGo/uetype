@@ -120,6 +120,12 @@ class GhostPicker extends Component
      */
     public function selectOpponent(string $type, ?int $refId = null): void
     {
+        // Ghost dikunci untuk guest (leaderboard ditutup untuk tamu). Picker memang
+        // tak di-mount untuk guest, ini pertahanan lapis kedua di endpoint-nya.
+        if (! Auth::check()) {
+            return;
+        }
+
         if (! $this->isEligibleMode()) {
             return;
         }

@@ -3,10 +3,12 @@
 return [
     'standard' => 'Standard',
     'survival' => 'Survival',
+    'survival_login' => 'Login to unlock Survival',
     'ghost' => 'Ghost',
     'ghost_pick' => '+ Race a Ghost',
     'ghost_change' => 'Change',
     'ghost_clear' => 'Clear',
+    'ghost_login' => '+ Race a Ghost',
 
     'type_time' => 'Time',
     'type_words' => 'Words',
