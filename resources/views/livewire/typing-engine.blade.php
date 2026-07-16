@@ -100,8 +100,10 @@
                             :class="currentMain === 'survival' ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">{{ __('typing.survival') }}</button>
                     @endauth
                     @guest
-                        {{-- Guest: Survival dikunci. Tetap tampil (biar tahu ada mode ini) tapi mengarah ke login. --}}
-                        <a href="{{ route('login') }}" wire:navigate
+                        {{-- Guest: Survival dikunci. Tetap tampil (biar tahu ada mode ini) tapi mengarah ke login.
+                             Sengaja TANPA wire:navigate: navigasi SPA + @entangle('mainMode') bikin currentMain
+                             jadi undefined saat tombol Back (baris config/ghost x-if runtuh). Full-load aman. --}}
+                        <a href="{{ route('login') }}"
                             aria-label="{{ __('typing.aria.mode_survival') }}" title="{{ __('typing.survival_login') }}"
                             class="inline-flex items-center gap-1.5 px-3 sm:px-[18px] py-[7px] rounded-md text-small font-mono font-bold text-muted hover:text-foreground transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand">
                             <svg class="w-3.5 h-3.5 shrink-0 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -171,8 +173,9 @@
                     <div class="flex items-center justify-center gap-2 text-small font-mono" role="group"
                         aria-label="{{ __('typing.aria.mode_ghost') }}">
                         @guest
-                            {{-- Guest: ghost dikunci. CTA mengarah ke login, bukan picker. --}}
-                            <a href="{{ route('login') }}" wire:navigate
+                            {{-- Guest: ghost dikunci. CTA mengarah ke login, bukan picker.
+                                 TANPA wire:navigate (lihat catatan tombol Survival: hindari currentMain undefined saat Back). --}}
+                            <a href="{{ route('login') }}"
                                 class="px-3 py-[6px] rounded-md border border-border text-muted hover:text-foreground transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand">
                                 {{ __('typing.ghost_login') }}</a>
                         @endguest

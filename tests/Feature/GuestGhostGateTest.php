@@ -34,18 +34,19 @@ it('selectOpponent tidak melakukan apa-apa untuk guest', function () {
     expect(session('ghost_selection'))->toBeNull();
 });
 
-it('menampilkan CTA login (bukan tombol pick) di halaman typing untuk guest', function () {
+it('tidak me-mount ghost picker untuk guest (CTA login menggantikannya)', function () {
+    // Teks ghost_login bisa saja disamakan dengan ghost_pick, jadi pembeda yang andal
+    // adalah picker-nya: guest tak boleh punya ghost picker sama sekali.
     $this->get('/typing')
         ->assertOk()
         ->assertSee(__('typing.ghost_login'))
-        ->assertDontSee(__('typing.ghost_pick'));
+        ->assertDontSee('ghost-picker');
 });
 
-it('menampilkan tombol pick ghost (bukan CTA login) untuk user login', function () {
+it('me-mount ghost picker untuk user login', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)->get('/typing')
         ->assertOk()
-        ->assertSee(__('typing.ghost_pick'))
-        ->assertDontSee(__('typing.ghost_login'));
+        ->assertSee('ghost-picker');
 });
