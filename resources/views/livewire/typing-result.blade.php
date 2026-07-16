@@ -380,8 +380,10 @@
 
         <div
             class="mt-8 bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6 flex flex-col items-center gap-2">
-            <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-muted mb-4 self-start">{{ __('result.error_heatmap') }}</h3>
-            <div class="w-full overflow-x-auto">
+            <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-muted mb-0 self-start">{{ __('result.error_heatmap') }}</h3>
+            {{-- pt-10: overflow-x-auto memaksa overflow-y ikut memotong, jadi tooltip baris
+                 teratas (-top-10) tanpa ruang ini akan terpotong tepi atas & tak muncul saat hover. --}}
+            <div class="w-full overflow-x-auto pt-10">
             <div class="flex flex-col gap-2 md:gap-3 w-max mx-auto">
                 @foreach ($keyboard as $rowIndex => $row)
                     <div class="flex justify-center gap-2 md:gap-3" style="margin-left: {{ $rowIndex * 1.5 }}rem;">
