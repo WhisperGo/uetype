@@ -4,6 +4,7 @@ return [
     'title' => 'Papan Peringkat',
     'all_time' => 'Sepanjang Masa',
     'daily' => 'Harian',
+    'language' => 'Bahasa',
 
     'tab' => [
         'time' => 'Waktu',

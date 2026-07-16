@@ -17,6 +17,7 @@ class TypingResult extends Model
         'text_id',
         'mode',
         'mode_config',
+        'language',
         'net_wpm',
         'raw_wpm',
         'accuracy',

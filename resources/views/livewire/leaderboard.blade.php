@@ -4,14 +4,18 @@ use App\Enums\FriendshipStatus;
 use App\Events\FriendshipUpdated;
 use App\Models\Friendship;
 use App\Models\TypingResult;
+use App\Support\TypingLanguage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use function Livewire\Volt\{state, computed};
+
+use function Livewire\Volt\computed;
+use function Livewire\Volt\state;
 
 state([
     'currentTab' => 'time',
     'currentConfig' => '30',
-    'timeframe' => 'all_time'
+    'timeframe' => 'all_time',
+    'currentLang' => 'en',
 ]);
 
 $setTab = function ($tab) {
@@ -29,6 +33,12 @@ $setConfig = function ($config) {
 
 $setTimeframe = function ($timeframe) {
     $this->timeframe = $timeframe;
+};
+
+// Bahasa teks yang diketik (en|id): dimensi ortogonal, berlaku untuk semua tab.
+// Normalisasi server-side -- kode tak dikenal jatuh ke default (en).
+$setLanguage = function ($lang) {
+    $this->currentLang = TypingLanguage::resolve($lang);
 };
 
 $sendRequest = function (int $userId) {
@@ -63,8 +73,10 @@ $metricFor = fn (string $tab) => $tab === 'survival' ? 'duration_seconds' : 'net
 // State dioper eksplisit sebagai argumen, bukan lewat $this: closure biasa di
 // Volt TIDAK di-bind ke komponen (hanya action & computed yang di-bind), jadi
 // $this di sini akan fatal.
-$scoped = function (string $tab, string $config, string $timeframe) {
-    $q = TypingResult::where('mode', $tab)->where('mode_config', $config);
+$scoped = function (string $tab, string $config, string $timeframe, string $language) {
+    $q = TypingResult::where('mode', $tab)
+        ->where('mode_config', $config)
+        ->where('language', $language);
 
     if ($timeframe === 'daily') {
         $q->where('created_at', '>=', now()->startOfDay());
@@ -74,7 +86,7 @@ $scoped = function (string $tab, string $config, string $timeframe) {
 };
 
 // Rekor terbaik per user di scope aktif.
-$bestPerUser = fn (string $metric, string $tab, string $config, string $timeframe) => $scoped($tab, $config, $timeframe)
+$bestPerUser = fn (string $metric, string $tab, string $config, string $timeframe, string $language) => $scoped($tab, $config, $timeframe, $language)
     ->select('user_id', DB::raw("MAX({$metric}) as best_score"))
     ->groupBy('user_id');
 
@@ -87,9 +99,9 @@ $leaderboard = computed(function () use ($metricFor, $bestPerUser) {
     // baris, menggandakan dirinya di papan DAN menggeser pemain lain keluar dari
     // top 10. Grouping menjamin satu baris per user secara struktural.
     $rows = TypingResult::from('typing_results as tr')
-        ->joinSub($bestPerUser($metric, $this->currentTab, $this->currentConfig, $this->timeframe), 'pb', function ($join) use ($metric) {
+        ->joinSub($bestPerUser($metric, $this->currentTab, $this->currentConfig, $this->timeframe, $this->currentLang), 'pb', function ($join) use ($metric) {
             $join->on('tr.user_id', '=', 'pb.user_id')
-                 ->on("tr.{$metric}", '=', 'pb.best_score');
+                ->on("tr.{$metric}", '=', 'pb.best_score');
         })
         ->join('users', 'tr.user_id', '=', 'users.id')
         ->groupBy('tr.user_id', 'users.username', 'users.avatar', 'pb.best_score')
@@ -123,12 +135,14 @@ $leaderboard = computed(function () use ($metricFor, $bestPerUser) {
 });
 
 $userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
-    if (!Auth::check()) return null;
+    if (! Auth::check()) {
+        return null;
+    }
 
     $metric = $metricFor($this->currentTab);
 
     // Rekor SAYA di mode/config ini. Belum pernah main -> tak punya peringkat.
-    $myBest = $scoped($this->currentTab, $this->currentConfig, $this->timeframe)
+    $myBest = $scoped($this->currentTab, $this->currentConfig, $this->timeframe, $this->currentLang)
         ->where('user_id', Auth::id())
         ->max($metric);
 
@@ -141,7 +155,7 @@ $userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
     // (Dulu: pluck() menarik SATU BARIS PER USER ke memori PHP lalu array_search
     //  -- 10.000 user = 10.000 baris ditarik, setiap kali user ganti tab.)
     $better = DB::query()
-        ->fromSub($bestPerUser($metric, $this->currentTab, $this->currentConfig, $this->timeframe), 'pb')
+        ->fromSub($bestPerUser($metric, $this->currentTab, $this->currentConfig, $this->timeframe, $this->currentLang), 'pb')
         ->where('pb.best_score', '>', $myBest)
         ->count();
 
@@ -162,9 +176,18 @@ $userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
                 {{ __('leaderboard.title') }}
             </h1>
 
-            <div class="flex gap-1 bg-surface border border-border p-1 rounded-xl text-xs">
-                <button wire:click="setTimeframe('all_time')" class="px-4 py-2 rounded-lg transition font-bold tracking-wider uppercase {{ $timeframe === 'all_time' ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">{{ __('leaderboard.all_time') }}</button>
-                <button wire:click="setTimeframe('daily')" class="px-4 py-2 rounded-lg transition font-bold tracking-wider uppercase {{ $timeframe === 'daily' ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">{{ __('leaderboard.daily') }}</button>
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="flex gap-1 bg-surface border border-border p-1 rounded-xl text-xs">
+                    <button wire:click="setTimeframe('all_time')" class="px-4 py-2 rounded-lg transition font-bold tracking-wider uppercase {{ $timeframe === 'all_time' ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">{{ __('leaderboard.all_time') }}</button>
+                    <button wire:click="setTimeframe('daily')" class="px-4 py-2 rounded-lg transition font-bold tracking-wider uppercase {{ $timeframe === 'daily' ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">{{ __('leaderboard.daily') }}</button>
+                </div>
+
+                {{-- Bahasa teks yang diketik (bukan bahasa UI): filter ortogonal, berlaku ke semua tab. --}}
+                <div class="flex gap-1 bg-surface border border-border p-1 rounded-xl text-xs" role="group" aria-label="{{ __('leaderboard.language') }}">
+                    @foreach (['en' => 'EN', 'id' => 'ID'] as $code => $label)
+                        <button wire:click="setLanguage('{{ $code }}')" class="px-4 py-2 rounded-lg transition font-bold tracking-wider uppercase {{ $currentLang === $code ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">{{ $label }}</button>
+                    @endforeach
+                </div>
             </div>
         </div>
 

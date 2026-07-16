@@ -67,6 +67,8 @@ class DummyDataSeeder extends Seeder
                     'text_id' => null, // Opsional untuk leaderboard
                     'mode' => $selectedMode['mode'],
                     'mode_config' => $selectedConfig,
+                    // Bobot ke en agar realistis; ID mengisi papan berbahasa Indonesia.
+                    'language' => $faker->randomElement(['en', 'en', 'id']),
                     'net_wpm' => $netWpm,
                     'raw_wpm' => $rawWpm,
                     'accuracy' => $accuracy,

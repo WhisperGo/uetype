@@ -101,6 +101,8 @@ class DummyUserSeeder extends Seeder
                 'text_id' => null,
                 'mode' => $pick['mode'],
                 'mode_config' => $pick['config'],
+                // Bobot ke en agar realistis; ID mengisi papan berbahasa Indonesia.
+                'language' => fake()->randomElement(['en', 'en', 'id']),
                 'net_wpm' => $netWpm,
                 'raw_wpm' => $rawWpm,
                 'accuracy' => $accuracy,

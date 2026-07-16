@@ -573,6 +573,8 @@ class TypingEngine extends Component
                     'mode' => $this->mainMode, // 'time' | 'words' | 'survival'
                     // survival: difficulty ('easy'|'medium'|'hard', kunci filter leaderboard).
                     'mode_config' => (string) $this->subMode,
+                    // Bahasa teks yang diketik (en|id) -- sudah dinormalisasi via TypingLanguage::resolve().
+                    'language' => $this->contentLang,
                     'net_wpm' => $finalNetWpm,
                     'raw_wpm' => $finalRawWpm,
                     'accuracy' => $finalAccuracy,

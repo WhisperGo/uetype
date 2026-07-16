@@ -4,6 +4,7 @@ return [
     'title' => 'Leaderboard',
     'all_time' => 'All Time',
     'daily' => 'Daily',
+    'language' => 'Language',
 
     'tab' => [
         'time' => 'Time',
