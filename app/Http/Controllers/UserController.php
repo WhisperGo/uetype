@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 /**
  * Intended admin/user management (show/update user profiles). Currently a stub —

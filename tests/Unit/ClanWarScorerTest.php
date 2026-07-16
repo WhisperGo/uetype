@@ -14,7 +14,7 @@ use App\Services\ClanWarScorer;
 
 function scoreResult(float $accuracy, float $netWpm, float $durationSeconds): TypingResult
 {
-    $result = new TypingResult();
+    $result = new TypingResult;
     $result->accuracy = $accuracy;
     $result->net_wpm = $netWpm;
     $result->duration_seconds = $durationSeconds;

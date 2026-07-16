@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class UserAchievement extends Model
 {
     public const UPDATED_AT = null;
+
     public const CREATED_AT = null;
 
     protected $fillable = [

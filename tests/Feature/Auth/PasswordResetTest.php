@@ -35,4 +35,3 @@ test('reset password screen can be rendered', function () {
         return true;
     });
 });
-

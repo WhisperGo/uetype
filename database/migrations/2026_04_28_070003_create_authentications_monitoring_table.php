@@ -21,7 +21,7 @@ return new class extends Migration
                         ->nullable()
                         ->constrained(config('user-monitoring.user.table'))
                         ->cascadeOnDelete();
-                } else if (config('user-monitoring.user.foreign_key_type') === 'uuid') {
+                } elseif (config('user-monitoring.user.foreign_key_type') === 'uuid') {
                     $table->foreignUuid(config('user-monitoring.user.foreign_key'))
                         ->nullable()
                         ->constrained(config('user-monitoring.user.table'))

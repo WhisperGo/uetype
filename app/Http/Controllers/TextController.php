@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Text;
+use Illuminate\Http\Request;
 
 /**
  * Intended admin CRUD for typing texts (list/create/update/delete). Currently a stub.

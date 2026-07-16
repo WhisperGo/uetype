@@ -22,7 +22,7 @@ class VisitMonitoringMiddleware
         if (config('user-monitoring.visit_monitoring.ajax_requests', false) === false && $request->ajax()) {
             return $next($request);
         }
-        if (!config('user-monitoring.visit_monitoring.guest_mode', true) && is_null(UserUtils::getUserId())) {
+        if (! config('user-monitoring.visit_monitoring.guest_mode', true) && is_null(UserUtils::getUserId())) {
             return $next($request);
         }
 
@@ -34,7 +34,7 @@ class VisitMonitoringMiddleware
         $detector = new Detector;
         $exceptPages = config('user-monitoring.visit_monitoring.except_pages', []);
 
-        if (empty($exceptPages) || !$this->checkIsExceptPages($request->path(), $exceptPages)) {
+        if (empty($exceptPages) || ! $this->checkIsExceptPages($request->path(), $exceptPages)) {
             // Store visit
             DB::table(config('user-monitoring.visit_monitoring.table'))->insert([
                 'user_id' => UserUtils::getUserId(),
@@ -60,7 +60,7 @@ class VisitMonitoringMiddleware
         return collect($exceptPages)->contains(function ($pattern) use ($page) {
             $regex = str_replace('\*', '.*', preg_quote($pattern, '/'));
 
-            return preg_match('/^' . $regex . '$/', $page);
+            return preg_match('/^'.$regex.'$/', $page);
         });
     }
 

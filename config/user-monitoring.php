@@ -130,14 +130,14 @@ return [
          * Enable or disable monitoring of specific actions (e.g., store, update, delete).
          * Set to true to monitor actions or false to disable.
          */
-        'on_store'      => true,
-        'on_update'     => true,
-        'on_destroy'    => true,
+        'on_store' => true,
+        'on_update' => true,
+        'on_destroy' => true,
         // on_read dimatikan: model seperti Message dibaca puluhan kali per halaman
         // chat, akan membanjiri tabel actions_monitoring. Hanya aksi tulis yang dilog.
-        'on_read'       => false,
-        'on_restore'    => false,
-        'on_replicate'  => false,
+        'on_read' => false,
+        'on_restore' => false,
+        'on_replicate' => false,
 
         /*
          * If your application is behind a reverse proxy (e.g., Nginx or Cloudflare),

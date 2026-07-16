@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Enums\FriendshipStatus;
+use App\Enums\TypingMode;
 use App\Events\FriendshipUpdated;
 use App\Models\Friendship;
 use App\Models\TypingResult;
@@ -209,7 +210,7 @@ class Friends extends Component
         $map = [];
 
         foreach ($rows as $row) {
-            $mode = $row->mode instanceof \App\Enums\TypingMode ? $row->mode->value : (string) $row->mode;
+            $mode = $row->mode instanceof TypingMode ? $row->mode->value : (string) $row->mode;
             $map[$row->user_id][$mode][] = (string) $row->mode_config;
         }
 

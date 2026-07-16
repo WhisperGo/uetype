@@ -2,11 +2,10 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\User;
 use App\Models\TypingResult;
+use App\Models\User;
 use Faker\Factory as Faker;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Seeder;
 
 class DummyDataSeeder extends Seeder
 {
@@ -21,7 +20,7 @@ class DummyDataSeeder extends Seeder
                 'username' => $faker->unique()->userName,
                 'email' => $faker->unique()->safeEmail,
                 'google_id' => $faker->unique()->numerify('10#############'),
-                'avatar' => 'https://api.dicebear.com/7.x/bottts/svg?seed=' . $faker->word,
+                'avatar' => 'https://api.dicebear.com/7.x/bottts/svg?seed='.$faker->word,
                 'highest_wpm' => 0, // Akan di-update otomatis nanti
                 'total_xp' => $faker->numberBetween(500, 25000),
             ]);
@@ -31,7 +30,7 @@ class DummyDataSeeder extends Seeder
         $modes = [
             ['mode' => 'time', 'configs' => ['15', '30', '60', '120']],
             ['mode' => 'words', 'configs' => ['10', '25', '50', '100']],
-            ['mode' => 'survival', 'configs' => ['easy', 'medium', 'hard']]
+            ['mode' => 'survival', 'configs' => ['easy', 'medium', 'hard']],
         ];
 
         // 2. Generasikan Riwayat Typing Results untuk setiap user

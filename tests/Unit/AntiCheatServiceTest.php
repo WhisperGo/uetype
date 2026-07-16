@@ -3,7 +3,7 @@
 use App\Services\AntiCheatService;
 
 beforeEach(function () {
-    $this->service = new AntiCheatService();
+    $this->service = new AntiCheatService;
 });
 
 it('accepts a normal human session and recomputes wpm from chars and duration', function () {

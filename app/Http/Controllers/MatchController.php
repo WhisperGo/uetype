@@ -2,11 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Matches;
 use App\Models\Text;
-use App\Models\MatchParticipant;
-use App\Models\KeystrokeLog;
+use Illuminate\Http\Request;
 
 /**
  * Intended to manage typing matches (create, store results). Currently a stub —

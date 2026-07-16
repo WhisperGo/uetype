@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Language;
+use Illuminate\Database\Seeder;
 
 class LanguageSeeder extends Seeder
 {
@@ -27,7 +27,7 @@ class LanguageSeeder extends Seeder
         foreach ($languages as $lang) {
             Language::create($lang);
         }
-        
+
         $this->command->info('Bahasa Indonesia dan Inggris berhasil ditambahkan.');
     }
 }

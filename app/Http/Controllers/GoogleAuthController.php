@@ -23,23 +23,24 @@ class GoogleAuthController extends Controller
     {
         try {
             $googleUser = Socialite::driver('google')->user();
-            
+
             // Cek apakah user sudah terdaftar di database.
             $user = User::where('google_id', $googleUser->id)
-                        ->orWhere('email', $googleUser->email)
-                        ->first();
+                ->orWhere('email', $googleUser->email)
+                ->first();
 
             if ($user) {
                 // Akun sudah ada: sinkronisasi ID lalu login.
-                if (!$user->google_id) {
+                if (! $user->google_id) {
                     $user->update(
                         [
                             'google_id' => $googleUser->id,
-                            'avatar' => $googleUser->avatar
+                            'avatar' => $googleUser->avatar,
                         ]
                     );
                 }
                 Auth::login($user);
+
                 return redirect()->intended('/typing');
             }
 
@@ -53,9 +54,9 @@ class GoogleAuthController extends Controller
             $request->session()->put('google_register_data', [
                 'email' => $googleUser->email,
                 'google_id' => $googleUser->id,
-                'avatar' => $googleUser->avatar, 
+                'avatar' => $googleUser->avatar,
             ]);
-            
+
             return redirect()->route('auth.google.choose-username');
 
         } catch (\Exception $e) {
@@ -69,7 +70,7 @@ class GoogleAuthController extends Controller
     public function showChooseUsernameForm(Request $request)
     {
         // Perlu session data Google, kalau tidak ada kembalikan ke register.
-        if (!$request->session()->has('google_register_data')) {
+        if (! $request->session()->has('google_register_data')) {
             return redirect('/register');
         }
 
@@ -82,7 +83,7 @@ class GoogleAuthController extends Controller
     public function storeUsername(Request $request)
     {
         // Validasi data Google di session.
-        if (!$request->session()->has('google_register_data')) {
+        if (! $request->session()->has('google_register_data')) {
             return redirect('/register');
         }
 
@@ -90,25 +91,26 @@ class GoogleAuthController extends Controller
 
         // Cek ulang database sebelum insert, untuk mencegah duplicate entry.
         $existingUser = User::where('google_id', $googleData['google_id'])
-                            ->orWhere('email', $googleData['email'])
-                            ->first();
+            ->orWhere('email', $googleData['email'])
+            ->first();
 
         if ($existingUser) {
             // Datanya sudah ada: batalkan register, langsung login.
             $request->session()->forget('google_register_data');
             Auth::login($existingUser);
+
             return redirect('/typing');
         }
 
         // Validasi input username dari user (wajib unik).
         $request->validate([
             'username' => [
-                'required', 
-                'string', 
-                'alpha_dash', 
-                'min:3', 
-                'max:20', 
-                'unique:users,username'
+                'required',
+                'string',
+                'alpha_dash',
+                'min:3',
+                'max:20',
+                'unique:users,username',
             ],
         ], [
             'username.unique' => __('auth.username.taken'),
@@ -121,7 +123,7 @@ class GoogleAuthController extends Controller
             'email' => $googleData['email'],
             'google_id' => $googleData['google_id'],
             'avatar' => $googleData['avatar'],
-            'password' => encrypt(\Illuminate\Support\Str::random(16)), 
+            'password' => encrypt(Str::random(16)),
         ]);
 
         // Bersihkan session data Google.
@@ -129,6 +131,7 @@ class GoogleAuthController extends Controller
 
         // Otomatis login-kan dan lempar ke game.
         Auth::login($user);
+
         return redirect('/typing');
     }
 }

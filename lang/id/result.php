@@ -2,7 +2,7 @@
 
 return [
     'mode' => [
-        'time' => 'Time · :config' . 's',
+        'time' => 'Time · :config'.'s',
         'words' => 'Words · :config',
         'survival' => 'Survival · :config',
     ],
