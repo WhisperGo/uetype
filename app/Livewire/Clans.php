@@ -96,7 +96,7 @@ class Clans extends Component
             'newEmblem' => ['required', 'string', Rule::in(ClanEmblem::iconKeys())],
             'newEmblemColor' => ['required', 'string', Rule::in(ClanEmblem::colorKeys())],
             'newDescription' => ['nullable', 'string', 'max:160'],
-        ], [], ['newName' => 'nama clan', 'newTag' => 'tag clan']);
+        ], [], ['newName' => __('clan.attr.name'), 'newTag' => __('clan.attr.tag')]);
 
         $clan = Clan::create([
             'name' => $name,
@@ -168,7 +168,7 @@ class Clans extends Component
         }
 
         if ($member->clan->activeMembers()->count() >= self::MAX_MEMBERS) {
-            $this->addError('newName', 'Clan sudah mencapai batas maksimal '.self::MAX_MEMBERS.' member.');
+            $this->addError('newName', __('clan.error.max_members', ['max' => self::MAX_MEMBERS]));
 
             return;
         }

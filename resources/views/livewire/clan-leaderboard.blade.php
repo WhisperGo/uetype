@@ -2,10 +2,10 @@
     <x-page-container>
 
         <div class="flex flex-wrap items-center justify-between gap-3 mb-8">
-            <h1 class="font-display text-fluid-title tracking-wide text-foreground">CLAN LEADERBOARD</h1>
+            <h1 class="font-display text-fluid-title tracking-wide text-foreground">{{ __('clan.leaderboard_title') }}</h1>
             <a href="{{ route('clans.index') }}" wire:navigate class="font-mono text-xs text-muted hover:text-foreground transition inline-flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                Back to Clan
+                {{ __('clan.back_to_clan_plain') }}
             </a>
         </div>
 
@@ -33,13 +33,13 @@
                                 @if ($clan->tag)<span class="text-muted font-normal">[{{ $clan->tag }}]</span>@endif
                             </p>
                             <p class="font-mono text-[0.65rem] uppercase tracking-wider text-muted mt-1">
-                                Lv {{ $clan->levelData()['level'] }} · {{ $clan->members_count }} members · {{ $row['wins'] }} wins
+                                {{ __('clan.leaderboard_row.stats', ['level' => $clan->levelData()['level'], 'members' => $clan->members_count, 'wins' => $row['wins']]) }}
                             </p>
                         </div>
                         <p class="font-mono text-2xl font-bold text-gold tabular-nums leading-none">{{ number_format($clan->power) }}</p>
-                        <p class="font-mono text-[0.55rem] uppercase tracking-widest text-muted -mt-2">power</p>
+                        <p class="font-mono text-[0.55rem] uppercase tracking-widest text-muted -mt-2">{{ __('clan.power') }}</p>
                         @if ($isMine)
-                            <span class="font-mono text-[0.55rem] uppercase tracking-wider text-gold">your clan</span>
+                            <span class="font-mono text-[0.55rem] uppercase tracking-wider text-gold">{{ __('clan.leaderboard_row.your_clan') }}</span>
                         @endif
                     </a>
                 @endforeach
@@ -62,15 +62,15 @@
                                 <p class="font-mono text-sm font-bold text-foreground truncate group-hover:text-gold transition-colors">
                                     {{ $clan->name }}
                                     @if ($clan->tag)<span class="text-muted font-normal">[{{ $clan->tag }}]</span>@endif
-                                    @if ($isMine)<span class="ml-1 text-[0.6rem] uppercase tracking-wider text-gold">· your clan</span>@endif
+                                    @if ($isMine)<span class="ml-1 text-[0.6rem] uppercase tracking-wider text-gold">{{ __('clan.leaderboard_row.your_clan_dot') }}</span>@endif
                                 </p>
                                 <p class="font-mono text-xs text-muted mt-0.5">
-                                    Lv {{ $clan->levelData()['level'] }} · {{ $clan->members_count }} members · {{ $row['wins'] }} wins
+                                    {{ __('clan.leaderboard_row.stats', ['level' => $clan->levelData()['level'], 'members' => $clan->members_count, 'wins' => $row['wins']]) }}
                                 </p>
                             </div>
                             <div class="text-right shrink-0">
                                 <p class="font-mono text-lg font-bold text-gold tabular-nums leading-none">{{ number_format($clan->power) }}</p>
-                                <p class="font-mono text-[0.55rem] uppercase tracking-wider text-muted mt-1">power</p>
+                                <p class="font-mono text-[0.55rem] uppercase tracking-wider text-muted mt-1">{{ __('clan.power') }}</p>
                             </div>
                         </a>
                     @endforeach
@@ -79,8 +79,8 @@
         @else
             <div class="flex flex-col items-center justify-center py-24 text-center select-none">
                 <img src="/icon/uetype_mascot.png" alt="" class="w-16 h-16 opacity-30 mb-4">
-                <p class="font-mono text-sm font-bold text-foreground">No clans yet</p>
-                <p class="font-mono text-xs text-muted mt-1">Create a clan to appear on the leaderboard</p>
+                <p class="font-mono text-sm font-bold text-foreground">{{ __('clan.empty.leaderboard_title') }}</p>
+                <p class="font-mono text-xs text-muted mt-1">{{ __('clan.empty.leaderboard_body') }}</p>
             </div>
         @endif
     </x-page-container>

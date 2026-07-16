@@ -204,7 +204,7 @@ class ClanWar extends Component
         }
 
         if (! $claim) {
-            session()->flash('clan_war_claim_error', 'Mode ini baru saja diambil oleh member lain.');
+            session()->flash('clan_war_claim_error', __('clan.error.mode_taken'));
 
             return;
         }
