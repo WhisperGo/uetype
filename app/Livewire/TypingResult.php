@@ -96,8 +96,10 @@ class TypingResult extends Component
      */
     public function retry()
     {
+        // Full-load (TANPA navigate:true): masuk /typing via SPA lalu Back akan me-restore
+        // snapshot mesin ketik yang rusak. Muat penuh menjaga /typing selalu mount bersih.
         if ($this->mode !== 'words' || ! $this->textToType) {
-            return $this->redirect(route('typing'), navigate: true);
+            return $this->redirect(route('typing'));
         }
 
         session()->put('typing_retry', [
@@ -106,7 +108,7 @@ class TypingResult extends Component
             'subMode' => $this->subMode,
         ]);
 
-        return $this->redirect(route('typing'), navigate: true);
+        return $this->redirect(route('typing'));
     }
 
     public function render()

@@ -72,7 +72,9 @@
                             @endif
                         </span>
                     </div>
-                    <a href="{{ route('clan-war.index') }}" wire:navigate class="text-x-small font-mono text-muted hover:text-foreground transition">
+                    {{-- TANPA wire:navigate: satu-satunya jalur keluar /typing yang masih SPA saat
+                         war-lock; Back darinya me-restore snapshot mesin ketik yang rusak. Full-load aman. --}}
+                    <a href="{{ route('clan-war.index') }}" class="text-x-small font-mono text-muted hover:text-foreground transition">
                         ← Batalkan &amp; kembali ke Clan War
                     </a>
                 </div>
@@ -398,6 +400,15 @@
     </div>
 
     <script>
+        // Guard bfcache: saat Back menyajikan /typing dari back-forward cache, DOM beku pada
+        // state "selesai" (isFinished=true, $wire mati) -> mesin ketik stuck. Muat ulang supaya
+        // mount bersih. e.persisted hanya true pada restore bfcache, jadi load awal tak kena.
+        window.addEventListener('pageshow', (e) => {
+            if (e.persisted) {
+                window.location.reload();
+            }
+        });
+
         // Preset stamina Survival.
         //   sMax/sStart : kapasitas & stamina awal
         //   graceSec    : detik awal dengan drain dilembutkan
