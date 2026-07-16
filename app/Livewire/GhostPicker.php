@@ -5,7 +5,7 @@ namespace App\Livewire;
 use App\Enums\FriendshipStatus;
 use App\Models\Friendship;
 use App\Models\TypingResult;
-use App\Models\User;
+use App\Services\GhostResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -124,48 +124,28 @@ class GhostPicker extends Component
             return;
         }
 
-        $wpm = null;
-        $label = null;
+        // WPM/label diturunkan dari DB lewat resolver (satu sumber kebenaran, dipakai
+        // juga saat memulihkan pilihan). Identitas tak sah -> null -> tak jadi apa-apa.
+        $ghost = app(GhostResolver::class)->resolve($type, $refId, $this->mainMode, $this->subMode, Auth::id());
 
-        if ($type === 'own') {
-            $wpm = (float) (Auth::user()->highest_wpm ?? 0);
-            $label = 'Your Best';
-        } elseif ($type === 'friend' && $refId !== null) {
-            $friendship = Friendship::where('id', $refId)
-                ->where('status', FriendshipStatus::Accepted)
-                ->where(fn ($q) => $q->where('requester_id', Auth::id())->orWhere('addressee_id', Auth::id()))
-                ->with(['requester', 'addressee'])
-                ->first();
-
-            if ($friendship) {
-                $friend = $friendship->requester_id === Auth::id() ? $friendship->addressee : $friendship->requester;
-                if ($friend) {
-                    $wpm = (float) $friend->highest_wpm;
-                    $label = $friend->username;
-                }
-            }
-        } elseif ($type === 'leaderboard' && $refId !== null) {
-            $best = TypingResult::where('user_id', $refId)
-                ->where('mode', $this->mainMode)
-                ->where('mode_config', $this->subMode)
-                ->max('net_wpm');
-
-            if ($best !== null && (float) $best > 0) {
-                $wpm = (float) $best;
-                $label = User::find($refId)?->username ?? 'Leaderboard';
-            }
-        }
-
-        if ($wpm === null || $wpm <= 0) {
+        if ($ghost === null) {
             return;
         }
 
-        $this->dispatch('ghost-selected', type: $type, wpm: $wpm, label: $label);
+        // Simpan IDENTITAS-nya (bukan angka wpm) supaya pilihan bertahan lintas tes /
+        // reload dan bisa di-derive ulang. Dibaca kembali oleh TypingEngine::applyGhostRestore().
+        session()->put('ghost_selection', ['type' => $type, 'ref_id' => $refId]);
+
+        $this->dispatch('ghost-selected', type: $type, wpm: $ghost['wpm'], label: $ghost['label']);
         $this->dispatch('close-modal', 'ghost-picker');
     }
 
     public function clearOpponent(): void
     {
+        // Clear eksplisit: buang identitas tersimpan supaya ghost TIDAK muncul lagi
+        // di tes berikutnya (beda dari sekadar sembunyi saat pindah ke survival).
+        session()->forget('ghost_selection');
+
         $this->dispatch('ghost-cleared');
     }
 

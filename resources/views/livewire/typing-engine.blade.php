@@ -169,7 +169,11 @@
                                     @click.prevent="$dispatch('open-modal', 'ghost-picker'); $el.blur()"
                                     class="px-2.5 py-[5px] rounded-md border border-border text-muted hover:text-foreground transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand">
                                     {{ __('typing.ghost_change') }}</button>
+                                {{-- Clear eksplisit: wire:click ke server MENGHAPUS pilihan dari
+                                     session (biar tak muncul lagi di tes berikutnya); dispatch Alpine
+                                     menyembunyikan kursor seketika tanpa menunggu round-trip. --}}
                                 <button type="button"
+                                    wire:click="clearGhost"
                                     @click.prevent="$dispatch('ghost-cleared'); $el.blur()"
                                     class="px-2.5 py-[5px] rounded-md border border-border text-muted hover:text-danger transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-danger">
                                     {{ __('typing.ghost_clear') }}</button>

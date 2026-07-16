@@ -6,10 +6,10 @@ use App\Enums\ClanWarStatus;
 use App\Models\ClanWarFixedText;
 use App\Models\ClanWarModeClaim;
 use App\Models\TypingResult;
-use App\Models\User;
 use App\Services\AchievementService;
 use App\Services\AntiCheatService;
 use App\Services\ClanWarScorer;
+use App\Services\GhostResolver;
 use App\Services\TextGeneratorService;
 use App\Support\TypingLanguage;
 use Illuminate\Support\Facades\Auth;
@@ -103,10 +103,13 @@ class TypingEngine extends Component
             $this->contentLang = TypingLanguage::resolve(session('typing_preferences')['contentLang'] ?? null);
         }
 
-        // Ghost deep-link diproses setelah war-lock supaya war tetap menang; hanya
-        // berlaku untuk sesi solo & mode time/words.
+        // Ghost diproses setelah war-lock supaya war tetap menang; hanya berlaku untuk
+        // sesi solo & mode time/words. Deep-link (?ghost=) dicerna jadi pilihan tersimpan
+        // lebih dulu, lalu applyGhostRestore memulihkan pilihan itu (atau yang sudah ada
+        // di session dari tes sebelumnya -- inilah yang membuat ghost bertahan lintas tes).
         if (! $this->warLock) {
-            $this->resolveGhostDeepLink();
+            $this->ingestGhostDeepLink();
+            $this->applyGhostRestore();
         }
 
         // Retry (mode words): pull sekali pakai. Hanya jalur solo -- war-lock menang,
@@ -137,19 +140,15 @@ class TypingEngine extends Component
     }
 
     /**
-     * Pasang lawan ghost dari ?ghost=&mode=&config= (dari baris leaderboard). WPM
-     * selalu diturunkan ulang dari DB, sama pola dengan GhostPicker::selectOpponent
-     * ('leaderboard'). Hanya time/words; param liar/tanpa rekor diabaikan (fail-safe).
+     * Cerna deep-link ?ghost=&mode=&config= (dari baris leaderboard) menjadi PILIHAN
+     * ghost tersimpan di session -- supaya ikut sticky seperti pilihan dari picker.
+     * Mengunci mode/config ke milik ghost. Hanya time/words; param liar / lawan tanpa
+     * rekor diabaikan (fail-safe). Dispatch-nya diserahkan ke applyGhostRestore().
      */
-    private function resolveGhostDeepLink(): void
+    private function ingestGhostDeepLink(): void
     {
-        if (! $this->ghostUserId || ! Auth::check()) {
-            $this->clearGhostDeepLinkParams();
-
-            return;
-        }
-
-        if (! in_array($this->ghostMode, ['time', 'words'], true)) {
+        if (! $this->ghostUserId || ! Auth::check()
+            || ! in_array($this->ghostMode, ['time', 'words'], true)) {
             $this->clearGhostDeepLinkParams();
 
             return;
@@ -157,12 +156,10 @@ class TypingEngine extends Component
 
         [$main, $sub] = $this->normalizeMode($this->ghostMode, $this->ghostConfig);
 
-        $best = TypingResult::where('user_id', $this->ghostUserId)
-            ->where('mode', $main)
-            ->where('mode_config', $sub)
-            ->max('net_wpm');
+        // Validasi lawan benar-benar punya rekor di mode/config itu sebelum menyimpan.
+        $ghost = app(GhostResolver::class)->resolve('leaderboard', $this->ghostUserId, $main, $sub, Auth::id());
 
-        if ($best === null || (float) $best <= 0) {
+        if ($ghost === null) {
             $this->clearGhostDeepLinkParams();
 
             return;
@@ -171,12 +168,62 @@ class TypingEngine extends Component
         $this->mainMode = $main;
         $this->subMode = $sub;
 
-        $label = User::find($this->ghostUserId)?->username ?? 'Leaderboard';
-
-        $this->ghostActive = true;
-        $this->dispatch('ghost-selected', type: 'leaderboard', wpm: (float) $best, label: $label);
+        session()->put('ghost_selection', ['type' => 'leaderboard', 'ref_id' => $this->ghostUserId]);
 
         $this->clearGhostDeepLinkParams();
+    }
+
+    /**
+     * Pulihkan ghost dari pilihan tersimpan di session untuk mode/config SAAT INI.
+     * Ini yang membuat ghost bertahan lintas Next Test / refresh: pilihan tetap di
+     * session, dan tiap mount/pindah-mode ke time-words kita turunkan ULANG WPM dari
+     * DB (bukan angka beku) lalu tampilkan.
+     *
+     * Mode non-eligible (survival) -> ghost cuma DISEMBUNYIKAN (ghostActive false),
+     * pilihan di session TIDAK dihapus -> otomatis muncul lagi saat balik ke time/words.
+     */
+    private function applyGhostRestore(): void
+    {
+        if (! $this->isGhostEligibleMode()) {
+            $this->ghostActive = false;
+
+            return;
+        }
+
+        $selection = session('ghost_selection');
+        if (! is_array($selection) || empty($selection['type'])) {
+            return;
+        }
+
+        $ghost = app(GhostResolver::class)->resolve(
+            $selection['type'],
+            $selection['ref_id'] ?? null,
+            $this->mainMode,
+            $this->subMode,
+            Auth::id(),
+        );
+
+        // Lawan tak lagi punya rekor di config ini -> sembunyikan (pilihan tetap disimpan).
+        if ($ghost === null) {
+            $this->ghostActive = false;
+
+            return;
+        }
+
+        $this->ghostActive = true;
+        $this->dispatch('ghost-selected', type: $ghost['type'], wpm: $ghost['wpm'], label: $ghost['label']);
+    }
+
+    /**
+     * Clear eksplisit (tombol "Clear" di arena): buang pilihan dari session supaya
+     * ghost TIDAK muncul lagi di tes berikutnya. Beda dari suspend saat survival, yang
+     * cuma menyembunyikan tanpa menghapus.
+     */
+    public function clearGhost(): void
+    {
+        session()->forget('ghost_selection');
+        $this->ghostActive = false;
+        $this->dispatch('ghost-cleared');
     }
 
     /** Ghost Mode hanya sah untuk time & words (survival dikecualikan). */
@@ -192,6 +239,8 @@ class TypingEngine extends Component
         $this->ghostActive = $this->isGhostEligibleMode();
     }
 
+    // Sembunyikan kursor ghost (suspend saat survival ATAU clear eksplisit). SENGAJA
+    // tidak menyentuh session: penghapusan pilihan hanya lewat clearGhost()/clearOpponent().
     #[On('ghost-cleared')]
     public function onGhostCleared(): void
     {
@@ -301,11 +350,14 @@ class TypingEngine extends Component
 
         $this->generateText();
 
-        // Invariant server: mode yang tak mendukung ghost (survival) memaksa ghost mati,
-        // apa pun keadaan klien. Cegah ghost tersisa saat berpindah ke survival.
         if (! $this->isGhostEligibleMode()) {
+            // Survival: sembunyikan kursor ghost (suspend). Pilihan di session SENGAJA
+            // tak dihapus -> otomatis pulih saat balik ke time/words.
             $this->ghostActive = false;
             $this->dispatch('ghost-cleared');
+        } else {
+            // time/words: pulihkan ghost tersimpan, di-derive ulang utk mode/config baru.
+            $this->applyGhostRestore();
         }
 
         $this->dispatch(
@@ -338,6 +390,10 @@ class TypingEngine extends Component
         session()->save();
 
         $this->generateText();
+
+        // Teks baru dirakit -> posisi kursor ghost ikut reset; pulihkan ghost tersimpan
+        // supaya tetap tampil (self-guard: no-op kalau mode survival / tak ada pilihan).
+        $this->applyGhostRestore();
 
         $this->dispatch(
             'mode-changed',
