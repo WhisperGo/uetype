@@ -62,6 +62,7 @@ return [
     'th_accuracy' => 'Akurasi',
     'th_time' => 'Waktu',
     'xp_earned' => 'XP Didapat',
+    'level' => 'Level',
     'play_again' => 'Main Lagi',
 
     'error_code_length' => 'Kode harus 6 digit lengkap!',

@@ -5,6 +5,7 @@ return [
 
     'tab_friends' => 'Teman',
     'tab_clan' => 'Clan',
+    'tab_aria' => 'Tab chat',
 
     'empty_inbox_title' => 'Belum ada percakapan',
     'empty_inbox_body' => 'Mulai percakapan dari daftar temanmu',

@@ -147,7 +147,7 @@ $userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
         ->max($metric);
 
     if ($myBest === null) {
-        return 'Unranked';
+        return __('leaderboard.unranked');
     }
 
     // Peringkat = jumlah user yang rekornya LEBIH TINGGI dari rekor saya, + 1.

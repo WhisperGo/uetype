@@ -62,6 +62,7 @@ return [
     'th_accuracy' => 'Accuracy',
     'th_time' => 'Time',
     'xp_earned' => 'XP Earned',
+    'level' => 'Level',
     'play_again' => 'Play Again',
 
     'error_code_length' => 'The code must be a full 6 digits!',

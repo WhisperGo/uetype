@@ -5,6 +5,7 @@ return [
 
     'tab_friends' => 'Friends',
     'tab_clan' => 'Clan',
+    'tab_aria' => 'Chat tabs',
 
     'empty_inbox_title' => 'No conversations yet',
     'empty_inbox_body' => 'Start a conversation from your friends list',

@@ -5,7 +5,7 @@
     @if ($activeMode === null)
         {{-- TABS: Friends | Clan --}}
         <div class="border-b border-white/10 mb-6">
-            <nav class="flex gap-6 -mb-px font-mono text-sm" aria-label="Chat tabs">
+            <nav class="flex gap-6 -mb-px font-mono text-sm" aria-label="{{ __('chat.tab_aria') }}">
                 <button wire:click="$set('activeMode', null)"
                     class="px-1 py-3 border-b-2 border-gold text-foreground font-semibold whitespace-nowrap">
                     {{ __('chat.tab_friends') }}

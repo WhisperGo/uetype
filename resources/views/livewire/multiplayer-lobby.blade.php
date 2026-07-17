@@ -776,7 +776,7 @@
                         </div>
                         <div class="text-right flex flex-col items-end">
                             <span class="text-foreground font-bold text-xs">{{ number_format($xpProgress) }} / {{ number_format($xpNeeded) }} XP</span>
-                            <span class="text-muted text-[10px] mt-0.5">Level {{ $lvl['level'] }} <span
+                            <span class="text-muted text-[10px] mt-0.5">{{ __('multiplayer.level') }} {{ $lvl['level'] }} <span
                                     class="text-muted/50">-</span> {{ $lvl['next_level'] }}</span>
                         </div>
                     </div>

@@ -4,7 +4,7 @@
 
     <!-- ===== TABS ===== -->
     <div class="border-b border-white/10 mb-6">
-        <nav class="flex gap-6 -mb-px font-mono text-sm" aria-label="Friend tabs">
+        <nav class="flex gap-6 -mb-px font-mono text-sm" aria-label="{{ __('friends.tab.aria') }}">
             <button wire:click="setTab('friends')"
                 @class([
                     'px-1 py-3 border-b-2 transition-colors whitespace-nowrap',

@@ -7,6 +7,7 @@ return [
         'friends' => 'Friends (:count)',
         'requests' => 'Requests (:count)',
         'find' => 'Find Friends',
+        'aria' => 'Friend tabs',
     ],
 
     'level' => 'level :level',

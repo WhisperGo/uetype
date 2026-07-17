@@ -7,6 +7,7 @@ return [
         'friends' => 'Teman (:count)',
         'requests' => 'Permintaan (:count)',
         'find' => 'Cari Teman',
+        'aria' => 'Tab teman',
     ],
 
     'level' => 'level :level',
