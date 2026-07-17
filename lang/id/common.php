@@ -4,4 +4,9 @@ return [
     'coming_soon' => 'Segera hadir',
     'soon' => 'segera',
     'guest' => 'Tamu',
+
+    'footer' => [
+        'about' => 'Tentang',
+        'privacy' => 'Privasi',
+    ],
 ];

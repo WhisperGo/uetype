@@ -46,8 +46,8 @@
             <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-x-small text-muted">
                 <span>&copy; 2026 UeType</span>
                 <nav class="flex items-center gap-6">
-                    <a href="/about" class="hover:text-foreground transition-colors">About</a>
-                    <a href="/privacy-policy" class="hover:text-foreground transition-colors">Privacy</a>
+                    <a href="/about" class="hover:text-foreground transition-colors">{{ __('common.footer.about') }}</a>
+                    <a href="/privacy-policy" class="hover:text-foreground transition-colors">{{ __('common.footer.privacy') }}</a>
                 </nav>
             </div>
         </footer>
@@ -79,11 +79,11 @@
                         </div>
                         <div class="min-w-0 flex-1">
                             <p class="font-mono text-xs uppercase tracking-wider text-muted"
-                                x-text="t.type === 'accepted' ? 'Friend request accepted' : 'New friend request'"></p>
+                                x-text="t.type === 'accepted' ? @js(__('notif.friend.accepted')) : @js(__('notif.friend.request'))"></p>
                             <p class="mt-0.5 font-mono text-sm text-foreground break-words" x-text="t.message"></p>
-                            <a href="{{ route('friends.index') }}" class="mt-1.5 inline-block font-mono text-xs text-brand-bright hover:underline">View →</a>
+                            <a href="{{ route('friends.index') }}" class="mt-1.5 inline-block font-mono text-xs text-brand-bright hover:underline">{{ __('notif.view') }}</a>
                         </div>
-                        <button @click="dismiss(t.id)" class="text-muted hover:text-foreground shrink-0" aria-label="Dismiss">
+                        <button @click="dismiss(t.id)" class="text-muted hover:text-foreground shrink-0" aria-label="{{ __('notif.dismiss') }}">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
@@ -175,16 +175,16 @@
                         <div class="min-w-0 flex-1">
                             <p class="font-mono text-xs uppercase tracking-wider text-muted"
                                 x-text="{
-                                    'accepted': 'Clan request accepted',
-                                    'war-result': 'Clan War result',
-                                    'war-challenge': 'Clan War challenge',
-                                    'war-accepted': 'Clan War accepted',
-                                    'war-declined': 'Clan War declined',
-                                }[t.type] || 'Clan update'"></p>
+                                    'accepted': @js(__('notif.clan.accepted')),
+                                    'war-result': @js(__('notif.clan.war_result')),
+                                    'war-challenge': @js(__('notif.clan.war_challenge')),
+                                    'war-accepted': @js(__('notif.clan.war_accepted')),
+                                    'war-declined': @js(__('notif.clan.war_declined')),
+                                }[t.type] || @js(__('notif.clan.update'))"></p>
                             <p class="mt-0.5 font-mono text-sm text-foreground break-words" x-text="t.message"></p>
-                            <a :href="['war-result', 'war-challenge', 'war-accepted', 'war-declined'].includes(t.type) ? '{{ route('clan-war.index') }}' : '{{ route('clans.index') }}'" class="mt-1.5 inline-block font-mono text-xs text-brand-bright hover:underline">View →</a>
+                            <a :href="['war-result', 'war-challenge', 'war-accepted', 'war-declined'].includes(t.type) ? '{{ route('clan-war.index') }}' : '{{ route('clans.index') }}'" class="mt-1.5 inline-block font-mono text-xs text-brand-bright hover:underline">{{ __('notif.view') }}</a>
                         </div>
-                        <button @click="dismiss(t.id)" class="text-muted hover:text-foreground shrink-0" aria-label="Dismiss">
+                        <button @click="dismiss(t.id)" class="text-muted hover:text-foreground shrink-0" aria-label="{{ __('notif.dismiss') }}">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
@@ -247,9 +247,9 @@
                         <div class="min-w-0 flex-1">
                             <p class="font-mono text-xs uppercase tracking-wider text-muted" x-text="t.senderUsername"></p>
                             <p class="mt-0.5 font-mono text-sm text-foreground break-words" x-text="t.message"></p>
-                            <a :href="t.clanId ? '{{ route('chat.index') }}?mode=clan' : `{{ route('chat.index') }}?mode=dm&with=${t.senderUsername}`" wire:navigate class="mt-1.5 inline-block font-mono text-xs text-brand-bright hover:underline">Reply →</a>
+                            <a :href="t.clanId ? '{{ route('chat.index') }}?mode=clan' : `{{ route('chat.index') }}?mode=dm&with=${t.senderUsername}`" wire:navigate class="mt-1.5 inline-block font-mono text-xs text-brand-bright hover:underline">{{ __('notif.reply') }}</a>
                         </div>
-                        <button @click="dismiss(t.id)" class="text-muted hover:text-foreground shrink-0" aria-label="Dismiss">
+                        <button @click="dismiss(t.id)" class="text-muted hover:text-foreground shrink-0" aria-label="{{ __('notif.dismiss') }}">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
