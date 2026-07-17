@@ -47,6 +47,12 @@ return [
     'request_sent' => 'Request Sent',
     'respond' => 'Respond',
     'add' => '+ Add',
+    'add_friend' => 'Add Friend',
     'no_results' => 'No users found matching ":query".',
     'find_prompt' => 'Type a username above to find players.',
+
+    'notify' => [
+        'request' => ':name sent you a friend request',
+        'accepted' => ':name accepted your friend request',
+    ],
 ];

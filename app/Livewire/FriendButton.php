@@ -55,7 +55,7 @@ class FriendButton extends Component
 
         $this->notify($this->target->id, [
             'type' => 'request',
-            'message' => Auth::user()->username.' sent you a friend request',
+            'message' => __('friends.notify.request', ['name' => Auth::user()->username]),
         ]);
     }
 
@@ -75,7 +75,7 @@ class FriendButton extends Component
 
         $this->notify($this->target->id, [
             'type' => 'accepted',
-            'message' => Auth::user()->username.' accepted your friend request',
+            'message' => __('friends.notify.accepted', ['name' => Auth::user()->username]),
         ]);
     }
 

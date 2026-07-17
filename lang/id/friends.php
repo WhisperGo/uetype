@@ -47,6 +47,12 @@ return [
     'request_sent' => 'Permintaan Terkirim',
     'respond' => 'Tanggapi',
     'add' => '+ Tambah',
+    'add_friend' => 'Tambah Teman',
     'no_results' => 'Tidak ada pengguna yang cocok dengan ":query".',
     'find_prompt' => 'Ketik username di atas untuk menemukan pemain.',
+
+    'notify' => [
+        'request' => ':name mengirimimu permintaan teman',
+        'accepted' => ':name menerima permintaan temanmu',
+    ],
 ];

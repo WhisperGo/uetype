@@ -63,7 +63,7 @@ class Friends extends Component
 
         $this->notify($userId, [
             'type' => 'request',
-            'message' => Auth::user()->username.' sent you a friend request',
+            'message' => __('friends.notify.request', ['name' => Auth::user()->username]),
         ]);
     }
 
@@ -78,7 +78,7 @@ class Friends extends Component
 
         $this->notify($friendship->requester_id, [
             'type' => 'accepted',
-            'message' => Auth::user()->username.' accepted your friend request',
+            'message' => __('friends.notify.accepted', ['name' => Auth::user()->username]),
         ]);
     }
 
