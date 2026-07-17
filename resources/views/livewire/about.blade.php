@@ -67,7 +67,7 @@
                                 {{ $initial }}
                             </div>
                         @endif
-                        <span class="font-mono text-small text-foreground font-bold">
+                        <span class="font-mono text-small text-foreground font-bold leading-snug min-h-[2.5rem] flex items-start justify-center">
                             {{ $member['name'] }}
                         </span>
                         <span class="font-mono text-x-small text-muted mt-1">
