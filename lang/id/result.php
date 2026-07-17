@@ -45,4 +45,15 @@ return [
 
     'error_heatmap' => 'heatmap kesalahan',
     'miss_count' => ':count salah',
+
+    'error_axis' => 'kesalahan',
+    'error_hint' => 'klik penanda di grafik untuk melihat apa yang salah',
+    'error_at' => 'detik :second',
+    'error_expected' => 'butuh :expected',
+    'error_typed' => 'kamu menekan :actual',
+    'error_skipped' => 'dilewati — kamu pindah kata sebelum mengetiknya',
+    'error_no_word' => 'kata tak diketahui',
+    'error_legend_needed' => 'tuts yang dibutuhkan',
+    'error_legend_pressed' => 'tuts yang kamu tekan',
+    'error_scope' => 'menghitung karakter target yang salah — termasuk yang sudah kamu perbaiki',
 ];

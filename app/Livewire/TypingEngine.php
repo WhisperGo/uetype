@@ -11,6 +11,7 @@ use App\Services\AntiCheatService;
 use App\Services\ClanWarScorer;
 use App\Services\GhostResolver;
 use App\Services\TextGeneratorService;
+use App\Services\TypingErrorInspector;
 use App\Support\TypingLanguage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -487,7 +488,8 @@ class TypingEngine extends Component
         $drainEventCount = 0,
         $ghostWpm = null,
         $ghostLabel = null,
-        $ghostCharsAtFinish = null
+        $ghostCharsAtFinish = null,
+        $errorEvents = []
     ) {
         // Gerbang mode: normalkan terhadap whitelist sebelum dipakai untuk score/mode_config,
         // supaya difficulty/sub-mode liar tak masuk DB & mencemari filter leaderboard.
@@ -623,6 +625,13 @@ class TypingEngine extends Component
             ];
         }
 
+        // Stream error per-karakter: tier PRESENTASI (session-only, tak pernah menyentuh
+        // skor/XP/PB/leaderboard — jadi tak ada urusan dengan AntiCheatService). Tetap
+        // disanitasi seperti ghost: bentuk divalidasi, nilai di-cast, panjang di-cap.
+        // Beda dari missedChars yang mentah tapi aman karena cuma dibaca lewat lookup
+        // kunci yang sudah diketahui — di sini `actual` benar-benar DIRENDER.
+        $errorEvents = TypingErrorInspector::sanitize($errorEvents);
+
         session()->put('typing_result', [
             'wpm' => $finalNetWpm,
             'rawWpm' => $finalRawWpm,
@@ -649,6 +658,9 @@ class TypingEngine extends Component
             'survivalPreviousBest' => $survivalPreviousBest !== null ? (float) $survivalPreviousBest : null,
             'isSurvivalPersonalBest' => $isSurvivalPersonalBest,
             'ghostResult' => $ghostResult,
+            // Ringkas by design: cuma indeks. Halaman hasil merekonstruksi kata dari
+            // textToType (sudah ada di atas) ketimbang kita menyimpan string dua kali.
+            'errorEvents' => $errorEvents,
         ]);
         session()->save();
 

@@ -117,6 +117,59 @@ masuk ke field itu saja dan tak ikut men-trigger tes ketik di belakang. Tanpa gu
 mengetik pesan di overlay chat akan sekaligus memulai & mengisi paragraf typing. Lihat
 [chat.md](chat.md#47-sembunyi-saat-sesi-testbalapan-aktif).
 
+## 3.x Stream Error (penanda error di grafik hasil)
+
+**Service:** [`App\Services\TypingErrorInspector`](../../app/Services/TypingErrorInspector.php)
+
+Selain `missedChars` (peta `huruf target => jumlah`, sumber heatmap), engine juga mengirim
+`errorEvents`: satu entri `{second, index, actual}` per karakter target yang gagal diketik
+benar. `actual` = tuts yang **benar-benar ditekan** (`missedChars` cuma tahu huruf yang
+*seharusnya* diketik), atau `null` kalau karakternya **dilewati** — user menekan spasi di
+tengah kata, jadi tak pernah ada keypress untuk karakter itu.
+
+Halaman hasil memakainya untuk menandai error di grafik dan, saat titiknya diklik,
+menampilkan kata tempat error terjadi. Kata **tidak dikirim** dari klien — direkonstruksi
+server dari `textToType` + `index`, supaya tak ada duplikasi sumber kebenaran.
+
+Tier **presentasi**: session-only, tak pernah masuk DB, tak menyentuh skor/XP/PB/leaderboard
+— jadi bukan urusan anti-cheat. Tetap disanitasi di `saveResult` (bentuk, cast, cap 500,
+`actual` dipotong 1 karakter) karena `actual` benar-benar dirender.
+
+### Dua keputusan yang jangan "diperbaiki"
+
+**1. Detik terakhir di-clamp, bukan dibuang.** Tick yang memicu `finish()` men-set
+`isFinished` sebelum baris push `wpmHistory` dievaluasi, jadi tes `time` 30 detik cuma
+menghasilkan ~29 sampel. Error di detik yang tak ter-push di-clamp ke sampel terakhir.
+Membuangnya akan merusak invarian di bawah, dan detik terakhir justru tempat error
+kelelahan menumpuk. Biayanya ≤1 detik pergeseran di sumbu yang resolusinya memang 1 detik.
+
+**2. Titik grafik TIDAK akan sama dengan tile "characters" — itu disengaja.**
+
+```
+incorrectKeystrokes (tile) = keypress salah + overtype extra + spasi tengah kata
+Σ missedChars (titik+heatmap) = keypress salah + karakter dilewati
+```
+
+Melenceng ke dua arah. Contoh: target `"the quick"`, ketik `"t"` lalu spasi → `h` dan `e`
+ditandai terlewat (2 titik) padahal cuma **1** keystroke salah → tile 1, titik 2. Ketik
+`"thex"` lalu spasi → `x` masuk `extraChars`, tak menyentuh `missedChars` → tile 1, titik 0.
+
+Keduanya benar karena mengukur hal berbeda: **tile menghitung keystroke** (numerator akurasi,
+memberi makan `AntiCheatService` — jangan disentuh); **titik & heatmap menghitung karakter
+target yang gagal diproduksi** (satu-satunya definisi yang bisa menjawab "tombol mana yang
+saya kesulitan" — karakter yang dilewati tetap kegagalan pada tuts itu meski tak ada tuts
+ditekan). Caption `result.error_scope` di halaman hasil menyatakan definisi ini ke user.
+
+**Yang WAJIB tetap cocok:** `Σ titik grafik === Σ missedChars === Σ tooltip heatmap`.
+Berlaku secara konstruksi karena `recordError()` dipanggil dari **dalam guard yang sama**
+dengan yang menaikkan `missedChars`. Kalau memindahkan panggilan itu ke luar guard, kedua
+angka akan melenceng dan grafik jadi berbohong terhadap heatmap 8px di bawahnya.
+Invarian ini diuji di `tests/Unit/TypingErrorInspectorTest.php`.
+
+Pengecualian terdokumentasi: di atas cap 500 event titik akan undercount sementara heatmap
+tidak; dan heatmap membuang karakter di luar 3 baris QWERTY-nya (praktis tak terjangkau —
+wordlist en/id murni `a-z`; hanya `ClanWarFixedText` yang bisa membawa karakter lain).
+
 ## 4. Integrasi dengan Fitur Lain
 
 - **Ghost Mode** (`?ghost=...`): deep-link dari leaderboard memasang lawan ghost. Lihat

@@ -45,4 +45,15 @@ return [
 
     'error_heatmap' => 'error heatmap',
     'miss_count' => ':count wrong',
+
+    'error_axis' => 'errors',
+    'error_hint' => 'click a marker on the chart to see what went wrong',
+    'error_at' => 'second :second',
+    'error_expected' => 'needed :expected',
+    'error_typed' => 'you pressed :actual',
+    'error_skipped' => 'skipped — you moved on before typing this',
+    'error_no_word' => 'unknown word',
+    'error_legend_needed' => 'key you needed',
+    'error_legend_pressed' => 'key you pressed',
+    'error_scope' => 'counts target characters you got wrong — including ones you went back and fixed',
 ];

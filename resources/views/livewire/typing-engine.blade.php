@@ -441,6 +441,10 @@
             hard:   { sMax: 85,  sStart: 70,  graceSec: 0, dStart: 5.5, dAccel: 0.40, refill: 1.3, penalty: 16 },
         };
 
+        // Batas event error yang dikirim ke server. Sesi latihan wajar jauh di bawah ini;
+        // 500 error dalam satu tes ≈ akurasi di bawah 50% di mode time 120 -- itu mashing.
+        const MAX_ERROR_EVENTS = 500;
+
         function survivalConfig(difficulty) {
             return SURVIVAL_PRESETS[difficulty] || SURVIVAL_PRESETS.medium;
         }
@@ -492,6 +496,9 @@
                 wpmHistory: [],
                 rawHistory: [],
                 missedChars: {},
+                // Satu entri per karakter target yang gagal diketik benar: {second, index, actual}.
+                // missedChars tahu TUTS APA yang meleset; ini juga tahu KAPAN & DI KATA MANA.
+                errorEvents: [],
                 modeChangedCleanup: null,
 
                 // --- Survival: stamina menyusut per detik, terisi per karakter benar, habis = game over. ---
@@ -617,6 +624,7 @@
                     this.wpmHistory = [];
                     this.rawHistory = [];
                     this.missedChars = {};
+                    this.errorEvents = [];
                     this.ghostCharIndex = 0;
                     this.ghostFinished = false;
                     this.ghostFinishTime = null;
@@ -675,6 +683,23 @@
                         return true;
                     }
                     return false;
+                },
+
+                // Catat SATU karakter target yang gagal diketik benar. WAJIB dipanggil dari
+                // dalam guard yang sama persis dengan yang menaikkan missedChars -- itu yang
+                // membuat jumlah event === jumlah missedChars, invarian yang dipakai halaman
+                // hasil untuk menyamakan titik di grafik dengan angka di heatmap tepat di bawahnya.
+                //   charIndex : index absolut di targetArray
+                //   actual    : tuts yang ditekan (handleInput sudah menjamin panjangnya 1),
+                //               atau null untuk karakter yang DILEWATI -- user menekan spasi,
+                //               tak pernah ada tuts untuk karakter ini.
+                recordError(charIndex, actual) {
+                    if (this.errorEvents.length >= MAX_ERROR_EVENTS) return;
+                    this.errorEvents.push({
+                        second: this.startTime ? Math.floor((Date.now() - this.startTime) / 1000) : 0,
+                        index: charIndex,
+                        actual: actual,
+                    });
                 },
 
                 // --- Helper Survival ---
@@ -1125,6 +1150,9 @@
                             const expectedChar = this.targetArray[i].toLowerCase();
                             if (expectedChar !== ' ' && expectedChar.length === 1) {
                                 this.missedChars[expectedChar] = (this.missedChars[expectedChar] || 0) + 1;
+                                // null: user menekan spasi SEKALI lalu melewati sisa kata -- tak
+                                // pernah ada tuts untuk karakter ini.
+                                this.recordError(i, null);
                             }
                         }
                         this.markWordDirty();
@@ -1151,6 +1179,7 @@
                         const expectedChar = this.targetArray[this.currentIndex].toLowerCase();
                         if (expectedChar !== ' ' && expectedChar.length === 1) {
                             this.missedChars[expectedChar] = (this.missedChars[expectedChar] || 0) + 1;
+                            this.recordError(this.currentIndex, e.key);
                         }
                         this.markWordDirty();
                     }
@@ -1230,7 +1259,7 @@
                     const ghostLabelArg = this.ghostActive ? this.ghostLabel : null;
                     const ghostCharsArg = this.ghostActive ? this.ghostCharIndex : null;
 
-                    this.$wire.saveResult(durationMs, total, correct, this.wpmHistory, this.rawHistory, this.missedChars, this.drainEventCount, ghostWpmArg, ghostLabelArg, ghostCharsArg);
+                    this.$wire.saveResult(durationMs, total, correct, this.wpmHistory, this.rawHistory, this.missedChars, this.drainEventCount, ghostWpmArg, ghostLabelArg, ghostCharsArg, this.errorEvents);
                 }
             }
         }

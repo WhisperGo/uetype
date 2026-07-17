@@ -2,6 +2,8 @@
 
 namespace App\Livewire;
 
+use App\Services\TypingErrorInspector;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
@@ -56,6 +58,9 @@ class TypingResult extends Component
 
     public $textToType;
 
+    /** Stream error ringkas dari session: [{second, index, actual}]. Di-enrich saat render. */
+    public $errorEvents;
+
     public function mount()
     {
         $result = session('typing_result');
@@ -87,6 +92,27 @@ class TypingResult extends Component
         $this->isSurvivalPersonalBest = $result['isSurvivalPersonalBest'] ?? false;
         $this->ghostResult = $result['ghostResult'] ?? null;
         $this->textToType = $result['textToType'] ?? null;
+        // ?? WAJIB: sesi lama (dari request sebelum deploy) tak punya kunci ini.
+        $this->errorEvents = $result['errorEvents'] ?? [];
+    }
+
+    /**
+     * View model penanda error: KAPAN (detik), TUTS MANA, DI KATA MANA + apa yang
+     * benar-benar ditekan.
+     *
+     * #[Computed], BUKAN properti publik: hasil enrich-nya berkali lipat lebih besar
+     * dari errorEvents mentah (tiap event membawa string kata), dan properti publik ikut
+     * di-serialize ke snapshot Livewire di SETIAP request — padahal ini cuma dibutuhkan
+     * saat render. Lazy juga: cabang survival tak pernah menyentuhnya.
+     */
+    #[Computed]
+    public function errorSeries(): array
+    {
+        return TypingErrorInspector::inspect(
+            $this->errorEvents ?? [],
+            $this->textToType,
+            count($this->wpmHistory ?? []),
+        );
     }
 
     /**
