@@ -32,8 +32,10 @@
             <div class="flex items-center justify-between p-4 border-b border-white/5 shrink-0">
                 <p class="font-display text-sm text-foreground">{{ __('chat.title') }}</p>
                 <div class="flex items-center gap-2">
-                    <a href="{{ route('chat.index') }}" wire:navigate class="font-mono text-[0.65rem] text-brand-bright hover:underline">
-                        {{ __('chat.open_full') }} →
+                    <a href="{{ route('chat.index') }}" wire:navigate class="text-muted hover:text-foreground transition shrink-0 p-1" aria-label="{{ __('chat.open_full') }}" title="{{ __('chat.open_full') }}">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                        </svg>
                     </a>
                     <button @click="open = false" class="text-muted hover:text-foreground shrink-0" aria-label="{{ __('chat.close') }}">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -99,16 +101,20 @@
                         <x-friend-avatar :user="$this->activeFriend" :online="$this->activeFriend->isOnline()" size="w-7 h-7" fallback-size="w-4 h-4" />
                         <p class="font-mono text-xs font-bold text-foreground truncate">{{ $this->activeFriend->username }}</p>
                     </div>
-                    <a href="{{ route('chat.index', ['mode' => 'dm', 'with' => $this->activeFriend->username]) }}" wire:navigate class="font-mono text-[0.6rem] text-brand-bright hover:underline shrink-0">
-                        {{ __('chat.open_full') }} →
+                    <a href="{{ route('chat.index', ['mode' => 'dm', 'with' => $this->activeFriend->username]) }}" wire:navigate class="text-muted hover:text-foreground transition shrink-0 p-1" aria-label="{{ __('chat.open_full') }}" title="{{ __('chat.open_full') }}">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                        </svg>
                     </a>
                 @elseif ($activeMode === 'clan' && $this->myClan)
                     <div class="flex items-center gap-2 min-w-0 flex-1">
                         <x-clan-emblem :clan="$this->myClan" size="sm" />
                         <p class="font-mono text-xs font-bold text-foreground truncate">{{ $this->myClan->name }}</p>
                     </div>
-                    <a href="{{ route('chat.index', ['mode' => 'clan']) }}" wire:navigate class="font-mono text-[0.6rem] text-brand-bright hover:underline shrink-0">
-                        {{ __('chat.open_full') }} →
+                    <a href="{{ route('chat.index', ['mode' => 'clan']) }}" wire:navigate class="text-muted hover:text-foreground transition shrink-0 p-1" aria-label="{{ __('chat.open_full') }}" title="{{ __('chat.open_full') }}">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                        </svg>
                     </a>
                 @endif
 
