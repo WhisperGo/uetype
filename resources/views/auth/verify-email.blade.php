@@ -1,11 +1,11 @@
 <x-guest-layout>
     <div class="mb-4 text-sm text-muted">
-        {{ __('Terima kasih sudah mendaftar! Sebelum mulai, verifikasi dulu alamat emailmu dengan mengeklik tautan yang baru saja kami kirim. Jika belum menerima emailnya, kami akan dengan senang hati mengirim ulang.') }}
+        {{ __('auth.verify.instruction') }}
     </div>
 
     @if (session('status') == 'verification-link-sent')
         <div class="mb-4 font-medium text-sm text-gold">
-            {{ __('Tautan verifikasi baru telah dikirim ke alamat email yang kamu berikan saat mendaftar.') }}
+            {{ __('auth.verify.sent') }}
         </div>
     @endif
 
@@ -15,7 +15,7 @@
 
             <div>
                 <x-primary-button>
-                    {{ __('Kirim Ulang Email Verifikasi') }}
+                    {{ __('auth.verify.resend') }}
                 </x-primary-button>
             </div>
         </form>
@@ -24,7 +24,7 @@
             @csrf
 
             <button type="submit" class="underline text-sm text-muted hover:text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface focus:ring-brand">
-                {{ __('Keluar') }}
+                {{ __('auth.verify.logout') }}
             </button>
         </form>
     </div>

@@ -26,4 +26,29 @@ return [
     ],
 
     'google_failed' => 'Google authentication failed.',
+
+    'email' => 'Email',
+    'password' => 'Password',
+    'confirm_password' => 'Confirm password',
+
+    'forgot' => [
+        'instruction' => 'Forgot your password? No problem. Just tell us your email address and we will send you a link to reset it.',
+        'submit' => 'Send Reset Link',
+    ],
+
+    'reset' => [
+        'submit' => 'Reset Password',
+    ],
+
+    'confirm' => [
+        'instruction' => 'This is a secure area of the application. Please confirm your password before continuing.',
+        'submit' => 'Confirm',
+    ],
+
+    'verify' => [
+        'instruction' => 'Thanks for signing up! Before getting started, please verify your email address by clicking the link we just emailed you. If you did not receive the email, we will gladly send you another.',
+        'sent' => 'A new verification link has been sent to the email address you provided during registration.',
+        'resend' => 'Resend Verification Email',
+        'logout' => 'Log Out',
+    ],
 ];

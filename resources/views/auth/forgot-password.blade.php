@@ -1,6 +1,6 @@
 <x-guest-layout>
     <div class="mb-4 text-sm text-muted">
-        {{ __('Lupa kata sandi? Tidak masalah. Beri tahu kami alamat emailmu dan kami akan mengirim tautan untuk mengatur ulang kata sandi.') }}
+        {{ __('auth.forgot.instruction') }}
     </div>
 
     <!-- Session Status -->
@@ -11,14 +11,14 @@
 
         <!-- Email Address -->
         <div>
-            <x-input-label for="email" :value="__('Email')" />
+            <x-input-label for="email" :value="__('auth.email')" />
             <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus />
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
 
         <div class="flex items-center justify-end mt-4">
             <x-primary-button>
-                {{ __('Kirim Tautan Atur Ulang') }}
+                {{ __('auth.forgot.submit') }}
             </x-primary-button>
         </div>
     </form>

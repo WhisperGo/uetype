@@ -1,6 +1,6 @@
 <x-guest-layout>
     <div class="mb-4 text-sm text-muted">
-        {{ __('Ini area aman dari aplikasi. Konfirmasikan kata sandimu sebelum melanjutkan.') }}
+        {{ __('auth.confirm.instruction') }}
     </div>
 
     <form method="POST" action="{{ route('password.confirm') }}">
@@ -8,7 +8,7 @@
 
         <!-- Password -->
         <div>
-            <x-input-label for="password" :value="__('Kata sandi')" />
+            <x-input-label for="password" :value="__('auth.password')" />
 
             <x-text-input id="password" class="block mt-1 w-full"
                             type="password"
@@ -20,7 +20,7 @@
 
         <div class="flex justify-end mt-4">
             <x-primary-button>
-                {{ __('Konfirmasi') }}
+                {{ __('auth.confirm.submit') }}
             </x-primary-button>
         </div>
     </form>
