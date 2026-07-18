@@ -56,4 +56,5 @@ return [
     'error_legend_needed' => 'key you needed',
     'error_legend_pressed' => 'key you pressed',
     'error_scope' => 'counts target characters you got wrong — including ones you went back and fixed',
+    'error_none' => 'clean run — no mistakes',
 ];

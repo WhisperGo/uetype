@@ -28,6 +28,22 @@
             $pbMins = $pbSeconds !== null ? intdiv($pbSeconds, 60) : null;
             $pbSecsPart = $pbSeconds !== null ? $pbSeconds % 60 : null;
             $survivalDelta = $pbSeconds !== null ? $pbSeconds - (int) $time : null;
+
+            // Kartu stat non-survival: raw wpm + akurasi + characters selalu ada; consistency
+            // & duration kondisional. Duration DIBUANG di mode time (redundan dengan label
+            // "Time · Ns" di atas hero), tapi tetap tampil di words (durasi bervariasi).
+            $statCount = 3 + (! is_null($consistency) ? 1 : 0) + ($mode === 'words' ? 1 : 0);
+            // Baris stat gaya survival, kini FULL-WIDTH (sejajar grafik) -> muat satu baris
+            // penuh: 3 (time tanpa consistency), 4 (time), 5 (words). Di lebar segini 5 kartu
+            // sebaris lebih rapi daripada 3+2 yang menyisakan sel kosong mencolok.
+            $statCols = match ($statCount) {
+                3 => 'sm:grid-cols-3',
+                5 => 'sm:grid-cols-5',
+                default => 'sm:grid-cols-4',
+            };
+            // Jumlah ganjil -> kartu characters (yang terakhir) direntang penuh di mobile
+            // 2-kolom agar tak ada sel menggantung.
+            $charsSpan = $statCount % 2 === 1 ? 'col-span-2 sm:col-span-1' : '';
         @endphp
 
         @if ($isSurvival)
@@ -130,146 +146,121 @@
             </div>
         @else
 
-        {{-- Island error inspector: membungkus grid DAN heatmap (keduanya bersaudara) supaya
-             klik titik di grafik bisa menyorot tuts + menampilkan katanya. Tanpa class layout
-             -- grid tetap memegang display:grid sendiri, mt-8 heatmap tetap margin sibling. --}}
-        <div x-data="errorInspector(@js($this->errorSeries['events']))"
-            x-on:error-inspect.window="select($event.detail.index)">
+        {{-- Scoreboard (full-width, sejajar dengan blok grafik di bawahnya): hero-card di
+             tengah -> baris stat -> XP. Meniru URUTAN vertikal survival, tapi lebarnya
+             mengikuti grafik (bukan kolom sempit max-w-2xl) supaya kartu stat & XP tak
+             terlihat mengambang di atas grafik yang lebar. Isi hero tetap center. --}}
+        <div class="flex flex-col gap-8">
 
-        <!-- 2 kolom: kiri stats & aksi, kanan chart -->
-        {{-- TANPA items-start: tinggi baris grid ditentukan kolom kiri (yang berbeda tinggi
-             antara guest & login), lalu kartu chart ikut meregang -> bottom kedua kolom rata. --}}
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {{-- Hero card: reuse pola kartu survival (garis aksen atas + center), tapi aksennya
+                 EMAS bukan danger -- solo bukan "game over". Mode label mengambil peran baris
+                 "game over" di atas hero; heroLabel ("wpm") mengambil peran "survived". --}}
+            <div class="relative overflow-hidden rounded-3xl border border-border bg-surface/60 px-8 py-10 text-center">
+                <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-gold to-transparent opacity-70"></div>
 
-            <!-- ===== KOLOM KIRI ===== -->
-            <div class="flex flex-col gap-6">
+                <p class="font-mono text-xs uppercase tracking-[0.35em] text-muted mb-4">{{ $modeLabel }}</p>
 
-                <!-- Hero -->
-                <div>
-                    <p class="font-mono text-xs uppercase tracking-[0.2em] text-muted mb-2">{{ $modeLabel }}</p>
-                    <div class="flex items-end gap-3">
-                        <span class="font-display text-fluid-hero text-gold leading-none tabular-nums">{{ $heroValue }}</span>
-                        <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted pb-1.5">{{ $heroLabel }}</span>
-                    </div>
+                <div class="flex flex-col items-center gap-1">
+                    <span class="font-display text-fluid-hero text-gold leading-none tabular-nums">{{ $heroValue }}</span>
+                    <span class="font-mono text-xs uppercase tracking-[0.3em] text-muted mt-3">{{ $heroLabel }}</span>
+                </div>
+
+                {{-- Momen pencapaian = pill emas (menyamai treatment PB cabang survival di
+                     ~baris 82), BUKAN teks kecil. Solo bisa tampil PB DAN ghost sekaligus, jadi
+                     tetap kolom. State kalah/di-bawah-rekor tetap teks muted -- bukan perayaan. --}}
+                <div class="mt-6 flex flex-col items-center gap-2">
                     @if ($isPersonalBest)
-                        <p class="mt-3 flex items-center gap-1.5 text-sm text-gold font-mono">
+                        <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gold/10 border border-gold/40 text-gold font-mono text-sm">
                             <span>✦</span> {{ __('result.new_personal_best') }}
-                        </p>
+                        </span>
                     @elseif (!is_null($recordDelta))
-                        <p class="mt-3 font-mono text-sm text-muted tabular-nums">
+                        <p class="font-mono text-sm text-muted tabular-nums">
                             {{ $recordDelta >= 0 ? '+' : '' }}{{ $recordDelta }} <span class="text-muted/70">{{ __('result.vs_record', ['best' => rtrim(rtrim(number_format($previousBest, 1), '0'), '.')]) }}</span>
                         </p>
                     @endif
 
                     @if ($ghostResult)
-                        <p class="mt-3 flex items-center gap-1.5 text-sm font-mono {{ $ghostResult['playerWon'] ? 'text-gold' : 'text-muted' }}">
-                            <span>{{ $ghostResult['playerWon'] ? '✦' : '·' }}</span>
-                            {{ $ghostResult['playerWon'] ? __('result.beat_ghost') : __('result.lost_ghost') }}
-                            <span class="text-muted/70">{{ __('result.vs_ghost', ['label' => $ghostResult['label'], 'wpm' => rtrim(rtrim(number_format($ghostResult['wpm'], 1), '0'), '.')]) }}</span>
-                        </p>
+                        @if ($ghostResult['playerWon'])
+                            <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gold/10 border border-gold/40 text-gold font-mono text-sm">
+                                <span>✦</span> {{ __('result.beat_ghost') }}
+                                <span class="text-gold/60">{{ __('result.vs_ghost', ['label' => $ghostResult['label'], 'wpm' => rtrim(rtrim(number_format($ghostResult['wpm'], 1), '0'), '.')]) }}</span>
+                            </span>
+                        @else
+                            <p class="flex items-center gap-1.5 text-sm font-mono text-muted">
+                                <span>·</span> {{ __('result.lost_ghost') }}
+                                <span class="text-muted/70">{{ __('result.vs_ghost', ['label' => $ghostResult['label'], 'wpm' => rtrim(rtrim(number_format($ghostResult['wpm'], 1), '0'), '.')]) }}</span>
+                            </p>
+                        @endif
                     @endif
                 </div>
+            </div>{{-- /hero card --}}
 
-                <!-- Sub-stats -->
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    @if ($isSurvival)
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.avg_wpm') }}</span>
-                            <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $wpm }}</span>
-                        </div>
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.accuracy') }}</span>
-                            <span class="text-xl sm:text-2xl text-gold font-bold font-mono leading-none tabular-nums">{{ $accuracy }}<span class="text-lg">%</span></span>
-                        </div>
-                        @if (!is_null($consistency))
-                            <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                                <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.consistency') }}</span>
-                                <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $consistency }}<span class="text-lg">%</span></span>
-                            </div>
-                        @endif
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.characters') }}</span>
-                            <span class="text-xl sm:text-2xl font-bold font-mono leading-none tabular-nums">
-                                <span class="text-foreground">{{ $correctKeystrokes }}</span><span class="text-muted"> / </span><span class="text-danger">{{ $incorrectKeystrokes }}</span>
-                            </span>
-                        </div>
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.difficulty') }}</span>
-                            <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none capitalize">{{ $subMode }}</span>
-                        </div>
-                    @else
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.raw_wpm') }}</span>
-                            <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $rawWpm }}</span>
-                        </div>
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.accuracy') }}</span>
-                            <span class="text-xl sm:text-2xl text-gold font-bold font-mono leading-none tabular-nums">{{ $accuracy }}<span class="text-lg">%</span></span>
-                        </div>
-                        @if (!is_null($consistency))
-                            <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                                <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.consistency') }}</span>
-                                <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $consistency }}<span class="text-lg">%</span></span>
-                            </div>
-                        @endif
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
-                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.duration') }}</span>
-                            <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ round($time, 1) }}<span class="text-lg text-muted">s</span></span>
-                        </div>
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2 {{ is_null($consistency) ? 'col-span-2 sm:col-span-1' : '' }}">
-                            <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.characters') }}</span>
-                            <span class="text-xl sm:text-2xl font-bold font-mono leading-none tabular-nums">
-                                <span class="text-foreground">{{ $correctKeystrokes }}</span><span class="text-muted"> / </span><span class="text-danger">{{ $incorrectKeystrokes }}</span>
-                            </span>
-                        </div>
-                    @endif
+            {{-- Baris stat gaya survival (grid-cols-2 sm:grid-cols-4). Kita sudah di dalam
+                 cabang non-survival, jadi cuma kartu solo: raw wpm + akurasi + characters
+                 selalu ada; consistency & duration (words) kondisional. --}}
+            <div class="grid grid-cols-2 {{ $statCols }} gap-3">
+                <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+                    <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.raw_wpm') }}</span>
+                    <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $rawWpm }}</span>
                 </div>
-
-                <!-- XP + level bar -->
-                @auth
-                    @if ($levelData)
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4">
-                            <div class="flex items-start justify-between mb-3">
-                                <div class="flex flex-col gap-2">
-                                    <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
-                                    <span class="text-xl sm:text-2xl font-bold font-mono text-foreground leading-none">{{ __('result.xp_gained', ['amount' => $xpEarned]) }}</span>
-                                </div>
-                                <div class="text-right font-mono text-xs text-muted leading-relaxed">
-                                    <div>{{ __('result.xp_progress', ['progress' => number_format($levelData['progress']), 'needed' => number_format($levelData['needed'])]) }}</div>
-                                    <div>{{ __('result.xp_level_up', ['from' => $levelData['level'], 'to' => $levelData['next_level']]) }}</div>
-                                </div>
-                            </div>
-                            <div class="h-2 overflow-hidden rounded-full bg-white/5">
-                                <div class="h-full rounded-full bg-foreground transition-all"
-                                    style="width: {{ $levelData['needed'] > 0 ? min(100, ($levelData['progress'] / $levelData['needed']) * 100) : 0 }}%"></div>
-                            </div>
-                        </div>
-                    @endif
-                @endauth
-
-                <!-- Tombol aksi -->
-                <div class="flex items-stretch gap-3">
-                    <a id="restartButton" href="/typing"
-                        class="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-mono font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition"
-                        title="{{ $isSurvival ? __('result.play_again_title') : __('result.next_test_title') }}">
-                        <span>{{ $isSurvival ? __('result.play_again_title') : __('result.next_test_title') }}</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
-                        </svg>
-                    </a>
-                    {{-- Retry hanya untuk Words: mengulang rangkaian kata yang sama persis
-                         (lewat retry() -> session typing_retry), berbeda dari Next Test yang acak. --}}
-                    @if ($mode === 'words' && $textToType)
-                        <button type="button" wire:click="retry"
-                            class="inline-flex items-center justify-center h-12 px-6 rounded-2xl bg-surface border border-white/5 text-foreground/80 hover:text-foreground hover:border-white/10 font-mono font-semibold text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-border transition"
-                            title="{{ __('result.retry_title') }}">
-                            {{ __('result.retry_title') }}
-                        </button>
-                    @endif
+                <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+                    <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.accuracy') }}</span>
+                    <span class="text-xl sm:text-2xl text-gold font-bold font-mono leading-none tabular-nums">{{ $accuracy }}<span class="text-lg">%</span></span>
+                </div>
+                @if (!is_null($consistency))
+                    <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+                        <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.consistency') }}</span>
+                        <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $consistency }}<span class="text-lg">%</span></span>
+                    </div>
+                @endif
+                {{-- Duration hanya untuk WORDS: di mode time selalu = konfigurasi
+                     (mis. label "Time · 15s"), jadi kartunya cuma mengulang. --}}
+                @if ($mode === 'words')
+                    <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+                        <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.duration') }}</span>
+                        <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ round($time, 1) }}<span class="text-lg text-muted">s</span></span>
+                    </div>
+                @endif
+                <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2 {{ $charsSpan }}">
+                    <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.characters') }}</span>
+                    <span class="text-xl sm:text-2xl font-bold font-mono leading-none tabular-nums">
+                        <span class="text-foreground">{{ $correctKeystrokes }}</span><span class="text-muted"> / </span><span class="text-danger">{{ $incorrectKeystrokes }}</span>
+                    </span>
                 </div>
             </div>
 
-            <!-- ===== KOLOM KANAN: chart ===== -->
+            {{-- XP + level bar (full-width dalam kolom center) --}}
+            @auth
+                @if ($levelData)
+                    <div class="bg-surface/70 border border-white/5 rounded-2xl p-4">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex flex-col gap-2">
+                                <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
+                                <span class="text-xl sm:text-2xl font-bold font-mono text-foreground leading-none">{{ __('result.xp_gained', ['amount' => $xpEarned]) }}</span>
+                            </div>
+                            <div class="text-right font-mono text-xs text-muted leading-relaxed">
+                                <div>{{ __('result.xp_progress', ['progress' => number_format($levelData['progress']), 'needed' => number_format($levelData['needed'])]) }}</div>
+                                <div>{{ __('result.xp_level_up', ['from' => $levelData['level'], 'to' => $levelData['next_level']]) }}</div>
+                            </div>
+                        </div>
+                        <div class="h-2 overflow-hidden rounded-full bg-white/5">
+                            <div class="h-full rounded-full bg-foreground transition-all"
+                                style="width: {{ $levelData['needed'] > 0 ? min(100, ($levelData['progress'] / $levelData['needed']) * 100) : 0 }}%"></div>
+                        </div>
+                    </div>
+                @endif
+            @endauth
+        </div>{{-- /scoreboard center --}}
+
+        {{-- Blok error-review: grafik full-width + heatmap TEPAT di bawahnya, dibungkus island
+             supaya klik titik di grafik langsung menyorot tuts. Karena keduanya kini
+             bersebelahan, revealHeatmap() (scrollIntoView) jadi no-op saat sudah terlihat --
+             tetap disimpan sebagai jaring pengaman. --}}
+        <div x-data="errorInspector(@js($this->errorSeries['events']))"
+            x-on:error-inspect.window="select($event.detail.index)"
+            class="mt-10 flex flex-col gap-6">
+
+            <!-- ===== GRAFIK (full-width) ===== -->
             <div class="bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6 flex flex-col">
                 <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-muted mb-2">{{ $isSurvival ? __('result.chart_stamina') : __('result.chart_performance') }}</h3>
 
@@ -303,11 +294,13 @@
                      tinggi baris grid tak bergantung pada canvas. Kalau dibuat in-flow lagi,
                      dependensinya melingkar (baris <- card <- canvas <- Chart.js baca parent)
                      dan Chart.js masuk loop resize. flex-basis:0% tidak cukup memutusnya. --}}
-                <div class="relative w-full h-72 lg:h-auto lg:flex-1 lg:min-h-0" wire:ignore>
+                {{-- Tinggi EKSPLISIT (bukan lagi lg:flex-1 yang ikut tinggi kolom kiri):
+                     kini grafik proporsinya sama untuk guest & login. Canvas tetap absolute
+                     agar tak menyumbang intrinsic size -> Chart.js tak masuk resize-loop. --}}
+                <div class="relative w-full h-72 md:h-80" wire:ignore>
                     <canvas id="wpmChart" class="absolute inset-0"></canvas>
                 </div>
             </div>
-        </div>
 
         @script
             <script>
@@ -423,7 +416,15 @@
                                     ticks: {
                                         color: '#94a3b8'
                                     },
-                                    beginAtZero: true
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: @js(__('result.wpm')),
+                                        color: '#94a3b8',
+                                        font: {
+                                            size: 10
+                                        }
+                                    }
                                 },
                                 y1: {
                                     position: 'right',
@@ -443,7 +444,17 @@
                                     // rentangnya waras; display menyembunyikannya sama sekali: tak
                                     // ada error, tak ada sumbu error, grafik persis seperti dulu.
                                     suggestedMax: 5,
-                                    display: hasErrors
+                                    // display: hasErrors mematikan SELURUH sumbu (judul ikut) saat
+                                    // run bersih -> tak ada error, tak ada sumbu kanan sama sekali.
+                                    display: hasErrors,
+                                    title: {
+                                        display: true,
+                                        text: @js(__('result.error_axis')),
+                                        color: '#94a3b8',
+                                        font: {
+                                            size: 10
+                                        }
+                                    }
                                 }
                             },
                             plugins: {
@@ -481,28 +492,41 @@
                 ['z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/'],
             ];
             $maxMiss = count($missedChars) > 0 ? max($missedChars) : 0;
+            // Run bersih = tak ada tuts meleset DAN tak ada titik error. Pakai KEDUANYA supaya
+            // sesi lama (missedChars terisi tanpa errorEvents) tetap terhitung ber-error ->
+            // heatmap tetap tampil (menjaga assertSee 'error heatmap' di test layout).
+            $isCleanRun = empty($missedChars) && array_sum($this->errorSeries['counts']) === 0;
         @endphp
 
+        @if ($isCleanRun)
+            {{-- Run bersih: JANGAN tampilkan konsol error kosong + hint "klik penanda" yang
+                 mustahil (tak ada penanda). Ganti pengakuan positif; grafik di atas tetap ada. --}}
+            <div class="bg-surface/40 border border-white/5 rounded-2xl p-6 flex items-center justify-center gap-3">
+                <span class="text-gold text-lg leading-none">✦</span>
+                <span class="font-mono text-sm text-gold uppercase tracking-[0.2em]">{{ __('result.error_none') }}</span>
+            </div>
+        @else
         <div x-ref="heatmap"
-            class="mt-8 bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6 flex flex-col items-center gap-2">
+            class="bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6 flex flex-col items-center gap-2">
             <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-muted mb-0 self-start">{{ __('result.error_heatmap') }}</h3>
             {{-- Titik grafik & heatmap menghitung KARAKTER TARGET yang gagal diproduksi;
                  tile "characters" menghitung KEYSTROKE. Keduanya sengaja beda (lihat docs),
                  jadi definisinya dinyatakan di sini -- tepat di titik kebingungannya. --}}
             <p class="font-mono text-[0.65rem] text-muted/60 self-start -mt-1">{{ __('result.error_scope') }}</p>
 
-            {{-- Slot panel SELALU dirender dengan min-h supaya membuka/menutupnya tak
-                 menggeser layout; empty state-nya merangkap satu-satunya petunjuk bahwa
-                 grafik di atas bisa diklik. --}}
-            <div class="w-full min-h-[5rem] mt-2 self-start">
-                <template x-if="! selected">
-                    <p class="font-mono text-xs text-muted/70">{{ __('result.error_hint') }}</p>
-                </template>
+            {{-- Idle: cukup hint ringkas (afordans bahwa grafik bisa diklik), TANPA min-h
+                 besar -- jadi tak ada ruang kosong menganga sebelum ada titik diklik. Saat
+                 titik diklik, panel detail mengembang MULUS lewat x-collapse (bukan lompat).
+                 x-show, bukan x-if: x-collapse perlu elemen tetap ada untuk menganimasikan
+                 tingginya. Kalau plugin Collapse absen, x-collapse jadi no-op & panel tetap
+                 toggle instan (graceful). Akses `selected` di-guard (?. / ?? []) karena
+                 elemennya kini selalu ada di DOM meski `selected` masih null. --}}
+            <div class="w-full mt-2 self-start">
+                <p x-show="! open" class="font-mono text-xs text-muted/70">{{ __('result.error_hint') }}</p>
 
-                <template x-if="selected">
-                    <div class="flex flex-col gap-1.5">
+                <div x-show="open" x-collapse class="flex flex-col gap-1.5">
                         <p class="font-mono text-xs uppercase tracking-[0.2em] text-muted"
-                            x-text="@js(__('result.error_at')).replace(':second', selected[0].label)"></p>
+                            x-text="@js(__('result.error_at')).replace(':second', selected?.[0]?.label ?? '')"></p>
 
                         {{-- Banyak error dalam satu detik -> satu baris per error (bisa kata
                              yang sama dengan offset berbeda). Jujur apa adanya. --}}
@@ -512,7 +536,7 @@
                              menghasilkan dua event ber-{second,index} SAMA, jadi field apa pun
                              dari data tetap bisa bentrok. selected diganti utuh & tak pernah
                              diurut ulang, jadi posisi array itu kunci yang aman. --}}
-                        <template x-for="(e, i) in selected" :key="i">
+                        <template x-for="(e, i) in (selected ?? [])" :key="i">
                             {{-- Tombol: baris inilah yang menyetir pasangan ring di keyboard.
                                  Penanda terpilih & cursor cuma muncul kalau memang ada pilihan
                                  (>1 error) -- kalau cuma satu, tombol yang "bisa diklik" tapi
@@ -528,8 +552,8 @@
                                     <span class="text-muted"
                                         ><span x-text="e.word.slice(0, e.offset)"></span
                                         ><span class="text-danger font-bold underline underline-offset-4"
-                                            x-text="e.word[e.offset]"></span
-                                        ><span x-text="e.word.slice(e.offset + 1)"></span
+                                            x-text="e.word.slice(e.offset, e.offsetEnd + 1)"></span
+                                        ><span x-text="e.word.slice(e.offsetEnd + 1)"></span
                                     ></span>
                                 </template>
                                 <template x-if="! e.word">
@@ -549,23 +573,7 @@
                                 </template>
                             </button>
                         </template>
-                    </div>
-                </template>
-            </div>
-
-            {{-- Legenda memakai swatch dengan class ring/outline yang SAMA PERSIS dengan
-                 tuts, jadi bahasanya mengajarkan dirinya sendiri ketimbang minta user
-                 menghafal kata "solid"/"dashed". Selalu tampil: tak ada layout shift, dan
-                 sudah terbaca bahkan sebelum titik pertama diklik. --}}
-            <div class="w-full flex flex-wrap items-center gap-x-5 gap-y-1.5 font-mono text-[0.65rem] text-muted/60">
-                <span class="inline-flex items-center gap-2">
-                    <span class="w-3 h-3 rounded-sm bg-white/5 ring-2 ring-gold ring-offset-2 ring-offset-surface"></span>
-                    {{ __('result.error_legend_needed') }}
-                </span>
-                <span class="inline-flex items-center gap-2">
-                    <span class="w-3 h-3 rounded-sm bg-white/5 outline outline-2 outline-dashed outline-offset-2 outline-gold/50"></span>
-                    {{ __('result.error_legend_pressed') }}
-                </span>
+                </div>
             </div>
 
             {{-- overflow-x-auto memaksa overflow-y ikut MEMOTONG (spek: overflow-y:visible
@@ -595,7 +603,7 @@
                             <div data-key="{{ $key }}"
                                 class="w-10 h-10 md:w-12 md:h-12 rounded-lg flex items-center justify-center text-sm md:text-base font-bold transition-colors relative group"
                                 :class="{
-                                    'ring-2 ring-gold ring-offset-2 ring-offset-surface': expectedKey === @js($key),
+                                    'ring-2 ring-gold ring-offset-2 ring-offset-surface': expectedKeys.includes(@js($key)),
                                     'outline outline-2 outline-dashed outline-offset-2 outline-gold/50': actualKey === @js($key),
                                 }"
                                 style="{{ $style }}">
@@ -613,9 +621,46 @@
                 @endforeach
             </div>
             </div>
+
+            {{-- Legenda: PINDAH ke bawah keyboard supaya alur baca hint -> keyboard ->
+                 keterangan simbol, dan tak lagi menyelip mepet di antara hint & keyboard.
+                 Di-center (justify-center) mengikuti keyboard yang juga center. Swatch pakai
+                 class ring/outline PERSIS sama dengan tuts -- mengajarkan dirinya sendiri. --}}
+            <div class="w-full flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 font-mono text-[0.65rem] text-muted/60">
+                <span class="inline-flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-sm bg-white/5 ring-2 ring-gold ring-offset-2 ring-offset-surface"></span>
+                    {{ __('result.error_legend_needed') }}
+                </span>
+                <span class="inline-flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-sm bg-white/5 outline outline-2 outline-dashed outline-offset-2 outline-gold/50"></span>
+                    {{ __('result.error_legend_pressed') }}
+                </span>
+            </div>
         </div>
+        @endif{{-- /clean-run --}}
 
         </div>{{-- /island error inspector --}}
+
+        {{-- Tombol aksi: full-width di bawah seluruh ringkasan + blok error-review. --}}
+        <div class="mt-10 flex items-stretch gap-3">
+            <a id="restartButton" href="/typing"
+                class="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-mono font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition"
+                title="{{ __('result.next_test_title') }}">
+                <span>{{ __('result.next_test_title') }}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
+                </svg>
+            </a>
+            {{-- Retry hanya untuk Words: mengulang rangkaian kata yang sama persis
+                 (lewat retry() -> session typing_retry), berbeda dari Next Test yang acak. --}}
+            @if ($mode === 'words' && $textToType)
+                <button type="button" wire:click="retry"
+                    class="inline-flex items-center justify-center h-12 px-6 rounded-2xl bg-surface border border-white/5 text-foreground/80 hover:text-foreground hover:border-white/10 font-mono font-semibold text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-border transition"
+                    title="{{ __('result.retry_title') }}">
+                    {{ __('result.retry_title') }}
+                </button>
+            @endif
+        </div>
 
         @endif
     </div>
@@ -630,30 +675,63 @@
         return {
             // Dikelompokkan di klien, bukan PHP: array PHP ber-key int rapat 0..n di-encode
             // jadi ARRAY oleh json_encode, yang jarang jadi OBJECT. Mengelompokkan di sini
-            // menghilangkan jebakan bentuk itu sepenuhnya.
-            grouped: events.reduce((acc, e) => ((acc[e.second] ??= []).push(e), acc), {}),
+            // menghilangkan jebakan bentuk itu sepenuhnya. Tiap detik lalu dilewatkan
+            // mergeSkippedRuns() -> "display rows": run karakter SKIPPED yang berurutan dalam
+            // satu kata jadi SATU baris (grafik & heatmap tetap per-karakter, ini murni tampilan).
+            grouped: Object.fromEntries(
+                Object.entries(
+                    events.reduce((acc, e) => ((acc[e.second] ??= []).push(e), acc), {})
+                ).map(([sec, evs]) => [sec, mergeSkippedRuns(evs)])
+            ),
             selected: null,
-            // Baris yang sedang disorot DI DALAM detik terpilih. Keyboard selalu menampilkan
-            // tepat SATU pasang (butuh -> tekan). Menyorot seluruh detik sekaligus bikin
-            // maknanya runtuh: satu tuts bisa jadi "yang dibutuhkan" di error A sekaligus
-            // "yang ditekan" di error B, dan solid-vs-dashed kehilangan artinya.
+            // Visibilitas panel DIPISAH dari `selected`. x-collapse mengukur tinggi elemen
+            // tepat saat x-show berubah true; kalau visibilitas diikat langsung ke `selected`,
+            // efek x-show (di induk) bisa jalan SEBELUM x-for (di anak) menyisipkan baris ->
+            // tinggi terukur cuma setinggi label -> animasi mengembang ke tinggi salah lalu
+            // "meloncat" ke penuh. `open` di-flip SETELAH konten ter-render (lihat select()).
+            open: false,
+            // Baris yang sedang disorot DI DALAM detik terpilih. Keyboard menyorot tuts dari
+            // SATU baris saja (baris run bisa banyak tuts "needed"; baris salah-ketik = 1 pasang
+            // butuh->tekan). Menyorot seluruh detik sekaligus bikin maknanya runtuh: satu tuts
+            // bisa jadi "yang dibutuhkan" di error A sekaligus "yang ditekan" di error B, dan
+            // solid-vs-dashed kehilangan artinya.
             row: 0,
 
             select(index) {
-                this.selected = this.grouped[index] ?? null;
+                const group = this.grouped[index] ?? null;
+
+                // Klik kolom tanpa error -> tutup panel & bersihkan sorotan keyboard.
+                if (! group) {
+                    this.open = false;
+                    this.selected = null;
+                    this.row = 0;
+                    return;
+                }
+
+                // Isi konten DULU: x-for merender baris pada flush tick ini.
+                this.selected = group;
                 this.row = 0;
-                if (this.selected) this.revealHeatmap();
+
+                // Baru buka di tick berikutnya, setelah baris ada di DOM -> x-collapse
+                // mengukur tinggi yang benar & animasinya mulus (tak meloncat). Scroll juga
+                // ditunda ke sini supaya tak dihitung saat panel masih tinggi 0.
+                this.$nextTick(() => {
+                    this.open = true;
+                    this.revealHeatmap();
+                });
             },
 
             get current() {
                 return this.selected?.[this.row] ?? null;
             },
 
-            // Di-lowercase agar cocok dengan kunci heatmap (yang juga lowercase dari
-            // missedChars). Panel tetap menampilkan karakter ASLINYA -- "kamu menekan T"
-            // vs "t" itu justru informasinya (menekan Shift saat tak perlu).
-            get expectedKey() {
-                return (this.current?.expected ?? '').toLowerCase();
+            // Tuts "needed" yang disorot di keyboard. Array, bukan string tunggal: baris run
+            // skipped mewakili BEBERAPA karakter -> semua ter-ring sekaligus. Baris salah-ketik
+            // / skip tunggal = array 1 elemen (perilaku identik dengan sebelumnya). Sudah
+            // di-lowercase di mergeSkippedRuns agar cocok dengan kunci heatmap (lowercase dari
+            // missedChars). Panel tetap menampilkan karakter ASLINYA.
+            get expectedKeys() {
+                return this.current?.keys ?? [];
             },
 
             get actualKey() {
@@ -669,5 +747,39 @@
                 this.$refs.heatmap?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             },
         };
+    }
+
+    // Ubah event mentah satu detik jadi "display rows": karakter SKIPPED (actual === null)
+    // yang BERURUTAN dalam kata yang SAMA digabung ke satu baris (mis. "a" ketik lalu lompat
+    // -> "bout" jadi satu run a[bout]) supaya panel tak mengulang kalimat "skipped" per huruf.
+    // MURNI tampilan: counts grafik & missedChars/heatmap tetap per-karakter (dari PHP inspect).
+    // Event dalam satu detik sudah urut ketik = urut index, jadi run skipped kontigu pasti
+    // berdampingan. Error salah-ketik & skip tunggal jadi baris biasa (offsetEnd === offset).
+    function mergeSkippedRuns(events) {
+        const rows = [];
+
+        for (const e of events) {
+            const prev = rows[rows.length - 1];
+            const isSkip = e.actual === null;
+
+            if (isSkip && prev && prev.skipped && prev.word && prev.word === e.word
+                && typeof e.offset === 'number' && e.offset === prev.offsetEnd + 1) {
+                prev.offsetEnd = e.offset;
+                prev.keys.push((e.expected ?? '').toLowerCase());
+                continue;
+            }
+
+            rows.push({
+                word: e.word,
+                offset: e.offset,               // awal garis bawah
+                offsetEnd: e.offset,            // akhir garis bawah (== offset utk baris tunggal)
+                expected: e.expected,
+                actual: e.actual,
+                skipped: isSkip,
+                keys: [(e.expected ?? '').toLowerCase()],   // tuts "needed" utk sorotan keyboard
+            });
+        }
+
+        return rows;
     }
 </script>
