@@ -107,3 +107,22 @@
         background-size: calc(var(--square) * 2) calc(var(--square) * 2);
     }
 }
+
+/* Hormati preferensi sistem "kurangi gerakan".
+
+   Aplikasi ini padat gerak: countdown balapan, transisi toast, animasi caret,
+   pulse stamina, dan race-surge. Bagi pengguna dengan sensitivitas vestibular
+   (migrain, vertigo, gangguan keseimbangan) gerakan sebanyak itu bisa memicu
+   gejala fisik nyata. Durasi tidak dinolkan penuh (0.01ms) supaya event
+   transitionend/animationend tetap terpicu -- menolkannya total akan membuat
+   logika yang menunggu event itu menggantung. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

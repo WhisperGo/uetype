@@ -480,19 +480,12 @@
             }
         };
 
-        const boot = () => {
-            if (typeof Chart !== 'undefined') return draw();
-            const s = document.createElement('script');
-            s.src = 'https://cdn.jsdelivr.net/npm/chart.js';
-            s.onload = draw;
-            document.head.appendChild(s);
-        };
-
-        boot();
+        // Chart datang dari bundle Vite (window.Chart di app.js), bukan CDN runtime.
+        draw();
 
         // Ganti rentang hari -> Livewire render ulang -> gambar ulang grafik.
         Livewire.hook('morph.updated', ({ component }) => {
-            if (component.id === $wire.id) boot();
+            if (component.id === $wire.id) draw();
         });
     </script>
     @endscript

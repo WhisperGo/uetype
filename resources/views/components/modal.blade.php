@@ -46,6 +46,12 @@ $maxWidth = [
     x-on:keydown.tab.prevent="$event.shiftKey || nextFocusable().focus()"
     x-on:keydown.shift.tab.prevent="prevFocusable().focus()"
     x-show="show"
+    {{-- Focus trap saja tak cukup: tanpa role/aria-modal, pembaca layar tidak
+         mengumumkan bahwa konteks berpindah ke dialog, dan konten di belakangnya
+         tetap terbaca seolah masih aktif. --}}
+    role="dialog"
+    aria-modal="true"
+    :aria-hidden="show ? 'false' : 'true'"
     class="fixed inset-0 z-[70] flex min-h-full items-center justify-center overflow-y-auto px-4 py-6 sm:px-0"
     style="display: {{ $show ? 'block' : 'none' }};"
 >

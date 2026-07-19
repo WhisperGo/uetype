@@ -473,14 +473,8 @@
                     });
                 };
 
-                if (typeof Chart === 'undefined') {
-                    const script = document.createElement('script');
-                    script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
-                    script.onload = renderChart;
-                    document.head.appendChild(script);
-                } else {
-                    renderChart();
-                }
+                // Chart datang dari bundle Vite (window.Chart di app.js), bukan CDN runtime.
+                renderChart();
             </script>
         @endscript
 

@@ -170,7 +170,7 @@
                                             <div class="flex items-center gap-2">
                                                 <div class="w-6 h-6 rounded-md overflow-hidden bg-foreground/5 flex items-center justify-center shrink-0">
                                                     @if ($spectator->user->avatar)
-                                                        <img src="{{ $spectator->user->avatar }}" referrerpolicy="no-referrer" class="w-full h-full object-cover">
+                                                        <img src="{{ $spectator->user->avatar }}" alt="{{ $spectator->user->username }}" referrerpolicy="no-referrer" class="w-full h-full object-cover">
                                                     @else
                                                         <img src="/icon/uetype_mascot.png" alt="{{ $spectator->user->username }}" class="w-4/5 h-4/5 object-contain">
                                                     @endif
@@ -200,8 +200,8 @@
                                 <div
                                     class="w-14 h-14 rounded-xl overflow-hidden bg-foreground/5 mb-3 flex items-center justify-center text-xl">
                                     @if ($member->user->avatar)
-                                        <img src="{{ $member->user->avatar }}" referrerpolicy="no-referrer"
-                                            class="w-full h-full object-cover">
+                                        <img src="{{ $member->user->avatar }}" alt="{{ $member->user->username }}"
+                                            referrerpolicy="no-referrer" class="w-full h-full object-cover">
                                     @else
                                         <img src="/icon/uetype_mascot.png" alt="{{ $member->user->username }}" class="w-4/5 h-4/5 object-contain">
                                     @endif
