@@ -55,6 +55,5 @@ return [
     'error_no_word' => 'kata tak diketahui',
     'error_legend_needed' => 'tuts yang dibutuhkan',
     'error_legend_pressed' => 'tuts yang kamu tekan',
-    'error_scope' => 'menghitung karakter target yang salah — termasuk yang sudah kamu perbaiki',
     'error_none' => 'bersih — tanpa kesalahan',
 ];

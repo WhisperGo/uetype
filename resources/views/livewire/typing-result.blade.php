@@ -512,7 +512,6 @@
             {{-- Titik grafik & heatmap menghitung KARAKTER TARGET yang gagal diproduksi;
                  tile "characters" menghitung KEYSTROKE. Keduanya sengaja beda (lihat docs),
                  jadi definisinya dinyatakan di sini -- tepat di titik kebingungannya. --}}
-            <p class="font-mono text-[0.65rem] text-muted/60 self-start -mt-1">{{ __('result.error_scope') }}</p>
 
             {{-- Idle: cukup hint ringkas (afordans bahwa grafik bisa diklik), TANPA min-h
                  besar -- jadi tak ada ruang kosong menganga sebelum ada titik diklik. Saat
