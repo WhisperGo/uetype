@@ -6,9 +6,12 @@
 /storage/*.key
 /storage/pail
 /vendor
-.env
-.env.backup
-.env.production
+.DS_Store
+# Semua varian .env diabaikan, lalu .env.example dikecualikan. Pola daftar-putih
+# ini menutup nama yang belum terpikirkan (.env2, .env.local, .env.bak) -- daftar
+# hitam eksplisit pernah meloloskan .env2 berisi APP_KEY.
+.env*
+!.env.example
 .phpactor.json
 .phpunit.result.cache
 Homestead.json

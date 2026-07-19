@@ -31,10 +31,6 @@ Route::redirect('/', '/typing')->name('home');
 Route::get('/typing', TypingEngine::class)->name('typing');
 Route::get('/result', TypingResult::class)->name('typing.result');
 
-Route::get('/dashboard', function () {
-    return redirect('/');
-})->middleware(['auth', 'verified'])->name('dashboard');
-
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'me'])->name('profile.me');
 
@@ -47,7 +43,12 @@ Route::middleware('auth')->group(function () {
 
     // Heartbeat presence: klien ping berkala supaya last_seen_at tetap segar
     // (deteksi online/offline di daftar teman).
-    Route::post('/heartbeat', [PresenceController::class, 'heartbeat'])->name('presence.heartbeat');
+    // Throttle 30/menit: klien normal hanya 2/menit (interval 30 detik), tapi tiap
+    // tab kembali visible memicu ping ekstra -- batas ini menyisakan ruang untuk
+    // burst wajar itu tanpa membiarkan endpoint dibanjiri.
+    Route::post('/heartbeat', [PresenceController::class, 'heartbeat'])
+        ->middleware('throttle:30,1')
+        ->name('presence.heartbeat');
 
     Route::get('/achievements', [AchievementController::class, 'index'])->name('achievements.index');
 
@@ -57,7 +58,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/chat', Chat::class)->name('chat.index');
     // Kirim pesan lewat endpoint ringan (paralel, di luar antrean Livewire)
     // supaya spam pesan tak saling menunggu.
-    Route::post('/chat/send', [ChatController::class, 'send'])->name('chat.send');
+    // Throttle longgar (60/menit) justru KARENA endpoint ini didesain untuk burst:
+    // batas ketat akan memutus pengetik cepat, bukan penyerang.
+    Route::post('/chat/send', [ChatController::class, 'send'])
+        ->middleware('throttle:60,1')
+        ->name('chat.send');
 
     Route::get('/clans', Clans::class)->name('clans.index');
     Route::get('/clan-war', ClanWar::class)->name('clan-war.index');
@@ -69,7 +74,19 @@ Route::middleware('auth')->group(function () {
     Volt::route('/leaderboard', 'leaderboard')->name('leaderboard');
 });
 
-Route::post('/locale', LocaleController::class)->name('locale.update');
+Route::post('/locale', LocaleController::class)
+    ->middleware('throttle:20,1')
+    ->name('locale.update');
+
+// Autentikasi Google-only. Nama route 'login' WAJIB dipertahankan: middleware
+// `auth` bawaan Laravel me-redirect tamu ke route bernama itu, jadi menghapusnya
+// membuat setiap halaman terproteksi melempar RouteNotFoundException.
+Route::get('/login', [GoogleAuthController::class, 'showLogin'])
+    ->middleware('guest')
+    ->name('login');
+Route::post('/logout', [GoogleAuthController::class, 'logout'])
+    ->middleware('auth')
+    ->name('logout');
 
 Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])->name('auth.google');
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
@@ -100,19 +117,4 @@ if (app()->environment('local')) {
 
         return redirect('/typing');
     })->name('dev.login');
-
-    Route::get('/dev-login2', function () {
-        $email = request('email', 'dummy2@uetype.test');
-        $user = User::where('email', $email)->first();
-
-        if (! $user) {
-            abort(404, "User dummy '{$email}' tidak ditemukan. Jalankan: php artisan db:seed --class=DummyUserSeeder");
-        }
-
-        Auth::login($user);
-
-        return redirect('/typing');
-    })->name('dev.login2');
 }
-
-require __DIR__.'/auth.php';

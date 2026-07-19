@@ -3,17 +3,26 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
+use Illuminate\View\View;
 use Laravel\Socialite\Facades\Socialite;
 
 /**
- * Handles Google OAuth sign-in: redirects to Google and processes the callback,
- * creating or matching a user by their Google identity.
+ * Satu-satunya jalur autentikasi aplikasi: Google OAuth. Tabel `users` memang tak
+ * punya kolom `password` -- scaffolding password bawaan Breeze sudah dihapus
+ * seluruhnya, termasuk halaman login/logout-nya yang kini tinggal di sini.
  */
 class GoogleAuthController extends Controller
 {
+    /** Halaman masuk: hanya menawarkan "lanjut dengan Google". */
+    public function showLogin(): View
+    {
+        return view('auth.login');
+    }
+
     public function redirect()
     {
         return Socialite::driver('google')->redirect();
@@ -39,7 +48,8 @@ class GoogleAuthController extends Controller
                         ]
                     );
                 }
-                Auth::login($user);
+
+                $this->loginAndRegenerate($request, $user);
 
                 return redirect()->intended('/typing');
             }
@@ -51,16 +61,14 @@ class GoogleAuthController extends Controller
                 'avatar' => $googleUser->avatar,
             ]);
 
-            $request->session()->put('google_register_data', [
-                'email' => $googleUser->email,
-                'google_id' => $googleUser->id,
-                'avatar' => $googleUser->avatar,
-            ]);
-
             return redirect()->route('auth.google.choose-username');
 
         } catch (\Exception $e) {
-            return redirect('/login')->with('error', __('auth.google_failed'));
+            // Tanpa log, misconfig OAuth (client ID salah, redirect URI tak cocok)
+            // tak bisa dibedakan dari user yang sekadar membatalkan izin.
+            Log::warning('Google OAuth gagal', ['exception' => $e]);
+
+            return redirect()->route('login')->with('error', __('auth.google_failed'));
         }
     }
 
@@ -69,9 +77,9 @@ class GoogleAuthController extends Controller
      */
     public function showChooseUsernameForm(Request $request)
     {
-        // Perlu session data Google, kalau tidak ada kembalikan ke register.
+        // Perlu session data Google, kalau tidak ada kembalikan ke halaman masuk.
         if (! $request->session()->has('google_register_data')) {
-            return redirect('/register');
+            return redirect()->route('login');
         }
 
         return view('auth.google-username');
@@ -84,7 +92,7 @@ class GoogleAuthController extends Controller
     {
         // Validasi data Google di session.
         if (! $request->session()->has('google_register_data')) {
-            return redirect('/register');
+            return redirect()->route('login');
         }
 
         $googleData = $request->session()->get('google_register_data');
@@ -97,7 +105,7 @@ class GoogleAuthController extends Controller
         if ($existingUser) {
             // Datanya sudah ada: batalkan register, langsung login.
             $request->session()->forget('google_register_data');
-            Auth::login($existingUser);
+            $this->loginAndRegenerate($request, $existingUser);
 
             return redirect('/typing');
         }
@@ -117,21 +125,49 @@ class GoogleAuthController extends Controller
             'username.alpha_dash' => __('auth.username.format'),
         ]);
 
-        // Buat user baru di database.
+        // Buat user baru di database. Tak ada kolom password -- identitas
+        // sepenuhnya bersandar pada google_id.
         $user = User::create([
             'username' => $request->username,
             'email' => $googleData['email'],
             'google_id' => $googleData['google_id'],
             'avatar' => $googleData['avatar'],
-            'password' => encrypt(Str::random(16)),
         ]);
 
         // Bersihkan session data Google.
         $request->session()->forget('google_register_data');
 
         // Otomatis login-kan dan lempar ke game.
-        Auth::login($user);
+        $this->loginAndRegenerate($request, $user);
 
         return redirect('/typing');
+    }
+
+    public function logout(Request $request): RedirectResponse
+    {
+        // Tandai offline sebelum logout, supaya teman langsung melihat status offline.
+        Auth::user()?->markOffline();
+
+        Auth::guard('web')->logout();
+
+        $request->session()->invalidate();
+
+        $request->session()->regenerateToken();
+
+        return redirect('/');
+    }
+
+    /**
+     * Login + ganti session ID. Auth::login() TIDAK mengganti session ID sendiri,
+     * jadi tanpa regenerate() session yang dipegang sejak sebelum login tetap
+     * valid sesudahnya -- siapa pun yang sempat menanamkan session ID ke browser
+     * korban (mesin bersama, lab) ikut terbawa masuk. Semua jalur login harus
+     * lewat sini; jangan panggil Auth::login() langsung.
+     */
+    private function loginAndRegenerate(Request $request, User $user): void
+    {
+        Auth::login($user);
+
+        $request->session()->regenerate();
     }
 }

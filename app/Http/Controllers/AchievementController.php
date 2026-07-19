@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Services\AchievementService;
 use App\Support\AchievementDefinitions;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
 use Illuminate\View\View;
 
 /**

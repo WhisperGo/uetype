@@ -1,13 +1,9 @@
-@php
-    $isRegister = ($mode ?? 'login') === 'register';
-@endphp
-
 <div class="flex flex-col items-center text-center">
     <img src="{{ asset('icon/uetype_mascot.png') }}" alt="Maskot UeType"
         class="h-20 w-20 object-contain drop-shadow-[0_0_18px_rgba(var(--color-brand)/0.35)]">
 
     <p class="mt-4 font-mono text-[0.7rem] uppercase tracking-[0.35em] text-gold">
-        {{ $isRegister ? __('auth.create_account') : __('auth.welcome') }}
+        {{ __('auth.welcome') }}
     </p>
 
     <h1 class="mt-2 font-display text-h6 leading-tight text-foreground">
