@@ -83,4 +83,13 @@ return [
     'spectating_title' => 'You Are Spectating',
     'spectating_desc' => 'Watching the race live. Enjoy the show!',
     'you_spectated' => 'You spectated this match',
+
+    // Chat lobby (broadcast-only, tidak disimpan)
+    'chat_title' => 'Room Chat',
+    'chat_placeholder' => 'Type a message...',
+    'chat_send' => 'Send',
+    'chat_empty' => 'No messages yet. Say hi while you wait!',
+    'chat_you' => 'You',
+    'chat_joined' => ':name joined the room',
+    'chat_left' => ':name left the room',
 ];
