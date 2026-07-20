@@ -122,156 +122,14 @@
                 class="flex-1 overflow-y-auto chat-scroll p-4 space-y-3">
                 @if ($this->hasMoreOlder)
                     <div class="flex justify-center pb-2">
-                        <button wire:click="loadOlder" class="font-mono text-xs text-muted hover:text-foreground border border-white/10 rounded-lg px-3 py-1.5 transition">
-                            {{ __('chat.load_older') }}
-                        </button>
+                        <x-btn-ghost size="sm" wire:click="loadOlder">{{ __('chat.load_older') }}</x-btn-ghost>
                     </div>
                 @endif
 
                 @forelse ($this->messages as $message)
-                    @php
-                        $mine = $message->sender_id === auth()->id();
-                        $deleted = $message->isDeletedForEveryone();
-                        $editing = $editingId === $message->id;
-                        $canEdit = $mine && $message->canBeEditedBy(auth()->id());
-                        $canDeleteEveryone = $mine && $message->canBeDeletedForEveryoneBy(auth()->id());
-                    @endphp
-                    <div class="flex {{ $mine ? 'justify-end' : 'justify-start' }} group/msg" wire:key="msg-{{ $message->id }}">
-                        <div class="max-w-[75%] {{ $mine ? '' : 'flex flex-col items-start' }}">
-                            @if ($activeMode === 'clan' && ! $mine)
-                                <p class="font-mono text-[0.65rem] text-muted mb-1 px-1">{{ $message->sender->username }}</p>
-                            @endif
-
-                            @if ($editing)
-                                {{-- Form edit inline --}}
-                                <form wire:submit.prevent="saveEdit" class="flex items-center gap-2">
-                                    <input type="text" wire:model="editBody" maxlength="2000" autocomplete="off"
-                                        x-init="$nextTick(() => $el.focus())"
-                                        @keydown.escape="$wire.cancelEdit()"
-                                        class="px-3 py-2 bg-surface border border-gold/40 rounded-xl font-mono text-sm text-foreground focus:border-gold focus:ring-0 min-w-[12rem]">
-                                    <button type="submit" class="text-gold hover:text-gold/80 shrink-0" aria-label="{{ __('chat.edit_save') }}" title="{{ __('chat.edit_save') }}">
-                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-                                    </button>
-                                    <button type="button" wire:click="cancelEdit" class="text-muted hover:text-foreground shrink-0" aria-label="{{ __('chat.edit_cancel') }}" title="{{ __('chat.edit_cancel') }}">
-                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                    </button>
-                                </form>
-                            @else
-                                <div class="flex items-end gap-1.5 {{ $mine ? 'flex-row-reverse' : '' }}">
-                                    <div class="px-4 py-2.5 rounded-2xl font-mono text-sm break-words
-                                        {{ $mine ? 'bg-gold text-background rounded-br-md' : 'bg-white/5 text-foreground rounded-bl-md' }}
-                                        {{ $deleted ? 'opacity-60 italic' : '' }}">
-                                        {{-- Kutipan pesan yang dibalas (kalau ini reply & pesan asli masih ada). --}}
-                                        @if (! $deleted && $message->reply_to_id && $message->replyTo)
-                                            <button type="button" onclick="window.chatScrollToMessage({{ $message->reply_to_id }})"
-                                                class="block w-full text-left mb-1.5 pl-2 border-l-2 rounded-r
-                                                    {{ $mine ? 'border-background/40 bg-background/10' : 'border-gold/50 bg-white/5' }} px-2 py-1">
-                                                <span class="block text-[0.65rem] font-bold {{ $mine ? 'text-background/80' : 'text-gold' }}">
-                                                    {{ $message->replyTo->sender_id === auth()->id() ? __('chat.you') : $message->replyTo->sender->username }}
-                                                </span>
-                                                <span class="block text-[0.7rem] opacity-70 truncate">
-                                                    {{ $message->replyTo->isDeletedForEveryone() ? __('chat.deleted_placeholder') : Str::limit($message->replyTo->body, 60) }}
-                                                </span>
-                                            </button>
-                                        @endif
-
-                                        @if ($deleted)
-                                            <span class="flex items-center gap-1.5">
-                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-                                                {{ __('chat.deleted_placeholder') }}
-                                            </span>
-                                        @else
-                                            {{ $message->body }}
-                                        @endif
-                                        <p class="text-[0.6rem] mt-1 opacity-60">
-                                            {{ $message->created_at->format('H:i') }}
-                                            @if (! $deleted && $message->isEdited())
-                                                · {{ __('chat.edited') }}
-                                            @endif
-                                        </p>
-                                    </div>
-
-                                    {{-- Menu aksi per-pesan; tak muncul untuk pesan yang sudah dihapus-untuk-semua. --}}
-                                    @unless ($deleted)
-                                        <div x-data="{
-                                                open: false,
-                                                placed: false,
-                                                topPx: 0,
-                                                toggle() {
-                                                    if (this.open) { this.open = false; return; }
-                                                    this.placed = false;
-                                                    this.open = true;
-                                                    // Posisikan setelah dirender agar tingginya terukur (2-4 item).
-                                                    this.$nextTick(() => { this.place(); this.placed = true; });
-                                                },
-                                                // Buka ke bawah; kalau tak muat ke atas; lalu clamp agar menu
-                                                // selalu utuh di dalam #chat-messages.
-                                                place() {
-                                                    const box = document.getElementById('chat-messages');
-                                                    const menu = this.$refs.menu;
-                                                    if (!box || !menu) return;
-
-                                                    const area = box.getBoundingClientRect();
-                                                    const btn = this.$refs.trigger.getBoundingClientRect();
-                                                    const h = menu.offsetHeight;
-                                                    const gap = 4, pad = 8;
-
-                                                    let top = btn.bottom + gap;                 // buka ke bawah
-                                                    if (top + h > area.bottom - pad) {
-                                                        top = btn.top - gap - h;                // buka ke atas
-                                                    }
-                                                    const maxTop = area.bottom - pad - h;
-                                                    const minTop = area.top + pad;
-                                                    top = Math.max(minTop, Math.min(top, maxTop));
-
-                                                    // Menu absolute terhadap wrapper -> simpan relatif ke tombol.
-                                                    this.topPx = top - btn.top;
-                                                },
-                                            }" @click.outside="open = false"
-                                            @chat-scrolled.window="open = false"
-                                            class="relative shrink-0">
-                                            <button x-ref="trigger" @click="toggle()"
-                                                :class="open ? 'bg-gold text-background' : 'bg-white/10 text-foreground hover:bg-gold hover:text-background'"
-                                                class="p-1.5 rounded-full border border-white/10 shadow-sm transition"
-                                                aria-label="{{ __('chat.message_actions') }}">
-                                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" /></svg>
-                                            </button>
-                                            <div x-show="open" x-cloak x-ref="menu"
-                                                :style="`top: ${topPx}px`"
-                                                :class="placed ? 'opacity-100' : 'opacity-0'"
-                                                class="absolute z-30 {{ $mine ? 'right-0' : 'left-0' }} w-48 py-1 bg-surface border border-white/10 rounded-xl shadow-lg overflow-hidden transition-opacity duration-150">
-                                                <button wire:click="startReply({{ $message->id }})" @click="open = false"
-                                                    class="w-full flex items-center gap-2.5 text-left px-3 py-2 font-mono text-xs font-semibold text-foreground hover:bg-white/5 transition">
-                                                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6M3 10l6-6" /></svg>
-                                                    {{ __('chat.reply') }}
-                                                </button>
-                                                @if ($canEdit)
-                                                    <button wire:click="startEdit({{ $message->id }})" @click="open = false"
-                                                        class="w-full flex items-center gap-2.5 text-left px-3 py-2 font-mono text-xs font-semibold text-gold hover:bg-gold/10 transition">
-                                                        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                                        {{ __('chat.edit') }}
-                                                    </button>
-                                                @endif
-                                                <button wire:click="deleteForMe({{ $message->id }})" @click="open = false"
-                                                    class="w-full flex items-center gap-2.5 text-left px-3 py-2 font-mono text-xs font-semibold text-amber-400 hover:bg-amber-400/10 transition">
-                                                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0L21 21" /></svg>
-                                                    {{ __('chat.delete_for_me') }}
-                                                </button>
-                                                @if ($canDeleteEveryone)
-                                                    <button wire:click="deleteForEveryone({{ $message->id }})"
-                                                        wire:confirm="{{ __('chat.confirm_delete_everyone') }}" @click="open = false"
-                                                        class="w-full flex items-center gap-2.5 text-left px-3 py-2 font-mono text-xs font-semibold text-red-400 hover:bg-red-400/10 transition">
-                                                        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" /></svg>
-                                                        {{ __('chat.delete_for_everyone') }}
-                                                    </button>
-                                                @endif
-                                            </div>
-                                        </div>
-                                    @endunless
-                                </div>
-                            @endif
-                        </div>
-                    </div>
+                    <x-chat.message :message="$message" :active-mode="$activeMode" :editing-id="$editingId"
+                        size="lg" keyPrefix="msg" containerId="chat-messages"
+                        scrollEvent="chat-scrolled" scrollFn="window.chatScrollToMessage" />
                 @empty
                     <p class="font-mono text-sm text-muted text-center py-10">{{ __('chat.no_messages_yet') }}</p>
                 @endforelse
@@ -279,275 +137,35 @@
 
             {{-- Preview pesan yang sedang dibalas (di atas input). --}}
             @if ($this->replyingTo)
-                <div class="flex items-center gap-3 px-4 pt-3 shrink-0">
-                    <div class="flex-1 min-w-0 pl-3 border-l-2 border-gold">
-                        <p class="font-mono text-[0.65rem] font-bold text-gold">
-                            {{ __('chat.replying_to') }}
-                            {{ $this->replyingTo->sender_id === auth()->id() ? __('chat.you') : $this->replyingTo->sender->username }}
-                        </p>
-                        <p class="font-mono text-xs text-muted truncate">
-                            {{ $this->replyingTo->isDeletedForEveryone() ? __('chat.deleted_placeholder') : Str::limit($this->replyingTo->body, 80) }}
-                        </p>
-                    </div>
-                    <button wire:click="cancelReply" class="text-muted hover:text-foreground shrink-0 p-1" aria-label="{{ __('chat.cancel_reply') }}" title="{{ __('chat.cancel_reply') }}">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
+                <x-chat.reply-preview :message="$this->replyingTo" size="lg" />
             @endif
 
-            {{-- Input: kirim lewat fetch() ke /chat/send (paralel, di luar antrean
-                 Livewire) agar spam pesan tak saling menunggu. --}}
-            <form x-data="{ draft: '' }"
-                @submit.prevent="
-                    const b = draft.trim();
-                    if (b === '') return;
-                    window.chatSend(b);
-                    draft = '';
-                    $refs.msgInput.focus();
-                "
-                class="flex items-center gap-3 p-4 border-t border-white/5 shrink-0">
-                <input type="text" x-model="draft" x-ref="msgInput" maxlength="2000" autocomplete="off"
-                    placeholder="{{ __('chat.placeholder') }}"
-                    class="flex-1 px-4 py-2.5 bg-surface/40 border border-white/10 rounded-2xl font-mono text-sm text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
-                <x-btn-gold type="submit" size="xl" class="disabled:opacity-40" x-bind:disabled="draft.trim() === ''">
-                    {{ __('chat.send') }}
-                </x-btn-gold>
-            </form>
+            <x-chat.composer size="lg" sendFn="window.chatSend" inputRef="msgInput" />
         </div>
     @endif
 
     {{-- ===== MODAL: CLEAR CHAT ===== --}}
     @if ($showClearModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" wire:click.self="$set('showClearModal', false)">
-            <div class="w-full max-w-sm p-6 bg-surface border border-white/10 rounded-2xl">
-                <h2 class="font-display text-lg text-foreground mb-1">{{ __('chat.clear_modal_title') }}</h2>
-                <p class="font-mono text-xs text-muted mb-5">{{ __('chat.clear_modal_body') }}</p>
-
-                <div class="space-y-3 mb-5">
-                    <label class="flex items-center gap-3 font-mono text-sm text-foreground cursor-pointer">
-                        <input type="radio" wire:model="clearScope" value="all" class="accent-gold">
-                        {{ __('chat.clear_scope_all') }}
-                    </label>
-                    <label class="flex items-center gap-3 font-mono text-sm text-foreground cursor-pointer">
-                        <input type="radio" wire:model="clearScope" value="days" class="accent-gold">
-                        <span>{{ __('chat.clear_scope_days') }}</span>
-                        <input type="number" wire:model="clearDays" min="1" max="3650"
-                            class="w-16 px-2 py-1 bg-surface/60 border border-white/10 rounded-lg font-mono text-sm text-foreground focus:border-gold/50 focus:ring-0">
-                        <span>{{ __('chat.clear_scope_days_suffix') }}</span>
-                    </label>
-                </div>
-
-                <div class="flex justify-end gap-3">
-                    <button wire:click="$set('showClearModal', false)"
-                        class="px-4 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
-                        {{ __('chat.clear_cancel') }}
-                    </button>
-                    <button wire:click="confirmClear"
-                        class="px-4 py-2 font-mono text-xs font-bold text-background bg-red-400 hover:bg-red-400/90 rounded-lg transition">
-                        {{ __('chat.clear_confirm') }}
-                    </button>
-                </div>
-            </div>
-        </div>
+        <x-chat.clear-modal z="z-50" />
     @endif
 
     {{-- REAL-TIME: subscription Echo dipegang toast global di layout (satu-satunya
-         subscriber). Halaman ini cukup mendengar event window yang diteruskannya. --}}
+         subscriber). Halaman ini cukup mendengar event window yang diteruskannya.
+
+         Bodinya ada di resources/js/chat-runtime.js; @script ini hanya menyuntikkan
+         empat nilai yang memang cuma diketahui Blade. --}}
     @script
         <script>
-            const meId = {{ auth()->id() }};
-
-            // Payload WebSocket = input user lain; escape sebelum masuk DOM.
-            const esc = (s) => { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; };
-
-            // Apakah pesan masuk termasuk percakapan yang sedang dibuka?
-            const belongsToOpenConversation = (d) => {
-                if (d.kind === 'dm') {
-                    return $wire.activeMode === 'dm' && $wire.withUsername === d.senderUsername;
-                }
-                if (d.kind === 'clan') {
-                    return $wire.activeMode === 'clan';
-                }
-                return false;
-            };
-
-            // Gambar bubble langsung dari payload WS tanpa menunggu render server.
-            // wire:key sama dengan render Livewire nanti -> tak terduplikasi.
-            const appendBubble = (d) => {
-                const list = document.getElementById('chat-messages');
-                if (!list) return;
-                if (document.querySelector(`[wire\\:key="msg-${d.messageId}"]`)) return; // sudah ada
-
-                const showName = d.kind === 'clan' && d.senderId !== meId;
-                const wrap = document.createElement('div');
-                wrap.className = 'flex justify-start';
-                wrap.setAttribute('wire:key', `msg-${d.messageId}`);
-                wrap.innerHTML =
-                    '<div class="max-w-[75%] flex flex-col items-start">' +
-                        (showName ? `<p class="font-mono text-[0.65rem] text-muted mb-1 px-1">${esc(d.senderUsername)}</p>` : '') +
-                        '<div class="px-4 py-2.5 rounded-2xl font-mono text-sm break-words bg-white/5 text-foreground rounded-bl-md">' +
-                            esc(d.body) +
-                            '<p class="text-[0.6rem] mt-1 opacity-60">' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) + '</p>' +
-                        '</div>' +
-                    '</div>';
-                list.appendChild(wrap);
-                requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
-            };
-
-            // Bubble pesan sendiri tampil seketika saat submit (mendukung spam beruntun).
-            // wire:key unik "opt-N" agar Livewire morph tak menyentuhnya (tak kedip);
-            // dibuang serentak saat semua kiriman selesai, digantikan bubble asli.
-            let __optSeq = 0;
-            // Di window agar hook morph.updated global tetap membaca counter yang benar
-            // setelah wire:navigate.
-            window.__chatPendingSends = window.__chatPendingSends || 0;
-            window.chatAppendOutgoing = (body) => {
-                const list = document.getElementById('chat-messages');
-                if (!list) return;
-                const wrap = document.createElement('div');
-                wrap.className = 'flex justify-end';
-                wrap.setAttribute('data-optimistic', '1');
-                wrap.setAttribute('wire:key', `opt-${++__optSeq}`);
-                wrap.innerHTML =
-                    '<div class="max-w-[75%]">' +
-                        '<div class="px-4 py-2.5 rounded-2xl font-mono text-sm break-words bg-gold text-background rounded-br-md opacity-70">' +
-                            esc(body) +
-                            '<p class="text-[0.6rem] mt-1 opacity-60">' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) + '</p>' +
-                        '</div>' +
-                    '</div>';
-                list.appendChild(wrap);
-                requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
-            };
-
-            const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
-            let __syncTimer = null;
-
-            // Kirim via fetch() paralel (bukan Livewire) agar spam tak saling menunggu.
-            // Setelah semua kiriman selesai, sinkron sekali (debounced) ke server.
-            window.chatSend = (body) => {
-                const mode = $wire.activeMode;
-                if (!mode) return;
-
-                window.chatAppendOutgoing(body);
-
-                // Reply hanya berlaku untuk kiriman pertama sejak preview dibuka.
-                const replyId = $wire.replyingToId || null;
-                if (replyId) $wire.cancelReply();
-
-                window.__chatPendingSends++;
-                fetch(@js(route('chat.send')), {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrf,
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        mode,
-                        body,
-                        with: $wire.withUsername || null,
-                        reply_to_id: replyId,
-                    }),
-                }).catch(() => {}).finally(() => {
-                    window.__chatPendingSends--;
-                    if (window.__chatPendingSends === 0) {
-                        // Hanya minta re-render (debounced). Bubble optimistic dibuang
-                        // di morph.updated, setelah bubble asli ada di DOM, agar pesan
-                        // tak sempat hilang lalu muncul lagi.
-                        clearTimeout(__syncTimer);
-                        __syncTimer = setTimeout(() => $wire.dispatch('message-received'), 120);
-                    }
-                });
-            };
-
-            // Klik kutipan reply -> gulir ke pesan asli & kedipkan sebentar.
-            window.chatScrollToMessage = (id) => {
-                const el = document.querySelector(`[wire\\:key="msg-${id}"]`);
-                if (!el) return;
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                el.classList.add('chat-flash');
-                setTimeout(() => el.classList.remove('chat-flash'), 1200);
-            };
-
-            const onRemote = (ev) => {
-                const d = ev.detail;
-                if (d && belongsToOpenConversation(d)) {
-                    appendBubble(d);
-                }
-                // Tetap sinkronkan state otoritatif (read receipt, dedup, dsb).
-                $wire.dispatch('message-received');
-            };
-            window.addEventListener('message-received-remote', onRemote);
-
-            // Edit/hapus dari sisi lain: patch bubble langsung dari payload (instan),
-            // server tetap disinkronkan di belakang layar.
-            const patchMutation = (d) => {
-                const node = document.querySelector(`[wire\\:key="msg-${d.messageId}"]`);
-                if (!node) return false;
-                const bubble = node.querySelector('.rounded-2xl');
-                if (!bubble) return false;
-
-                if (d.action === 'edited') {
-                    // Bangun ulang isi: buang semua kecuali <p> waktu, sisipkan teks baru.
-                    const timeP = bubble.querySelector('p.opacity-60');
-                    [...bubble.childNodes].forEach(n => { if (n !== timeP) n.remove(); });
-                    bubble.insertBefore(document.createTextNode(d.body ?? ''), timeP);
-                    if (timeP && !timeP.dataset.edited) {
-                        timeP.append(` · {{ __('chat.edited') }}`);
-                        timeP.dataset.edited = '1';
-                    }
-                } else if (d.action === 'deleted') {
-                    bubble.classList.add('opacity-60', 'italic');
-                    bubble.innerHTML =
-                        '<span class="flex items-center gap-1.5">' +
-                        '<svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>' +
-                        @js(__('chat.deleted_placeholder')) +
-                        '</span>';
-                }
-                return true;
-            };
-            const onMutated = (ev) => {
-                const d = ev.detail;
-                if (d && d.messageId) patchMutation(d);
-                // Sinkron server (mis. untuk pesan yang belum termuat / kutipan reply).
-                $wire.dispatch('message-received');
-            };
-            window.addEventListener('message-mutated-remote', onMutated);
-
-            document.addEventListener('livewire:navigating', () => {
-                window.removeEventListener('message-received-remote', onRemote);
-                window.removeEventListener('message-mutated-remote', onMutated);
-            }, { once: true });
-
-            // Auto-scroll ke pesan terbaru tiap daftar berubah. Hook didaftarkan
-            // sekali secara global agar tak menumpuk tiap jendela dibuka/tutup.
-            if (!window.__chatScrollHookRegistered) {
-                window.__chatScrollHookRegistered = true;
-                Livewire.hook('morph.updated', () => {
-                    // Bubble asli sudah ada di DOM -> baru buang placeholder optimistic.
-                    if (window.__chatPendingSends === 0) {
-                        document.querySelectorAll('#chat-messages [data-optimistic]').forEach(n => n.remove());
-                    }
-                    const el = document.getElementById('chat-messages');
-                    if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
-                });
-            }
-
-            Alpine.data('chatScroll', () => ({
-                init() {
-                    this.$nextTick(() => {
-                        const el = document.getElementById('chat-messages');
-                        if (!el) return;
-                        el.scrollTop = el.scrollHeight;
-
-                        // Tutup menu aksi yang terbuka saat daftar di-scroll, supaya
-                        // posisinya (yang dihitung sekali saat dibuka) tak jadi basi.
-                        el.addEventListener('scroll', () => {
-                            window.dispatchEvent(new CustomEvent('chat-scrolled'));
-                        }, { passive: true });
-                    });
+            window.createChatRuntime({
+                variant: 'page',
+                wire: $wire,
+                meId: {{ auth()->id() }},
+                sendUrl: @js(route('chat.send')),
+                labels: {
+                    edited: @js(__('chat.edited')),
+                    deleted: @js(__('chat.deleted_placeholder')),
                 },
-            }));
+            });
         </script>
     @endscript
 </div>
