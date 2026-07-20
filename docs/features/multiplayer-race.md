@@ -3,16 +3,22 @@
 **Komponen:** [`App\Livewire\MultiplayerLobby`](../../app/Livewire/MultiplayerLobby.php)
 (Volt route `multiplayer-lobby`)
 **Model:** [`Room`](../../app/Models/Room.php), [`RoomMember`](../../app/Models/RoomMember.php)
-**Events:** `RoomUpdated`, `RaceProgressUpdated`, `SuddenDeathTriggered`
+**Events:** `RoomUpdated`, `RaceProgressUpdated`, `SuddenDeathTriggered`,
+[`RoomMessageSent`](../../app/Events/RoomMessageSent.php),
+[`RoomPresenceChanged`](../../app/Events/RoomPresenceChanged.php)
+**View chat:** [`livewire/partials/room-chat.blade.php`](../../resources/views/livewire/partials/room-chat.blade.php)
+**JS:** [`resources/js/race-echo.js`](../../resources/js/race-echo.js) (langganan Echo + komponen Alpine `roomChat`)
 **Route:** `/multiplayer`
 
 ---
 
 ## 1. Apa Ini
 
-Balapan mengetik **real-time** untuk hingga **5 pemain** dalam satu room. Alur:
-buat/gabung room (kode 6 karakter) → semua siap → host mulai → countdown 3-2-1 → balapan →
-sudden death → hasil. Progres tiap pemain (maskot yang bergerak) tampil live ke semua peserta.
+Balapan mengetik **real-time** untuk hingga **5 pemain** (plus hingga **5 penonton**) dalam satu
+room. Alur: buat/gabung room (kode 6 karakter) → semua siap → host mulai → countdown 3-2-1 →
+balapan → sudden death → hasil. Progres tiap pemain (maskot yang bergerak) tampil live ke semua
+peserta. Sambil menunggu (dan di layar hasil) peserta bisa **mengobrol lewat chat room** dan
+melihat **notifikasi saat ada yang masuk/keluar** — lihat §3.9.
 
 ## 2. State Machine Room
 
@@ -113,6 +119,58 @@ terhadap kondisi race yang tak terhindarkan di sistem real-time.
 
 **Justifikasi:** kedua hal ini menutup bug real-time yang halus namun terasa jelas oleh pemain
 (countdown yang "melompat" atau race yang gagal karena WebSocket sesaat down).
+
+### 3.9 Chat room & notifikasi kehadiran (broadcast-only)
+
+Peserta room (pemain **maupun** penonton) bisa mengobrol saat menunggu di lobby dan di layar hasil
+(untuk mengajak main lagi). Saat balapan (`racing`) panel chat **tidak dirender** agar fokus mengetik.
+
+| Aspek | Keputusan | Justifikasi |
+|-------|-----------|-------------|
+| **Penyimpanan** | **Broadcast-only**, tidak masuk database | Obrolan lobby bersifat sesaat & ikut hilang saat room bubar. Tanpa tabel/migrasi. Pesan ditahan di **state Alpine** klien (`roomChat`), bukan model `Message`. |
+| **Channel** | Numpang `room.{code}` yang **sudah** di-subscribe | Tak perlu channel baru — cukup tambah listener `.room.message` & `.room.presence` di `race-echo.js`. |
+| **Method** | `sendRoomMessage(string $body)` di `MultiplayerLobby` | Volume chat lobby rendah, komponen Livewire sudah hidup di halaman → lebih sederhana daripada endpoint `fetch()` terpisah (beda dengan chat global, lihat [chat.md](chat.md)). |
+| **Optimistic + `->toOthers()`** | Pengirim menampilkan pesannya sendiri secara lokal; siaran hanya ke peserta lain | Kalau pengirim ikut menerima siaran, pesannya akan **dobel**. |
+
+**Alur kirim:** klik kirim → `roomChat.send()` append lokal (optimistic) → `$wire.sendRoomMessage(body)`
+→ server validasi (harus anggota room, bukan saat `racing`, trim + maks 500 char) → broadcast
+[`RoomMessageSent`](../../app/Events/RoomMessageSent.php) `->toOthers()` → Reverb → `.room.message`
+→ window event → Alpine append + auto-scroll.
+
+**Notifikasi kehadiran** ([`RoomPresenceChanged`](../../app/Events/RoomPresenceChanged.php)):
+- **Join** disiarkan di `joinRoom()` dengan `->toOthers()` (yang masuk tak melihat notif dirinya sendiri).
+- **Leave** disiarkan di `leaveRoom()` **sebelum** `RoomMember` dihapus (agar username masih terbaca),
+  dan **hanya jika room masih punya anggota** — kalau anggota terakhir keluar, room dihapus sehingga
+  notif tak perlu (tak ada yang mendengarkan).
+- Ditampilkan sebagai **pesan sistem di tengah** panel chat (pil samar `bg-white/[0.03]` +
+  `text-muted/60`), dibedakan dari bubble chat biasa lewat flag `msg.system` di komponen Alpine.
+
+**Konsistensi visual:** bubble, input, tombol send, dan scrollbar (`chat-scroll`) disamakan dengan
+halaman chat global — pesan sendiri = bubble emas (`bg-gold`), pesan orang lain = `bg-white/5`.
+Namun karena broadcast-only (state Alpine, bukan objek `Message` dari DB), kelas visualnya **disalin**
+dari [`components/chat/message.blade.php`](../../resources/views/components/chat/message.blade.php)
+& [`components/chat/composer.blade.php`](../../resources/views/components/chat/composer.blade.php),
+bukan me-reuse komponen tersebut (keduanya menerima objek pesan dari database).
+
+**Batasan yang disengaja:** karena tak disimpan, **player yang baru join tak melihat riwayat**
+pesan sebelumnya, dan chat di layar hasil adalah **instance terpisah** dari chat lobby (state Alpine
+baru, `wire:key` berbeda) sehingga pesan lobby tak terbawa ke layar hasil.
+
+### 3.10 Penonton (spectator) — kapasitas & luapan otomatis
+
+Room memisahkan **pembalap** (`ROLE_PLAYER`) dan **penonton** (`ROLE_SPECTATOR`), masing-masing
+dibatasi konstanta `MAX_PLAYERS = 5` / `MAX_SPECTATORS = 5`.
+
+- **Luapan otomatis saat join:** pemain ke-6+ (slot pembalap penuh) **tidak ditolak**, melainkan
+  otomatis masuk sebagai penonton. Room baru dianggap benar-benar penuh hanya kalau **kedua** kuota
+  habis (5 pembalap + 5 penonton).
+- **Pindah peran:** `toggleSpectator()` menukar pembalap ⇄ penonton, **hanya saat `waiting`**,
+  dengan guard kapasitas per sisi. Host boleh jadi penonton (`host_id` terpisah dari `role`): ia
+  tetap pemegang tombol "Mulai Balapan" tanpa ikut membalap.
+- **Penonton tak menahan penutupan race:** deteksi "semua finish" & pemberian `place` hanya
+  menghitung `ROLE_PLAYER`; penonton tak punya `finished_time_seconds` dan bukan DNF.
+- **Reassign host** saat host keluar mengutamakan pembalap yang tersisa; hanya jika tak ada
+  pembalap, penonton menjadi host-penonton.
 
 ## 4. Batasan Saat Ini
 

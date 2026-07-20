@@ -42,10 +42,14 @@ Dibangun dengan **Laravel 12 + Livewire 4 + Alpine.js + Tailwind CSS**, dengan
   akal ditolak. Lihat [`docs/features/anti-cheat-wpm.md`](docs/features/anti-cheat-wpm.md).
 
 ### Multiplayer Race (Real-time)
-- Buat / gabung ruang lewat **kode 6 digit** (maks. 5 pemain).
+- Buat / gabung ruang lewat **kode 6 digit** (maks. 5 pemain + 5 penonton).
 - **Countdown 3-2-1 tersinkron** di semua layar, lalu balapan bersama.
 - Progres & maskot lawan bergerak **real-time** lewat WebSocket.
 - **Sudden death** (masa tenggang setelah pemenang pertama finis).
+- **Mode penonton (spectator)**: masuk untuk menonton tanpa membalap; luapan otomatis
+  jadi penonton saat slot pemain penuh, dan bisa tukar peran saat menunggu.
+- **Chat ruang**: ngobrol sambil menunggu di lobby & di layar hasil (untuk ngajak main
+  lagi), plus **notifikasi saat ada yang masuk/keluar** ruang.
 - Riwayat pertandingan permanen + statistik (win rate, placement, dsb).
 
 ### Sosial
