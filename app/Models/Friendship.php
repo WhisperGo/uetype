@@ -6,6 +6,7 @@ use App\Enums\FriendshipStatus;
 use Binafy\LaravelUserMonitoring\Traits\Actionable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 
 /** A directed friend relationship (requester -> addressee) with its status. */
 class Friendship extends Model
@@ -33,6 +34,47 @@ class Friendship extends Model
     public function addressee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'addressee_id');
+    }
+
+    /**
+     * Ajukan pertemanan $requesterId -> $addresseeId, tapi hanya kalau belum ada
+     * relasi ke arah MANA PUN. Mengembalikan null kalau sudah ada.
+     *
+     * Satu pintu untuk ketiga tempat yang dulu menyalin pola "cek friendshipWith()
+     * lalu create()" sendiri-sendiri (FriendButton, Friends, leaderboard).
+     *
+     * PERHATIAN -- ini TIDAK menutup jendela konkurensi sesungguhnya. Unique index
+     * di DB hanya `(requester_id, addressee_id)`, jadi satu arah: A->B dan B->A bisa
+     * hidup bersamaan. Transaksi di sini menyerialkan pemeriksaan terhadap penulis
+     * lain di koneksi yang sama, tapi dua request benar-benar paralel masih bisa
+     * lolos berdua. Menutupnya butuh unique index atas pasangan yang dinormalisasi
+     * (LEAST/GREATEST sebagai generated column), yang sintaksnya berbeda antara
+     * MySQL dan sqlite -- harga yang belum sepadan untuk dampaknya: dua baris
+     * pending yang redundan, bukan kerusakan data.
+     */
+    public static function requestBetween(int $requesterId, int $addresseeId): ?self
+    {
+        if ($requesterId === $addresseeId) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($requesterId, $addresseeId) {
+            $existing = static::query()
+                ->whereIn('requester_id', [$requesterId, $addresseeId])
+                ->whereIn('addressee_id', [$requesterId, $addresseeId])
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing) {
+                return null;
+            }
+
+            return static::create([
+                'requester_id' => $requesterId,
+                'addressee_id' => $addresseeId,
+                'status' => FriendshipStatus::Pending,
+            ]);
+        });
     }
 
     /**

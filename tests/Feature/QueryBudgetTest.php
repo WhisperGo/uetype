@@ -5,15 +5,21 @@ use App\Enums\ClanRole;
 use App\Enums\FriendshipStatus;
 use App\Livewire\Chat;
 use App\Livewire\Clans;
+use App\Livewire\ClanWar;
 use App\Livewire\Friends;
+use App\Livewire\MultiplayerLobby;
 use App\Livewire\Stats;
 use App\Models\Clan;
 use App\Models\ClanMember;
 use App\Models\Friendship;
 use App\Models\Message;
+use App\Models\Room;
+use App\Models\RoomMember;
 use App\Models\TypingResult;
 use App\Models\User;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Livewire\Volt\Volt;
 
 /**
  * Budget query per halaman.
@@ -205,4 +211,103 @@ test('halaman clan sendiri tidak mengulang query membership yang sama', function
     // myMembership/myClan diakses dari mount(), beberapa computed, dan view.
     // Tanpa cache, query yang sama persis dijalankan berulang kali.
     expect($queries)->toBeLessThanOrEqual(10);
+});
+
+/**
+ * Tiga halaman di bawah ini adalah lubang terbesar di budget: leaderboard dan
+ * lobby balapan justru dua jalur TERPANAS aplikasi (leaderboard dirender ulang
+ * tiap ganti tab/config; lobby di-poll selama balapan berlangsung), tapi tak satu
+ * pun punya penjaga sampai sekarang.
+ */
+test('leaderboard tidak menembak query per peserta', function () {
+    $bikinPeserta = function (int $n) {
+        User::factory()->count($n)->create()->each(function (User $u) {
+            TypingResult::create([
+                'user_id' => $u->id,
+                'mode' => 'time', 'mode_config' => '30', 'language' => 'en',
+                'net_wpm' => rand(40, 120), 'raw_wpm' => 130, 'accuracy' => 95,
+                'correct_chars' => 300, 'incorrect_chars' => 10, 'duration_seconds' => 30,
+            ]);
+        });
+    };
+
+    $me = User::factory()->create();
+    $bikinPeserta(3);
+
+    $this->actingAs($me);
+
+    $sedikit = countQueries(fn () => Volt::test('leaderboard')->call('setTab', 'time'));
+
+    $bikinPeserta(17); // total 20
+    $banyak = countQueries(fn () => Volt::test('leaderboard')->call('setTab', 'time'));
+
+    // Papan + rank + peta relasi pertemanan semuanya di-batch; jumlahnya tak boleh
+    // tumbuh seiring jumlah peserta.
+    expect($banyak)->toBe($sedikit);
+});
+
+test('lobby balapan tidak menembak query per anggota room', function () {
+    $bikinRoom = function (int $anggota) {
+        $host = User::factory()->create();
+        $room = Room::create([
+            'code' => 'BUD'.rand(100, 999),
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'aa bb cc',
+        ]);
+
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'is_ready' => true]);
+
+        for ($i = 1; $i < $anggota; $i++) {
+            RoomMember::create([
+                'room_id' => $room->id,
+                'user_id' => User::factory()->create()->id,
+                'is_ready' => true,
+            ]);
+        }
+
+        return [$host, $room];
+    };
+
+    [$hostKecil, $roomKecil] = $bikinRoom(2);
+    $sedikit = countQueries(fn () => Livewire::actingAs($hostKecil)->test(MultiplayerLobby::class)
+        ->set('roomCode', $roomKecil->code)->set('step', 'waiting'));
+
+    [$hostBesar, $roomBesar] = $bikinRoom(6);
+    $banyak = countQueries(fn () => Livewire::actingAs($hostBesar)->test(MultiplayerLobby::class)
+        ->set('roomCode', $roomBesar->code)->set('step', 'waiting'));
+
+    // roomData() meng-eager-load members.user; kalau eager load itu hilang, tiap
+    // baris lane menambah satu query -- dan lobby ini di-poll selama balapan.
+    expect($banyak)->toBe($sedikit);
+});
+
+test('daftar clan yang bisa ditantang tidak menembak query per clan', function () {
+    $me = User::factory()->create();
+    $myClan = Clan::create(['name' => 'Clan Ku', 'leader_id' => $me->id, 'power' => 1000]);
+    ClanMember::create([
+        'clan_id' => $myClan->id, 'user_id' => $me->id,
+        'role' => ClanRole::Leader, 'status' => ClanMemberStatus::Active,
+    ]);
+
+    $bikinClan = function (int $n) {
+        foreach (range(1, $n) as $i) {
+            Clan::create([
+                'name' => 'Lawan '.Str::random(8),
+                'leader_id' => User::factory()->create()->id,
+                'power' => 1000 + $i,
+            ]);
+        }
+    };
+
+    $bikinClan(3);
+    $sedikit = countQueries(fn () => Livewire::actingAs($me)->test(ClanWar::class));
+
+    $bikinClan(17); // total 20
+    $banyak = countQueries(fn () => Livewire::actingAs($me)->test(ClanWar::class));
+
+    // getChallengeableClansProperty dulu memanggil activeWar() per clan di dalam
+    // filter() -- satu query untuk SETIAP clan, tiap render. Sekarang penyaringannya
+    // satu subquery.
+    expect($banyak)->toBe($sedikit);
 });

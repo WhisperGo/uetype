@@ -44,19 +44,11 @@ $setLanguage = function ($lang) {
 $sendRequest = function (int $userId) {
     $me = Auth::id();
 
-    if ($userId === $me) {
+    // Cek "sudah berelasi (arah mana pun)" + insert dilakukan sebagai satu operasi
+    // di dalam Friendship::requestBetween(), bukan dua langkah terpisah.
+    if (! Friendship::requestBetween($me, $userId)) {
         return;
     }
-
-    if (Auth::user()->friendshipWith($userId)) {
-        return;
-    }
-
-    Friendship::create([
-        'requester_id' => $me,
-        'addressee_id' => $userId,
-        'status' => FriendshipStatus::Pending,
-    ]);
 
     $payload = ['type' => 'request', 'message' => Auth::user()->username.' sent you a friend request'];
 

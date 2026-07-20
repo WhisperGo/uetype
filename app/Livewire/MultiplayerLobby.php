@@ -6,6 +6,7 @@ use App\Events\RaceProgressUpdated;
 use App\Events\RoomUpdated;
 use App\Events\SuddenDeathTriggered;
 use App\Livewire\Concerns\FinalizesRace;
+use App\Livewire\Concerns\ManagesRoomMembership;
 use App\Livewire\Concerns\ReadsRoomState;
 use App\Models\Room;
 use App\Models\RoomMember;
@@ -14,6 +15,7 @@ use App\Services\TextGeneratorService;
 use App\Support\SafeBroadcast;
 use App\Support\TypingLanguage;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -29,7 +31,7 @@ use Livewire\Component;
  */
 class MultiplayerLobby extends Component
 {
-    use FinalizesRace, ReadsRoomState;
+    use FinalizesRace, ManagesRoomMembership, ReadsRoomState;
 
     public string $step = 'choose';
 
@@ -62,28 +64,31 @@ class MultiplayerLobby extends Component
     public function createRoom(): void
     {
         $user = Auth::user();
-
-        RoomMember::where('user_id', $user->id)->delete();
-
         $code = strtoupper(Str::random(6));
 
-        $room = Room::create([
-            'code' => $code,
-            'host_id' => $user->id,
-            'status' => 'waiting',
-            'text_to_type' => $this->generateRaceText(),
-        ]);
+        // Satu transaksi: keluar dari room lama + masuk ke yang baru. Kalau dipecah,
+        // ada jendela di mana pemain tak ada di room mana pun (atau ada di dua).
+        DB::transaction(function () use ($user, $code) {
+            $this->departCurrentRooms($user->id);
 
-        RoomMember::create([
-            'room_id' => $room->id,
-            'user_id' => $user->id,
-            'role' => RoomMember::ROLE_PLAYER,
-            'is_ready' => true,
-            'progress_percent' => 0,
-            'wpm' => 0,
-            'accuracy' => 100,
-            'finished_time_seconds' => null,
-        ]);
+            $room = Room::create([
+                'code' => $code,
+                'host_id' => $user->id,
+                'status' => 'waiting',
+                'text_to_type' => $this->generateRaceText(),
+            ]);
+
+            RoomMember::create([
+                'room_id' => $room->id,
+                'user_id' => $user->id,
+                'role' => RoomMember::ROLE_PLAYER,
+                'is_ready' => true,
+                'progress_percent' => 0,
+                'wpm' => 0,
+                'accuracy' => 100,
+                'finished_time_seconds' => null,
+            ]);
+        });
 
         $this->roomCode = $code;
         $this->step = 'waiting';
@@ -124,30 +129,49 @@ class MultiplayerLobby extends Component
             return;
         }
 
-        // Room "penuh" hanya untuk pembalap: slot pemain ke-6+ tidak ditolak, melainkan
-        // diarahkan jadi penonton (luapan otomatis). Room baru dianggap penuh untuk
-        // menonton hanya kalau kuota penonton juga habis.
-        $playersFull = $room->players()->count() >= self::MAX_PLAYERS;
+        // Satu transaksi menutup dua hal sekaligus:
+        //
+        //  1. Keluar-lalu-masuk harus atomik. Tanpa ini pemain bisa terdaftar di dua
+        //     room sekaligus -- dan dulu memang begitu, karena joinRoom() tak pernah
+        //     membuang keanggotaan lamanya sama sekali.
+        //  2. Hitung-kapasitas-lalu-daftar juga harus atomik. `count() >= MAX` yang
+        //     dibaca di luar transaksi bisa dilewati dua pemain bersamaan sehingga
+        //     room menampung lebih dari kuotanya; lockForUpdate menyerialkannya.
+        $full = DB::transaction(function () use ($room) {
+            $players = $room->players()->lockForUpdate()->count();
+            $playersFull = $players >= self::MAX_PLAYERS;
 
-        if ($playersFull && $room->spectators()->count() >= self::MAX_SPECTATORS) {
+            // Room "penuh" hanya untuk pembalap: slot pemain ke-6+ tidak ditolak,
+            // melainkan diarahkan jadi penonton (luapan otomatis). Room dianggap penuh
+            // untuk menonton hanya kalau kuota penonton juga habis.
+            if ($playersFull && $room->spectators()->lockForUpdate()->count() >= self::MAX_SPECTATORS) {
+                return true;
+            }
+
+            // Room tujuan dikecualikan: bergabung ke room yang sudah didiami tak
+            // boleh membuat host kehilangan status host-nya (lihat departCurrentRooms).
+            $this->departCurrentRooms(Auth::id(), $room->id);
+
+            RoomMember::updateOrCreate(
+                ['room_id' => $room->id, 'user_id' => Auth::id()],
+                [
+                    'role' => $playersFull ? RoomMember::ROLE_SPECTATOR : RoomMember::ROLE_PLAYER,
+                    'is_ready' => false,
+                    'progress_percent' => 0,
+                    'wpm' => 0,
+                    'accuracy' => 100,
+                    'finished_time_seconds' => null,
+                ]
+            );
+
+            return false;
+        });
+
+        if ($full) {
             session()->flash('error', __('multiplayer.error_room_full'));
 
             return;
         }
-
-        $role = $playersFull ? RoomMember::ROLE_SPECTATOR : RoomMember::ROLE_PLAYER;
-
-        RoomMember::updateOrCreate(
-            ['room_id' => $room->id, 'user_id' => Auth::id()],
-            [
-                'role' => $role,
-                'is_ready' => false,
-                'progress_percent' => 0,
-                'wpm' => 0,
-                'accuracy' => 100,
-                'finished_time_seconds' => null,
-            ]
-        );
 
         $this->roomCode = $code;
         $this->step = 'waiting';
@@ -278,17 +302,10 @@ class MultiplayerLobby extends Component
         $room = Room::where('code', $this->roomCode)->first();
 
         if ($room) {
-            $leavingUserId = Auth::id();
-
-            RoomMember::where('room_id', $room->id)->where('user_id', $leavingUserId)->delete();
-
-            $remaining = RoomMember::where('room_id', $room->id)->count();
-
-            if ($remaining === 0) {
-                $room->delete();
-            } else {
-                $this->reassignHostIfNeeded($room, $leavingUserId);
-            }
+            // Jalur yang sama dengan createRoom/joinRoom. Dulu logika ini ditulis
+            // sendiri di sini, dan hanya DI SINI yang merawat room yang ditinggalkan
+            // -- itulah kenapa dua jalur lain bocor. Satu pintu, satu perilaku.
+            DB::transaction(fn () => $this->departCurrentRooms(Auth::id()));
 
             SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
         }
@@ -413,6 +430,16 @@ class MultiplayerLobby extends Component
             // absolute: true -> cegah hasil negatif.
             $updateData['finished_time_seconds'] = (int) round($durationSeconds);
 
+            // Peringkat SEMENTARA, bukan otoritatif. Hitung-lalu-tambah-satu ini tidak
+            // atomik: dua pemain yang finis dalam milidetik yang sama bisa sama-sama
+            // membaca hitungan yang sama dan mendapat angka yang identik.
+            //
+            // Sengaja TIDAK dikunci. Nilai ini hanya hidup beberapa detik sebagai
+            // umpan balik di layar, lalu ditimpa seluruhnya oleh finalizeRace() yang
+            // mengurutkan ulang semua pemain dalam satu query di dalam transaksi --
+            // itulah sumber kebenaran peringkat. Menambahkan lock di sini berarti
+            // membayar ongkos kontensi pada jalur terpanas balapan demi angka yang
+            // memang akan dibuang.
             $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
                 ->where('role', RoomMember::ROLE_PLAYER)
                 ->whereNotNull('finished_time_seconds')

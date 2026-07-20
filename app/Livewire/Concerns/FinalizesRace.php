@@ -6,6 +6,7 @@ use App\Models\MultiplayerMatchHistory;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Services\AntiCheatService;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Penutupan balapan: menetapkan peringkat & durasi final, memvalidasinya lewat
@@ -22,20 +23,47 @@ use App\Services\AntiCheatService;
  */
 trait FinalizesRace
 {
+    /**
+     * Seluruhnya dalam SATU transaksi: satu balapan menulis place & xp_earned untuk
+     * tiap pemain, total_xp tiap user, dan satu baris riwayat permanen per pemain.
+     * Gagal di tengah tanpa transaksi meninggalkan balapan separuh final -- dan
+     * karena guard idempoten `xp_earned IS NULL` menganggap pemain yang terlanjur
+     * diproses sudah selesai, pemanggilan ulang tak akan memperbaikinya.
+     *
+     * Guard idempoten TETAP diperlukan: transaksi melindungi dari tulis separuh
+     * jadi, guard melindungi dari pemanggilan ganda (fast-path "semua finish" dan
+     * checkSuddenDeath bisa sama-sama sampai ke sini). Beda peran, bukan duplikasi.
+     */
     public function finalizeRace(string $roomId): void
+    {
+        DB::transaction(fn () => $this->writeFinalStandings($roomId));
+
+        // place/xp/result_recorded baru saja berubah -> snapshot & view harus membaca
+        // ulang. Di LUAR transaksi: ini membuang cache di memori, bukan menulis DB.
+        $this->forgetRoomCache();
+    }
+
+    private function writeFinalStandings(string $roomId): void
     {
         $room = Room::find($roomId);
         $textLength = $room ? mb_strlen($room->text_to_type) : 0;
 
         // Hanya pembalap yang difinalisasi: penonton tak punya place/XP dan tak boleh
         // mencemari urutan podium maupun jumlah pemain di riwayat.
+        //
+        // "Belum finis" HARUS jadi kunci urut pertama. MySQL menaruh NULL paling awal
+        // pada ASC, jadi dengan finished_time_seconds sebagai kunci pertama, pemain
+        // yang belum selesai akan mendarat di atas penyelesai yang sah -- juara 1 untuk
+        // orang yang tak menyelesaikan balapan. Ketiga pemanggil finalizeRace() saat ini
+        // menjamin tak ada NULL yang sampai ke sini (mereka menunggu semua finis atau
+        // menyetel sentinel DNF lebih dulu), jadi ini kerapuhan, bukan bug hidup --
+        // tapi kerapuhan yang harganya satu baris.
         $members = RoomMember::with('user')
             ->where('room_id', $roomId)
             ->where('role', RoomMember::ROLE_PLAYER)
-            // ->orderBy('wpm', 'desc')
+            ->orderByRaw('finished_time_seconds IS NULL')
             ->orderBy('finished_time_seconds', 'asc')
             ->orderBy('progress_percent', 'desc')
-            ->orderByRaw('finished_time_seconds IS NULL, finished_time_seconds ASC')
             ->get();
 
         foreach ($members as $index => $member) {
@@ -86,9 +114,6 @@ trait FinalizesRace
 
             $member->update($updateData);
         }
-
-        // place/xp/result_recorded baru saja berubah -> snapshot & view harus membaca ulang.
-        $this->forgetRoomCache();
     }
 
     /**

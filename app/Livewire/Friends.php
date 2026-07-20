@@ -50,16 +50,11 @@ class Friends extends Component
             return;
         }
 
-        // Cegah duplikat / kirim ulang jika relasi (arah mana pun) sudah ada.
-        if (Auth::user()->friendshipWith($userId)) {
+        // Cek "sudah berelasi (arah mana pun)" + insert dilakukan sebagai satu
+        // operasi di dalam Friendship::requestBetween(), bukan dua langkah terpisah.
+        if (! Friendship::requestBetween($me, $userId)) {
             return;
         }
-
-        Friendship::create([
-            'requester_id' => $me,
-            'addressee_id' => $userId,
-            'status' => FriendshipStatus::Pending,
-        ]);
 
         $this->notify($userId, [
             'type' => 'request',

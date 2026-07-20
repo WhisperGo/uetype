@@ -80,11 +80,23 @@ class ClanWar extends Component
             return collect();
         }
 
+        // Penyaringan "sedang berperang" dilakukan DI DATABASE lewat satu subquery.
+        // Dulu daftarnya ditarik utuh lalu di-filter() di PHP dengan memanggil
+        // activeWar() per clan -- satu query tambahan untuk SETIAP clan, tiap kali
+        // halaman ini dirender. Dengan 50 clan itu 51 query untuk satu daftar.
+        $busyClanIds = ClanWarModel::query()
+            ->whereIn('status', [ClanWarStatus::Pending, ClanWarStatus::Ongoing])
+            ->select('challenger_clan_id')
+            ->union(
+                ClanWarModel::query()
+                    ->whereIn('status', [ClanWarStatus::Pending, ClanWarStatus::Ongoing])
+                    ->select('opponent_clan_id')
+            );
+
         return Clan::where('id', '!=', $this->myClan->id)
+            ->whereNotIn('id', $busyClanIds)
             ->orderByDesc('power')
-            ->get()
-            ->filter(fn (Clan $clan) => $clan->activeWar() === null)
-            ->values();
+            ->get();
     }
 
     /** Riwayat war sendiri yang sudah selesai, terbaru dulu. */

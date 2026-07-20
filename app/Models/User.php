@@ -115,8 +115,16 @@ class User extends Authenticatable
         $accuracyMultiplier = 0.5 + 0.5 * (max(0, min(100, $accuracy)) / 100);
         $xpEarned = (int) round(max(0, $correctChars) * 0.1 * $accuracyMultiplier);
 
-        $this->total_xp += $xpEarned;
-        $this->save();
+        // increment(), BUKAN `$this->total_xp += ...; save()`. Yang terakhir membaca
+        // nilai lama ke memori PHP lalu menulis balik utuh, jadi dua penulis dengan
+        // instance berbeda (hasil solo & finalisasi balapan sama-sama memanggil
+        // method ini) akan saling menimpa dan EXP hilang tanpa jejak. increment()
+        // menyerahkan penambahannya ke DB: `total_xp = total_xp + ?`.
+        //
+        // increment() juga menyegarkan atribut di instance ini, jadi levelData()
+        // yang dibaca panel hasil tepat setelah pemanggilan ini melihat nilai baru,
+        // bukan yang basi.
+        $this->increment('total_xp', $xpEarned);
 
         return $xpEarned;
     }
