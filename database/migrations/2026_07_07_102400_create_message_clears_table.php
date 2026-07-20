@@ -27,10 +27,9 @@ return new class extends Migration
             $table->unique(['user_id', 'clan_id'], 'message_clears_clan_unique');
         });
 
-        DB::statement('ALTER TABLE message_clears ADD CONSTRAINT message_clears_exactly_one_target CHECK (
-            (other_user_id IS NOT NULL AND clan_id IS NULL) OR
-            (other_user_id IS NULL AND clan_id IS NOT NULL)
-        )');
+        // Penjagaan "tepat satu target" dipasang di migrasi
+        // 2026_07_20_100000_enforce_message_target_invariants, bersama milik
+        // `messages` -- satu tempat yang memiliki kedua invarian ini.
     }
 
     public function down(): void

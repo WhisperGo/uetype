@@ -154,9 +154,15 @@ $userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
     // Dihitung DI DATABASE lewat COUNT: yang kembali ke PHP cuma satu angka.
     // (Dulu: pluck() menarik SATU BARIS PER USER ke memori PHP lalu array_search
     //  -- 10.000 user = 10.000 baris ditarik, setiap kali user ganti tab.)
+    // CAST-nya WAJIB, bukan hiasan. Kolom hasil MAX() di dalam subquery tak punya
+    // type affinity di sqlite, sementara Laravel mem-bind angka pecahan sebagai
+    // TEXT -- dan sqlite mengurutkan SEMUA text di atas SEMUA angka. Tanpa cast,
+    // `103 > '102.5'` bernilai FALSE dan peringkat siapa pun yang rekornya
+    // berkoma jadi terlalu tinggi. MySQL memaksa konversi diam-diam sehingga
+    // bug ini tak terlihat di sana.
     $better = DB::query()
         ->fromSub($bestPerUser($metric, $this->currentTab, $this->currentConfig, $this->timeframe, $this->currentLang), 'pb')
-        ->where('pb.best_score', '>', $myBest)
+        ->whereRaw('CAST(pb.best_score AS DECIMAL(12,2)) > CAST(? AS DECIMAL(12,2))', [$myBest])
         ->count();
 
     return $better + 1;

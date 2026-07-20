@@ -10,7 +10,11 @@ return new class extends Migration
      * Satu tabel untuk dua jenis chat, target lewat kolom nullable:
      *   - DM: recipient_id terisi, clan_id null.
      *   - Clan chat: clan_id terisi, recipient_id null.
-     * CHECK di bawah menjamin tepat satu target terisi di level DB.
+     *
+     * Penjagaan DB-level-nya TIDAK dipasang di sini melainkan di migrasi
+     * 2026_07_20_100000_enforce_message_target_invariants: tabel ini masih
+     * diubah tiga migrasi berikutnya, dan di sqlite penambahan FOREIGN KEY
+     * membangun ulang tabel sehingga trigger apa pun ikut terhapus.
      */
     public function up(): void
     {
@@ -29,11 +33,6 @@ return new class extends Migration
             $table->index(['clan_id', 'created_at']);
         });
 
-        // Gerbang DB-level, bukan sekadar disiplin aplikasi.
-        DB::statement('ALTER TABLE messages ADD CONSTRAINT messages_exactly_one_target CHECK (
-            (recipient_id IS NOT NULL AND clan_id IS NULL) OR
-            (recipient_id IS NULL AND clan_id IS NOT NULL)
-        )');
     }
 
     public function down(): void

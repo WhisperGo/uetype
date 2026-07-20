@@ -106,6 +106,28 @@ test('userRank menghitung peringkat dengan benar', function () {
     expect(Volt::test('leaderboard')->get('userRank'))->toBe(2);
 });
 
+/**
+ * Rekor berkoma harus dibandingkan sebagai ANGKA, bukan teks.
+ *
+ * Ini pernah salah dan hanya kelihatan di sqlite: kolom hasil MAX() di dalam
+ * subquery tak punya type affinity di sana, sementara Laravel mem-bind angka
+ * pecahan sebagai TEXT -- dan sqlite mengurutkan SEMUA text di atas SEMUA angka.
+ * Akibatnya `103 > '102.5'` bernilai FALSE, tak ada lawan yang terhitung lebih
+ * baik, dan pemain berekor koma selalu dilaporkan rank 1. MySQL memaksa konversi
+ * diam-diam sehingga bug ini tak pernah muncul di CI.
+ */
+test('userRank membandingkan rekor berkoma sebagai angka, bukan teks', function () {
+    $atas = User::factory()->create();
+    result($atas, 'time', '30', 103);      // integer, lebih tinggi
+
+    $me = User::factory()->create();
+    result($me, 'time', '30', 102.5);      // pecahan, lebih rendah
+    $this->actingAs($me);
+
+    // Kalau perbandingannya jatuh ke teks, ini akan mengembalikan 1.
+    expect(Volt::test('leaderboard')->get('userRank'))->toBe(2);
+});
+
 test('userRank mengembalikan Unranked kalau belum pernah main di mode itu', function () {
     $me = User::factory()->create();
     $this->actingAs($me);
