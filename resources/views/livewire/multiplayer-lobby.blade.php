@@ -289,6 +289,12 @@
                     </div>
                 @endif
             </div>
+
+            {{-- Chat lobby: player & spectator bisa mengobrol sambil menunggu. wire:key
+                 stabil agar state Alpine (daftar pesan) tak reset saat lobby re-render. --}}
+            <div wire:key="room-chat-waiting">
+                @include('livewire.partials.room-chat', ['currentUserId' => auth()->id()])
+            </div>
         </div>
     @endif
 
@@ -778,6 +784,13 @@
                     </div>
                 </div>
             @endif
+
+            {{-- Chat di layar hasil: dipakai untuk mengajak main lagi. Instance TERPISAH
+                 dari chat lobby (wire:key beda) -> ini state Alpine baru, jadi pesan lobby
+                 tak terbawa; sesuai sifat broadcast-only yang sesaat. --}}
+            <div wire:key="room-chat-result">
+                @include('livewire.partials.room-chat', ['currentUserId' => auth()->id()])
+            </div>
 
             <!-- AKSI BUTTON MENU BAWAH -->
             <div class="pt-2 flex flex-wrap gap-3 sm:gap-4">

@@ -1,6 +1,8 @@
 <?php
 
 use App\Events\RaceProgressUpdated;
+use App\Events\RoomMessageSent;
+use App\Events\RoomPresenceChanged;
 use App\Events\RoomUpdated;
 use App\Events\SuddenDeathTriggered;
 use App\Livewire\MultiplayerLobby;
@@ -419,5 +421,183 @@ describe('multiplayer spectators', function () {
 
         // Room tetap waiting: tak ada pembalap untuk memulai.
         $this->assertDatabaseHas('rooms', ['code' => 'SPEC04', 'status' => 'waiting']);
+    });
+});
+
+describe('multiplayer room chat', function () {
+    it('broadcasts a room chat message from a member', function () {
+        Event::fake([RoomMessageSent::class]);
+
+        $host = User::factory()->create(['username' => 'host_chat']);
+        $room = Room::create([
+            'code' => 'CHAT01',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+
+        Livewire::actingAs($host)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'CHAT01')
+            ->set('step', 'waiting')
+            ->call('sendRoomMessage', 'halo semuanya');
+
+        Event::assertDispatched(RoomMessageSent::class, function ($e) use ($host) {
+            return $e->roomCode === 'CHAT01'
+                && $e->senderId === $host->id
+                && $e->senderUsername === 'host_chat'
+                && $e->body === 'halo semuanya';
+        });
+    });
+
+    it('lets a spectator send chat messages too', function () {
+        Event::fake([RoomMessageSent::class]);
+
+        $host = User::factory()->create();
+        $watcher = User::factory()->create(['username' => 'penonton']);
+        $room = Room::create([
+            'code' => 'CHAT02',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $watcher->id, 'role' => 'spectator', 'is_ready' => false]);
+
+        Livewire::actingAs($watcher)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'CHAT02')
+            ->set('step', 'waiting')
+            ->call('sendRoomMessage', 'semangat!');
+
+        Event::assertDispatched(RoomMessageSent::class, fn ($e) => $e->senderUsername === 'penonton' && $e->body === 'semangat!');
+    });
+
+    it('ignores chat from a non-member', function () {
+        Event::fake([RoomMessageSent::class]);
+
+        $host = User::factory()->create();
+        $outsider = User::factory()->create();
+        Room::create([
+            'code' => 'CHAT03',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+
+        Livewire::actingAs($outsider)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'CHAT03')
+            ->set('step', 'waiting')
+            ->call('sendRoomMessage', 'menyusup');
+
+        Event::assertNotDispatched(RoomMessageSent::class);
+    });
+
+    it('does not broadcast an empty or whitespace-only message', function () {
+        Event::fake([RoomMessageSent::class]);
+
+        $host = User::factory()->create();
+        $room = Room::create([
+            'code' => 'CHAT04',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+
+        Livewire::actingAs($host)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'CHAT04')
+            ->set('step', 'waiting')
+            ->call('sendRoomMessage', '   ');
+
+        Event::assertNotDispatched(RoomMessageSent::class);
+    });
+
+    it('does not allow chat while a race is in progress', function () {
+        Event::fake([RoomMessageSent::class]);
+
+        $host = User::factory()->create();
+        $room = Room::create([
+            'code' => 'CHAT05',
+            'host_id' => $host->id,
+            'status' => 'racing',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+
+        Livewire::actingAs($host)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'CHAT05')
+            ->set('step', 'racing')
+            ->call('sendRoomMessage', 'ngobrol saat balapan');
+
+        Event::assertNotDispatched(RoomMessageSent::class);
+    });
+});
+
+describe('multiplayer room presence', function () {
+    it('broadcasts a join notification when someone joins the room', function () {
+        Event::fake([RoomUpdated::class, RoomPresenceChanged::class]);
+
+        $host = User::factory()->create();
+        $joiner = User::factory()->create(['username' => 'pemain_baru']);
+        $room = Room::create([
+            'code' => 'JOIN01',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+
+        Livewire::actingAs($joiner)->test(MultiplayerLobby::class)
+            ->set('joinCodeInput', str_split('JOIN01'))
+            ->call('joinRoom');
+
+        Event::assertDispatched(RoomPresenceChanged::class, function ($e) {
+            return $e->roomCode === 'JOIN01' && $e->username === 'pemain_baru' && $e->action === 'join';
+        });
+    });
+
+    it('broadcasts a leave notification when a member leaves a room that still has others', function () {
+        Event::fake([RoomUpdated::class, RoomPresenceChanged::class]);
+
+        $host = User::factory()->create();
+        $leaver = User::factory()->create(['username' => 'yang_keluar']);
+        $room = Room::create([
+            'code' => 'LEAV01',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $leaver->id, 'role' => 'player', 'is_ready' => false]);
+
+        Livewire::actingAs($leaver)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'LEAV01')
+            ->set('step', 'waiting')
+            ->call('leaveRoom');
+
+        Event::assertDispatched(RoomPresenceChanged::class, function ($e) {
+            return $e->username === 'yang_keluar' && $e->action === 'leave';
+        });
+    });
+
+    it('does not broadcast a leave notification when the last member leaves (room deleted)', function () {
+        Event::fake([RoomUpdated::class, RoomPresenceChanged::class]);
+
+        $solo = User::factory()->create();
+        $room = Room::create([
+            'code' => 'LEAV02',
+            'host_id' => $solo->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $solo->id, 'role' => 'player', 'is_ready' => true]);
+
+        Livewire::actingAs($solo)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'LEAV02')
+            ->set('step', 'waiting')
+            ->call('leaveRoom');
+
+        // Tak ada yang mendengarkan lagi -> notif keluar tak perlu disiarkan.
+        Event::assertNotDispatched(RoomPresenceChanged::class);
     });
 });

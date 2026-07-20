@@ -3,6 +3,8 @@
 namespace App\Livewire;
 
 use App\Events\RaceProgressUpdated;
+use App\Events\RoomMessageSent;
+use App\Events\RoomPresenceChanged;
 use App\Events\RoomUpdated;
 use App\Events\SuddenDeathTriggered;
 use App\Livewire\Concerns\FinalizesRace;
@@ -180,6 +182,10 @@ class MultiplayerLobby extends Component
         $this->dispatch('subscribe-room', room: $code);
 
         SafeBroadcast::run(fn () => broadcast(new RoomUpdated($code))->toOthers());
+
+        // Notif kehadiran ke anggota lain: "<user> masuk". ->toOthers() supaya yang
+        // baru masuk tak melihat notif dirinya sendiri.
+        SafeBroadcast::run(fn () => broadcast(new RoomPresenceChanged($code, Auth::user()->username, 'join'))->toOthers());
     }
 
     #[On('room-updated')]
@@ -302,10 +308,28 @@ class MultiplayerLobby extends Component
         $room = Room::where('code', $this->roomCode)->first();
 
         if ($room) {
+<<<<<<< HEAD
             // Jalur yang sama dengan createRoom/joinRoom. Dulu logika ini ditulis
             // sendiri di sini, dan hanya DI SINI yang merawat room yang ditinggalkan
             // -- itulah kenapa dua jalur lain bocor. Satu pintu, satu perilaku.
             DB::transaction(fn () => $this->departCurrentRooms(Auth::id()));
+=======
+            $leavingUserId = Auth::id();
+            $leavingUsername = Auth::user()->username;
+
+            RoomMember::where('room_id', $room->id)->where('user_id', $leavingUserId)->delete();
+
+            $remaining = RoomMember::where('room_id', $room->id)->count();
+
+            if ($remaining === 0) {
+                $room->delete();
+            } else {
+                $this->reassignHostIfNeeded($room, $leavingUserId);
+
+                // Notif "<user> keluar" hanya kalau masih ada yang mendengarkan di room.
+                SafeBroadcast::run(fn () => broadcast(new RoomPresenceChanged($this->roomCode, $leavingUsername, 'leave')));
+            }
+>>>>>>> 3464cd665d9d82a04307e4edcef700f991640815
 
             SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
         }
@@ -313,6 +337,51 @@ class MultiplayerLobby extends Component
         $this->resetToChoose();
 
         $this->dispatch('leave-room');
+    }
+
+    /**
+     * Kirim satu pesan obrolan ke seluruh anggota room. Broadcast-only: tidak disimpan
+     * (obrolan lobby bersifat sesaat). Boleh dilakukan pembalap maupun penonton, selama
+     * masih tergabung di room. Sengaja diblokir saat 'racing' agar tak mengganggu balapan
+     * -- di fase itu panel chat memang tidak dirender.
+     *
+     * ->toOthers(): pengirim menampilkan pesannya sendiri secara optimistik di klien,
+     * jadi kalau ikut menerima siaran ini pesannya akan dobel.
+     */
+    public function sendRoomMessage(string $body): void
+    {
+        $body = trim($body);
+
+        if ($body === '') {
+            return;
+        }
+
+        // Batasi panjang agar payload WebSocket tetap ringan (senada max chat global).
+        $body = mb_substr($body, 0, 500);
+
+        $room = Room::where('code', $this->roomCode)->first();
+
+        if (! $room || $room->status === 'racing') {
+            return;
+        }
+
+        // Harus benar-benar anggota room ini (mencegah kirim ke room yang bukan miliknya).
+        $isMember = RoomMember::where('room_id', $room->id)
+            ->where('user_id', Auth::id())
+            ->exists();
+
+        if (! $isMember) {
+            return;
+        }
+
+        $user = Auth::user();
+
+        SafeBroadcast::run(fn () => broadcast(new RoomMessageSent(
+            $this->roomCode,
+            $user->id,
+            $user->username,
+            $body,
+        ))->toOthers());
     }
 
     private function reassignHostIfNeeded(Room $room, int $leavingUserId): void
