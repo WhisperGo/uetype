@@ -101,6 +101,9 @@ Dua pola arsitektur yang berulang di seluruh proyek (detail alasan ada di
 - **`multiplayer_match_history`** — log permanen hasil race (karena `rooms`/
   `room_members` dihapus setelah semua pemain keluar) — sumber data tab multiplayer
   di halaman Stats.
+- *Chat ruang & notifikasi join/leave **tidak menyentuh DB*** — sengaja broadcast-only
+  (event `RoomMessageSent` / `RoomPresenceChanged` di channel `room.{code}`), ditahan di
+  state Alpine klien. Lihat [`features/multiplayer-race.md`](features/multiplayer-race.md) §3.9.
 
 ### Clan & Clan War
 - **`clans`** — `name`, `tag`, `leader_id`, `power` (rating Elo, default 1000),
@@ -237,6 +240,8 @@ Sumber: `routes/web.php`, `routes/auth.php`, `routes/channels.php`.
 | `RoomUpdated` | `room.{code}` |
 | `RaceProgressUpdated` | `race.{code}` |
 | `SuddenDeathTriggered` | `race.{code}` |
+| `RoomMessageSent` | `room.{code}` (chat lobby, broadcast-only) |
+| `RoomPresenceChanged` | `room.{code}` (notif join/leave) |
 | `DirectMessageSent` | `chat.{recipientId}` |
 | `ClanMessageSent` | `clan-chat.{clanId}` |
 | `MessageEdited` / `MessageDeleted` | `chat.{id}` atau `clan-chat.{id}` |

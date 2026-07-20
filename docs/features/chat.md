@@ -18,6 +18,12 @@ Sistem pesan dengan dua mode:
 Fitur: kirim, **reply**, **edit inline** (dengan jendela waktu), **hapus** (untuk diri sendiri
 atau untuk semua), **clear chat** (semua / lebih lama dari N hari), paginasi "load more".
 
+> **Bukan bagian dari dokumen ini:** ada juga **chat di dalam room multiplayer** — obrolan
+> sesaat antar peserta room saat menunggu/di layar hasil. Itu **broadcast-only** (tak disimpan
+> ke `messages`, tak memakai komponen di sini), didokumentasikan di
+> [`multiplayer-race.md`](multiplayer-race.md) §3.9. Chat DM/clan/overlay di bawah ini semuanya
+> **persisten** (model `Message`).
+
 ## 2. Keputusan Desain & Justifikasi
 
 ### 2.1 Kirim pesan lewat endpoint HTTP terpisah, bukan Livewire action

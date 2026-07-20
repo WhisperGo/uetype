@@ -42,7 +42,7 @@ Sebelum membaca per fitur, tiga prinsip ini muncul terus dan menjelaskan banyak 
 | 1 | Mesin Ketik Solo (Time / Words / Survival) | [typing-engine.md](typing-engine.md) |
 | 2 | Anti-Cheat & Perhitungan WPM | [anti-cheat-wpm.md](anti-cheat-wpm.md) |
 | 3 | Ghost Mode (balapan lawan rekor) | [ghost-mode.md](ghost-mode.md) |
-| 4 | Multiplayer Race (real-time) | [multiplayer-race.md](multiplayer-race.md) |
+| 4 | Multiplayer Race (real-time) — termasuk penonton, chat ruang & notif join/leave | [multiplayer-race.md](multiplayer-race.md) |
 | 5 | Level & EXP | [level-exp.md](level-exp.md) |
 | 6 | Statistik & Achievement | [stats-achievements.md](stats-achievements.md) |
 | 7 | Teman & Presence (online/offline) | [friends-presence.md](friends-presence.md) |
