@@ -98,7 +98,6 @@ class DummyUserSeeder extends Seeder
 
             TypingResult::create([
                 'user_id' => $user->id,
-                'text_id' => null,
                 'mode' => $pick['mode'],
                 'mode_config' => $pick['config'],
                 // Bobot ke en agar realistis; ID mengisi papan berbahasa Indonesia.

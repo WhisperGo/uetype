@@ -54,10 +54,6 @@ class TypingEngine extends Component
 
     public int $typingSessionKey = 0;
 
-    // ID baris `texts` yang diketik: selalu null (teks time/words/survival dirakit acak
-    // dari wordlist JSON, bukan dari DB).
-    public $textId = null;
-
     // Penanda ghost aktif; sumber kebenaran server. Ghost hanya sah untuk time/words -
     // pindah ke survival memaksa false (invariant, bukan sekadar event klien).
     public bool $ghostActive = false;
@@ -446,7 +442,6 @@ class TypingEngine extends Component
         // Hanya di-set di mount() untuk jalur solo (war-lock menang), dan hanya sekali --
         // restart()/setMode() memanggil generateText() dengan $retryText sudah null lagi.
         if ($this->retryText !== null) {
-            $this->textId = null;
             $this->textToType = $this->retryText;
             $this->retryText = null;
 
@@ -462,7 +457,6 @@ class TypingEngine extends Component
 
                 // Fallback ke generate biasa kalau baris tetap tak ada (layar tak pernah kosong).
                 if ($fixed !== null) {
-                    $this->textId = null;
                     $this->textToType = $fixed;
 
                     return;
@@ -471,9 +465,6 @@ class TypingEngine extends Component
         }
 
         // Time/words/survival: teks dirakit acak dari wordlist sesuai bahasa konten.
-        // (textId selalu null -- teks ini tak berasal dari tabel `texts`.)
-        $this->textId = null;
-
         $this->textToType = app(TextGeneratorService::class)
             ->forSoloMode($this->mainMode, (string) $this->subMode, $this->contentLang);
     }
@@ -571,7 +562,6 @@ class TypingEngine extends Component
 
                 $typingResult = TypingResult::create([
                     'user_id' => $user->id,
-                    'text_id' => $this->textId, // selalu null (time/words/survival dirakit dari wordlist)
                     'mode' => $this->mainMode, // 'time' | 'words' | 'survival'
                     // survival: difficulty ('easy'|'medium'|'hard', kunci filter leaderboard).
                     'mode_config' => (string) $this->subMode,

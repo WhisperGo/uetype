@@ -134,16 +134,6 @@ class User extends Authenticatable
         return $this->hasMany(TypingResult::class);
     }
 
-    public function matchParticipants(): HasMany
-    {
-        return $this->hasMany(MatchParticipant::class);
-    }
-
-    public function hostedMatches(): HasMany
-    {
-        return $this->hasMany(Matches::class, 'host_user_id');
-    }
-
     public function sentFriendRequests(): HasMany
     {
         return $this->hasMany(Friendship::class, 'requester_id');

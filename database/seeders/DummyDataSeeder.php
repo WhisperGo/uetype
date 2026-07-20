@@ -64,7 +64,6 @@ class DummyDataSeeder extends Seeder
 
                 TypingResult::create([
                     'user_id' => $user->id,
-                    'text_id' => null, // Opsional untuk leaderboard
                     'mode' => $selectedMode['mode'],
                     'mode_config' => $selectedConfig,
                     // Bobot ke en agar realistis; ID mengisi papan berbahasa Indonesia.

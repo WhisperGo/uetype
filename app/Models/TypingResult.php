@@ -14,7 +14,6 @@ class TypingResult extends Model
 
     protected $fillable = [
         'user_id',
-        'text_id',
         'mode',
         'mode_config',
         'language',
@@ -41,12 +40,6 @@ class TypingResult extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    /** The text typed (null when generated from a wordlist). */
-    public function text(): BelongsTo
-    {
-        return $this->belongsTo(Text::class);
     }
 
     /** Scope: results created today. */

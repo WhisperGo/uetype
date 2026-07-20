@@ -12,9 +12,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // LanguageSeeder & TextSeeder ikut dihapus bersama tabel `languages`/`texts`:
+        // teks latihan kini dirakit TextGeneratorService dari wordlist JSON, bukan
+        // dibaca dari DB, jadi keduanya mengisi tabel yang tak pernah dibaca siapa pun.
         $this->call([
-            LanguageSeeder::class, // Pastikan ini jalan duluan
-            TextSeeder::class,
             DummyDataSeeder::class,
         ]);
 
