@@ -21,9 +21,10 @@ function lobbySource(): string
     return file_get_contents(app_path('Livewire/MultiplayerLobby.php'));
 }
 
+/** Markup + modul JS arena; lihat arenaSourceAll() di RaceLiveWpmTest. */
 function arenaBlade(): string
 {
-    return file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php'));
+    return arenaSourceAll();
 }
 
 function racingRoomFor(User $host, array $others = []): Room
@@ -135,11 +136,23 @@ it('does not broadcast the race start back to the host', function () {
     // hitung mundur mulai lagi dari 3, dan host tertahan di overlay.
     expect(lobbySource())->toContain('broadcast(new RoomUpdated($this->roomCode))->toOthers());');
 
-    // Tak ada broadcast RoomUpdated tanpa toOthers() di startRace().
-    $startRace = substr(lobbySource(), strpos(lobbySource(), 'public function startRace'));
-    $startRace = substr($startRace, 0, strpos($startRace, 'public function checkRoomStatus'));
+    // Aturannya khusus startRace(). Jalur lain (giveUp, sudden death) memang SENGAJA
+    // menyiarkan ke diri sendiri juga, karena pengirimnya perlu ikut re-render.
+    //
+    // Dulu irisan ini dibatasi oleh nama method BERIKUTNYA di file (`checkRoomStatus`),
+    // sehingga diam-diam mengunci urutan method -- memindah salah satunya ke trait
+    // mematahkannya dengan pesan yang menyesatkan. Sekarang batasnya deklarasi method
+    // apa pun yang menyusul, jadi urutannya bebas berubah.
+    // Batasnya: deklarasi method berikutnya ATAU akhir file -- startRace bisa saja
+    // menjadi method terakhir.
+    preg_match(
+        '/public function startRace\(\).*?(?=\n    (?:public|private|protected) function |\z)/s',
+        lobbySource(),
+        $m
+    );
 
-    expect($startRace)->toContain('->toOthers()');
+    expect($m)->not->toBeEmpty('Method startRace() tak ditemukan')
+        ->and($m[0])->toContain('->toOthers()');
 });
 
 it('locks the countdown deadline once per race so a re-render cannot restart it', function () {

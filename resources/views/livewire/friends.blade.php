@@ -64,10 +64,10 @@
                             <span class="text-[0.65rem] uppercase tracking-wider text-muted">{{ __('friends.level', ['level' => $row['user']->levelData()['level']]) }}</span>
                         </div>
 
-                        <a href="{{ route('chat.index', ['mode' => 'dm', 'with' => $row['user']->username]) }}" wire:navigate
-                            class="px-3 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition shrink-0">
+                        <x-btn-gold as="a" size="sm" class="shrink-0" wire:navigate
+                            href="{{ route('chat.index', ['mode' => 'dm', 'with' => $row['user']->username]) }}">
                             {{ __('friends.chat') }}
-                        </a>
+                        </x-btn-gold>
 
                         <div class="shrink-0 relative" x-data="{ open: false, ghost: false }" @click.outside="open = false; ghost = false" @keydown.escape="open = false; ghost = false">
                             <button type="button" @click="open = !open; ghost = false"
@@ -148,15 +148,11 @@
                 @endforeach
             </div>
         @else
-            <div class="flex flex-col items-center justify-center py-24 text-center select-none">
-                <img src="/icon/uetype_mascot.png" alt="" class="w-16 opacity-30 mb-4">
-                <p class="font-mono text-sm font-bold text-foreground">{{ __('friends.empty_friends_title') }}</p>
-                <p class="font-mono text-xs text-muted mt-1">{{ __('friends.empty_friends_body') }}</p>
-                <button wire:click="setTab('find')"
-                    class="mt-5 px-5 py-2 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
-                    {{ __('friends.find_friends') }}
-                </button>
-            </div>
+            <x-empty-state :title="__('friends.empty_friends_title')" :body="__('friends.empty_friends_body')">
+                <x-slot:cta>
+                    <x-btn-gold size="lg" wire:click="setTab('find')">{{ __('friends.find_friends') }}</x-btn-gold>
+                </x-slot:cta>
+            </x-empty-state>
         @endif
     @endif
 
@@ -165,11 +161,7 @@
     {{-- ===================================================================== --}}
     @if ($tab === 'requests')
         @if ($this->incomingRequests->count() === 0 && $this->sentRequests->count() === 0)
-            <div class="flex flex-col items-center justify-center py-24 text-center select-none">
-                <img src="/icon/uetype_mascot.png" alt="" class="w-16 opacity-30 mb-4">
-                <p class="font-mono text-sm font-bold text-foreground">{{ __('friends.empty_requests_title') }}</p>
-                <p class="font-mono text-xs text-muted mt-1">{{ __('friends.empty_requests_body') }}</p>
-            </div>
+            <x-empty-state :title="__('friends.empty_requests_title')" :body="__('friends.empty_requests_body')" />
         @else
             {{-- INCOMING --}}
             @if ($this->incomingRequests->count() > 0)
@@ -184,14 +176,8 @@
                                     <p class="font-mono text-xs text-muted mt-0.5">{{ __('friends.level', ['level' => $req->requester->levelData()['level']]) }}</p>
                                 </div>
                             </a>
-                            <button wire:click="acceptRequest({{ $req->id }})"
-                                class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
-                                {{ __('friends.accept') }}
-                            </button>
-                            <button wire:click="rejectRequest({{ $req->id }})"
-                                class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
-                                {{ __('friends.reject') }}
-                            </button>
+                            <x-btn-gold wire:click="acceptRequest({{ $req->id }})">{{ __('friends.accept') }}</x-btn-gold>
+                            <x-btn-ghost wire:click="rejectRequest({{ $req->id }})">{{ __('friends.reject') }}</x-btn-ghost>
                         </div>
                     @endforeach
                 </div>
@@ -260,16 +246,12 @@
                                     <span class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg">{{ __('friends.request_sent') }}</span>
                                     @break
                                 @case('incoming')
-                                    <button wire:click="setTab('requests')"
-                                        class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
-                                        {{ __('friends.respond') }}
-                                    </button>
+                                    <x-btn-gold wire:click="setTab('requests')">{{ __('friends.respond') }}</x-btn-gold>
                                     @break
                                 @default
-                                    <button wire:click="sendRequest({{ $row['user']->id }})"
-                                        class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition flex items-center gap-1">
+                                    <x-btn-gold class="flex items-center gap-1" wire:click="sendRequest({{ $row['user']->id }})">
                                         {{ __('friends.add') }}
-                                    </button>
+                                    </x-btn-gold>
                             @endswitch
                         </div>
                     @endforeach

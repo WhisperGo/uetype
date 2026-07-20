@@ -11,9 +11,10 @@ use Livewire\Livewire;
  * penyebutnya (menit berlalu) terus tumbuh sehingga WPM-nya turun. Angka WPM di
  * lane harus ikut hidup, sementara bar progres & maskot TIDAK boleh bergerak.
  */
+/** Markup + modul JS arena; helper bersama ada di tests/Pest.php. */
 function arenaJs(): string
 {
-    return file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php'));
+    return arenaSourceAll();
 }
 
 function racingMember(User $user): RoomMember

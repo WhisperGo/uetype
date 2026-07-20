@@ -43,15 +43,13 @@
                 @endforeach
             </div>
         @else
-            <div class="flex flex-col items-center justify-center py-16 text-center select-none">
-                <img src="/icon/uetype_mascot.png" alt="" class="w-16 opacity-30 mb-4">
-                <p class="font-mono text-sm font-bold text-foreground">{{ __('chat.empty_inbox_title') }}</p>
-                <p class="font-mono text-xs text-muted mt-1">{{ __('chat.empty_inbox_body') }}</p>
-                <a href="{{ route('friends.index') }}" wire:navigate
-                    class="mt-5 px-5 py-2 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
-                    {{ __('chat.go_to_friends') }}
-                </a>
-            </div>
+            <x-empty-state spacing="16" :title="__('chat.empty_inbox_title')" :body="__('chat.empty_inbox_body')">
+                <x-slot:cta>
+                    <x-btn-gold as="a" size="lg" href="{{ route('friends.index') }}" wire:navigate>
+                        {{ __('chat.go_to_friends') }}
+                    </x-btn-gold>
+                </x-slot:cta>
+            </x-empty-state>
         @endif
 
         {{-- CLAN CHAT: kartu pintasan (clan cuma satu, bukan tab terpisah). --}}
@@ -64,18 +62,15 @@
                     <p class="font-mono text-sm font-bold text-foreground truncate group-hover:text-gold transition-colors">{{ $this->myClan->name }}</p>
                     <p class="font-mono text-xs text-muted mt-0.5">{{ __('chat.members', ['count' => $this->myClan->activeMembers()->count()]) }}</p>
                 </div>
-                <span class="px-3 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition shrink-0">
-                    {{ __('chat.open_clan_chat') }}
-                </span>
+                <x-btn-gold as="span" size="sm" class="shrink-0">{{ __('chat.open_clan_chat') }}</x-btn-gold>
             </button>
         @else
             <div class="flex flex-col items-center justify-center py-12 text-center select-none border bg-surface/20 border-white/5 rounded-2xl">
                 <p class="font-mono text-sm font-bold text-foreground">{{ __('chat.no_clan_title') }}</p>
                 <p class="font-mono text-xs text-muted mt-1">{{ __('chat.no_clan_body') }}</p>
-                <a href="{{ route('clans.index') }}" wire:navigate
-                    class="mt-4 px-5 py-2 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
+                <x-btn-gold as="a" size="lg" class="mt-4" href="{{ route('clans.index') }}" wire:navigate>
                     {{ __('chat.go_to_clans') }}
-                </a>
+                </x-btn-gold>
             </div>
         @endif
     @else
@@ -314,11 +309,9 @@
                 <input type="text" x-model="draft" x-ref="msgInput" maxlength="2000" autocomplete="off"
                     placeholder="{{ __('chat.placeholder') }}"
                     class="flex-1 px-4 py-2.5 bg-surface/40 border border-white/10 rounded-2xl font-mono text-sm text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
-                <button type="submit"
-                    class="px-5 py-2.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition disabled:opacity-40"
-                    x-bind:disabled="draft.trim() === ''">
+                <x-btn-gold type="submit" size="xl" class="disabled:opacity-40" x-bind:disabled="draft.trim() === ''">
                     {{ __('chat.send') }}
-                </button>
+                </x-btn-gold>
             </form>
         </div>
     @endif

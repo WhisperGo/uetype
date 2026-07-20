@@ -16,15 +16,13 @@
     </div>
 
     @if (! $this->myClan)
-        <div class="flex flex-col items-center justify-center py-24 text-center select-none">
-            <img src="/icon/uetype_mascot.png" alt="" class="w-16 h-16 opacity-30 mb-4">
-            <p class="font-mono text-sm font-bold text-foreground">{{ __('clan.war.no_clan_title') }}</p>
-            <p class="font-mono text-xs text-muted mt-1">{{ __('clan.war.no_clan_body') }}</p>
-            <a href="{{ route('clans.index') }}" wire:navigate
-                class="mt-5 px-5 py-2 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
-                {{ __('clan.war.go_to_clans') }}
-            </a>
-        </div>
+        <x-empty-state :title="__('clan.war.no_clan_title')" :body="__('clan.war.no_clan_body')">
+            <x-slot:cta>
+                <x-btn-gold as="a" size="lg" href="{{ route('clans.index') }}" wire:navigate>
+                    {{ __('clan.war.go_to_clans') }}
+                </x-btn-gold>
+            </x-slot:cta>
+        </x-empty-state>
     @else
         <p class="font-mono text-xs text-muted mb-6">
             {{ __('clan.war.clan_power', ['name' => $this->myClan->name, 'power' => number_format($this->myClan->power)]) }}
@@ -48,10 +46,7 @@
                     </div>
                 </div>
                 <div class="flex gap-3 mt-4">
-                    <button wire:click="acceptChallenge({{ $war->id }})"
-                        class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
-                        {{ __('clan.war.accept') }}
-                    </button>
+                    <x-btn-gold wire:click="acceptChallenge({{ $war->id }})">{{ __('clan.war.accept') }}</x-btn-gold>
                     <button wire:click="declineChallenge({{ $war->id }})"
                         class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
                         {{ __('clan.war.decline') }}
@@ -137,18 +132,18 @@
 
                         @switch($slot['status'])
                             @case('open')
-                                <button wire:click="claimMode('{{ $slot['mode'] }}', '{{ $slot['config'] }}')"
-                                    class="w-full px-3 py-2 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
+                                <x-btn-gold size="px-3 py-2 text-xs" class="w-full"
+                                    wire:click="claimMode('{{ $slot['mode'] }}', '{{ $slot['config'] }}')">
                                     {{ __('clan.war.claim_play') }}
-                                </button>
+                                </x-btn-gold>
                                 @break
 
                             @case('claimed')
                                 <div class="flex items-center justify-between gap-2">
                                     <span class="font-mono text-[0.7rem] text-muted truncate">{{ __('clan.war.claimed_by', ['name' => $slot['claim']->user->username]) }}</span>
                                     @if ($slot['claim']->user_id === auth()->id())
-                                        <a href="{{ route('typing', ['war_claim' => $slot['claim']->id]) }}" wire:navigate
-                                            class="px-2.5 py-1 font-mono text-[0.7rem] font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition shrink-0">{{ __('clan.war.play') }}</a>
+                                        <x-btn-gold as="a" size="xs" class="shrink-0" wire:navigate
+                                            href="{{ route('typing', ['war_claim' => $slot['claim']->id]) }}">{{ __('clan.war.play') }}</x-btn-gold>
                                     @endif
                                 </div>
                                 @if ($slot['claim']->user_id === auth()->id() || $this->isLeader)
@@ -198,10 +193,7 @@
                                 </p>
                                 <p class="font-mono text-xs text-muted mt-0.5">{{ __('clan.power_inline', ['value' => number_format($clan->power)]) }}</p>
                             </div>
-                            <button wire:click="challengeClan({{ $clan->id }})"
-                                class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
-                                {{ __('clan.war.challenge') }}
-                            </button>
+                            <x-btn-gold wire:click="challengeClan({{ $clan->id }})">{{ __('clan.war.challenge') }}</x-btn-gold>
                         </div>
                     @endforeach
                 </div>

@@ -156,12 +156,13 @@ it('keeps the runner on the flag in the dense layout too', function () {
 });
 
 /**
- * Logika store Alpine ada di dalam @assets, yang TIDAK ikut ter-render di HTML
- * komponen Livewire. Jadi kontraknya dijaga lewat berkas sumbernya langsung.
+ * Logika store Alpine hidup di modul JS, bukan di HTML yang dirender komponen
+ * Livewire. Jadi kontraknya dijaga lewat berkas sumbernya langsung -- markup plus
+ * kedua modul; lihat arenaSourceAll() di RaceLiveWpmTest.
  */
 function arenaSource(): string
 {
-    return file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php'));
+    return arenaSourceAll();
 }
 
 it('does not wipe mascot positions when the arena re-initializes mid race', function () {

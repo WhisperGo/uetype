@@ -1,3 +1,14 @@
+@php
+    // Satu sumber untuk desktop & mobile -- lihat App\Support\NavItems.
+    $navMain = App\Support\NavItems::main();
+    $navAccount = App\Support\NavItems::account();
+
+    // Leaderboard tampil terpisah (ikon trofi di kanan pada desktop), jadi
+    // dipisahkan dari kelompok kiri -- tapi sumber datanya tetap sama.
+    $navLeaderboard = collect($navMain)->firstWhere('key', 'leaderboard');
+    $navPrimary = collect($navMain)->reject(fn ($i) => $i['key'] === 'leaderboard');
+@endphp
+
 <nav x-data="{ open: false }" class="{{ request()->is('typing') || request()->is('/') ? '' : 'sticky top-0' }} z-40 border-b border-white/5 bg-background/80 backdrop-blur-md">
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
@@ -12,15 +23,11 @@
 
                 <!-- Navigation Links -->
                 <div class="hidden sm:-my-px sm:ms-10 sm:flex sm:gap-1">
-                    <x-nav-link href="{{ url('/typing') }}" :active="request()->is('typing')">
-                        {{ __('nav.solo') }}
-                    </x-nav-link>
-                    <x-nav-link href="{{ url('/multiplayer') }}" :active="request()->is('multiplayer')">
-                        {{ __('nav.multiplayer') }}
-                    </x-nav-link>
-                    <x-nav-link href="{{ route('clans.index') }}" :active="request()->routeIs('clans.index', 'clan-war.index')">
-                        {{ __('nav.klan') }}
-                    </x-nav-link>
+                    @foreach ($navPrimary as $item)
+                        <x-nav-link href="{{ $item['href'] }}" :active="$item['active']">
+                            {{ __($item['label']) }}
+                        </x-nav-link>
+                    @endforeach
                 </div>
             </div>
 
@@ -28,12 +35,9 @@
             <div class="hidden sm:flex sm:items-center sm:gap-4 sm:ms-6">
                 @auth
                     <!-- Trophy shortcut -> Leaderboard -->
-                    <a href="{{ route('leaderboard') }}" title="{{ __('nav.leaderboard') }}"
-                        class="p-2 rounded-lg border {{ request()->is('leaderboard') ? 'text-gold border-gold/40 bg-gold/10' : 'text-muted border-transparent hover:text-gold hover:border-gold/30 hover:bg-surface' }} focus:outline-none focus-visible:ring-1 focus-visible:ring-gold/40 transition">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
-                        </svg>
+                    <a href="{{ $navLeaderboard['href'] }}" title="{{ __($navLeaderboard['label']) }}"
+                        class="p-2 rounded-lg border {{ $navLeaderboard['active'] ? 'text-gold border-gold/40 bg-gold/10' : 'text-muted border-transparent hover:text-gold hover:border-gold/30 hover:bg-surface' }} focus:outline-none focus-visible:ring-1 focus-visible:ring-gold/40 transition">
+                        <x-icon-trophy />
                     </a>
 
                     <div class="h-6 w-px bg-border"></div>
@@ -74,14 +78,9 @@
 
                     <x-slot name="content">
                         @auth
-                            <x-dropdown-link :href="route('profile.me')">{{ __('nav.profile') }}</x-dropdown-link>
-
-                            <x-dropdown-link :href="route('achievements.index')">{{ __('nav.achievements') }}</x-dropdown-link>
-
-                            <x-dropdown-link :href="route('stats')">{{ __('nav.user_stats') }}</x-dropdown-link>
-                            <x-dropdown-link :href="route('friends.index')">{{ __('nav.friends') }}</x-dropdown-link>
-                            <x-dropdown-link :href="route('chat.index')">{{ __('nav.chat') }}</x-dropdown-link>
-                            <x-dropdown-link :href="route('settings')">{{ __('nav.settings') }}</x-dropdown-link>
+                            @foreach ($navAccount as $item)
+                                <x-dropdown-link :href="$item['href']">{{ __($item['label']) }}</x-dropdown-link>
+                            @endforeach
 
                             <div class="my-1 border-t border-white/5"></div>
 
@@ -136,26 +135,15 @@
     <!-- Responsive Navigation Menu -->
     <div :class="{ 'block': open, 'hidden': !open }" class="hidden border-t sm:hidden border-white/5">
         <div class="pt-2 pb-3 space-y-1">
-            <x-responsive-nav-link href="{{ url('/typing') }}"
-                :active="request()->is('typing')">{{ __('nav.solo') }}</x-responsive-nav-link>
-            <x-responsive-nav-link href="{{ url('/multiplayer') }}"
-                :active="request()->is('multiplayer')">{{ __('nav.multiplayer') }}</x-responsive-nav-link>
-            {{-- <span
-                class="flex items-center w-full gap-2 py-2 text-base font-medium cursor-not-allowed ps-3 pe-4 text-muted/50">
-                {{ __('nav.multiplayer') }}
-                <span
-                    class="text-[0.6rem] font-mono uppercase tracking-wider px-1 py-0.5 rounded bg-white/5 text-muted/60">soon</span>
-            </span> --}}
-            <x-responsive-nav-link href="{{ route('clans.index') }}"
-                :active="request()->routeIs('clans.index', 'clan-war.index')">{{ __('nav.klan') }}</x-responsive-nav-link>
+            @foreach ($navPrimary as $item)
+                <x-responsive-nav-link href="{{ $item['href'] }}"
+                    :active="$item['active']">{{ __($item['label']) }}</x-responsive-nav-link>
+            @endforeach
             @auth
-                <x-responsive-nav-link href="{{ url('/leaderboard') }}" :active="request()->is('leaderboard')">
+                <x-responsive-nav-link href="{{ $navLeaderboard['href'] }}" :active="$navLeaderboard['active']">
                     <span class="flex items-center gap-2">
-                        <svg class="w-4 h-4 text-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
-                        </svg>
-                        {{ __('nav.leaderboard') }}
+                        <x-icon-trophy class="w-4 h-4 text-gold" />
+                        {{ __($navLeaderboard['label']) }}
                     </span>
                 </x-responsive-nav-link>
             @endauth
@@ -171,12 +159,10 @@
                     <div class="text-sm font-medium text-muted">{{ Auth::user()->email }}</div>
                 </div>
                 <div class="mt-3 space-y-1">
-                    <x-responsive-nav-link :href="route('profile.me')">{{ __('nav.profile') }}</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('achievements.index')">{{ __('nav.achievements') }}</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('stats')">{{ __('nav.user_stats') }}</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('friends.index')">{{ __('nav.friends') }}</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('chat.index')">{{ __('nav.chat') }}</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('settings')">{{ __('nav.settings') }}</x-responsive-nav-link>
+                    @foreach ($navAccount as $item)
+                        <x-responsive-nav-link :href="$item['href']"
+                            :active="$item['active']">{{ __($item['label']) }}</x-responsive-nav-link>
+                    @endforeach
                     <button type="button"
                         x-on:click="$dispatch('open-modal', 'confirm-sign-out'); open = false"
                         class="group flex w-full items-center gap-2 border-l-4 border-transparent py-2 ps-3 pe-4 text-start text-base font-medium text-muted transition duration-150 ease-in-out hover:border-white/20 hover:bg-surface hover:text-foreground focus:border-white/20 focus:bg-surface focus:text-foreground focus:outline-none">

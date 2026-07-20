@@ -3,6 +3,8 @@ import './bootstrap';
 import Chart from 'chart.js/auto';
 import toastStack from './toasts';
 import typingGame from './typing-game';
+import './race-arena';
+import './race-echo';
 
 window.Chart = Chart;
 

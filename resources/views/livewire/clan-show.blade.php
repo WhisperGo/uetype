@@ -85,10 +85,7 @@
             @endforeach
         </div>
     @else
-        <div class="flex flex-col items-center justify-center py-16 text-center select-none border border-white/5 rounded-2xl bg-surface/20">
-            <img src="/icon/uetype_mascot.png" alt="" class="w-14 h-14 opacity-25 mb-3">
-            <p class="font-mono text-sm text-muted">{{ __('clan.empty.history') }}</p>
-        </div>
+        <x-empty-state card spacing="16" :body="__('clan.empty.history')" />
     @endif
     </x-page-container>
 </div>

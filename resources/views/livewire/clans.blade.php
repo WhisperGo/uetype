@@ -66,10 +66,9 @@
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2 shrink-0">
-                        <a href="{{ route('clan-war.index') }}" wire:navigate
-                            class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
+                        <x-btn-gold as="a" href="{{ route('clan-war.index') }}" wire:navigate>
                             {{ __('clan.clan_war') }}
-                        </a>
+                        </x-btn-gold>
                         <a href="{{ route('clan-leaderboard.index') }}" wire:navigate
                             class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
                             {{ __('clan.leaderboard') }}
@@ -99,10 +98,7 @@
                                 <p class="font-mono text-sm font-bold text-foreground truncate">{{ $req->user->username }}</p>
                                 <p class="font-mono text-xs text-muted mt-0.5">{{ __('clan.user_level', ['level' => $req->user->levelData()['level']]) }}</p>
                             </div>
-                            <button wire:click="approveMember({{ $req->id }})"
-                                class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
-                                {{ __('clan.my_clan.accept') }}
-                            </button>
+                            <x-btn-gold wire:click="approveMember({{ $req->id }})">{{ __('clan.my_clan.accept') }}</x-btn-gold>
                             <button wire:click="rejectMember({{ $req->id }})"
                                 class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
                                 {{ __('clan.my_clan.reject') }}
@@ -140,25 +136,15 @@
                 @endforeach
             </div>
         @else
-            <div class="flex flex-col items-center justify-center py-24 text-center select-none">
-                <img src="/icon/uetype_mascot.png" alt="" class="w-16 h-16 opacity-30 mb-4">
-                <p class="font-mono text-sm font-bold text-foreground">{{ __('clan.empty.no_clan_title') }}</p>
-                <p class="font-mono text-xs text-muted mt-1">{{ __('clan.empty.no_clan_body') }}</p>
-                <div class="flex flex-wrap items-center justify-center gap-3 mt-5">
-                    <button wire:click="setTab('browse')"
-                        class="px-5 py-2 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
-                        {{ __('clan.tab.browse') }}
-                    </button>
-                    <button wire:click="setTab('create')"
-                        class="px-5 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
-                        {{ __('clan.tab.create') }}
-                    </button>
-                    <a href="{{ route('clan-leaderboard.index') }}" wire:navigate
-                        class="px-5 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+            <x-empty-state :title="__('clan.empty.no_clan_title')" :body="__('clan.empty.no_clan_body')">
+                <x-slot:cta>
+                    <x-btn-gold size="lg" wire:click="setTab('browse')">{{ __('clan.tab.browse') }}</x-btn-gold>
+                    <x-btn-ghost size="lg" wire:click="setTab('create')">{{ __('clan.tab.create') }}</x-btn-ghost>
+                    <x-btn-ghost as="a" size="lg" href="{{ route('clan-leaderboard.index') }}" wire:navigate>
                         {{ __('clan.leaderboard') }}
-                    </a>
-                </div>
-            </div>
+                    </x-btn-ghost>
+                </x-slot:cta>
+            </x-empty-state>
         @endif
     @endif
 
@@ -200,22 +186,18 @@
                                 <span class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg shrink-0">{{ __('clan.browse.request_sent') }}</span>
                                 @break
                             @default
-                                <button wire:click="sendJoinRequest({{ $row['clan']->id }})"
-                                    class="px-4 py-1.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition shrink-0">
+                                <x-btn-gold class="shrink-0" wire:click="sendJoinRequest({{ $row['clan']->id }})">
                                     {{ __('clan.browse.join') }}
-                                </button>
+                                </x-btn-gold>
                         @endswitch
                     </div>
                 @endforeach
             </div>
         @else
-            <div class="flex flex-col items-center justify-center py-24 text-center select-none">
-                <img src="/icon/uetype_mascot.png" alt="" class="w-16 h-16 opacity-30 mb-4">
-                <p class="font-mono text-sm font-bold text-foreground">{{ __('clan.empty.no_results_title') }}</p>
-                <p class="font-mono text-xs text-muted mt-1">
-                    {{ trim($search) !== '' ? __('clan.empty.no_results_body', ['query' => trim($search)]) : __('clan.empty.no_results_alt') }}
-                </p>
-            </div>
+            {{-- Keterangan lewat slot, bukan prop: isinya bergantung ada/tidaknya kata kunci. --}}
+            <x-empty-state :title="__('clan.empty.no_results_title')">
+                {{ trim($search) !== '' ? __('clan.empty.no_results_body', ['query' => trim($search)]) : __('clan.empty.no_results_alt') }}
+            </x-empty-state>
         @endif
     @endif
 
@@ -290,10 +272,7 @@
                 @error('newEmblemColor')<p class="font-mono text-xs text-danger mt-1.5">{{ $message }}</p>@enderror
             </div>
 
-            <button type="submit"
-                class="px-5 py-2.5 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
-                {{ __('clan.create.submit') }}
-            </button>
+            <x-btn-gold type="submit" size="xl">{{ __('clan.create.submit') }}</x-btn-gold>
         </form>
     @endif
 

@@ -4,6 +4,9 @@
     <button x-show="!hidden" x-cloak x-ref="bubble"
         @pointerdown="startDrag($event)"
         :style="bubbleStyle()"
+        {{-- Sengaja TIDAK memakai <x-btn-gold>: ini FAB bulat dengan logika drag,
+             bukan tombol teks. Memaksakannya ke komponen hanya akan menambah prop
+             yang tak dipakai siapa pun. --}}
         class="fixed z-[56] w-14 h-14 rounded-full bg-gold hover:bg-gold/90 text-background shadow-xl flex items-center justify-center transition-colors touch-none select-none cursor-grab active:cursor-grabbing"
         aria-label="{{ __('chat.title') }}">
         <svg class="w-6 h-6 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -312,11 +315,10 @@
                 <input type="text" x-model="draft" x-ref="overlayMsgInput" maxlength="2000" autocomplete="off"
                     placeholder="{{ __('chat.placeholder') }}"
                     class="flex-1 px-3 py-2 bg-surface/40 border border-white/10 rounded-xl font-mono text-xs text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
-                <button type="submit"
-                    class="px-3 py-2 font-mono text-[0.7rem] font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition disabled:opacity-40"
+                <x-btn-gold type="submit" size="px-3 py-2 text-[0.7rem]" class="disabled:opacity-40"
                     x-bind:disabled="draft.trim() === ''">
                     {{ __('chat.send') }}
-                </button>
+                </x-btn-gold>
             </form>
         @endif
     </div>

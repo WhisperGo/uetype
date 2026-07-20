@@ -53,6 +53,24 @@ expect()->extend('toBeOne', function () {
  * regresi performa, yang tak bisa ditangkap oleh test fungsional biasa (halaman
  * dengan 500 query tetap "lulus" kalau outputnya benar).
  */
+/**
+ * Seluruh sumber sisi-klien arena balapan: markup Blade (tempat lane x-data hidup)
+ * digabung dengan kedua modul JS-nya.
+ *
+ * Logika arena pindah dari <script> inline ke resources/js/race-*.js. Test yang
+ * membaca Blade saja akan gagal dengan alasan yang salah -- "string tak ditemukan"
+ * padahal kodenya hanya berpindah file. Digabung supaya kontraknya tetap terjaga
+ * di mana pun kodenya tinggal.
+ */
+function arenaSourceAll(): string
+{
+    return implode("\n", [
+        file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php')),
+        file_get_contents(resource_path('js/race-arena.js')),
+        file_get_contents(resource_path('js/race-echo.js')),
+    ]);
+}
+
 function countQueries(Closure $callback): int
 {
     DB::flushQueryLog();

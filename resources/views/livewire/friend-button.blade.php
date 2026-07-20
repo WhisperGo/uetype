@@ -35,24 +35,17 @@
         {{-- Ada permintaan masuk dari target: terima / tolak langsung di sini. --}}
         @case('incoming')
             <div class="inline-flex items-center gap-2">
-                <button wire:click="acceptRequest"
-                    class="px-4 py-2 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition">
-                    {{ __('friends.accept') }}
-                </button>
-                <button wire:click="rejectRequest"
-                    class="px-4 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
-                    {{ __('friends.reject') }}
-                </button>
+                <x-btn-gold size="wide" wire:click="acceptRequest">{{ __('friends.accept') }}</x-btn-gold>
+                <x-btn-ghost size="wide" wire:click="rejectRequest">{{ __('friends.reject') }}</x-btn-ghost>
             </div>
             @break
 
         {{-- Belum ada relasi: kirim permintaan pertemanan. --}}
         @default
-            <button wire:click="sendRequest"
-                class="px-4 py-2 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition inline-flex items-center gap-1.5">
+            <x-btn-gold size="wide" class="inline-flex items-center gap-1.5" wire:click="sendRequest">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14" /></svg>
                 {{ __('friends.add_friend') }}
-            </button>
+            </x-btn-gold>
     @endswitch
 
     {{-- Dengarkan siaran real-time (diteruskan toast global lewat window event)

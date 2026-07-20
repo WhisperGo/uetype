@@ -17,15 +17,22 @@ $hostTerlarang = [
     'cdnjs.cloudflare.com',
 ];
 
-it('tidak memuat aset dari CDN eksternal di view aplikasi', function () use ($hostTerlarang) {
+it('tidak memuat aset dari CDN eksternal di view maupun modul js', function () use ($hostTerlarang) {
     $pelanggaran = [];
 
-    $files = new RecursiveIteratorIterator(
+    // Memindai views DAN resources/js: setelah JS dipindah keluar dari Blade,
+    // memindai views saja membuat pemeriksaan ini berhenti berjalan untuk kode
+    // yang justru paling mungkin menarik dependensi luar.
+    $files = new AppendIterator;
+    $files->append(new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator(resource_path('views'), FilesystemIterator::SKIP_DOTS)
-    );
+    ));
+    $files->append(new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator(resource_path('js'), FilesystemIterator::SKIP_DOTS)
+    ));
 
     foreach ($files as $file) {
-        if ($file->getExtension() !== 'php') {
+        if (! in_array($file->getExtension(), ['php', 'js'], true)) {
             continue;
         }
 
