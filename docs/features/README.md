@@ -27,7 +27,7 @@ Sebelum membaca per fitur, tiga prinsip ini muncul terus dan menjelaskan banyak 
 
 2. **State diturunkan (derived), bukan disimpan ganda.**
    Level diturunkan dari `total_xp`, status online dari `last_seen_at`, keanggotaan clan dari
-   pivot `clan_members`. Kenap: menghindari data yang "nyangkut" tidak konsisten (mis. flag
+   pivot `clan_members`. Kenapa: menghindari data yang "nyangkut" tidak konsisten (mis. flag
    online `true` padahal browser sudah tertutup).
 
 3. **Real-time boleh gagal tanpa merusak request inti.**

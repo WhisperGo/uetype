@@ -1,6 +1,6 @@
 # UeType — Dokumentasi Proyek Menyeluruh
 
-**Dibuat:** 2026-07-13
+**Dibuat:** 2026-07-13 · **Diperbarui:** 2026-07-21
 **Cakupan:** Gambaran arsitektur, database, seluruh route, dan tooling di satu tempat.
 Untuk detail *cara kerja & justifikasi* per fitur, dokumen ini merujuk ke
 [`docs/features/`](features/README.md) yang sudah ada — tidak diduplikasi di sini.
@@ -75,7 +75,16 @@ Dua pola arsitektur yang berulang di seluruh proyek (detail alasan ada di
 
 ## 4. Skema Database
 
-31 migrasi di `database/migrations/`. Dikelompokkan per domain:
+42 migrasi di `database/migrations/`. Dikelompokkan per domain:
+
+> **Tabel legacy sudah dibuang.** Migrasi
+> `2026_07_20_110000_drop_legacy_match_and_text_tables.php` men-*drop*
+> `matches`, `match_participants`, `texts`, `languages`, dan `paragraphs` — sisa
+> rancangan awal yang digantikan `rooms`/`room_members` (balapan),
+> `multiplayer_match_history` (riwayat), dan `TextGeneratorService` (teks dirakit
+> dari wordlist JSON `database/data/*.json`, bukan dari tabel). Kolom
+> `typing_results.text_id` ikut dibuang. Dokumen ini menjelaskan **skema akhir**
+> (setelah drop), bukan tabel-tabel mati tersebut.
 
 ### Identitas & Autentikasi
 - **`users`** — `google_id`, `email`, `username` (unik), `avatar`, `highest_wpm`,
@@ -83,14 +92,10 @@ Dua pola arsitektur yang berulang di seluruh proyek (detail alasan ada di
 - **`password_reset_tokens`**, **`sessions`** — standar Laravel/Breeze.
 
 ### Konten Mengetik
-- **`languages`** — bahasa konten (en/id).
-- **`texts`** — materi sumber (mode/difficulty/author) — sebagian besar sudah
-  digantikan pendekatan wordlist JSON (`database/data/*.json`), tapi tabel tetap
-  dipakai untuk Ghost Mode & referensi hasil.
 - **`typing_results`** — catatan sesi solo: `net_wpm`, `raw_wpm`, `accuracy`,
   `correct_chars`/`incorrect_chars`, `duration_seconds`, `score` (khusus survival),
-  `xp_earned`. Write-once (`UPDATED_AT = null`).
-- **`paragraphs`** — materi latihan tambahan (jarang dipakai langsung).
+  `xp_earned`. Write-once (`UPDATED_AT = null`). Teks latihan **tidak** lagi berasal
+  dari tabel — dirakit runtime oleh `TextGeneratorService` dari wordlist JSON.
 
 ### Multiplayer Race
 - **`rooms`** — `code` (unik), `host_id`, `status`, `text_to_type`,
@@ -125,12 +130,10 @@ Dua pola arsitektur yang berulang di seluruh proyek (detail alasan ada di
 - **`message_clears`** — penanda "clear chat" per user per percakapan.
 - **`message_deletes`** — penanda "delete for me" per user per pesan.
 
-### Achievement & Legacy
+### Achievement
 - **`user_achievements`** — log unlock (`achievement_key`, `unlocked_at`);
   definisi achievement sendiri hidup di kode
-  ([`AchievementDefinitions`](../app/Support/AchievementDefinitions.php) — bukan DB.
-- **`matches`** + **`match_participants`** — sistem match 1v1 versi lama, sudah
-  digantikan `rooms`/`room_members`; `MatchController` masih berupa stub TODO.
+  ([`AchievementDefinitions`](../app/Support/AchievementDefinitions.php)) — bukan DB.
 
 ### Infrastruktur
 - `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs` — tabel bawaan Laravel.
@@ -141,7 +144,7 @@ konsisten di seluruh proyek.
 
 ## 5. Model & Relasi Kunci
 
-Daftar lengkap ada di `app/Models/` (19 file). Yang paling sering disentuh:
+Daftar lengkap ada di `app/Models/` (15 file). Yang paling sering disentuh:
 
 - **`User`** — memuat sistem level/XP (`addExp()`, `levelData()`, formula kuadratik
   tertutup dari `total_xp`) dan sistem presence (`isOnline()`, `touchPresence()`).
@@ -156,7 +159,7 @@ Daftar lengkap ada di `app/Models/` (19 file). Yang paling sering disentuh:
 
 ## 6. Livewire Components
 
-15 komponen class-based di `app/Livewire/` + 2 view Volt-style di
+16 komponen class-based di `app/Livewire/` + 2 view Volt-style di
 `resources/views/livewire/` (`leaderboard.blade.php` fungsional penuh,
 `multiplayer-lobby.blade.php` adalah view biasa yang di-*backing* kelas
 `MultiplayerLobby`).
@@ -168,7 +171,8 @@ Daftar lengkap ada di `app/Models/` (19 file). Yang paling sering disentuh:
 | `MultiplayerLobby` | `/multiplayer` | Lobby + arena race real-time |
 | `GhostPicker` | (embedded) | Pilih lawan ghost (diri sendiri/teman/leaderboard) |
 | `Stats` | `/stats` | Agregat statistik, semua dihitung saat render |
-| `Chat` | `/chat` | DM + clan chat |
+| `Chat` | `/chat` | DM + clan chat (halaman penuh) |
+| `ChatOverlay` | (global, mounted di layout) | Drawer chat balas-cepat dari halaman mana pun — lihat [`features/chat.md`](features/chat.md) §4 |
 | `Clans` | `/clans` | Hub clan sendiri/browse/create |
 | `ClanShow` | `/clans/{clan}` | Detail clan (read-only) |
 | `ClanWar` | `/clan-war` | Challenge/accept, grid klaim 9-mode |
@@ -179,6 +183,12 @@ Daftar lengkap ada di `app/Models/` (19 file). Yang paling sering disentuh:
 | `About` | `/about` | Halaman tim statis |
 | `Terms` | `/privacy-policy` | Kebijakan privasi |
 | `leaderboard` (Volt) | `/leaderboard` | Top-10 global per mode/config/timeframe |
+
+**Trait bersama** (`app/Livewire/Concerns/`, 5 file) — logika yang dipakai lintas
+komponen agar tak terduplikasi: `GuardsChatAccess` (guard DM/clan + kirim, dipakai
+`Chat` & `ChatOverlay`), `ManagesChatConversation`, `FinalizesRace`,
+`ReadsRoomState`, `ManagesRoomMembership` (tiga terakhir memecah `MultiplayerLobby`
+yang besar).
 
 Detail cara kerja tiap komponen inti ada di dokumen fitur masing-masing
 (lihat tabel di §9).
@@ -216,19 +226,23 @@ Sumber: `routes/web.php`, `routes/auth.php`, `routes/channels.php`.
 - `/style-guide` — referensi design system hidup
 - `/dev-login`, `/dev-login2` — login instan sebagai user dummy dari seeder
 
-**Route stub/belum jadi** (controller ada, logika TODO):
-- `LeaderboardController` (leaderboard asli ada di Volt component, bukan di sini)
-- `MatchController`, `TextController`, `UserController`, `ShopController` —
-  menandakan fitur yang direncanakan tapi belum dibangun (panel admin, shop/coin,
-  analitik keystroke).
+**Catatan controller:** hanya 7 controller yang tersisa (`AchievementController`,
+`ChatController`, `GoogleAuthController`, `LocaleController`, `PresenceController`,
+`ProfileController`, + base `Controller`). Kontroler-kontroler stub versi lama
+(`MatchController`, `TextController`, `UserController`, `ShopController`,
+`LeaderboardController`) **sudah dihapus** — logika sesungguhnya berada di komponen
+Livewire/Volt, jadi tak ada lagi controller kosong yang menyesatkan.
 
 ## 8. Services & Events
 
-### Services (`app/Services/`)
+### Services (`app/Services/`, 9 file)
 | Service | Peran |
 |---|---|
 | `AntiCheatService` | Hitung ulang & validasi WPM/akurasi server-side — trust boundary utama |
 | `AchievementService` | Evaluasi & catat unlock achievement |
+| `GhostResolver` | Turunkan lawan ghost dari identitas (type + refId), WPM selalu di-fetch ulang dari DB — satu sumber kebenaran (dipakai `GhostPicker` & `TypingEngine`) |
+| `TextGeneratorService` | Rakit teks latihan dari wordlist JSON — satu sumber untuk solo **dan** multiplayer (menggantikan tabel `texts`) |
+| `TypingErrorInspector` | Ubah stream error mentah klien jadi view-model penanda error di layar hasil (`sanitize()` = trust boundary, `inspect()` = pemetaan ke chart) |
 | `EloCalculator` | Rating Elo untuk Clan War (K=32) |
 | `ClanWarModeCatalog` | Definisi 9 mode wajib Clan War + skala poin |
 | `ClanWarScorer` | Skor hasil ketik untuk satu slot Clan War |
@@ -278,9 +292,8 @@ Dokumen terkait lain:
 ## 10. Testing
 
 - **Framework:** Pest v4 (`tests/Pest.php`), gaya fungsional (`it('...', fn () => ...)`).
-- **Struktur:** `tests/Unit` (3 file: contoh, `AntiCheatServiceTest`, `AppTimeTest`) +
-  `tests/Feature` (33 file top-level + 4 di `Auth/`).
-- **Total:** 40 file test, ±234 kasus `it()`/`test()`.
+- **Struktur:** `tests/Unit` (9 file) + `tests/Feature` (64 file top-level + 2 di `Auth/`).
+- **Total:** 75 file test, ±526 kasus `it()`/`test()`.
 - **Konvensi:** `RefreshDatabase`, pola
   `Livewire::actingAs($user)->test(Component::class)->call(...)->assertDispatched(...)`,
   fixture via factory (`UserFactory` — satu-satunya factory di proyek).
@@ -319,9 +332,9 @@ Dokumen terkait lain:
 - **Channel Reverb bersifat publik**, bukan `PrivateChannel` — keamanan bergantung
   pada kode/ID yang tak mudah ditebak, bukan otorisasi Laravel di
   `routes/channels.php`.
-- **Kontroler stub** (`MatchController`, `TextController`, `UserController`,
-  `ShopController`, `LeaderboardController`) jangan dikira representasi fitur asli
-  — logika sesungguhnya sudah pindah ke Livewire component/Volt.
+- **Logika halaman ada di Livewire/Volt, bukan controller.** Controller stub versi
+  lama sudah dihapus (lihat §7) — kalau mencari "controller" untuk suatu halaman dan
+  tak menemukannya, cari komponen Livewire/Volt-nya, bukan mengira fiturnya hilang.
 - **`minimum-stability: dev`** di `composer.json` — perlu hati-hati saat
   `composer update`.
 
