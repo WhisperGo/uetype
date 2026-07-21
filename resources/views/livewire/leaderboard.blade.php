@@ -50,7 +50,7 @@ $sendRequest = function (int $userId) {
         return;
     }
 
-    $payload = ['type' => 'request', 'message' => Auth::user()->username.' sent you a friend request'];
+    $payload = ['type' => 'request', 'message' => __('friends.notify.request', ['name' => Auth::user()->username])];
 
     FriendshipUpdated::dispatch($userId, $payload);
 };

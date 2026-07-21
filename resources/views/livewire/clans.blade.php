@@ -110,7 +110,10 @@
                 </div>
             @endif
 
-            @error('newName')
+            {{-- Error approve member (mis. clan penuh); key sendiri, dirender di dekat
+                 daftar pending. Dulu blok ini memakai key 'newName' milik form
+                 buat-clan di tab lain -- kopling rapuh yang kini dilepas. --}}
+            @error('approveMember')
                 <p class="font-mono text-xs text-danger mb-4">{{ $message }}</p>
             @enderror
 

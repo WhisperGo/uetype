@@ -313,6 +313,7 @@ class MultiplayerLobby extends Component
         $room = Room::where('code', $this->roomCode)->first();
 
         if ($room) {
+<<<<<<< HEAD
             // Read the username before departing, while the membership row still exists.
             $leavingUsername = Auth::user()->username;
 
@@ -324,6 +325,22 @@ class MultiplayerLobby extends Component
             // "<user> left" notice only if someone is still listening in the room
             // (departCurrentRooms deletes the room once its last member leaves).
             if (Room::where('id', $room->id)->exists()) {
+=======
+            // Nama diambil SEBELUM keluar; sesudahnya keanggotaan sudah terhapus.
+            $leavingUsername = Auth::user()->username;
+
+            // Jalur atomik yang sama dengan createRoom/joinRoom. Dulu logika ini
+            // ditulis sendiri di sini, dan hanya DI SINI yang merawat room yang
+            // ditinggalkan -- itulah kenapa dua jalur lain bocor. Satu pintu, satu
+            // perilaku (fix D6: hapus-room-kosong yang atomik).
+            DB::transaction(fn () => $this->departCurrentRooms(Auth::id()));
+
+            // Notif "<user> keluar" hanya kalau room masih ada -- departCurrentRooms
+            // sudah menghapusnya kalau kosong, jadi cek keberadaan ini menggantikan
+            // pemeriksaan "$remaining > 0" milik versi lama (tetap: tak ada gunanya
+            // menyiarkan kepergian ke room yang sudah tak berpenghuni).
+            if (Room::where('code', $this->roomCode)->exists()) {
+>>>>>>> 38cdc38ce4c679974fb9d88625324892088d60a2
                 SafeBroadcast::run(fn () => broadcast(new RoomPresenceChanged($this->roomCode, $leavingUsername, 'leave')));
             }
 

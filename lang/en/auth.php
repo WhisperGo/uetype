@@ -2,6 +2,7 @@
 
 return [
     'welcome' => 'Welcome',
+    'mascot_alt' => 'UeType mascot',
     'headline_start' => 'Start',
     'headline_accent' => 'typing',
     'tagline' => 'Sign in to save your progress and play with friends.',

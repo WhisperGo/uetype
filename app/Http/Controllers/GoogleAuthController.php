@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Support\UsernameRules;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -112,16 +113,15 @@ class GoogleAuthController extends Controller
             return redirect('/typing');
         }
 
+<<<<<<< HEAD
         // Validate the user's chosen username (must be unique).
+=======
+        // Validasi input username dari user (wajib unik). Aturan sama persis dengan
+        // Settings::saveUsername -- satu sumber di UsernameRules. Tanpa ignore: user
+        // ini belum punya baris, jadi tak ada yang perlu dikecualikan dari cek unique.
+>>>>>>> 38cdc38ce4c679974fb9d88625324892088d60a2
         $request->validate([
-            'username' => [
-                'required',
-                'string',
-                'alpha_dash',
-                'min:3',
-                'max:20',
-                'unique:users,username',
-            ],
+            'username' => UsernameRules::rules(),
         ], [
             'username.unique' => __('auth.username.taken'),
             'username.alpha_dash' => __('auth.username.format'),

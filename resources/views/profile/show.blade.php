@@ -19,7 +19,7 @@
         $totalSeconds = $stats['total_seconds'] ?? 0;
         $hours = intdiv($totalSeconds, 3600);
         $minutes = intdiv($totalSeconds % 3600, 60);
-        $timeLabel = $hours > 0 ? "{$hours}j {$minutes}m" : "{$minutes}m";
+        $timeLabel = $hours > 0 ? "{$hours}h {$minutes}m" : "{$minutes}m";
     @endphp
 
     <div class="py-10">

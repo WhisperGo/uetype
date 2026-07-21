@@ -275,6 +275,33 @@ it('clears only messages older than N days when scope is "days"', function () {
     expect($messages->first()->body)->toBe('baru');
 });
 
+it('clamps an out-of-range clearDays instead of trusting client input', function () {
+    [$me, $friend] = makeAcceptedFriends();
+
+    // Pesan berumur 20 tahun. `max="3650"` (10 tahun) hanya di HTML; request buatan
+    // bisa mengirim angka apa pun. Server harus menjepit ke 3650 hari, jadi pesan
+    // yang lebih tua dari itu TETAP terhapus, tapi tak lebih.
+    $ancient = Message::create(['sender_id' => $me->id, 'recipient_id' => $friend->id, 'body' => 'purba']);
+    $ancient->forceFill(['created_at' => now()->subYears(20)])->save();
+
+    $withinCap = Message::create(['sender_id' => $me->id, 'recipient_id' => $friend->id, 'body' => 'dalam-cap']);
+    $withinCap->forceFill(['created_at' => now()->subDays(3000)])->save();
+
+    Livewire::actingAs($me)->test(Chat::class)
+        ->call('openDm', $friend->username)
+        ->set('clearScope', 'days')
+        ->set('clearDays', 999999)   // jauh di atas batas
+        ->call('confirmClear');
+
+    // cleared_before dijepit ke 3650 hari lalu: pesan 3000 hari (dalam cap) tetap
+    // ada, pesan 20 tahun (di luar cap) terhapus. Kalau 999999 dipakai apa adanya,
+    // cleared_before jatuh ~2700 tahun lalu -> tak ada yang terhapus.
+    $messages = Livewire::actingAs($me)->test(Chat::class)
+        ->call('openDm', $friend->username)->get('messages');
+
+    expect($messages->pluck('body')->all())->toBe(['dalam-cap']);
+});
+
 it('clears clan chat history for the clearing member only', function () {
     [$clan, [$leader, $member]] = makeClanWithMembers(2);
 

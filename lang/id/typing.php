@@ -22,6 +22,8 @@ return [
     'restart' => 'ulangi',
     'then' => 'lalu',
     'war_locked_restart' => 'ulangi dikunci (clan war)',
+    'war_lock_label' => 'Clan War',
+    'war_lock_cancel' => 'Batalkan & kembali ke Clan War',
 
     'caps_lock' => 'Caps Lock aktif',
 

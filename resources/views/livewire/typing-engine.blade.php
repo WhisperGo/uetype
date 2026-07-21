@@ -62,7 +62,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
                         <span class="text-small font-mono font-bold text-gold">
-                            Clan War ·
+                            {{ __('typing.war_lock_label') }} ·
                             @if ($warLock['mode'] === 'survival')
                                 Survival {{ ucfirst($warLock['config']) }}
                             @elseif ($warLock['mode'] === 'time')
@@ -75,7 +75,7 @@
                     {{-- WITHOUT wire:navigate: the only SPA exit from /typing while war-locked;
                          Back from it would restore a broken typing-engine snapshot. A full load is safe. --}}
                     <a href="{{ route('clan-war.index') }}" class="text-x-small font-mono text-muted hover:text-foreground transition">
-                        ← Batalkan &amp; kembali ke Clan War
+                        ← {{ __('typing.war_lock_cancel') }}
                     </a>
                 </div>
             @else

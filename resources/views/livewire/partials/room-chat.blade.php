@@ -71,9 +71,8 @@
         <input type="text" x-model="draft" maxlength="500" autocomplete="off"
             placeholder="{{ __('multiplayer.chat_placeholder') }}"
             class="flex-1 px-4 py-2.5 rounded-2xl text-sm bg-surface/40 border border-white/10 font-mono text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
-        <button type="submit" x-bind:disabled="draft.trim() === ''"
-            class="font-mono font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition px-5 py-2.5 text-xs disabled:opacity-40">
+        <x-btn-gold type="submit" size="xl" class="disabled:opacity-40" x-bind:disabled="draft.trim() === ''">
             {{ __('multiplayer.chat_send') }}
-        </button>
+        </x-btn-gold>
     </form>
 </div>

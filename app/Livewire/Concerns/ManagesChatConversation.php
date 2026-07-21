@@ -302,8 +302,13 @@ trait ManagesChatConversation
 
     public function confirmClear(): void
     {
+        // Jepit ke rentang yang sama dengan atribut HTML (min 1, max 3650). max()
+        // saja hanya menjaga batas bawah; batas atas dari `max="3650"` di markup
+        // tak berarti apa-apa untuk request yang dibuat manual, jadi ditegakkan di sini.
+        $days = min(3650, max(1, $this->clearDays));
+
         $before = $this->clearScope === 'days'
-            ? now()->subDays(max(1, $this->clearDays))
+            ? now()->subDays($days)
             : now();
 
         if ($this->activeMode === 'dm' && $this->activeFriend) {
