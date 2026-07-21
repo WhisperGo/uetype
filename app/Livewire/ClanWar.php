@@ -270,7 +270,7 @@ class ClanWar extends Component
 
         $this->notify($opponent->leader_id, [
             'type' => 'war-challenge',
-            'message' => $this->myClan->name.' menantang clan-mu untuk Clan War',
+            'message' => __('clan.notify.war_challenged', ['clan' => $this->myClan->name]),
         ]);
     }
 
@@ -291,7 +291,7 @@ class ClanWar extends Component
 
         $this->notify($war->challenger->leader_id, [
             'type' => 'war-accepted',
-            'message' => $war->opponent->name.' menerima tantangan Clan War-mu',
+            'message' => __('clan.notify.war_accepted', ['clan' => $war->opponent->name]),
         ]);
     }
 
@@ -306,7 +306,7 @@ class ClanWar extends Component
 
         $this->notify($war->challenger->leader_id, [
             'type' => 'war-declined',
-            'message' => $war->opponent->name.' menolak tantangan Clan War-mu',
+            'message' => __('clan.notify.war_declined', ['clan' => $war->opponent->name]),
         ]);
     }
 

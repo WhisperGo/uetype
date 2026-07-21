@@ -25,6 +25,46 @@ it('creates a clan and makes the creator an active leader', function () {
     ]);
 });
 
+it('validates the trimmed clan name, not the padded raw input', function () {
+    $me = User::factory()->create();
+
+    // "  ab  " = 6 karakter mentah (lolos min:3), tapi 2 karakter setelah trim.
+    // Dulu validate() menilai yang mentah lalu MENYIMPAN yang ter-trim -> nama 2
+    // huruf lolos, melanggar min:3 secara efektif.
+    Livewire::actingAs($me)->test(Clans::class)
+        ->set('newName', '  ab  ')
+        ->call('createClan')
+        ->assertHasErrors('newName');
+
+    expect(Clan::count())->toBe(0);
+});
+
+it('does not 500 when a padded name collides with an existing clan', function () {
+    $me = User::factory()->create();
+    Clan::create(['name' => 'ab', 'leader_id' => User::factory()->create()->id]);
+
+    // "  ab  " ter-trim jadi "ab", yang sudah ada. Dulu unique menilai string
+    // ber-spasi (lolos) lalu insert menabrak constraint DB -> 500 tak tertangani.
+    // Sekarang unique menilai "ab" dan menolaknya sebagai error validasi biasa.
+    Livewire::actingAs($me)->test(Clans::class)
+        ->set('newName', '  ab  ')
+        ->call('createClan')
+        ->assertHasErrors('newName');
+
+    expect(Clan::count())->toBe(1);
+});
+
+it('trims the edges of a valid clan name but keeps inner spaces', function () {
+    $me = User::factory()->create();
+
+    Livewire::actingAs($me)->test(Clans::class)
+        ->set('newName', '  Naga Api  ')
+        ->call('createClan')
+        ->assertHasNoErrors();
+
+    $this->assertDatabaseHas('clans', ['name' => 'Naga Api']);
+});
+
 it('sends a join request and lets the leader approve it', function () {
     $leader = User::factory()->create();
     $applicant = User::factory()->create();
@@ -131,6 +171,31 @@ it('lets a member leave but blocks the leader from leaving directly', function (
 
     Livewire::actingAs($leader)->test(Clans::class)->call('leaveClan');
     $this->assertDatabaseHas('clan_members', ['clan_id' => $clan->id, 'user_id' => $leader->id, 'status' => ClanMemberStatus::Active->value]);
+});
+
+it('reports a full-clan approval error on its own key, not the create-form field', function () {
+    $leader = User::factory()->create();
+    $clan = Clan::create(['name' => 'Full House', 'leader_id' => $leader->id]);
+    ClanMember::create(['clan_id' => $clan->id, 'user_id' => $leader->id, 'role' => ClanRole::Leader, 'status' => ClanMemberStatus::Active]);
+
+    for ($i = 0; $i < 19; $i++) {
+        $u = User::factory()->create();
+        ClanMember::create(['clan_id' => $clan->id, 'user_id' => $u->id, 'role' => ClanRole::Member, 'status' => ClanMemberStatus::Active]);
+    }
+
+    $pending = ClanMember::create([
+        'clan_id' => $clan->id, 'user_id' => User::factory()->create()->id,
+        'role' => ClanRole::Member, 'status' => ClanMemberStatus::Pending,
+    ]);
+
+    $component = Livewire::actingAs($leader)->test(Clans::class)
+        ->call('approveMember', $pending->id);
+
+    // Error kapasitas muncul di key-nya sendiri, BUKAN 'newName' -- key itu milik
+    // form buat-clan di tab lain, dan memakainya bersama membuat error kapasitas
+    // bocor ke tempat yang salah (dan sebaliknya).
+    $component->assertHasErrors('approveMember')
+        ->assertHasNoErrors('newName');
 });
 
 it('requires authentication to view the clans page', function () {

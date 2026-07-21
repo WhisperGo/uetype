@@ -86,9 +86,15 @@ class Clans extends Component
             return;
         }
 
-        $name = trim($this->newName);
-        $tag = trim($this->newTag) ?: null;
-        $description = trim($this->newDescription) ?: null;
+        // Trim ke PROPERTI sebelum validate, bukan ke variabel lokal terpisah.
+        // Dulu validate() menilai $this->newName mentah tapi Clan::create menyimpan
+        // versi ter-trim -> nama "  ab  " (6 char) lolos min:3 lalu tersimpan "ab"
+        // (2 char). Lebih buruk: unique menilai string ber-spasi, jadi nama yang
+        // ter-trim bentrok dengan clan yang sudah ada lolos validasi lalu menabrak
+        // constraint DB -> 500. Menilai nilai final menutup keduanya.
+        $this->newName = trim($this->newName);
+        $this->newTag = trim($this->newTag);
+        $this->newDescription = trim($this->newDescription);
 
         $this->validate([
             'newName' => ['required', 'string', 'min:3', 'max:40', 'unique:clans,name'],
@@ -99,11 +105,11 @@ class Clans extends Component
         ], [], ['newName' => __('clan.attr.name'), 'newTag' => __('clan.attr.tag')]);
 
         $clan = Clan::create([
-            'name' => $name,
-            'tag' => $tag,
+            'name' => $this->newName,
+            'tag' => $this->newTag ?: null,
             'emblem' => $this->newEmblem,
             'emblem_color' => $this->newEmblemColor,
-            'description' => $description,
+            'description' => $this->newDescription ?: null,
             'leader_id' => Auth::id(),
         ]);
 
@@ -156,7 +162,7 @@ class Clans extends Component
 
         $this->notify($clan->leader_id, [
             'type' => 'request',
-            'message' => Auth::user()->username.' meminta bergabung ke '.$clan->name,
+            'message' => __('clan.notify.join_request', ['name' => Auth::user()->username, 'clan' => $clan->name]),
         ]);
     }
 
@@ -168,7 +174,10 @@ class Clans extends Component
         }
 
         if ($member->clan->activeMembers()->count() >= self::MAX_MEMBERS) {
-            $this->addError('newName', __('clan.error.max_members', ['max' => self::MAX_MEMBERS]));
+            // Key sendiri, BUKAN 'newName' (field form buat-clan di tab lain).
+            // Berbagi key membuat error kapasitas bocor ke tempat yang salah dan
+            // sebaliknya; dirender di dekat daftar pending, tempat aksi ini terjadi.
+            $this->addError('approveMember', __('clan.error.max_members', ['max' => self::MAX_MEMBERS]));
 
             return;
         }
@@ -179,7 +188,7 @@ class Clans extends Component
 
         $this->notify($member->user_id, [
             'type' => 'accepted',
-            'message' => 'Permintaanmu bergabung ke '.$member->clan->name.' diterima',
+            'message' => __('clan.notify.join_accepted', ['clan' => $member->clan->name]),
         ]);
     }
 

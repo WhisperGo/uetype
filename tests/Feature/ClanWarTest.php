@@ -72,7 +72,9 @@ it('toasts the opponent leader when a war is challenged', function () {
 
     Event::assertDispatched(ClanUpdated::class, function ($e) use ($leaderB) {
         return $e->userId === $leaderB->id
-            && $e->notification['type'] === 'war-challenge';
+            && $e->notification['type'] === 'war-challenge'
+            // Pesan lewat __('clan.notify.*'), bukan literal hardcoded.
+            && $e->notification['message'] === __('clan.notify.war_challenged', ['clan' => 'Clan A']);
     });
 });
 

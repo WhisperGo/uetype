@@ -159,4 +159,13 @@ return [
         'max_members' => 'Clan has reached the maximum of :max members.',
         'mode_taken' => 'This mode was just taken by another member.',
     ],
+
+    // Pesan notifikasi ke user LAIN (toast). Pola sama dengan friends.notify.*.
+    'notify' => [
+        'join_request' => ':name requested to join :clan',
+        'join_accepted' => 'Your request to join :clan was accepted',
+        'war_challenged' => ':clan challenged your clan to a Clan War',
+        'war_accepted' => ':clan accepted your Clan War challenge',
+        'war_declined' => ':clan declined your Clan War challenge',
+    ],
 ];

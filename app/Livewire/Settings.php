@@ -3,8 +3,8 @@
 namespace App\Livewire;
 
 use App\Support\Locale;
+use App\Support\UsernameRules;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -29,14 +29,7 @@ class Settings extends Component
         $user = Auth::user();
 
         $validated = $this->validate([
-            'username' => [
-                'required',
-                'string',
-                'alpha_dash',
-                'min:3',
-                'max:20',
-                Rule::unique('users', 'username')->ignore($user->id),
-            ],
+            'username' => UsernameRules::rules($user->id),
         ], [
             'username.unique' => __('auth.username.taken'),
             'username.alpha_dash' => __('auth.username.format'),

@@ -308,28 +308,22 @@ class MultiplayerLobby extends Component
         $room = Room::where('code', $this->roomCode)->first();
 
         if ($room) {
-<<<<<<< HEAD
-            // Jalur yang sama dengan createRoom/joinRoom. Dulu logika ini ditulis
-            // sendiri di sini, dan hanya DI SINI yang merawat room yang ditinggalkan
-            // -- itulah kenapa dua jalur lain bocor. Satu pintu, satu perilaku.
-            DB::transaction(fn () => $this->departCurrentRooms(Auth::id()));
-=======
-            $leavingUserId = Auth::id();
+            // Nama diambil SEBELUM keluar; sesudahnya keanggotaan sudah terhapus.
             $leavingUsername = Auth::user()->username;
 
-            RoomMember::where('room_id', $room->id)->where('user_id', $leavingUserId)->delete();
+            // Jalur atomik yang sama dengan createRoom/joinRoom. Dulu logika ini
+            // ditulis sendiri di sini, dan hanya DI SINI yang merawat room yang
+            // ditinggalkan -- itulah kenapa dua jalur lain bocor. Satu pintu, satu
+            // perilaku (fix D6: hapus-room-kosong yang atomik).
+            DB::transaction(fn () => $this->departCurrentRooms(Auth::id()));
 
-            $remaining = RoomMember::where('room_id', $room->id)->count();
-
-            if ($remaining === 0) {
-                $room->delete();
-            } else {
-                $this->reassignHostIfNeeded($room, $leavingUserId);
-
-                // Notif "<user> keluar" hanya kalau masih ada yang mendengarkan di room.
+            // Notif "<user> keluar" hanya kalau room masih ada -- departCurrentRooms
+            // sudah menghapusnya kalau kosong, jadi cek keberadaan ini menggantikan
+            // pemeriksaan "$remaining > 0" milik versi lama (tetap: tak ada gunanya
+            // menyiarkan kepergian ke room yang sudah tak berpenghuni).
+            if (Room::where('code', $this->roomCode)->exists()) {
                 SafeBroadcast::run(fn () => broadcast(new RoomPresenceChanged($this->roomCode, $leavingUsername, 'leave')));
             }
->>>>>>> 3464cd665d9d82a04307e4edcef700f991640815
 
             SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
         }
