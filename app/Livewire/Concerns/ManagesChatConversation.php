@@ -72,7 +72,7 @@ trait ManagesChatConversation
         //
     }
 
-    // ---- AKSI: NAVIGASI ----
+    // ---- ACTION: NAVIGATION ----
 
     public function openDm(string $username): void
     {
@@ -302,9 +302,9 @@ trait ManagesChatConversation
 
     public function confirmClear(): void
     {
-        // Jepit ke rentang yang sama dengan atribut HTML (min 1, max 3650). max()
-        // saja hanya menjaga batas bawah; batas atas dari `max="3650"` di markup
-        // tak berarti apa-apa untuk request yang dibuat manual, jadi ditegakkan di sini.
+        // Clamp to the same range as the HTML attributes (min 1, max 3650). max() alone
+        // only guards the lower bound; the upper bound from `max="3650"` in the markup
+        // means nothing for a hand-crafted request, so it's enforced here.
         $days = min(3650, max(1, $this->clearDays));
 
         $before = $this->clearScope === 'days'

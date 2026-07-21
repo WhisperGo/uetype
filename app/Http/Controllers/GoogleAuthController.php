@@ -113,13 +113,9 @@ class GoogleAuthController extends Controller
             return redirect('/typing');
         }
 
-<<<<<<< HEAD
-        // Validate the user's chosen username (must be unique).
-=======
-        // Validasi input username dari user (wajib unik). Aturan sama persis dengan
-        // Settings::saveUsername -- satu sumber di UsernameRules. Tanpa ignore: user
-        // ini belum punya baris, jadi tak ada yang perlu dikecualikan dari cek unique.
->>>>>>> 38cdc38ce4c679974fb9d88625324892088d60a2
+        // Validate the user's chosen username (must be unique). Same rules as
+        // Settings::saveUsername -- one source in UsernameRules. No ignore: this user has
+        // no row yet, so there's nothing to exclude from the unique check.
         $request->validate([
             'username' => UsernameRules::rules(),
         ], [

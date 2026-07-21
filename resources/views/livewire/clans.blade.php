@@ -110,9 +110,9 @@
                 </div>
             @endif
 
-            {{-- Error approve member (mis. clan penuh); key sendiri, dirender di dekat
-                 daftar pending. Dulu blok ini memakai key 'newName' milik form
-                 buat-clan di tab lain -- kopling rapuh yang kini dilepas. --}}
+            {{-- approveMember error (e.g. clan full); its own key, rendered near the
+                 pending list. This block used to use the 'newName' key from the create-clan
+                 form on another tab -- a fragile coupling now removed. --}}
             @error('approveMember')
                 <p class="font-mono text-xs text-danger mb-4">{{ $message }}</p>
             @enderror

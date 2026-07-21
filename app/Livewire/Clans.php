@@ -88,12 +88,12 @@ class Clans extends Component
             return;
         }
 
-        // Trim ke PROPERTI sebelum validate, bukan ke variabel lokal terpisah.
-        // Dulu validate() menilai $this->newName mentah tapi Clan::create menyimpan
-        // versi ter-trim -> nama "  ab  " (6 char) lolos min:3 lalu tersimpan "ab"
-        // (2 char). Lebih buruk: unique menilai string ber-spasi, jadi nama yang
-        // ter-trim bentrok dengan clan yang sudah ada lolos validasi lalu menabrak
-        // constraint DB -> 500. Menilai nilai final menutup keduanya.
+        // Trim into the PROPERTIES before validating, not into separate local variables.
+        // validate() used to check the raw $this->newName while Clan::create stored the
+        // trimmed version -> a name "  ab  " (6 chars) passed min:3 then saved as "ab"
+        // (2 chars). Worse: unique checked the spaced string, so a trimmed name clashing
+        // with an existing clan passed validation then hit the DB constraint -> 500.
+        // Validating the final value closes both holes.
         $this->newName = trim($this->newName);
         $this->newTag = trim($this->newTag);
         $this->newDescription = trim($this->newDescription);
@@ -178,9 +178,9 @@ class Clans extends Component
         }
 
         if ($member->clan->activeMembers()->count() >= self::MAX_MEMBERS) {
-            // Key sendiri, BUKAN 'newName' (field form buat-clan di tab lain).
-            // Berbagi key membuat error kapasitas bocor ke tempat yang salah dan
-            // sebaliknya; dirender di dekat daftar pending, tempat aksi ini terjadi.
+            // Its own key, NOT 'newName' (the create-clan form field on another tab).
+            // Sharing a key would leak the capacity error into the wrong place and vice
+            // versa; rendered near the pending list, where this action happens.
             $this->addError('approveMember', __('clan.error.max_members', ['max' => self::MAX_MEMBERS]));
 
             return;

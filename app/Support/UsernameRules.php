@@ -5,22 +5,20 @@ namespace App\Support;
 use Illuminate\Validation\Rule;
 
 /**
- * Satu sumber aturan validasi username.
+ * A single source for username validation rules.
  *
- * Dipakai dua tempat berbeda jenis: Settings::saveUsername (Livewire) dan
- * GoogleAuthController::storeUsername (controller). FormRequest hanya pas untuk
- * yang kedua, jadi bentuknya method statik yang bisa diteruskan ke `validate()`
- * Livewire MAUPUN `$request->validate()`. Sebelumnya array-nya disalin di kedua
- * tempat -- ubah satu (mis. panjang minimum, tambah filter kata terlarang) dan
- * yang lain diam-diam menyimpang.
+ * Used by two different kinds of caller: Settings::saveUsername (Livewire) and
+ * GoogleAuthController::storeUsername (controller). A FormRequest only fits the second,
+ * so this is a static method that can be passed to both Livewire's `validate()` AND
+ * `$request->validate()`. Previously the array was copied in both places -- change one
+ * (e.g. the minimum length, add a banned-word filter) and the other silently drifts.
  */
 final class UsernameRules
 {
     /**
-     * @param  int|null  $ignoreId  Id user yang dikecualikan dari cek unique.
-     *                              Settings meneruskan id user agar username
-     *                              miliknya sendiri tak dianggap bentrok;
-     *                              register (belum punya baris) tak meneruskannya.
+     * @param  int|null  $ignoreId  User id to exclude from the unique check. Settings passes
+     *                              the user's id so their own username isn't treated as a
+     *                              clash; registration (no row yet) doesn't pass it.
      */
     public static function rules(?int $ignoreId = null): array
     {
