@@ -1,3 +1,5 @@
+{{-- Ghost-opponent picker modal: choose a WPM pace to race against (your best, a
+     friend, or a leaderboard entry). Only available for the time and words modes. --}}
 <div>
     <x-modal name="ghost-picker" maxWidth="md" focusable>
         <div class="p-6 space-y-5">

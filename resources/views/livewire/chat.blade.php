@@ -1,3 +1,6 @@
+{{-- Full chat page: DM inbox + clan-chat shortcut, and the active conversation view
+     (message list, reply preview, composer). Real-time updates arrive via window events
+     relayed by the global toast subscriber in the layout. --}}
 <div class="max-w-5xl px-4 mx-auto py-10 sm:px-6 lg:px-8">
 
     <h1 class="font-display text-2xl tracking-wide text-foreground mb-6">{{ __('chat.title') }}</h1>
@@ -13,7 +16,7 @@
             </nav>
         </div>
 
-        {{-- INBOX: daftar percakapan DM --}}
+        {{-- INBOX: list of DM conversations --}}
         @if ($this->conversations->count() > 0)
             <div class="space-y-3 mb-8">
                 @foreach ($this->conversations as $row)
@@ -52,7 +55,7 @@
             </x-empty-state>
         @endif
 
-        {{-- CLAN CHAT: kartu pintasan (clan cuma satu, bukan tab terpisah). --}}
+        {{-- CLAN CHAT: shortcut card (there's only one clan, so no separate tab). --}}
         <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">{{ __('chat.tab_clan') }}</p>
         @if ($this->myClan)
             <button wire:click="openClanChat"
@@ -74,7 +77,7 @@
             </div>
         @endif
     @else
-        {{-- JENDELA OBROLAN AKTIF (DM atau Clan) --}}
+        {{-- ACTIVE CONVERSATION WINDOW (DM or Clan) --}}
         <div class="border bg-surface/40 border-white/5 rounded-3xl flex flex-col h-[70vh]">
             {{-- Header --}}
             <div class="flex items-center gap-3 p-4 border-b border-white/5 shrink-0">
@@ -117,7 +120,7 @@
                 </button>
             </div>
 
-            {{-- Daftar pesan --}}
+            {{-- Message list --}}
             <div x-data="chatScroll()" x-init="init()" id="chat-messages"
                 class="flex-1 overflow-y-auto chat-scroll p-4 space-y-3">
                 @if ($this->hasMoreOlder)
@@ -135,7 +138,7 @@
                 @endforelse
             </div>
 
-            {{-- Preview pesan yang sedang dibalas (di atas input). --}}
+            {{-- Preview of the message being replied to (above the input). --}}
             @if ($this->replyingTo)
                 <x-chat.reply-preview :message="$this->replyingTo" size="lg" />
             @endif
@@ -149,11 +152,11 @@
         <x-chat.clear-modal z="z-50" />
     @endif
 
-    {{-- REAL-TIME: subscription Echo dipegang toast global di layout (satu-satunya
-         subscriber). Halaman ini cukup mendengar event window yang diteruskannya.
+    {{-- REAL-TIME: the Echo subscription is owned by the global toast in the layout
+         (the only subscriber). This page just listens to the window events it relays.
 
-         Bodinya ada di resources/js/chat-runtime.js; @script ini hanya menyuntikkan
-         empat nilai yang memang cuma diketahui Blade. --}}
+         The body lives in resources/js/chat-runtime.js; this @script only injects the
+         four values that only Blade knows. --}}
     @script
         <script>
             window.createChatRuntime({

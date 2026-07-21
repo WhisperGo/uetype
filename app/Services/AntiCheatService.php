@@ -18,8 +18,8 @@ class AntiCheatService
     private const MIN_CHARS_PER_SECOND = 0.5;
 
     /**
-     * Sinyal yang MUSTAHIL secara fisik: tak ada manusia yang bisa menghasilkannya,
-     * jadi ini indikasi manipulasi -- berlaku di semua mode, solo maupun race.
+     * Physically IMPOSSIBLE signals: no human can produce them, so they indicate
+     * manipulation -- applies to all modes, solo and race alike.
      */
     private const IMPOSSIBLE_REASONS = [
         'wpm_too_high',
@@ -27,17 +27,17 @@ class AntiCheatService
         'accuracy_impossible',
     ];
 
-    /** Sesi kosong: bukan sesi nyata, tak layak disimpan (tapi juga bukan "curang"). */
+    /** Empty session: not a real session, not worth saving (but not "cheating" either). */
     private const EMPTY_SESSION_REASONS = [
         'no_input',
         'duration_too_short',
     ];
 
     /**
-     * Apakah alasan-alasan ini menandakan MANIPULASI (bukan sekadar sesi lemah)?
+     * Do these reasons indicate MANIPULATION (not just a weak session)?
      *
-     * Dipakai jalur multiplayer: pemain yang menyerah / lambat tetap dicatat ke
-     * riwayat, hanya yang angkanya mustahil yang dibuang.
+     * Used by the multiplayer path: players who quit or are slow are still recorded
+     * to history; only those with impossible numbers are discarded.
      *
      * @param  array<string>  $reasons
      */
@@ -47,19 +47,18 @@ class AntiCheatService
     }
 
     /**
-     * Apakah hasil sesi SOLO harus ditolak (tak disimpan, tak dapat EXP)?
+     * Should a SOLO session's result be rejected (not saved, no EXP)?
      *
-     * Sengaja TIDAK memakai flag `valid` mentah. `valid` menjawab "apakah sesi ini
-     * lolos semua sanity-check", yang mencampur dua hal berbeda: kecurangan dan
-     * sekadar-lambat. Memakainya sebagai gerbang membuat PENGETIK LAMBAT SUNGGUHAN
-     * (throughput di bawah ambang, mis. pemula 5 WPM di mode time 60) kehilangan
-     * hasil dan EXP-nya -- persis kebalikan dari tujuan anti-cheat.
+     * Deliberately does NOT use the raw `valid` flag. `valid` answers "did this
+     * session pass every sanity-check", which conflates two different things:
+     * cheating and merely-slow. Using it as the gate would make a GENUINELY SLOW
+     * TYPIST (throughput below the threshold, e.g. a beginner at 5 WPM in time 60)
+     * lose their result and EXP -- the exact opposite of the anti-cheat goal.
      *
-     * Throughput rendah hanya bermakna curang di SURVIVAL, karena hanya di sanalah
-     * durasi adalah metrik papan peringkat: diam saja -> durasi panjang -> juara.
-     * Di time durasi sudah dikunci oleh mode; di words durasi panjang justru
-     * menurunkan WPM. Mengulur waktu di dua mode itu merugikan diri sendiri, jadi
-     * tak ada yang perlu dijaga.
+     * Low throughput only means cheating in SURVIVAL, because only there is duration
+     * the leaderboard metric: stay idle -> long duration -> top the board. In time,
+     * duration is fixed by the mode; in words, a long duration only lowers WPM.
+     * Stalling in those two modes hurts you, so there is nothing to guard against.
      *
      * @param  array<string>  $reasons
      * @param  string  $mode  'time' | 'words' | 'survival'
@@ -81,8 +80,8 @@ class AntiCheatService
     /**
      * Check a session for plausibility and return its recomputed metrics.
      *
-     * Catatan: `valid` = "lolos SEMUA sanity-check". Itu bukan sinonim dari "tidak
-     * curang" -- untuk memutuskan tolak/terima, pakai rejectsSoloResult()/isCheating().
+     * Note: `valid` = "passed ALL sanity-checks". That is not a synonym for "not
+     * cheating" -- to decide accept/reject, use rejectsSoloResult()/isCheating().
      *
      * @param  int  $correctChars  Correct characters (for Net WPM).
      * @param  int  $totalChars  All characters typed (for Raw WPM & accuracy).
@@ -93,7 +92,7 @@ class AntiCheatService
     {
         $reasons = [];
 
-        // Hitung ulang dari karakter & durasi (standar: 1 kata = 5 karakter).
+        // Recompute from characters & duration (standard: 1 word = 5 characters).
         $durationMinutes = $durationSeconds / 60;
         $netWpm = 0.0;
         $rawWpm = 0.0;
@@ -107,33 +106,33 @@ class AntiCheatService
             ? round(($correctChars / $totalChars) * 100, 2)
             : 0.0;
 
-        // Durasi terlalu pendek = sesi tidak bermakna.
+        // Too short a duration = a meaningless session.
         if ($durationSeconds < self::MIN_DURATION_SECONDS) {
             $reasons[] = 'duration_too_short';
         }
 
-        // WPM di atas batas manusiawi.
+        // WPM above the human ceiling.
         if ($netWpm > self::MAX_HUMAN_WPM || $rawWpm > self::MAX_HUMAN_WPM) {
             $reasons[] = 'wpm_too_high';
         }
 
-        // Accuracy mustahil.
+        // Impossible accuracy.
         if ($accuracy > 100) {
             $reasons[] = 'accuracy_impossible';
         }
 
-        // Konsistensi karakter: benar tak boleh > total.
+        // Character consistency: correct must not exceed total.
         if ($correctChars > $totalChars) {
             $reasons[] = 'char_count_inconsistent';
         }
 
-        // Tidak ada karakter sama sekali = bukan sesi nyata.
+        // No characters at all = not a real session.
         if ($totalChars <= 0) {
             $reasons[] = 'no_input';
         }
 
-        // Throughput terlalu rendah untuk durasi yang diklaim (hanya dicek di atas durasi
-        // minimum, karena sesi pendek wajar punya rasio lebih bising).
+        // Throughput too low for the claimed duration (only checked above the minimum
+        // duration, since short sessions naturally have a noisier ratio).
         if ($durationSeconds >= self::MIN_DURATION_SECONDS
             && ($totalChars / $durationSeconds) < self::MIN_CHARS_PER_SECOND) {
             $reasons[] = 'throughput_too_low';

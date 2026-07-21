@@ -16,57 +16,56 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 
 /**
- * Seluruh alur percakapan chat (buka, paginasi, kirim, reply, edit, hapus,
- * clear) dipakai bersama oleh halaman penuh Chat dan drawer ChatOverlay.
+ * The entire chat conversation flow (open, paginate, send, reply, edit, delete, clear)
+ * shared by the full-page Chat and the ChatOverlay drawer.
  *
- * Diekstrak karena kedua komponen itu dulunya 91% duplikat: 886 baris dengan
- * hanya 82 baris berbeda, dan 16 dari 19 method bernama sama identik
- * byte-per-byte. Konsekuensinya setiap bug chat harus diperbaiki dua kali --
- * dan cepat atau lambat salah satu sisi tertinggal.
+ * Extracted because those two components were once 91% duplicate: 886 lines with only 82
+ * differing, and 16 of 19 same-named methods identical byte-for-byte. The consequence was
+ * that every chat bug had to be fixed twice -- and sooner or later one side falls behind.
  *
- * Melengkapi GuardsChatAccess (gerbang "siapa boleh DM/lihat pesan siapa").
- * ChatController sengaja tidak memakai keduanya -- lihat doc-comment-nya.
+ * Complements GuardsChatAccess (the "who may DM / see whose messages" gate). ChatController
+ * deliberately uses neither -- see its doc comment.
  *
- * Yang TIDAK ikut ke sini dan tetap di masing-masing kelas:
- *   - $activeMode & $withUsername, karena Chat memberinya atribut #[Url] dan
- *     atribut menempel pada deklarasi properti sehingga tak bisa hidup di trait
- *   - render(), karena hanya Chat yang memasang layout
- *   - ukuran halaman & batas kontak, lewat hook pageSize()/contactLimit()
+ * What does NOT move here and stays in each class:
+ *   - $activeMode & $withUsername, because Chat gives them the #[Url] attribute, and
+ *     attributes attach to the property declaration so can't live in a trait
+ *   - render(), because only Chat sets a layout
+ *   - page size & contact limit, via the pageSize()/contactLimit() hooks
  */
 trait ManagesChatConversation
 {
     public string $body = '';
 
-    // Offset paginasi manual untuk "load more" (scroll-ke-atas).
+    // Manual pagination offset for "load more" (scroll-up).
     public int $loadedOlder = 0;
 
-    // Kontrol modal "Clear Chat" (pilihan cakupan: semua / lebih lama dari N hari).
+    // "Clear Chat" modal controls (scope choice: all / older than N days).
     public bool $showClearModal = false;
 
     public string $clearScope = 'all'; // 'all' | 'days'
 
     public int $clearDays = 7;
 
-    // Edit inline: id pesan yang sedang diedit (null = tak ada) + draftnya.
+    // Inline edit: id of the message being edited (null = none) + its draft.
     public ?int $editingId = null;
 
     public string $editBody = '';
 
-    // Reply: id pesan yang sedang dibalas (null = kirim pesan biasa).
+    // Reply: id of the message being replied to (null = send a normal message).
     public ?int $replyingToId = null;
 
-    // ---- TITIK VARIASI ----
+    // ---- VARIATION POINTS ----
 
-    /** Berapa pesan dimuat per halaman. Overlay lebih kecil karena ruangnya sempit. */
+    /** How many messages load per page. The overlay uses fewer because space is tight. */
     abstract protected function pageSize(): int;
 
-    /** Batas jumlah kontak yang ditampilkan; null = tanpa batas (inbox penuh). */
+    /** Cap on how many contacts are shown; null = unlimited (full inbox). */
     protected function contactLimit(): ?int
     {
         return null;
     }
 
-    /** Listener Echo untuk pesan baru; body kosong karena action apa pun memicu re-render. */
+    /** Echo listener for new messages; empty body because any action triggers a re-render. */
     #[On('message-received')]
     public function refreshChat(): void
     {
@@ -104,10 +103,10 @@ trait ManagesChatConversation
     }
 
     /**
-     * Tutup percakapan aktif tanpa menyentuh state lain. Di halaman penuh ini
-     * berarti kembali ke inbox (closeConversation); di overlay berarti kembali ke
-     * daftar kontak TANPA menutup drawer (backToPicker) -- karena itu kedua nama
-     * publiknya dipertahankan, semantiknya memang berbeda bagi pengguna.
+     * Close the active conversation without touching other state. On the full page this
+     * means returning to the inbox (closeConversation); in the overlay it means returning
+     * to the contact list WITHOUT closing the drawer (backToPicker) -- hence the two public
+     * names are kept, since the semantics genuinely differ for the user.
      */
     protected function resetConversation(): void
     {
@@ -122,11 +121,12 @@ trait ManagesChatConversation
         $this->loadedOlder += $this->pageSize();
     }
 
-    // ---- AKSI: KIRIM PESAN ----
+    // ---- ACTION: SEND MESSAGE ----
 
     /**
-     * Kirim pesan. Body diterima sebagai argumen agar input UI langsung dikosongkan
-     * tanpa menunggu round-trip. $body opsional, fallback ke $this->body.
+     * Send a message. Body is passed as an argument so the UI input can be cleared
+     * immediately without waiting for a round-trip. $body is optional, falling back to
+     * $this->body.
      */
     public function sendMessage(?string $body = null): void
     {
@@ -147,7 +147,7 @@ trait ManagesChatConversation
         $this->replyingToId = null;
     }
 
-    /** Reply_to_id yang sah untuk percakapan aktif & boleh dilihat user, atau null. */
+    /** A valid reply_to_id for the active conversation that the user may see, or null. */
     private function resolveReplyTargetId(): ?int
     {
         if (! $this->replyingToId) {
@@ -160,7 +160,7 @@ trait ManagesChatConversation
             return null;
         }
 
-        // Pastikan pesan yang dibalas memang milik percakapan yang sama.
+        // Make sure the replied-to message belongs to the same conversation.
         if ($this->activeMode === 'clan') {
             return $target->clan_id === $this->myClan?->id ? $target->id : null;
         }
@@ -196,13 +196,13 @@ trait ManagesChatConversation
         $this->sendClanMessageAs($clan->id, $body, $replyToId);
     }
 
-    // ---- AKSI: REPLY ----
+    // ---- ACTION: REPLY ----
 
     public function startReply(int $messageId): void
     {
         $message = Message::find($messageId);
 
-        // Hanya boleh reply pesan yang boleh dilihat & belum dihapus-untuk-semua.
+        // Can only reply to a visible message that isn't deleted-for-everyone.
         if (! $message || ! $this->canSeeMessage($message) || $message->isDeletedForEveryone()) {
             return;
         }
@@ -216,9 +216,9 @@ trait ManagesChatConversation
         $this->replyingToId = null;
     }
 
-    // ---- AKSI: EDIT & DELETE PESAN ----
+    // ---- ACTION: EDIT & DELETE MESSAGE ----
 
-    /** Buka form edit inline (hanya pengirim, belum dihapus-untuk-semua, dalam jendela edit). */
+    /** Open the inline edit form (sender only, not deleted-for-everyone, within the edit window). */
     public function startEdit(int $messageId): void
     {
         $message = Message::find($messageId);
@@ -263,7 +263,7 @@ trait ManagesChatConversation
         SafeBroadcast::run(fn () => broadcast(new MessageEdited($message)));
     }
 
-    /** "Delete for everyone": ganti isi jadi placeholder untuk semua. Hanya pengirim. */
+    /** "Delete for everyone": replace the body with a placeholder for all. Sender only. */
     public function deleteForEveryone(int $messageId): void
     {
         $message = Message::find($messageId);
@@ -279,7 +279,7 @@ trait ManagesChatConversation
         SafeBroadcast::run(fn () => broadcast(new MessageDeleted($message)));
     }
 
-    /** "Delete for me": sembunyikan hanya dari user ini, tetap ada untuk orang lain. */
+    /** "Delete for me": hide from this user only, still present for others. */
     public function deleteForMe(int $messageId): void
     {
         $message = Message::find($messageId);
@@ -291,7 +291,7 @@ trait ManagesChatConversation
         MessageDelete::hide(Auth::id(), $message->id);
     }
 
-    // ---- AKSI: CLEAR CHAT ----
+    // ---- ACTION: CLEAR CHAT ----
 
     public function openClearModal(): void
     {
@@ -317,10 +317,10 @@ trait ManagesChatConversation
     }
 
     // ---- DATA (computed) ----
-    // getMyMembershipProperty()/getMyClanProperty() dan gerbang keamanan
-    // (isAcceptedFriend/canSeeMessage/markDmAsRead) hidup di GuardsChatAccess.
+    // getMyMembershipProperty()/getMyClanProperty() and the security gates
+    // (isAcceptedFriend/canSeeMessage/markDmAsRead) live in GuardsChatAccess.
 
-    /** Teman yang sedang dibuka percakapannya, null kalau tak valid/bukan teman. */
+    /** The friend whose conversation is open, null if invalid / not a friend. */
     public function getActiveFriendProperty(): ?User
     {
         if ($this->activeMode !== 'dm' || ! $this->withUsername) {
@@ -337,8 +337,9 @@ trait ManagesChatConversation
     }
 
     /**
-     * Riwayat pesan percakapan aktif, disaring visibleTo() (pesan yang di-clear user
-     * ini tak muncul lagi tapi tetap ada di DB untuk lawan bicara). Diurutkan lama->baru.
+     * The active conversation's message history, filtered by visibleTo() (messages this
+     * user cleared no longer show but remain in the DB for the other party). Sorted oldest
+     * to newest.
      */
     public function getMessagesProperty()
     {
@@ -379,7 +380,7 @@ trait ManagesChatConversation
         return collect();
     }
 
-    /** Pesan yang sedang dibalas (preview di atas input), null kalau tak valid. */
+    /** The message being replied to (preview above the input), null if invalid. */
     public function getReplyingToProperty(): ?Message
     {
         if (! $this->replyingToId) {
@@ -409,9 +410,9 @@ trait ManagesChatConversation
     }
 
     /**
-     * Inbox DM: satu baris per teman yang pernah ditukar pesan, diurutkan pesan
-     * terakhir. Hanya teman berstatus accepted (pertemanan putus -> hilang dari
-     * inbox, riwayat tetap ada di DB).
+     * DM inbox: one row per friend messages were exchanged with, sorted by the latest
+     * message. Accepted friends only (a broken friendship -> disappears from the inbox,
+     * history stays in the DB).
      */
     public function getConversationsProperty()
     {
@@ -429,9 +430,9 @@ trait ManagesChatConversation
 
         $friends = User::query()->whereIn('id', $friendIds)->get();
 
-        // Pesan terakhir & jumlah belum dibaca untuk SEMUA teman sekaligus: dua query,
-        // bukan tiga query per teman (pesan terakhir + lookup MessageClear di dalam
-        // visibleTo() + hitungan unread). Inbox 30 teman: ~90 query -> 2.
+        // Last message & unread count for ALL friends at once: two queries, not three per
+        // friend (last message + MessageClear lookup inside visibleTo() + unread count).
+        // A 30-friend inbox: ~90 queries -> 2.
         $ids = $friends->pluck('id')->all();
         $lastMessages = Message::lastPerConversation($me, $ids);
         $unreadCounts = Message::unreadCountsFrom($me, $ids);
@@ -443,7 +444,7 @@ trait ManagesChatConversation
                 'unreadCount' => (int) ($unreadCounts->get($friend->id) ?? 0),
                 'online' => $friend->isOnline(),
             ])
-            // Percakapan tanpa pesan ditaruh di bawah.
+            // Conversations with no messages go to the bottom.
             ->sortByDesc(fn ($row) => $row['lastMessage']?->created_at ?? Carbon::createFromTimestamp(0));
 
         $limit = $this->contactLimit();

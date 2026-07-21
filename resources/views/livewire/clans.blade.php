@@ -1,3 +1,5 @@
+{{-- Clans page: tabbed as My Clan (hero card, join requests, roster), Browse (search
+     and join), and Create (new clan form). Real-time updates via the global toast subscriber. --}}
 <div class="py-10">
     <x-page-container>
 
@@ -83,11 +85,11 @@
                     </div>
                 </div>
 
-                {{-- Bar progres level --}}
+                {{-- Level progress bar --}}
                 <x-clan.progress :data="$lvl" :show-unit="true" class="mt-5" />
             </div>
 
-            {{-- Permintaan gabung masuk (khusus leader) --}}
+            {{-- Incoming join requests (leader only) --}}
             @if ($this->myMembership->role->value === 'leader' && $this->pendingRequests->count() > 0)
                 <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">{{ __('clan.my_clan.join_requests', ['count' => $this->pendingRequests->count()]) }}</p>
                 <div class="space-y-3 mb-8">
@@ -194,7 +196,7 @@
                 @endforeach
             </div>
         @else
-            {{-- Keterangan lewat slot, bukan prop: isinya bergantung ada/tidaknya kata kunci. --}}
+            {{-- Body passed via slot, not a prop: its text depends on whether a search query exists. --}}
             <x-empty-state :title="__('clan.empty.no_results_title')">
                 {{ trim($search) !== '' ? __('clan.empty.no_results_body', ['query' => trim($search)]) : __('clan.empty.no_results_alt') }}
             </x-empty-state>
@@ -204,7 +206,7 @@
     {{-- TAB: CREATE CLAN --}}
     @if ($tab === 'create')
         <form wire:submit.prevent="createClan" class="max-w-lg space-y-5">
-            {{-- Preview + identitas --}}
+            {{-- Preview + identity --}}
             <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl">
                 <x-clan-emblem :clan="(object) ['name' => $newName ?: '?', 'emblem' => $newEmblem, 'emblem_color' => $newEmblemColor]" size="lg" />
                 <div class="min-w-0">
@@ -239,7 +241,7 @@
                 @error('newDescription')<p class="font-mono text-xs text-danger mt-1.5">{{ $message }}</p>@enderror
             </div>
 
-            {{-- Pemilih emblem --}}
+            {{-- Emblem picker --}}
             <div>
                 <label class="font-mono text-xs uppercase tracking-widest text-muted">{{ __('clan.create.emblem_label') }}</label>
                 <div class="mt-2 grid grid-cols-6 sm:grid-cols-8 gap-2">
@@ -258,7 +260,7 @@
                 @error('newEmblem')<p class="font-mono text-xs text-danger mt-1.5">{{ $message }}</p>@enderror
             </div>
 
-            {{-- Pemilih warna --}}
+            {{-- Color picker --}}
             <div>
                 <label class="font-mono text-xs uppercase tracking-widest text-muted">{{ __('clan.create.color_label') }}</label>
                 <div class="mt-2 flex flex-wrap gap-2.5">
@@ -276,9 +278,9 @@
         </form>
     @endif
 
-    {{-- ===== MODAL KONFIRMASI (bertema, gantikan wire:confirm native) ===== --}}
+    {{-- ===== CONFIRMATION MODALS (themed, replace native wire:confirm) ===== --}}
     @if ($this->myClan)
-        {{-- Leave Clan (anggota biasa) --}}
+        {{-- Leave Clan (regular member) --}}
         <x-modal name="confirm-leave" maxWidth="md">
             <div class="p-6">
                 <p class="font-mono text-sm font-bold text-foreground">{{ __('clan.modal.leave_title', ['name' => $this->myClan->name]) }}</p>
@@ -296,7 +298,7 @@
             </div>
         </x-modal>
 
-        {{-- Kick member (leader): satu modal, target disimpan dari event --}}
+        {{-- Kick member (leader): one modal, target stored from the event --}}
         @if ($this->myMembership->role->value === 'leader')
             <div x-data="{ kickId: null, kickLabel: '' }"
                 @open-modal.window="if ($event.detail?.name === 'confirm-kick') { kickId = $event.detail.id; kickLabel = $event.detail.label; $dispatch('open-modal', 'confirm-kick') }">

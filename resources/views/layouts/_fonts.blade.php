@@ -1,6 +1,6 @@
-{{-- Satu-satunya definisi font UeType (JetBrains Mono + Pixelify Sans + Press Start 2P).
-     Sebelumnya blok ini disalin identik di 4 layout, jadi mengganti font berarti
-     mengedit 4 tempat dan berisiko satu halaman tertinggal memakai font lama. --}}
+{{-- The single UeType font definition (JetBrains Mono + Pixelify Sans + Press Start 2P).
+     This block used to be copied identically across 4 layouts, so changing a font
+     meant editing 4 places and risking one page being left on the old font. --}}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link

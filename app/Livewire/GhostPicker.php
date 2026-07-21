@@ -27,19 +27,20 @@ class GhostPicker extends Component
         $this->subMode = $subMode;
     }
 
-    /** Ghost Mode hanya berlaku untuk Time & Words. */
+    /** Ghost Mode only applies to Time & Words. */
     private function isEligibleMode(): bool
     {
         return in_array($this->mainMode, ['time', 'words'], true);
     }
 
+    /** The current user's own best WPM (for the "race yourself" option). */
     public function getMyBestProperty(): float
     {
         return (float) (Auth::user()->highest_wpm ?? 0);
     }
 
     /**
-     * Teman accepted dengan highest_wpm > 0 saja; yang belum pernah main disembunyikan.
+     * Accepted friends with highest_wpm > 0 only; those who've never played are hidden.
      *
      * @return Collection<int, array{friendship_id:int, user_id:int, username:string, highest_wpm:float}>
      */
@@ -67,8 +68,8 @@ class GhostPicker extends Component
     }
 
     /**
-     * Top entries leaderboard untuk mode/config aktif di TypingEngine. Ghost hanya
-     * time/words, jadi metric selalu net_wpm.
+     * Top leaderboard entries for TypingEngine's active mode/config. Ghost is time/words
+     * only, so the metric is always net_wpm.
      *
      * @return Collection<int, array{user_id:int, username:string, wpm:float, accuracy:float}>
      */
@@ -83,9 +84,9 @@ class GhostPicker extends Component
             ->where('mode_config', $this->subMode)
             ->groupBy('user_id');
 
-        // GROUP BY di query luar wajib: join mencocokkan `tr.net_wpm = pb.best_score`,
-        // jadi user dengan DUA hasil ber-net_wpm identik akan muncul dua kali di
-        // daftar lawan ghost (dan menggeser kandidat lain keluar dari 10 besar).
+        // GROUP BY in the outer query is required: the join matches `tr.net_wpm =
+        // pb.best_score`, so a user with TWO results of identical net_wpm would appear
+        // twice in the ghost opponent list (pushing other candidates out of the top 10).
         return TypingResult::from('typing_results as tr')
             ->joinSub($subQuery, 'pb', function ($join) {
                 $join->on('tr.user_id', '=', 'pb.user_id')
@@ -112,16 +113,16 @@ class GhostPicker extends Component
     }
 
     /**
-     * Pilih lawan ghost. $refId ditafsirkan sesuai $type:
-     *   'own'         -> diabaikan, pakai Auth::user() langsung.
-     *   'friend'      -> $refId = friendship_id (divalidasi kepemilikan).
-     *   'leaderboard' -> $refId = user_id target (di-scope ulang ke mode/config aktif).
-     * WPM selalu diturunkan ulang dari DB, tidak pernah dari client.
+     * Select a ghost opponent. $refId is interpreted per $type:
+     *   'own'         -> ignored, uses Auth::user() directly.
+     *   'friend'      -> $refId = friendship_id (ownership validated).
+     *   'leaderboard' -> $refId = target user_id (re-scoped to the active mode/config).
+     * WPM is always re-derived from the DB, never from the client.
      */
     public function selectOpponent(string $type, ?int $refId = null): void
     {
-        // Ghost dikunci untuk guest (leaderboard ditutup untuk tamu). Picker memang
-        // tak di-mount untuk guest, ini pertahanan lapis kedua di endpoint-nya.
+        // Ghost is locked for guests (the leaderboard is closed to guests). The picker
+        // isn't mounted for guests anyway; this is second-line defense at the endpoint.
         if (! Auth::check()) {
             return;
         }
@@ -130,26 +131,27 @@ class GhostPicker extends Component
             return;
         }
 
-        // WPM/label diturunkan dari DB lewat resolver (satu sumber kebenaran, dipakai
-        // juga saat memulihkan pilihan). Identitas tak sah -> null -> tak jadi apa-apa.
+        // WPM/label are derived from the DB via the resolver (one source of truth, also
+        // used when restoring a selection). An invalid identity -> null -> a no-op.
         $ghost = app(GhostResolver::class)->resolve($type, $refId, $this->mainMode, $this->subMode, Auth::id());
 
         if ($ghost === null) {
             return;
         }
 
-        // Simpan IDENTITAS-nya (bukan angka wpm) supaya pilihan bertahan lintas tes /
-        // reload dan bisa di-derive ulang. Dibaca kembali oleh TypingEngine::applyGhostRestore().
+        // Store the IDENTITY (not the wpm number) so the selection persists across tests /
+        // reloads and can be re-derived. Read back by TypingEngine::applyGhostRestore().
         session()->put('ghost_selection', ['type' => $type, 'ref_id' => $refId]);
 
         $this->dispatch('ghost-selected', type: $type, wpm: $ghost['wpm'], label: $ghost['label']);
         $this->dispatch('close-modal', 'ghost-picker');
     }
 
+    /** Clear the selected ghost opponent so it won't reappear on the next test. */
     public function clearOpponent(): void
     {
-        // Clear eksplisit: buang identitas tersimpan supaya ghost TIDAK muncul lagi
-        // di tes berikutnya (beda dari sekadar sembunyi saat pindah ke survival).
+        // Explicit clear: drop the stored identity so the ghost does NOT reappear on the
+        // next test (different from merely hiding it when switching to survival).
         session()->forget('ghost_selection');
 
         $this->dispatch('ghost-cleared');

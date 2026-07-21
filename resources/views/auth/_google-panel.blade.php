@@ -1,3 +1,4 @@
+{{-- Login panel partial: mascot, tagline, and the "Continue with Google" button. --}}
 <div class="flex flex-col items-center text-center">
     <img src="{{ asset('icon/uetype_mascot.png') }}" alt="Maskot UeType"
         class="h-20 w-20 object-contain drop-shadow-[0_0_18px_rgba(var(--color-brand)/0.35)]">

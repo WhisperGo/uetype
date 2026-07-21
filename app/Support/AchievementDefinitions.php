@@ -19,7 +19,7 @@ class AchievementDefinitions
     public static function all(): array
     {
         return [
-            // ===== WPM (dari users.highest_wpm) =====
+            // ===== WPM (from users.highest_wpm) =====
             [
                 'key' => 'speed_demon',
                 'title' => 'Speed Demon',
@@ -48,7 +48,7 @@ class AchievementDefinitions
                 'check' => fn (array $s) => $s['highest_wpm'] >= 200,
             ],
 
-            // ===== TESTS (COUNT baris typing_results) =====
+            // ===== TESTS (COUNT of typing_results rows) =====
             [
                 'key' => 'century',
                 'title' => 'Century',
@@ -77,7 +77,7 @@ class AchievementDefinitions
                 'check' => fn (array $s) => $s['total_tests'] >= 1000,
             ],
 
-            // ===== LEVEL (turunan dari users.total_xp) =====
+            // ===== LEVEL (derived from users.total_xp) =====
             [
                 'key' => 'rising_star',
                 'title' => 'Rising Star',
@@ -106,7 +106,7 @@ class AchievementDefinitions
                 'check' => fn (array $s) => $s['level'] >= 50,
             ],
 
-            // ===== ACCURACY (dari accuracy di typing_results) =====
+            // ===== ACCURACY (from accuracy in typing_results) =====
             [
                 'key' => 'perfectionist',
                 'title' => 'Perfectionist',
@@ -167,7 +167,7 @@ class AchievementDefinitions
     }
 
     /**
-     * Kategori untuk filter chips di UI (urutan sesuai tampilan).
+     * Categories for the UI filter chips (order matches the display).
      *
      * @return array<int, array{key:string, label:string}>
      */

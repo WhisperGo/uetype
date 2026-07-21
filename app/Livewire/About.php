@@ -11,8 +11,8 @@ class About extends Component
 {
     public function render()
     {
-        // 'key' menautkan ke bio di lang/*/about.php (about.bio.<key>) supaya
-        // teksnya bisa diterjemahkan; nama & foto tetap di sini.
+        // 'key' links to the bio in lang/*/about.php (about.bio.<key>) so the text can be
+        // translated; name & photo stay here.
         $team = [
             ['key' => 'jessie', 'name' => 'Jessie La Vonna Sanjaya', 'role' => 'Product & Design', 'photo' => '/images/team/jessie.png'],
             ['key' => 'jason', 'name' => 'Jason Wijaya', 'role' => 'Frontend Development', 'photo' => '/images/team/jason.png'],
@@ -21,8 +21,8 @@ class About extends Component
             ['key' => 'kevin', 'name' => 'Kevin Fernando', 'role' => 'QA & Testing', 'photo' => '/images/team/kevin.png'],
         ];
 
-        // Tiap item: label + komponen Blade Icon (Simple Icons, prefix `simpleicon`).
-        // `color` = warna brand resmi untuk ikon; ikon SVG mewarisi via currentColor.
+        // Each item: label + Blade Icon component (Simple Icons, prefix `simpleicon`).
+        // `color` = the icon's official brand color; the SVG icon inherits via currentColor.
         $stack = [
             ['name' => 'Laravel', 'icon' => 'simpleicon-laravel', 'color' => '#FF2D20'],
             ['name' => 'Livewire', 'icon' => 'simpleicon-livewire', 'color' => '#FB70A9'],
@@ -31,13 +31,13 @@ class About extends Component
             ['name' => 'Vite', 'icon' => 'simpleicon-vite', 'color' => '#646CFF'],
             ['name' => 'PHP', 'icon' => 'simpleicon-php', 'color' => '#777BB4'],
             ['name' => 'MySQL', 'icon' => 'simpleicon-mysql', 'color' => '#4479A1'],
-            // Reverb tak punya ikon sendiri di Simple Icons — pakai logo Laravel (bagian dari ekosistemnya).
+            // Reverb has no icon of its own in Simple Icons -- use the Laravel logo (part of its ecosystem).
             ['name' => 'Laravel Reverb', 'icon' => 'simpleicon-laravel', 'color' => '#FF2D20'],
-            // color=null => logo Chart.js dua warna (pink + biru), bukan monokrom.
+            // color=null => the two-color Chart.js logo (pink + blue), not monochrome.
             ['name' => 'Chart.js', 'icon' => 'icon-chartjs-color', 'color' => null],
-            // Login sosial memakai Socialite dengan provider Google OAuth.
-            // color=null => pakai logo Google 4-warna asli (komponen icon-google-color),
-            // bukan ikon monokrom Simple Icons yang cuma bisa satu warna.
+            // Social login uses Socialite with the Google OAuth provider.
+            // color=null => use the real 4-color Google logo (icon-google-color component),
+            // not the monochrome Simple Icons glyph that can only be one color.
             ['name' => 'Google OAuth', 'icon' => 'icon-google-color', 'color' => null],
         ];
 

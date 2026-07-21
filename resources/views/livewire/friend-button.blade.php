@@ -1,12 +1,14 @@
+{{-- Contextual friend action button: renders the right control (add / cancel / accept /
+     remove / status) based on the viewer's relationship with the target user. --}}
 <div>
     @php $relation = $this->relation; @endphp
 
     @switch($relation)
-        {{-- Diri sendiri: tak ada aksi (biasanya sudah dialihkan ke /profile). --}}
+        {{-- Self: no action (usually already redirected to /profile). --}}
         @case('self')
             @break
 
-        {{-- Sudah berteman: tampilkan status + opsi hapus (muncul saat hover). --}}
+        {{-- Already friends: show status + remove option (revealed on hover). --}}
         @case('friends')
             <div class="group inline-flex items-center gap-2">
                 <span class="px-4 py-2 font-mono text-xs font-bold text-gold border border-gold/40 rounded-lg inline-flex items-center gap-1.5">
@@ -21,7 +23,7 @@
             </div>
             @break
 
-        {{-- Permintaan kita masih menunggu: tampilkan status + batal. --}}
+        {{-- Our request is still pending: show status + cancel. --}}
         @case('sent')
             <div class="inline-flex items-center gap-2">
                 <span class="px-4 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg">{{ __('friends.request_sent') }}</span>
@@ -32,7 +34,7 @@
             </div>
             @break
 
-        {{-- Ada permintaan masuk dari target: terima / tolak langsung di sini. --}}
+        {{-- Incoming request from the target: accept / reject right here. --}}
         @case('incoming')
             <div class="inline-flex items-center gap-2">
                 <x-btn-gold size="wide" wire:click="acceptRequest">{{ __('friends.accept') }}</x-btn-gold>
@@ -40,7 +42,7 @@
             </div>
             @break
 
-        {{-- Belum ada relasi: kirim permintaan pertemanan. --}}
+        {{-- No relationship yet: send a friend request. --}}
         @default
             <x-btn-gold size="wide" class="inline-flex items-center gap-1.5" wire:click="sendRequest">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14" /></svg>
@@ -48,8 +50,8 @@
             </x-btn-gold>
     @endswitch
 
-    {{-- Dengarkan siaran real-time (diteruskan toast global lewat window event)
-         supaya status tombol ikut menyegar tanpa reload. --}}
+    {{-- Listen for real-time broadcasts (relayed by the global toast via a window event)
+         so the button status refreshes without a reload. --}}
     @script
         <script>
             const onRemote = () => $wire.dispatch('friendship-updated');

@@ -33,14 +33,14 @@ class Friends extends Component
         }
     }
 
-    /** Listener Echo untuk friends.{me}; body kosong karena action apa pun memicu re-render. */
+    /** Echo listener for friends.{me}; empty body because any action triggers a re-render. */
     #[On('friendship-updated')]
     public function refreshFriends(): void
     {
         //
     }
 
-    // ---- AKSI ----
+    // ---- ACTIONS ----
 
     public function sendRequest(int $userId): void
     {
@@ -50,8 +50,8 @@ class Friends extends Component
             return;
         }
 
-        // Cek "sudah berelasi (arah mana pun)" + insert dilakukan sebagai satu
-        // operasi di dalam Friendship::requestBetween(), bukan dua langkah terpisah.
+        // The "already related (either direction)" check + insert happen as one operation
+        // inside Friendship::requestBetween(), not two separate steps.
         if (! Friendship::requestBetween($me, $userId)) {
             return;
         }
@@ -92,7 +92,7 @@ class Friends extends Component
 
     public function cancelRequest(int $friendshipId): void
     {
-        // Hanya pengirim yang boleh membatalkan permintaannya sendiri (masih pending).
+        // Only the sender may cancel their own (still pending) request.
         $friendship = Friendship::where('id', $friendshipId)
             ->where('requester_id', Auth::id())
             ->where('status', FriendshipStatus::Pending)
@@ -110,7 +110,7 @@ class Friends extends Component
 
     public function removeFriend(int $friendshipId): void
     {
-        // Salah satu pihak boleh menghapus pertemanan yang sudah accepted.
+        // Either party may remove an accepted friendship.
         $friendship = Friendship::where('id', $friendshipId)
             ->where('status', FriendshipStatus::Accepted)
             ->where(function ($q) {
@@ -132,7 +132,7 @@ class Friends extends Component
         $this->notify($otherId);
     }
 
-    /** Permintaan masuk pending untuk user ini; hanya penerima yang boleh accept/reject. */
+    /** A pending incoming request for this user; only the recipient may accept/reject. */
     private function incomingPending(int $friendshipId): ?Friendship
     {
         return Friendship::where('id', $friendshipId)
@@ -141,7 +141,7 @@ class Friends extends Component
             ->first();
     }
 
-    /** Siarkan perubahan ke user lain; $notification null berarti hanya segarkan daftar (tanpa toast). */
+    /** Broadcast the change to the other user; $notification null means just refresh the list (no toast). */
     private function notify(int $otherUserId, ?array $notification = null): void
     {
         SafeBroadcast::run(fn () => broadcast(new FriendshipUpdated($otherUserId, $notification)));
@@ -178,9 +178,9 @@ class Friends extends Component
     }
 
     /**
-     * Config per teman yang PUNYA rekor ghost (net_wpm > 0, mode time/words), untuk
-     * membangun submenu Race Ghost yang hanya menampilkan pilihan yang benar-benar
-     * ada lawannya. Satu query batch untuk seluruh daftar teman (bukan per baris).
+     * Per-friend config for friends that HAVE a ghost record (net_wpm > 0, time/words
+     * mode), to build the Race Ghost submenu that only lists options with an actual
+     * opponent. One batched query for the whole friend list (not per row).
      *
      * @param  array<int, int>  $userIds
      * @return array<int, array{time: list<string>, words: list<string>}>
@@ -242,7 +242,7 @@ class Friends extends Component
         return $this->incomingRequests->count() + $this->sentRequests->count();
     }
 
-    /** Hasil pencarian username, lengkap status relasi tiap kandidat untuk tombol yang tepat. */
+    /** Username search results, with each candidate's relation status for the right button. */
     public function getSearchResultsProperty()
     {
         $term = trim($this->search);
@@ -258,9 +258,9 @@ class Friends extends Component
             ->limit(15)
             ->get();
 
-        // Status relasi untuk SEMUA kandidat dalam satu query. Dulu friendshipWith()
-        // dipanggil per baris -> 15 hasil pencarian = 15 query, tiap kali user mengetik
-        // di kotak cari.
+        // Relation status for ALL candidates in one query. Previously friendshipWith() was
+        // called per row -> 15 search results = 15 queries, every time the user typed in the
+        // search box.
         $relations = Friendship::relationMapFor($me->id, $candidates->pluck('id')->all());
 
         return $candidates->map(fn (User $u) => [

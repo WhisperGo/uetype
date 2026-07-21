@@ -1,15 +1,15 @@
 {{--
-    Panel chat lobby room multiplayer. Broadcast-only: pesan TIDAK disimpan di
-    database — hanya disiarkan lewat channel 'room.{code}' (event RoomMessageSent)
-    dan ditahan di state Alpine sisi klien. Jadi player yang baru join tak melihat
-    riwayat sebelumnya; itu memang perilaku yang diinginkan untuk obrolan sesaat.
+    Multiplayer lobby room chat panel. Broadcast-only: messages are NOT stored in the
+    database — they are only broadcast over the 'room.{code}' channel (RoomMessageSent
+    event) and held in client-side Alpine state. So a newly joined player sees no
+    prior history; that is the intended behavior for this ephemeral chat.
 
-    Dipakai di dua tempat (blok 'waiting' & modal hasil), maka dibuat partial:
-    - $currentUserId : id user aktif, untuk membedakan bubble sendiri vs orang lain.
+    Used in two places (the 'waiting' block and the result modal), hence a partial:
+    - $currentUserId : the active user's id, to tell own bubbles from others'.
 
-    Alur:
-    - Kirim  -> optimistic append lokal + $wire.sendRoomMessage(body) [broadcast ->toOthers]
-    - Terima -> window 'room-message-received' (di-relay race-echo.js) -> append.
+    Flow:
+    - Send    -> optimistic local append + $wire.sendRoomMessage(body) [broadcast ->toOthers]
+    - Receive -> window 'room-message-received' (relayed by race-echo.js) -> append.
 --}}
 <div
     x-data="roomChat({
@@ -28,7 +28,7 @@
         </h3>
     </div>
 
-    {{-- Daftar pesan. x-ref="log" untuk auto-scroll ke bawah saat ada pesan baru. --}}
+    {{-- Message list. x-ref="log" is used to auto-scroll to the bottom on new messages. --}}
     <div x-ref="log" class="flex-1 overflow-y-auto chat-scroll px-4 py-3 space-y-2.5 min-h-[8rem]">
         <template x-if="messages.length === 0">
             <p class="text-xs font-mono text-muted/70 text-center py-6">
@@ -36,13 +36,13 @@
             </p>
         </template>
 
-        {{-- Bubble & warna disamakan dengan halaman chat (components/chat/message):
-             pesan sendiri = emas (rounded-br-md), pesan orang lain = putih transparan
-             (rounded-bl-md) dengan nama pengirim di atasnya.
-             Pesan sistem (join/leave) tampil di tengah, warna tipis (bukan bubble). --}}
+        {{-- Bubbles and colors mirror the chat page (components/chat/message):
+             own messages = gold (rounded-br-md), others' = translucent white
+             (rounded-bl-md) with the sender's name above it.
+             System messages (join/leave) are centered and faint (not bubbles). --}}
         <template x-for="(msg, i) in messages" :key="i">
             <div>
-                {{-- Notif kehadiran: pil samar di tengah, tak menonjol. --}}
+                {{-- Presence notice: a faint centered pill, deliberately unobtrusive. --}}
                 <template x-if="msg.system">
                     <div class="flex justify-center">
                         <span class="px-3 py-1 rounded-full bg-white/[0.03] font-mono text-[0.7rem] text-muted/60"
@@ -50,7 +50,7 @@
                     </div>
                 </template>
 
-                {{-- Pesan biasa. --}}
+                {{-- Regular message. --}}
                 <template x-if="!msg.system">
                     <div class="flex" :class="msg.mine ? 'justify-end' : 'justify-start'">
                         <div class="max-w-[75%]" :class="msg.mine ? '' : 'flex flex-col items-start'">
@@ -65,8 +65,8 @@
         </template>
     </div>
 
-    {{-- Form kirim. Input & tombol disamakan dengan halaman chat (components/chat/composer):
-         input bg-surface/40 border-white/10 focus:border-gold, tombol send emas (btn-gold). --}}
+    {{-- Send form. Input and button mirror the chat page (components/chat/composer):
+         input bg-surface/40 border-white/10 focus:border-gold, gold send button (btn-gold). --}}
     <form x-on:submit.prevent="send()" class="flex items-center gap-3 p-4 border-t border-white/5 shrink-0">
         <input type="text" x-model="draft" maxlength="500" autocomplete="off"
             placeholder="{{ __('multiplayer.chat_placeholder') }}"

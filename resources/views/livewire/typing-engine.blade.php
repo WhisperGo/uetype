@@ -13,8 +13,8 @@
                 $event.preventDefault();
                 document.getElementById('restartButton')?.focus();
             } else if (ae && ae.tagName !== 'BUTTON' && !editing) {
-                // Jangan tangkap ketikan saat fokus di field lain (mis. input chat overlay) —
-                // biar ketikannya masuk ke sana saja, tak bocor ke area typing di belakang.
+                // Don't capture typing while another field is focused (e.g. the chat overlay
+                // input) — let it go there instead, not leak into the typing area behind it.
                 handleInput($event);
             }
         "
@@ -54,7 +54,7 @@
             @endif
 
             @if ($warLock)
-                {{-- WAR-LOCK: mode dikunci klaim Clan War; kontrol mode disembunyikan (server juga menolak setMode). --}}
+                {{-- WAR-LOCK: the mode is locked by a Clan War claim; mode controls are hidden (the server also rejects setMode). --}}
                 <div class="flex flex-col items-center gap-2 mb-2 transition-opacity duration-500"
                     :class="isStarted ? 'opacity-0 pointer-events-none' : 'opacity-100'">
                     <div class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold/10 border border-gold/40">
@@ -72,16 +72,16 @@
                             @endif
                         </span>
                     </div>
-                    {{-- TANPA wire:navigate: satu-satunya jalur keluar /typing yang masih SPA saat
-                         war-lock; Back darinya me-restore snapshot mesin ketik yang rusak. Full-load aman. --}}
+                    {{-- WITHOUT wire:navigate: the only SPA exit from /typing while war-locked;
+                         Back from it would restore a broken typing-engine snapshot. A full load is safe. --}}
                     <a href="{{ route('clan-war.index') }}" class="text-x-small font-mono text-muted hover:text-foreground transition">
                         ← Batalkan &amp; kembali ke Clan War
                     </a>
                 </div>
             @else
-            <!-- MODE CONTROL BAR: Standard/Survival/Ghost → config → bahasa konten.
-                 Saat mengetik hanya di-fade (ruang tetap dipesan) agar tak ada layout shift.
-                 "Standard" cuma grup visual; mainMode backend tetap time/words. -->
+            <!-- MODE CONTROL BAR: Standard/Survival/Ghost → config → content language.
+                 While typing it only fades (space stays reserved) so there's no layout shift.
+                 "Standard" is just a visual group; the backend mainMode is still time/words. -->
             <div class="flex flex-col items-center gap-3 mb-2 transition-opacity duration-500"
                 :class="isStarted ? 'opacity-0 pointer-events-none' : 'opacity-100'">
 
@@ -102,9 +102,9 @@
                             :class="currentMain === 'survival' ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground'">{{ __('typing.survival') }}</button>
                     @endauth
                     @guest
-                        {{-- Guest: Survival dikunci. Tetap tampil (biar tahu ada mode ini) tapi mengarah ke login.
-                             Sengaja TANPA wire:navigate: navigasi SPA + @entangle('mainMode') bikin currentMain
-                             jadi undefined saat tombol Back (baris config/ghost x-if runtuh). Full-load aman. --}}
+                        {{-- Guest: Survival is locked. Still shown (so they know the mode exists) but points to login.
+                             Deliberately WITHOUT wire:navigate: SPA nav + @entangle('mainMode') leaves currentMain
+                             undefined on Back (the config/ghost x-if rows collapse). A full load is safe. --}}
                         <a href="{{ route('login') }}"
                             aria-label="{{ __('typing.aria.mode_survival') }}" title="{{ __('typing.survival_login') }}"
                             class="inline-flex items-center gap-1.5 px-3 sm:px-[18px] py-[7px] rounded-md text-small font-mono font-bold text-muted hover:text-foreground transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand">
@@ -170,13 +170,13 @@
                     </template>
                 </div>
 
-                <!-- Baris Ghost: lawan tambahan hanya untuk Standard (time/words); hilang saat Survival. -->
+                <!-- Ghost row: an extra opponent only for Standard (time/words); gone in Survival. -->
                 <template x-if="['time','words'].includes(currentMain)">
                     <div class="flex items-center justify-center gap-2 text-small font-mono" role="group"
                         aria-label="{{ __('typing.aria.mode_ghost') }}">
                         @guest
-                            {{-- Guest: ghost dikunci. CTA mengarah ke login, bukan picker.
-                                 TANPA wire:navigate (lihat catatan tombol Survival: hindari currentMain undefined saat Back). --}}
+                            {{-- Guest: ghost is locked. The CTA points to login, not the picker.
+                                 WITHOUT wire:navigate (see the Survival button note: avoid currentMain undefined on Back). --}}
                             <a href="{{ route('login') }}"
                                 class="px-3 py-[6px] rounded-md border border-border text-muted hover:text-foreground transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand">
                                 {{ __('typing.ghost_login') }}</a>
@@ -196,9 +196,9 @@
                                     @click.prevent="$dispatch('open-modal', 'ghost-picker'); $el.blur()"
                                     class="px-2.5 py-[5px] rounded-md border border-border text-muted hover:text-foreground transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand">
                                     {{ __('typing.ghost_change') }}</button>
-                                {{-- Clear eksplisit: wire:click ke server MENGHAPUS pilihan dari
-                                     session (biar tak muncul lagi di tes berikutnya); dispatch Alpine
-                                     menyembunyikan kursor seketika tanpa menunggu round-trip. --}}
+                                {{-- Explicit clear: wire:click to the server REMOVES the selection from
+                                     the session (so it won't reappear on the next test); the Alpine dispatch
+                                     hides the cursor immediately without waiting for a round-trip. --}}
                                 <button type="button"
                                     wire:click="clearGhost"
                                     @click.prevent="$dispatch('ghost-cleared'); $el.blur()"
@@ -210,7 +210,7 @@
                     </div>
                 </template>
 
-                <!-- Row 3: Language switch (EN/ID) — memilih bahasa KONTEN yang diketik (bukan bahasa UI) -->
+                <!-- Row 3: Language switch (EN/ID) — picks the CONTENT language being typed (not the UI language) -->
                 <div class="inline-flex items-stretch gap-0.5 p-[3px] rounded-lg bg-surface border border-border"
                     role="group" aria-label="{{ __('typing.aria.pick_content_language') }}">
                     @foreach (['en' => 'EN', 'id' => 'ID'] as $code => $label)
@@ -303,28 +303,27 @@
                 <!-- SINGLE SMOOTH CURSOR -->
                 <div x-ref="caret" x-show="!isFinished" wire:ignore
                     class="absolute top-0 left-0 w-[0.1em] h-[1.2em] z-20 rounded [transform-origin:top_left] [will-change:transform]"
-                    {{-- Posisi caret di-bind REAKTIF lewat transform (bukan el.style.transform imperatif).
-                         Kenapa: dulu moveCaret() men-set transform langsung ke DOM. Tiap kali Livewire
-                         me-render ulang lalu morph, inline style itu DIHAPUS morphdom (HTML server tak
-                         punya transform) -> caret balik ke (0,0) = atas baris, dan tak ada yang memasang
-                         ulang karena wire:key tak berubah (bukan remount). Ini yang terjadi saat pindah
-                         ke Survival: setMode() men-dispatch 'ghost-cleared', komponen mendengarnya via
-                         #[On('ghost-cleared')] -> round-trip KEDUA -> morph -> transform caret terhapus.
-                         (Standard lewat jalur applyGhostRestore yang biasanya tak dispatch, jadi aman.)
-                         Perbaikan dua lapis: (1) wire:ignore -> Livewire tak pernah menyentuh elemen ini
-                         saat morph; (2) transform reaktif -> Alpine selalu memasangnya dari cursorLeft/
-                         cursorTop, tak pernah "hilang". --}}
+                    {{-- The caret position is bound REACTIVELY via transform (not imperative el.style.transform).
+                         Why: moveCaret() used to set transform directly on the DOM. Each time Livewire re-rendered
+                         then morphed, morphdom STRIPPED that inline style (the server HTML has no transform) ->
+                         the caret snapped back to (0,0) = top of the line, and nothing reapplied it because
+                         wire:key was unchanged (not a remount). This happened when switching to Survival:
+                         setMode() dispatches 'ghost-cleared', the component hears it via #[On('ghost-cleared')]
+                         -> a SECOND round-trip -> morph -> the caret transform is wiped.
+                         (Standard goes through applyGhostRestore, which usually doesn't dispatch, so it's safe.)
+                         Two-layer fix: (1) wire:ignore -> Livewire never touches this element during morph;
+                         (2) reactive transform -> Alpine always sets it from cursorLeft/cursorTop, never "lost". --}}
                     :style="{
                         backgroundColor: (currentMain === 'survival' && isStarted && !isFinished)
                             ? (staminaPct > 50 ? 'rgb(var(--color-brand-bright))' : (staminaPct > 25 ? 'rgb(var(--color-gold))' : 'rgb(var(--color-danger))'))
                             : 'rgb(var(--color-brand-bright))',
                         transform: `translate(${cursorLeft}px, ${cursorTop - scrollOffset}px)`
                     }"
-                    {{-- Transisi transform HANYA saat mengetik: kursor meluncur mulus antar-karakter cuma
-                         ketika user aktif mengetik (isTyping=true). Di luar itu (mount awal, reset, ganti
-                         mode/bahasa) transisinya TIDAK ADA -> perubahan transform reaktif jadi INSTAN,
-                         tak ada "meluncur ke atas" saat pindah Standard -> Survival. resetProgress
-                         meng-set isTyping=false, jadi tiap reset dijamin instan. --}}
+                    {{-- Transform transition ONLY while typing: the cursor glides smoothly between characters
+                         only when the user is actively typing (isTyping=true). Outside that (initial mount,
+                         reset, mode/language change) there is NO transition -> reactive transform changes are
+                         INSTANT, with no "gliding up" when switching Standard -> Survival. resetProgress sets
+                         isTyping=false, so every reset is guaranteed instant. --}}
                     :class="isTyping
                         ? '[transition:transform_100ms_linear,background-color_150ms_ease-out]'
                         : 'animate-[caret-flash-smooth_1s_infinite]'">
@@ -334,9 +333,9 @@
                     class="relative flex flex-wrap content-start gap-x-0 transition-transform duration-[85ms] ease-out"
                     :style="`transform: translateY(-${scrollOffset}px)`">
 
-                    <!-- GHOST CURSOR: cursor kedua di jalur teks yang sama (z-10, di bawah cursor asli).
-                         Tak mengontrol scroll. Sengaja tanpa transition pada transform — posisi
-                         sudah dimuluskan per-frame oleh updateGhostPosition(); transisi hanya untuk opacity. -->
+                    <!-- GHOST CURSOR: a second cursor on the same text track (z-10, below the real cursor).
+                         Doesn't control scroll. Deliberately no transition on transform — the position is
+                         already smoothed per-frame by updateGhostPosition(); the transition is for opacity only. -->
                     <div x-show="ghostActive && !isFinished" x-cloak
                         class="absolute top-0 left-0 w-[2.5px] h-[1.5em] transition-opacity duration-150 z-10 rounded opacity-40"
                         :style="`transform: translate(${ghostCursorLeft}px, ${ghostCursorTop}px); background-color: rgb(var(--color-muted));`">
@@ -389,7 +388,7 @@
             </div>
 
             <div class="mt-8 flex justify-center">
-                {{-- War-lock: restart dinonaktifkan (satu klaim = satu kesempatan). Gerbangnya di server. --}}
+                {{-- War-lock: restart is disabled (one claim = one attempt). The gate is on the server. --}}
                 @if ($warLock)
                     <div class="flex flex-col items-center gap-1.5 select-none">
                         <div class="flex items-center gap-2 text-muted/40 px-4 py-2 rounded-xl cursor-not-allowed"
@@ -419,13 +418,12 @@
     </div>
 
     <script>
-        // Guard bfcache: saat Back menyajikan /typing dari back-forward cache, DOM beku pada
-        // state "selesai" (isFinished=true, $wire mati) -> mesin ketik stuck. Muat ulang supaya
-        // mount bersih. e.persisted hanya true pada restore bfcache, jadi load awal tak kena.
+        // bfcache guard: when Back serves /typing from the back-forward cache, the DOM is frozen
+        // in the "finished" state (isFinished=true, $wire dead) -> the typing engine is stuck. Reload
+        // for a clean mount. e.persisted is only true on a bfcache restore, so the initial load is unaffected.
         //
-        // Tetap inline (tidak ikut ke typing-game.js) karena ini perilaku khas halaman
-        // /typing, bukan milik komponen -- memindahnya ke app.js akan me-reload SEMUA
-        // halaman yang dipulihkan dari bfcache.
+        // Kept inline (not moved to typing-game.js) because this is behavior specific to the /typing
+        // page, not the component -- moving it to app.js would reload EVERY page restored from bfcache.
         window.addEventListener('pageshow', (e) => {
             if (e.persisted) {
                 window.location.reload();
@@ -433,6 +431,6 @@
         });
     </script>
 
-    {{-- Mesin ketiknya sendiri ada di resources/js/typing-game.js, didaftarkan
-         sebagai window.typingGame lewat app.js. --}}
+    {{-- The typing engine itself lives in resources/js/typing-game.js, registered as
+         window.typingGame via app.js. --}}
 </div>

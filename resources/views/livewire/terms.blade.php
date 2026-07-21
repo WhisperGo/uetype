@@ -1,3 +1,4 @@
+{{-- Terms of Service page: renders the titled sections provided by the component. --}}
 <div class="text-muted font-mono">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-16">
 

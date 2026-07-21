@@ -17,7 +17,7 @@ use Livewire\Component;
  */
 class FriendButton extends Component
 {
-    // User target yang profilnya sedang dilihat (di-mount dari view profil).
+    // The target user whose profile is being viewed (mounted from the profile view).
     public User $target;
 
     public function mount(User $target): void
@@ -25,14 +25,14 @@ class FriendButton extends Component
         $this->target = $target;
     }
 
-    /** Listener Echo friends.{me}; body kosong karena action apa pun memicu re-render. */
+    /** Echo listener for friends.{me}; empty body because any action triggers a re-render. */
     #[On('friendship-updated')]
     public function refresh(): void
     {
         //
     }
 
-    // ---- AKSI (cermin dari Friends.php, gerbang keamanan identik) ----
+    // ---- ACTIONS (mirror of Friends.php, identical security gates) ----
 
     public function sendRequest(): void
     {
@@ -42,8 +42,8 @@ class FriendButton extends Component
             return;
         }
 
-        // Cek "sudah berelasi (arah mana pun)" + insert dilakukan sebagai satu
-        // operasi di dalam Friendship::requestBetween(), bukan dua langkah terpisah.
+        // The "already related (either direction)" check + insert happen as one operation
+        // inside Friendship::requestBetween(), not two separate steps.
         if (! Friendship::requestBetween($me, $this->target->id)) {
             return;
         }
@@ -56,7 +56,7 @@ class FriendButton extends Component
 
     public function acceptRequest(): void
     {
-        // Hanya penerima permintaan pending yang boleh menerima.
+        // Only the recipient of a pending request may accept it.
         $friendship = Friendship::where('requester_id', $this->target->id)
             ->where('addressee_id', Auth::id())
             ->where('status', FriendshipStatus::Pending)
@@ -76,7 +76,7 @@ class FriendButton extends Component
 
     public function cancelRequest(): void
     {
-        // Hanya pengirim yang boleh membatalkan permintaannya sendiri (pending).
+        // Only the sender may cancel their own (pending) request.
         $friendship = Friendship::where('requester_id', Auth::id())
             ->where('addressee_id', $this->target->id)
             ->where('status', FriendshipStatus::Pending)
@@ -92,7 +92,7 @@ class FriendButton extends Component
 
     public function rejectRequest(): void
     {
-        // Penerima menolak permintaan masuk dari target.
+        // The recipient rejects an incoming request from the target.
         $friendship = Friendship::where('requester_id', $this->target->id)
             ->where('addressee_id', Auth::id())
             ->where('status', FriendshipStatus::Pending)
@@ -108,7 +108,7 @@ class FriendButton extends Component
 
     public function removeFriend(): void
     {
-        // Salah satu pihak boleh menghapus pertemanan yang sudah accepted.
+        // Either party may remove an accepted friendship.
         $friendship = Friendship::where('status', FriendshipStatus::Accepted)
             ->where(function ($q) {
                 $q->where(function ($inner) {

@@ -8,25 +8,25 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 
 /**
- * Read-model room: satu sumber baca untuk seluruh komponen multiplayer.
+ * Room read-model: a single read source for the whole multiplayer component.
  *
- * Ini trait DASAR, bukan lapisan di atas yang lain: forgetRoomCache() dipanggil
- * dari sebelas method di semua kelompok, jadi apa pun yang mengubah room/room_members
- * bergantung padanya. Memindahkannya ke sini membuat ketergantungan itu eksplisit.
+ * This is a BASE trait, not a layer on top of the others: forgetRoomCache() is called
+ * from eleven methods across all clusters, so anything that mutates room/room_members
+ * depends on it. Moving it here makes that dependency explicit.
  */
 trait ReadsRoomState
 {
     /**
-     * Room + member + host, sekali muat per request.
+     * Room + members + host, loaded once per request.
      *
-     * #[Computed] wajib di sini: properti ini dibaca dari SEMBILAN tempat berbeda
+     * #[Computed] is required here: this property is read from NINE different places
      * (orderedMembers, isHost, allReady, suddenDeathActive, suddenDeathRemaining,
-     * raceStartsAt, raceStartsInMs, myXpResult, captureResultSnapshot) plus view.
-     * Getter gaya lama tak di-cache Livewire, jadi query dengan eager-load ini
-     * dijalankan ulang tiap kali dibaca -- di komponen yang polling saat balapan.
+     * raceStartsAt, raceStartsInMs, myXpResult, captureResultSnapshot) plus the view.
+     * Old-style getters aren't cached by Livewire, so this eager-loading query would
+     * re-run on every read -- in a component that polls during a race.
      *
-     * Cache-nya dibuang lewat forgetRoomCache() setiap kali komponen ini mengubah
-     * room/room_members, supaya render setelah aksi tak memakai data basi.
+     * The cache is dropped via forgetRoomCache() whenever this component mutates
+     * room/room_members, so the render after an action doesn't use stale data.
      */
     #[Computed]
     public function roomData(): ?Room
@@ -51,13 +51,13 @@ trait ReadsRoomState
         return $room;
     }
 
-    /** Buang cache room setelah room/room_members berubah di request ini. */
+    /** Drop the room cache after room/room_members change in this request. */
     private function forgetRoomCache(): void
     {
         unset($this->roomData, $this->leaderboardData);
     }
 
-    /** Pembalap saja, terurut (host dulu): mengisi grid slot pemain. */
+    /** Racers only, ordered (host first): fills the player slot grid. */
     public function getOrderedMembersProperty()
     {
         $room = $this->roomData;
@@ -73,7 +73,7 @@ trait ReadsRoomState
             ->values();
     }
 
-    /** Penonton di room ini (host-penonton dulu), untuk daftar & badge. */
+    /** Spectators in this room (host-spectator first), for the list & badge. */
     public function getSpectatorsProperty()
     {
         $room = $this->roomData;
@@ -94,7 +94,7 @@ trait ReadsRoomState
         return $this->spectators->count();
     }
 
-    /** True kalau user saat ini adalah penonton di room ini. */
+    /** True if the current user is a spectator in this room. */
     public function getIsSpectatorProperty(): bool
     {
         $room = $this->roomData;
@@ -109,12 +109,12 @@ trait ReadsRoomState
     }
 
     /**
-     * Papan hasil balapan, terurut.
+     * The ordered race result board.
      *
-     * with('user') itu wajib: query ini memuat ULANG members (bukan memakai yang sudah
-     * di-eager-load di roomData), dan captureResultSnapshot() membaca $member->user
-     * untuk tiap baris -- tanpa eager load itu satu query per pemain. Terjaring oleh
-     * Model::preventLazyLoading(), bukan oleh mata.
+     * with('user') is required: this query RE-loads members (rather than reusing those
+     * already eager-loaded in roomData), and captureResultSnapshot() reads $member->user
+     * for each row -- without the eager load that's one query per player. Caught by
+     * Model::preventLazyLoading(), not by eye.
      */
     #[Computed]
     public function leaderboardData()
@@ -123,7 +123,7 @@ trait ReadsRoomState
             return collect();
         }
 
-        // Hanya pembalap: podium & tabel hasil tak memuat penonton.
+        // Racers only: the podium & result table don't include spectators.
         return $this->roomData->members()
             ->where('role', RoomMember::ROLE_PLAYER)
             ->with('user')
@@ -145,8 +145,8 @@ trait ReadsRoomState
     }
 
     /**
-     * Data EXP untuk panel hasil match: earned (room_members.xp_earned) + level
-     * (levelData() user terkini). Null-safe untuk guest / sebelum EXP diberikan.
+     * EXP data for the match result panel: earned (room_members.xp_earned) + level
+     * (the current user's levelData()). Null-safe for guests / before EXP is awarded.
      *
      * @return array{earned:int, level:array}|null
      */
@@ -184,8 +184,8 @@ trait ReadsRoomState
             return false;
         }
 
-        // Hanya pembalap non-host yang perlu ready. Kalau host jadi penonton, ia bukan
-        // pembalap sehingga semua pembalap ikut dihitung -- semuanya wajib ready.
+        // Only non-host racers need to be ready. If the host is a spectator, they aren't a
+        // racer, so all racers count -- every one of them must be ready.
         $participants = $room->members
             ->where('role', RoomMember::ROLE_PLAYER)
             ->where('user_id', '!=', $room->host_id);
@@ -193,7 +193,7 @@ trait ReadsRoomState
         return $participants->count() > 0 && $participants->where('is_ready', false)->count() === 0;
     }
 
-    /** True kalau sudden death aktif (minimal satu player finish, room masih racing). */
+    /** True if sudden death is active (at least one player finished, room still racing). */
     public function getSuddenDeathActiveProperty(): bool
     {
         $room = $this->roomData;
@@ -201,7 +201,7 @@ trait ReadsRoomState
         return (bool) ($room && $room->status === 'racing' && $room->countdown_started_at);
     }
 
-    /** Sisa waktu sudden death dalam detik mundur (15 -> 0), bukan elapsed. */
+    /** Sudden-death time left as a countdown in seconds (15 -> 0), not elapsed. */
     public function getSuddenDeathRemainingProperty(): int
     {
         $room = $this->roomData;
@@ -215,7 +215,7 @@ trait ReadsRoomState
         return max(0, self::SUDDEN_DEATH_SECONDS - (int) floor($elapsed));
     }
 
-    /** Waktu absolut (ISO string) kapan race resmi mulai, untuk countdown 3-2-1 sinkron. */
+    /** Absolute time (ISO string) when the race officially starts, for a synced 3-2-1 countdown. */
     public function getRaceStartsAtProperty(): ?string
     {
         $room = $this->roomData;
@@ -226,15 +226,15 @@ trait ReadsRoomState
     }
 
     /**
-     * Sisa milidetik menuju start, dihitung SERVER saat render.
+     * Milliseconds left until start, computed by the SERVER at render time.
      *
-     * Ini sengaja bukan "jam server" absolut: membandingkan jam server dengan
-     * Date.now() klien menghitung latensi jaringan sebagai selisih jam, dan
-     * toIso8601String() memotong milidetik (galat sampai 1 detik). Dengan durasi
-     * relatif, jam klien & zona waktu tak lagi relevan -- klien cukup menghitung
-     * mundur sebanyak ini sejak halaman diterima.
+     * This is deliberately not an absolute "server clock": comparing the server clock to
+     * the client's Date.now() would count network latency as a clock difference, and
+     * toIso8601String() truncates milliseconds (up to 1s of error). With a relative
+     * duration, the client's clock & timezone no longer matter -- the client just counts
+     * down this many ms from when the page was received.
      *
-     * null kalau race belum dijadwalkan.
+     * null if the race isn't scheduled yet.
      */
     public function getRaceStartsInMsProperty(): ?int
     {
@@ -244,8 +244,8 @@ trait ReadsRoomState
             return null;
         }
 
-        // Boleh negatif -> race sudah lewat titik mulai (mis. pemain refresh di
-        // tengah balapan); klien langsung masuk race tanpa countdown.
+        // May be negative -> the race is past its start point (e.g. a player refreshed
+        // mid-race); the client enters the race immediately without a countdown.
         return (int) round((float) now()->diffInMilliseconds($room->race_starts_at, false));
     }
 }

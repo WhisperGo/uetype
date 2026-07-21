@@ -8,26 +8,27 @@ use Binafy\LaravelUserMonitoring\Providers\LaravelUserMonitoringRouteServiceProv
 use Illuminate\Support\ServiceProvider;
 
 /**
- * Pengganti provider bawaan binafy/laravel-user-monitoring.
+ * Replacement for the default binafy/laravel-user-monitoring provider.
  *
- * Provider paket aslinya memanggil loadMigrationsFrom() ke folder vendor yang
- * migrasinya bertanggal 2023 — jadi jalan SEBELUM tabel `users` (2026) dan
- * gagal (FK ke users). Provider ini melakukan semua yang dilakukan provider
- * asli KECUALI loadMigrationsFrom; migrasi monitoring dipublish ke
- * database/migrations dengan tanggal setelah `users` supaya urutannya benar.
+ * The original package provider calls loadMigrationsFrom() into a vendor folder whose
+ * migrations are dated 2023 -- so they run BEFORE the `users` table (2026) and fail
+ * (FK to users). This provider does everything the original does EXCEPT
+ * loadMigrationsFrom; the monitoring migrations are published to database/migrations
+ * with a date after `users` so the ordering is correct.
  *
- * Auto-discovery paket dimatikan di composer.json (extra.laravel.dont-discover),
- * dan provider ini didaftarkan manual di bootstrap/providers.php.
+ * Package auto-discovery is disabled in composer.json (extra.laravel.dont-discover),
+ * and this provider is registered manually in bootstrap/providers.php.
  */
 class UserMonitoringServiceProvider extends ServiceProvider
 {
+    /** Wire up the monitoring package without its vendor migrations. */
     public function register(): void
     {
         $base = base_path('vendor/binafy/laravel-user-monitoring');
 
         $this->loadViewsFrom($base.'/resources/views/', 'LaravelUserMonitoring');
-        // Sengaja TIDAK loadMigrationsFrom($base.'/database/migrations') —
-        // migrasinya sudah dipublish (dan di-retanggal) ke database/migrations.
+        // Deliberately NOT loadMigrationsFrom($base.'/database/migrations') --
+        // the migrations are already published (and re-dated) to database/migrations.
         $this->mergeConfigFrom($base.'/config/user-monitoring.php', 'user-monitoring');
 
         $this->app['router']->aliasMiddleware('monitor-visit-middleware', VisitMonitoringMiddleware::class);

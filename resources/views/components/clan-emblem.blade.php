@@ -1,3 +1,4 @@
+{{-- Clan emblem badge: renders the clan's colored icon, or its initials as a fallback. --}}
 @props(['clan', 'size' => 'md'])
 
 @php

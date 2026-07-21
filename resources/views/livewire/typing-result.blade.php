@@ -29,20 +29,21 @@
             $pbSecsPart = $pbSeconds !== null ? $pbSeconds % 60 : null;
             $survivalDelta = $pbSeconds !== null ? $pbSeconds - (int) $time : null;
 
-            // Kartu stat non-survival: raw wpm + akurasi + characters selalu ada; consistency
-            // & duration kondisional. Duration DIBUANG di mode time (redundan dengan label
-            // "Time · Ns" di atas hero), tapi tetap tampil di words (durasi bervariasi).
+            // Non-survival stat cards: raw wpm + accuracy + characters always present;
+            // consistency & duration are conditional. Duration is DROPPED in time mode
+            // (redundant with the "Time · Ns" label above the hero), but kept in words mode
+            // (duration varies there).
             $statCount = 3 + (! is_null($consistency) ? 1 : 0) + ($mode === 'words' ? 1 : 0);
-            // Baris stat gaya survival, kini FULL-WIDTH (sejajar grafik) -> muat satu baris
-            // penuh: 3 (time tanpa consistency), 4 (time), 5 (words). Di lebar segini 5 kartu
-            // sebaris lebih rapi daripada 3+2 yang menyisakan sel kosong mencolok.
+            // Survival-style stat row, now FULL-WIDTH (aligned with the chart) -> fits one full
+            // row: 3 (time without consistency), 4 (time), 5 (words). At this width 5 cards in a
+            // row look tidier than 3+2, which leaves a conspicuous empty cell.
             $statCols = match ($statCount) {
                 3 => 'sm:grid-cols-3',
                 5 => 'sm:grid-cols-5',
                 default => 'sm:grid-cols-4',
             };
-            // Jumlah ganjil -> kartu characters (yang terakhir) direntang penuh di mobile
-            // 2-kolom agar tak ada sel menggantung.
+            // Odd count -> the characters card (the last one) spans full width on the mobile
+            // 2-column layout so no cell is left dangling.
             $charsSpan = $statCount % 2 === 1 ? 'col-span-2 sm:col-span-1' : '';
         @endphp
 
@@ -146,15 +147,15 @@
             </div>
         @else
 
-        {{-- Scoreboard (full-width, sejajar dengan blok grafik di bawahnya): hero-card di
-             tengah -> baris stat -> XP. Meniru URUTAN vertikal survival, tapi lebarnya
-             mengikuti grafik (bukan kolom sempit max-w-2xl) supaya kartu stat & XP tak
-             terlihat mengambang di atas grafik yang lebar. Isi hero tetap center. --}}
+        {{-- Scoreboard (full-width, aligned with the chart block below it): hero card
+             centered -> stat row -> XP. Mirrors survival's vertical ORDER, but its width
+             follows the chart (not the narrow max-w-2xl column) so the stat & XP cards
+             don't look like they're floating above the wide chart. Hero content stays centered. --}}
         <div class="flex flex-col gap-8">
 
-            {{-- Hero card: reuse pola kartu survival (garis aksen atas + center), tapi aksennya
-                 EMAS bukan danger -- solo bukan "game over". Mode label mengambil peran baris
-                 "game over" di atas hero; heroLabel ("wpm") mengambil peran "survived". --}}
+            {{-- Hero card: reuses the survival card pattern (top accent line + centered), but the
+                 accent is GOLD not danger -- solo isn't "game over". The mode label plays the role
+                 of the "game over" line above the hero; heroLabel ("wpm") plays the role of "survived". --}}
             <div class="relative overflow-hidden rounded-3xl border border-border bg-surface/60 px-8 py-10 text-center">
                 <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-gold to-transparent opacity-70"></div>
 
@@ -165,9 +166,9 @@
                     <span class="font-mono text-xs uppercase tracking-[0.3em] text-muted mt-3">{{ $heroLabel }}</span>
                 </div>
 
-                {{-- Momen pencapaian = pill emas (menyamai treatment PB cabang survival di
-                     ~baris 82), BUKAN teks kecil. Solo bisa tampil PB DAN ghost sekaligus, jadi
-                     tetap kolom. State kalah/di-bawah-rekor tetap teks muted -- bukan perayaan. --}}
+                {{-- Achievement moment = gold pill (matching the PB treatment in the survival
+                     branch around line 82), NOT small text. Solo can show a PB AND a ghost at once,
+                     so this stays a column. Loss / below-record states stay muted text -- not a celebration. --}}
                 <div class="mt-6 flex flex-col items-center gap-2">
                     @if ($isPersonalBest)
                         <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gold/10 border border-gold/40 text-gold font-mono text-sm">
@@ -195,9 +196,9 @@
                 </div>
             </div>{{-- /hero card --}}
 
-            {{-- Baris stat gaya survival (grid-cols-2 sm:grid-cols-4). Kita sudah di dalam
-                 cabang non-survival, jadi cuma kartu solo: raw wpm + akurasi + characters
-                 selalu ada; consistency & duration (words) kondisional. --}}
+            {{-- Survival-style stat row (grid-cols-2 sm:grid-cols-4). We're already in the
+                 non-survival branch, so these are solo-only cards: raw wpm + accuracy + characters
+                 always present; consistency & duration (words) conditional. --}}
             <div class="grid grid-cols-2 {{ $statCols }} gap-3">
                 <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
                     <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.raw_wpm') }}</span>
@@ -213,8 +214,8 @@
                         <span class="text-xl sm:text-2xl text-foreground font-bold font-mono leading-none tabular-nums">{{ $consistency }}<span class="text-lg">%</span></span>
                     </div>
                 @endif
-                {{-- Duration hanya untuk WORDS: di mode time selalu = konfigurasi
-                     (mis. label "Time · 15s"), jadi kartunya cuma mengulang. --}}
+                {{-- Duration is for WORDS only: in time mode it always equals the config
+                     (e.g. the "Time · 15s" label), so the card would just repeat it. --}}
                 @if ($mode === 'words')
                     <div class="bg-surface/70 border border-white/5 rounded-2xl p-4 flex flex-col gap-2">
                         <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.stat.duration') }}</span>
@@ -229,7 +230,7 @@
                 </div>
             </div>
 
-            {{-- XP + level bar (full-width dalam kolom center) --}}
+            {{-- XP + level bar (full-width within the centered column) --}}
             @auth
                 @if ($levelData)
                     <div class="bg-surface/70 border border-white/5 rounded-2xl p-4">
@@ -252,25 +253,25 @@
             @endauth
         </div>{{-- /scoreboard center --}}
 
-        {{-- Blok error-review: grafik full-width + heatmap TEPAT di bawahnya, dibungkus island
-             supaya klik titik di grafik langsung menyorot tuts. Karena keduanya kini
-             bersebelahan, revealHeatmap() (scrollIntoView) jadi no-op saat sudah terlihat --
-             tetap disimpan sebagai jaring pengaman. --}}
+        {{-- Error-review block: full-width chart + heatmap RIGHT below it, wrapped in one island
+             so clicking a chart point immediately highlights the keys. Because the two now sit
+             adjacent, revealHeatmap() (scrollIntoView) becomes a no-op when already visible --
+             kept as a safety net. --}}
         <div x-data="errorInspector(@js($this->errorSeries['events']))"
             x-on:error-inspect.window="select($event.detail.index)"
             class="mt-10 flex flex-col gap-6">
 
-            <!-- ===== GRAFIK (full-width) ===== -->
+            <!-- ===== CHART (full-width) ===== -->
             <div class="bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6 flex flex-col">
                 <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-muted mb-2">{{ $isSurvival ? __('result.chart_stamina') : __('result.chart_performance') }}</h3>
 
-                {{-- Legenda HTML, bukan plugins.legend bawaan Chart.js: yang bawaan digambar di
-                     canvas (tak bisa ikut font-mono/tracking token) dan item-nya bisa diklik
-                     untuk menyembunyikan dataset -- afordans yang tak kita inginkan di sini.
-                     Bentuknya sengaja sama dengan legenda heatmap di bawah.
-                     Warna di-hardcode agar SAMA PERSIS dengan warna dataset di blok @script;
-                     #C69F68 kebetulan = token gold, tapi #475569 & #F43F5E memang di luar token
-                     (lihat catatan dataset). Saat design-cleanup jalan, ganti di kedua tempat. --}}
+                {{-- HTML legend, not Chart.js's built-in plugins.legend: the built-in one is drawn
+                     on the canvas (can't inherit the font-mono/tracking tokens) and its items are
+                     clickable to hide datasets -- an affordance we don't want here. Its shape
+                     deliberately matches the heatmap legend below.
+                     Colors are hardcoded to be EXACTLY the same as the dataset colors in the @script
+                     block; #C69F68 happens to equal the gold token, but #475569 & #F43F5E really are
+                     outside the tokens (see the dataset notes). When design-cleanup runs, change both places. --}}
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[0.65rem] text-muted/60 mb-3">
                     <span class="inline-flex items-center gap-2">
                         <span class="w-4 h-[3px] rounded-full bg-gold"></span>
@@ -280,8 +281,8 @@
                         <span class="w-4 h-[2px] rounded-full" style="background-color: #475569;"></span>
                         {{ __('result.stat.raw_wpm') }}
                     </span>
-                    {{-- Ikut aturan sumbu y1 (display: hasErrors): run bersih -> tak ada titik,
-                         tak ada sumbu, jadi tak ada pula legendanya. --}}
+                    {{-- Follows the y1 axis rule (display: hasErrors): a clean run -> no points,
+                         no axis, so no legend entry either. --}}
                     @if (array_sum($this->errorSeries['counts']) > 0)
                         <span class="inline-flex items-center gap-2">
                             <span class="font-bold leading-none" style="color: #F43F5E;">✕</span>
@@ -290,13 +291,13 @@
                     @endif
                 </div>
 
-                {{-- Canvas WAJIB absolute: out-of-flow berkontribusi nol ke intrinsic size, jadi
-                     tinggi baris grid tak bergantung pada canvas. Kalau dibuat in-flow lagi,
-                     dependensinya melingkar (baris <- card <- canvas <- Chart.js baca parent)
-                     dan Chart.js masuk loop resize. flex-basis:0% tidak cukup memutusnya. --}}
-                {{-- Tinggi EKSPLISIT (bukan lagi lg:flex-1 yang ikut tinggi kolom kiri):
-                     kini grafik proporsinya sama untuk guest & login. Canvas tetap absolute
-                     agar tak menyumbang intrinsic size -> Chart.js tak masuk resize-loop. --}}
+                {{-- Canvas MUST be absolute: out-of-flow contributes zero to intrinsic size, so the
+                     grid row's height doesn't depend on the canvas. If it were in-flow again, the
+                     dependency becomes circular (row <- card <- canvas <- Chart.js reads parent) and
+                     Chart.js enters a resize loop. flex-basis:0% isn't enough to break it. --}}
+                {{-- EXPLICIT height (no longer lg:flex-1 following the left column's height):
+                     the chart now has the same proportions for guest & logged-in users. The canvas
+                     stays absolute so it adds no intrinsic size -> Chart.js won't enter a resize loop. --}}
                 <div class="relative w-full h-72 md:h-80" wire:ignore>
                     <canvas id="wpmChart" class="absolute inset-0"></canvas>
                 </div>
@@ -346,27 +347,27 @@
                                 },
                                 {
                                     label: @js(__('result.error_axis')),
-                                    // line + showLine:false, BUKAN type:'scatter'. Dataset ini harus
-                                    // memakai jalur parsing yang sama dengan dua di atasnya: sumbu x
-                                    // di sini skala CATEGORY (label 1..N) dengan array angka polos
-                                    // ter-index posisi. ScatterController default-nya parsing {x,y} --
-                                    // jalan, tapi lewat jalur beda, dan interaction.mode:'index'
-                                    // bergantung padanya. showLine:false hasilnya identik.
+                                    // line + showLine:false, NOT type:'scatter'. This dataset must use
+                                    // the same parsing path as the two above it: the x axis here is a
+                                    // CATEGORY scale (labels 1..N) with a plain numeric array indexed by
+                                    // position. ScatterController parses {x,y} by default -- that works,
+                                    // but via a different path, and interaction.mode:'index' depends on
+                                    // this one. showLine:false yields an identical result.
                                     type: 'line',
                                     showLine: false,
-                                    // null = titik tak digambar. Titik yang duduk di 0 cuma jadi
-                                    // derau sepanjang sumbu; yang informatif justru KETIADAAN-nya.
+                                    // null = point not drawn. A point sitting at 0 is just noise along
+                                    // the axis; here it's the ABSENCE of a point that's informative.
                                     data: errorCounts.map(c => c > 0 ? c : null),
                                     yAxisID: 'y1',
-                                    pointStyle: 'crossRot',   // X, bukan bulatan -- terbaca "error"
+                                    pointStyle: 'crossRot',   // an X, not a dot -- reads as "error"
                                     pointRadius: 5,
                                     pointHoverRadius: 7,
                                     pointHitRadius: 12,
-                                    // #F43F5E menyamai persis rgba(244,63,94) inline di heatmap.
-                                    // SENGAJA memakai token typing.error yang deprecated, bukan
-                                    // --color-danger: titik & heatmap adalah DATA YANG SAMA dan harus
-                                    // terlihat sebagai hal yang sama. Dua merah berbeda menyiratkan
-                                    // dua metrik berbeda. Saat design-cleanup jalan, ganti KEDUANYA.
+                                    // #F43F5E exactly matches the inline rgba(244,63,94) in the heatmap.
+                                    // DELIBERATELY uses the deprecated typing.error token, not
+                                    // --color-danger: the points & heatmap are THE SAME DATA and must
+                                    // look like the same thing. Two different reds would imply two
+                                    // different metrics. When design-cleanup runs, change BOTH.
                                     borderColor: '#F43F5E',
                                     pointBackgroundColor: '#F43F5E',
                                     borderWidth: 2,
@@ -380,11 +381,11 @@
                                 mode: 'index',
                                 intersect: false,
                             },
-                            // mode 'index' menyamai interaction.mode yang sudah dipakai tooltip:
-                            // klik di mana pun dalam satu kolom detik memilih detik itu -- target
-                            // kliknya jadi seluruh tinggi grafik, bukan titik 5px. Klik kolom TANPA
-                            // error tetap dikirim: island menutup panelnya sendiri, jadi tak perlu
-                            // tombol close.
+                            // mode 'index' matches the interaction.mode the tooltip already uses:
+                            // clicking anywhere within one second-column selects that second -- the
+                            // click target becomes the full chart height, not the 5px point. Clicks on
+                            // columns WITHOUT errors are still dispatched: the island closes its own
+                            // panel, so no close button is needed.
                             onClick: (evt, activeEls, chart) => {
                                 const hits = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, true);
                                 if (!hits.length) return;
@@ -429,8 +430,8 @@
                                 y1: {
                                     position: 'right',
                                     beginAtZero: true,
-                                    // Grid kanan tak digambar di area chart: dua set gridline di
-                                    // kartu sekecil ini membuat garis wpm sulit dibaca.
+                                    // Right-side grid not drawn in the chart area: two sets of
+                                    // gridlines in a card this small make the wpm line hard to read.
                                     grid: {
                                         drawOnChartArea: false
                                     },
@@ -439,13 +440,13 @@
                                         precision: 0,
                                         stepSize: 1
                                     },
-                                    // Sesi bersih (data semua null) -> Chart.js tak punya min/max &
-                                    // sumbunya jadi 0..1 yang terlihat rusak. suggestedMax menjaga
-                                    // rentangnya waras; display menyembunyikannya sama sekali: tak
-                                    // ada error, tak ada sumbu error, grafik persis seperti dulu.
+                                    // Clean session (all data null) -> Chart.js has no min/max & the
+                                    // axis becomes a broken-looking 0..1. suggestedMax keeps the range
+                                    // sane; display hides it entirely: no errors, no error axis, and
+                                    // the chart looks exactly as it did before.
                                     suggestedMax: 5,
-                                    // display: hasErrors mematikan SELURUH sumbu (judul ikut) saat
-                                    // run bersih -> tak ada error, tak ada sumbu kanan sama sekali.
+                                    // display: hasErrors turns off the WHOLE axis (title included) on a
+                                    // clean run -> no errors, no right-hand axis at all.
                                     display: hasErrors,
                                     title: {
                                         display: true,
@@ -473,7 +474,7 @@
                     });
                 };
 
-                // Chart datang dari bundle Vite (window.Chart di app.js), bukan CDN runtime.
+                // Chart comes from the Vite bundle (window.Chart in app.js), not a runtime CDN.
                 renderChart();
             </script>
         @endscript
@@ -486,15 +487,16 @@
                 ['z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/'],
             ];
             $maxMiss = count($missedChars) > 0 ? max($missedChars) : 0;
-            // Run bersih = tak ada tuts meleset DAN tak ada titik error. Pakai KEDUANYA supaya
-            // sesi lama (missedChars terisi tanpa errorEvents) tetap terhitung ber-error ->
-            // heatmap tetap tampil (menjaga assertSee 'error heatmap' di test layout).
+            // Clean run = no missed keys AND no error points. Use BOTH so that old sessions
+            // (missedChars populated but no errorEvents) still count as having errors ->
+            // the heatmap still renders (keeps the assertSee 'error heatmap' in the layout test).
             $isCleanRun = empty($missedChars) && array_sum($this->errorSeries['counts']) === 0;
         @endphp
 
         @if ($isCleanRun)
-            {{-- Run bersih: JANGAN tampilkan konsol error kosong + hint "klik penanda" yang
-                 mustahil (tak ada penanda). Ganti pengakuan positif; grafik di atas tetap ada. --}}
+            {{-- Clean run: DON'T show an empty error console + a "click a marker" hint that's
+                 impossible (there are no markers). Show a positive acknowledgement instead; the
+                 chart above stays. --}}
             <div class="bg-surface/40 border border-white/5 rounded-2xl p-6 flex items-center justify-center gap-3">
                 <span class="text-gold text-lg leading-none">✦</span>
                 <span class="font-mono text-sm text-gold uppercase tracking-[0.2em]">{{ __('result.error_none') }}</span>
@@ -503,17 +505,17 @@
         <div x-ref="heatmap"
             class="bg-surface/40 border border-white/5 rounded-2xl p-4 md:p-6 flex flex-col items-center gap-2">
             <h3 class="font-mono text-xs uppercase tracking-[0.2em] text-muted mb-0 self-start">{{ __('result.error_heatmap') }}</h3>
-            {{-- Titik grafik & heatmap menghitung KARAKTER TARGET yang gagal diproduksi;
-                 tile "characters" menghitung KEYSTROKE. Keduanya sengaja beda (lihat docs),
-                 jadi definisinya dinyatakan di sini -- tepat di titik kebingungannya. --}}
+            {{-- Chart points & heatmap count the TARGET CHARACTERS that failed to be produced;
+                 the "characters" tile counts KEYSTROKES. The two are intentionally different (see
+                 docs), so the definition is stated here -- right at the point of confusion. --}}
 
-            {{-- Idle: cukup hint ringkas (afordans bahwa grafik bisa diklik), TANPA min-h
-                 besar -- jadi tak ada ruang kosong menganga sebelum ada titik diklik. Saat
-                 titik diklik, panel detail mengembang MULUS lewat x-collapse (bukan lompat).
-                 x-show, bukan x-if: x-collapse perlu elemen tetap ada untuk menganimasikan
-                 tingginya. Kalau plugin Collapse absen, x-collapse jadi no-op & panel tetap
-                 toggle instan (graceful). Akses `selected` di-guard (?. / ?? []) karena
-                 elemennya kini selalu ada di DOM meski `selected` masih null. --}}
+            {{-- Idle: just a brief hint (the affordance that the chart is clickable), WITHOUT a
+                 large min-h -- so there's no gaping empty space before a point is clicked. When a
+                 point is clicked, the detail panel expands SMOOTHLY via x-collapse (no jump).
+                 x-show, not x-if: x-collapse needs the element to stay present to animate its
+                 height. If the Collapse plugin is absent, x-collapse becomes a no-op & the panel
+                 still toggles instantly (graceful). Access to `selected` is guarded (?. / ?? [])
+                 because the element is now always in the DOM even while `selected` is still null. --}}
             <div class="w-full mt-2 self-start">
                 <p x-show="! open" class="font-mono text-xs text-muted/70">{{ __('result.error_hint') }}</p>
 
@@ -521,19 +523,19 @@
                         <p class="font-mono text-xs uppercase tracking-[0.2em] text-muted"
                             x-text="@js(__('result.error_at')).replace(':second', selected?.[0]?.label ?? '')"></p>
 
-                        {{-- Banyak error dalam satu detik -> satu baris per error (bisa kata
-                             yang sama dengan offset berbeda). Jujur apa adanya. --}}
-                        {{-- :key POSISI, bukan e.second+e.index: `index` tak pernah ada di
-                             output enrich (kunci "10-undefined" untuk semua -> Alpine anggap
-                             duplikat & cuma render 1 baris). Backspace-lalu-ketik-ulang juga
-                             menghasilkan dua event ber-{second,index} SAMA, jadi field apa pun
-                             dari data tetap bisa bentrok. selected diganti utuh & tak pernah
-                             diurut ulang, jadi posisi array itu kunci yang aman. --}}
+                        {{-- Multiple errors in one second -> one row per error (can be the same
+                             word at different offsets). Honest and literal. --}}
+                        {{-- :key is POSITION, not e.second+e.index: `index` never exists in the
+                             enrich output (key "10-undefined" for all -> Alpine treats them as
+                             duplicates & renders only 1 row). Backspace-then-retype also produces
+                             two events with the SAME {second,index}, so any field from the data
+                             can still collide. selected is replaced wholesale & never reordered, so
+                             the array position is a safe key. --}}
                         <template x-for="(e, i) in (selected ?? [])" :key="i">
-                            {{-- Tombol: baris inilah yang menyetir pasangan ring di keyboard.
-                                 Penanda terpilih & cursor cuma muncul kalau memang ada pilihan
-                                 (>1 error) -- kalau cuma satu, tombol yang "bisa diklik" tapi
-                                 tak mengubah apa pun itu janji palsu. --}}
+                            {{-- Button: this row is what drives the ring pair on the keyboard.
+                                 The selected marker & cursor only appear when there's actually a
+                                 choice (>1 error) -- with only one, a button that looks "clickable"
+                                 but changes nothing is a false promise. --}}
                             <button type="button" @click="row = i"
                                 class="flex flex-wrap items-baseline gap-x-3 gap-y-1 font-mono text-sm text-left w-full border-l-2 pl-2 -ml-2 py-0.5 rounded-r transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gold/50"
                                 :class="selected.length > 1
@@ -569,12 +571,12 @@
                 </div>
             </div>
 
-            {{-- overflow-x-auto memaksa overflow-y ikut MEMOTONG (spek: overflow-y:visible
-                 terhitung jadi auto begitu overflow-x bukan visible), jadi apa pun yang
-                 menjulur ke luar kotak butuh ruang eksplisit di sini:
-                   pt-10 : tooltip baris teratas (-top-10)
-                   pb-2  : ring/outline tuts terpilih di baris terbawah -- ring-offset-2 +
-                           ring-2 menggambar 4px di bawah tuts, tanpa ini baris z/x terpotong. --}}
+            {{-- overflow-x-auto forces overflow-y to CLIP too (per spec: overflow-y:visible
+                 computes to auto once overflow-x isn't visible), so anything that spills outside
+                 the box needs explicit room here:
+                   pt-10 : the top row's tooltip (-top-10)
+                   pb-2  : the ring/outline of a selected key in the bottom row -- ring-offset-2 +
+                           ring-2 draw 4px below the key; without this the z/x row gets clipped. --}}
             <div class="w-full overflow-x-auto pt-10 pb-2">
             <div class="flex flex-col gap-2 md:gap-3 w-max mx-auto">
                 @foreach ($keyboard as $rowIndex => $row)
@@ -588,11 +590,11 @@
                                         ? "background-color: rgba(244, 63, 94, {$opacity}); color: #e2e8f0;"
                                         : 'background-color: rgba(255,255,255,0.04); color: #94a3b8;';
                             @endphp
-                            {{-- Ring EMAS, bukan merah: tuts ini sudah ber-background merah
-                                 (opacity miss), merah di atas merah tak terbaca. Emas = warna
-                                 "terpilih" di seluruh app. Pakai ring/outline BUKAN background:
-                                 style inline di bawah memiliki penuh background-color tuts ini.
-                                 Solid = tuts yang kamu BUTUHKAN; dashed = tuts yang kamu TEKAN. --}}
+                            {{-- GOLD ring, not red: this key already has a red background (miss
+                                 opacity), and red on red is unreadable. Gold = the "selected" color
+                                 across the whole app. Use ring/outline NOT background: the inline
+                                 style below fully owns this key's background-color.
+                                 Solid = the key you NEEDED; dashed = the key you PRESSED. --}}
                             <div data-key="{{ $key }}"
                                 class="w-10 h-10 md:w-12 md:h-12 rounded-lg flex items-center justify-center text-sm md:text-base font-bold transition-colors relative group"
                                 :class="{
@@ -615,10 +617,10 @@
             </div>
             </div>
 
-            {{-- Legenda: PINDAH ke bawah keyboard supaya alur baca hint -> keyboard ->
-                 keterangan simbol, dan tak lagi menyelip mepet di antara hint & keyboard.
-                 Di-center (justify-center) mengikuti keyboard yang juga center. Swatch pakai
-                 class ring/outline PERSIS sama dengan tuts -- mengajarkan dirinya sendiri. --}}
+            {{-- Legend: MOVED below the keyboard so the reading flow is hint -> keyboard ->
+                 symbol explanation, and it no longer wedges tightly between the hint & keyboard.
+                 Centered (justify-center) to follow the keyboard, which is also centered. Swatches
+                 use the EXACT same ring/outline classes as the keys -- it teaches itself. --}}
             <div class="w-full flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 font-mono text-[0.65rem] text-muted/60">
                 <span class="inline-flex items-center gap-2">
                     <span class="w-3 h-3 rounded-sm bg-white/5 ring-2 ring-gold ring-offset-2 ring-offset-surface"></span>
@@ -634,7 +636,7 @@
 
         </div>{{-- /island error inspector --}}
 
-        {{-- Tombol aksi: full-width di bawah seluruh ringkasan + blok error-review. --}}
+        {{-- Action buttons: full-width below the entire summary + error-review block. --}}
         <div class="mt-10 flex items-stretch gap-3">
             <a id="restartButton" href="/typing"
                 class="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-mono font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition"
@@ -644,8 +646,8 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
                 </svg>
             </a>
-            {{-- Retry hanya untuk Words: mengulang rangkaian kata yang sama persis
-                 (lewat retry() -> session typing_retry), berbeda dari Next Test yang acak. --}}
+            {{-- Retry is for Words only: replays the exact same sequence of words
+                 (via retry() -> session typing_retry), unlike Next Test which is randomized. --}}
             @if ($mode === 'words' && $textToType)
                 <button type="button" wire:click="retry"
                     class="inline-flex items-center justify-center h-12 px-6 rounded-2xl bg-surface border border-white/5 text-foreground/80 hover:text-foreground hover:border-white/10 font-mono font-semibold text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-border transition"
@@ -659,41 +661,42 @@
     </div>
 </div>
 
-{{-- Factory Alpine WAJIB di <script> biasa, BUKAN @script: script biasa dieksekusi saat
-     parsing HTML (sebelum Alpine menelusuri DOM & mengevaluasi x-data), sedangkan @script
-     jalan saat init Livewire -- berlomba dengan penelusuran itu dan melempar
-     "errorInspector is not defined". Pembagian yang sama dipakai typingGame() di engine. --}}
+{{-- The Alpine factory MUST live in a plain <script>, NOT @script: a plain script runs during
+     HTML parsing (before Alpine walks the DOM & evaluates x-data), whereas @script runs at
+     Livewire init -- racing that walk and throwing "errorInspector is not defined". The engine's
+     typingGame() uses the same split. --}}
 <script>
     function errorInspector(events) {
         return {
-            // Dikelompokkan di klien, bukan PHP: array PHP ber-key int rapat 0..n di-encode
-            // jadi ARRAY oleh json_encode, yang jarang jadi OBJECT. Mengelompokkan di sini
-            // menghilangkan jebakan bentuk itu sepenuhnya. Tiap detik lalu dilewatkan
-            // mergeSkippedRuns() -> "display rows": run karakter SKIPPED yang berurutan dalam
-            // satu kata jadi SATU baris (grafik & heatmap tetap per-karakter, ini murni tampilan).
+            // Grouped on the client, not in PHP: a PHP array with contiguous int keys 0..n is
+            // encoded as an ARRAY by json_encode, rarely as an OBJECT. Grouping here removes that
+            // shape trap entirely. Each second is then run through mergeSkippedRuns() -> "display
+            // rows": a run of consecutive SKIPPED characters within one word becomes ONE row (the
+            // chart & heatmap stay per-character; this is purely presentational).
             grouped: Object.fromEntries(
                 Object.entries(
                     events.reduce((acc, e) => ((acc[e.second] ??= []).push(e), acc), {})
                 ).map(([sec, evs]) => [sec, mergeSkippedRuns(evs)])
             ),
             selected: null,
-            // Visibilitas panel DIPISAH dari `selected`. x-collapse mengukur tinggi elemen
-            // tepat saat x-show berubah true; kalau visibilitas diikat langsung ke `selected`,
-            // efek x-show (di induk) bisa jalan SEBELUM x-for (di anak) menyisipkan baris ->
-            // tinggi terukur cuma setinggi label -> animasi mengembang ke tinggi salah lalu
-            // "meloncat" ke penuh. `open` di-flip SETELAH konten ter-render (lihat select()).
+            // Panel visibility is SEPARATED from `selected`. x-collapse measures the element's
+            // height exactly when x-show flips to true; if visibility were bound directly to
+            // `selected`, the x-show effect (on the parent) could run BEFORE x-for (on the child)
+            // inserts the rows -> the measured height is only the label's height -> the animation
+            // expands to the wrong height and then "jumps" to full. `open` is flipped AFTER the
+            // content renders (see select()).
             open: false,
-            // Baris yang sedang disorot DI DALAM detik terpilih. Keyboard menyorot tuts dari
-            // SATU baris saja (baris run bisa banyak tuts "needed"; baris salah-ketik = 1 pasang
-            // butuh->tekan). Menyorot seluruh detik sekaligus bikin maknanya runtuh: satu tuts
-            // bisa jadi "yang dibutuhkan" di error A sekaligus "yang ditekan" di error B, dan
-            // solid-vs-dashed kehilangan artinya.
+            // The row currently highlighted WITHIN the selected second. The keyboard highlights
+            // keys from ONE row only (a run row can have many "needed" keys; a mistyped row = 1
+            // need->press pair). Highlighting the whole second at once collapses the meaning: one
+            // key could be "the needed one" in error A and "the pressed one" in error B, and
+            // solid-vs-dashed loses its meaning.
             row: 0,
 
             select(index) {
                 const group = this.grouped[index] ?? null;
 
-                // Klik kolom tanpa error -> tutup panel & bersihkan sorotan keyboard.
+                // Click on a column without errors -> close the panel & clear the keyboard highlight.
                 if (! group) {
                     this.open = false;
                     this.selected = null;
@@ -701,13 +704,13 @@
                     return;
                 }
 
-                // Isi konten DULU: x-for merender baris pada flush tick ini.
+                // Fill the content FIRST: x-for renders the rows on this flush tick.
                 this.selected = group;
                 this.row = 0;
 
-                // Baru buka di tick berikutnya, setelah baris ada di DOM -> x-collapse
-                // mengukur tinggi yang benar & animasinya mulus (tak meloncat). Scroll juga
-                // ditunda ke sini supaya tak dihitung saat panel masih tinggi 0.
+                // Only open on the next tick, once the rows are in the DOM -> x-collapse measures
+                // the correct height & the animation is smooth (no jump). The scroll is also
+                // deferred to here so it isn't computed while the panel is still 0 height.
                 this.$nextTick(() => {
                     this.open = true;
                     this.revealHeatmap();
@@ -718,11 +721,11 @@
                 return this.selected?.[this.row] ?? null;
             },
 
-            // Tuts "needed" yang disorot di keyboard. Array, bukan string tunggal: baris run
-            // skipped mewakili BEBERAPA karakter -> semua ter-ring sekaligus. Baris salah-ketik
-            // / skip tunggal = array 1 elemen (perilaku identik dengan sebelumnya). Sudah
-            // di-lowercase di mergeSkippedRuns agar cocok dengan kunci heatmap (lowercase dari
-            // missedChars). Panel tetap menampilkan karakter ASLINYA.
+            // The "needed" keys highlighted on the keyboard. An array, not a single string: a
+            // skipped-run row represents MULTIPLE characters -> all get ringed at once. A mistyped
+            // / single-skip row = a 1-element array (behavior identical to before). Already
+            // lowercased in mergeSkippedRuns to match the heatmap keys (lowercase from
+            // missedChars). The panel still shows the ORIGINAL characters.
             get expectedKeys() {
                 return this.current?.keys ?? [];
             },
@@ -732,22 +735,23 @@
             },
 
             revealHeatmap() {
-                // block:'nearest', BUKAN 'center'. 'nearest' menggulir SEMINIMAL mungkin dan
-                // tak melakukan apa pun pada elemen yang sudah terlihat penuh -- jadi "gulir
-                // hanya kalau di luar layar" sudah jadi semantik bawaan browser. Cek
-                // getBoundingClientRect sendiri justru salah saat kartunya lebih tinggi
-                // dari viewport, dan 'center' akan membuang grafiknya dari layar.
+                // block:'nearest', NOT 'center'. 'nearest' scrolls the MINIMUM possible and does
+                // nothing to an element that's already fully visible -- so "scroll only if
+                // off-screen" is the browser's built-in semantics. A manual getBoundingClientRect
+                // check would actually be wrong when the card is taller than the viewport, and
+                // 'center' would push the chart off-screen.
                 this.$refs.heatmap?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             },
         };
     }
 
-    // Ubah event mentah satu detik jadi "display rows": karakter SKIPPED (actual === null)
-    // yang BERURUTAN dalam kata yang SAMA digabung ke satu baris (mis. "a" ketik lalu lompat
-    // -> "bout" jadi satu run a[bout]) supaya panel tak mengulang kalimat "skipped" per huruf.
-    // MURNI tampilan: counts grafik & missedChars/heatmap tetap per-karakter (dari PHP inspect).
-    // Event dalam satu detik sudah urut ketik = urut index, jadi run skipped kontigu pasti
-    // berdampingan. Error salah-ketik & skip tunggal jadi baris biasa (offsetEnd === offset).
+    // Turns one second's raw events into "display rows": CONSECUTIVE SKIPPED characters
+    // (actual === null) within the SAME word are merged into one row (e.g. typing "a" then
+    // jumping -> "bout" becomes one run a[bout]) so the panel doesn't repeat "skipped" per letter.
+    // PURELY presentational: the chart counts & missedChars/heatmap stay per-character (from PHP
+    // inspect). Events within one second are already in typing order = index order, so a contiguous
+    // skipped run is guaranteed adjacent. Mistyped errors & single skips become plain rows
+    // (offsetEnd === offset).
     function mergeSkippedRuns(events) {
         const rows = [];
 
@@ -764,12 +768,12 @@
 
             rows.push({
                 word: e.word,
-                offset: e.offset,               // awal garis bawah
-                offsetEnd: e.offset,            // akhir garis bawah (== offset utk baris tunggal)
+                offset: e.offset,               // underline start
+                offsetEnd: e.offset,            // underline end (== offset for a single row)
                 expected: e.expected,
                 actual: e.actual,
                 skipped: isSkip,
-                keys: [(e.expected ?? '').toLowerCase()],   // tuts "needed" utk sorotan keyboard
+                keys: [(e.expected ?? '').toLowerCase()],   // "needed" keys for the keyboard highlight
             });
         }
 

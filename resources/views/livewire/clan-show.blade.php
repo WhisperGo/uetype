@@ -1,3 +1,4 @@
+{{-- Clan detail page: identity banner, member roster, and clan-war match history. --}}
 <div class="py-10">
     <x-page-container>
 
@@ -8,7 +9,7 @@
         </a>
     </div>
 
-    {{-- ===== HEADER CLAN (banner ber-identitas) ===== --}}
+    {{-- ===== CLAN HEADER (identity banner) ===== --}}
     @php $lvl = $clan->levelData(); @endphp
     <div class="relative overflow-hidden p-6 sm:p-8 border bg-surface/70 border-white/10 rounded-3xl mb-8">
         <div class="pointer-events-none absolute -top-16 -right-16 w-56 h-56 rounded-full bg-gold/5 blur-2xl"></div>
@@ -35,7 +36,7 @@
             </div>
         </div>
 
-        {{-- Bar progres level (progress menuju level berikutnya, dari power) --}}
+        {{-- Level progress bar (progress toward the next level, derived from power) --}}
         <x-clan.progress :data="$lvl" class="mt-6" />
     </div>
 

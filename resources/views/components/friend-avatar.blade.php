@@ -9,16 +9,16 @@
     'bordered' => true,
 ])
 
-{{-- Avatar pengguna dengan fallback maskot. SATU-SATUNYA tempat avatar dirender;
-     jangan salin markupnya.
+{{-- User avatar with mascot fallback. The ONLY place avatars are rendered;
+     do not copy this markup.
 
-     Ini bukan aturan kosmetik: dua atribut `alt` yang sempat hilang dan harus
-     diperbaiki manual berada tepat di tempat yang menulis markup avatar sendiri
-     alih-alih memakai komponen ini. Duplikasi di sini memproduksi bug.
+     This isn't a cosmetic rule: the two missing `alt` attributes that had to be
+     fixed by hand were exactly in the spots that wrote their own avatar markup
+     instead of using this component. Duplication here produces bugs.
 
-     Semua nilai default menjaga 15 pemakaian lama tetap identik; props
-     shape/bg/bordered ditambahkan supaya varian di lobby multiplayer
-     (rounded-md tanpa border, rounded-xl bg-foreground/5) ikut tertampung. --}}
+     All default values keep the 15 existing usages identical; the shape/bg/bordered
+     props were added to accommodate the multiplayer lobby variants
+     (rounded-md without border, rounded-xl bg-foreground/5). --}}
 <div class="relative shrink-0">
     <div {{ $attributes->class([
         'overflow-hidden flex items-center justify-center',

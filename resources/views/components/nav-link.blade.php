@@ -1,3 +1,4 @@
+{{-- Desktop top-bar navigation link with active/inactive styling. --}}
 @props(['active'])
 
 @php

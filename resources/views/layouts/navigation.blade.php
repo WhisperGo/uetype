@@ -1,10 +1,11 @@
+{{-- Top navigation bar: primary links, leaderboard shortcut, account dropdown, and responsive mobile menu. --}}
 @php
-    // Satu sumber untuk desktop & mobile -- lihat App\Support\NavItems.
+    // Single source for desktop & mobile -- see App\Support\NavItems.
     $navMain = App\Support\NavItems::main();
     $navAccount = App\Support\NavItems::account();
 
-    // Leaderboard tampil terpisah (ikon trofi di kanan pada desktop), jadi
-    // dipisahkan dari kelompok kiri -- tapi sumber datanya tetap sama.
+    // Leaderboard is shown separately (trophy icon on the right on desktop), so it's
+    // split out from the left group -- but the data source stays the same.
     $navLeaderboard = collect($navMain)->firstWhere('key', 'leaderboard');
     $navPrimary = collect($navMain)->reject(fn ($i) => $i['key'] === 'leaderboard');
 @endphp

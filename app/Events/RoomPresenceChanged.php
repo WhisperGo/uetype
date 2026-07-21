@@ -9,10 +9,10 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Notifikasi kehadiran di room multiplayer: seseorang masuk ('join') atau keluar
- * ('leave'). Ditampilkan sebagai pesan sistem di tengah panel chat, bukan bubble
- * biasa. Broadcast-only (tak disimpan), numpang channel 'room.{code}' yang sudah
- * di-subscribe — frontend cukup satu listener tambahan ('.room.presence').
+ * Presence notification for a multiplayer room: someone joins ('join') or leaves
+ * ('leave'). Rendered as a centered system message in the chat panel rather than a
+ * normal bubble. Broadcast-only (not persisted), reusing the already-subscribed
+ * 'room.{code}' channel — the frontend only needs one extra listener ('.room.presence').
  */
 class RoomPresenceChanged implements ShouldBroadcastNow
 {

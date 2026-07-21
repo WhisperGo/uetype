@@ -1,3 +1,6 @@
+{{-- Friends page: tabbed as Friends (roster with per-friend actions and ghost-race
+     shortcuts), Requests (incoming + sent), and Find (user search). Real-time updates
+     arrive via a window event relayed by the global toast subscriber. --}}
 <div class="max-w-5xl px-4 mx-auto py-10 sm:px-6 lg:px-8">
 
     <h1 class="font-display text-fluid-title tracking-wide text-foreground mb-4">{{ __('friends.title') }}</h1>
@@ -267,16 +270,15 @@
     @endif
 
     {{-- ===== REAL-TIME =====
-         Subscription Echo ke friends.{id} DIPEGANG oleh toast global di layout
-         (satu-satunya subscriber, agar tak dobel). Halaman ini cukup mendengar
-         event window 'friendship-updated-remote' yang diteruskan toast lalu
-         menyegarkan datanya. --}}
+         The Echo subscription to friends.{id} is OWNED by the global toast in the
+         layout (the only subscriber, to avoid duplicates). This page just listens for
+         the 'friendship-updated-remote' window event it relays, then refreshes its data. --}}
     @script
         <script>
             const onRemote = () => $wire.dispatch('friendship-updated');
             window.addEventListener('friendship-updated-remote', onRemote);
 
-            // Lepas listener saat komponen dibongkar (hindari penumpukan lintas navigate).
+            // Detach the listener when the component tears down (avoid buildup across navigations).
             document.addEventListener('livewire:navigating', () => {
                 window.removeEventListener('friendship-updated-remote', onRemote);
             }, { once: true });

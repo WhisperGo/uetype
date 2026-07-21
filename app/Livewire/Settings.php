@@ -24,6 +24,7 @@ class Settings extends Component
         $this->username = Auth::user()->username;
     }
 
+    /** Validate and persist a new username (unique, alpha_dash, 3-20 chars). */
     public function saveUsername(): void
     {
         $user = Auth::user();
@@ -47,6 +48,7 @@ class Settings extends Component
         $this->dispatch('username-saved');
     }
 
+    /** Set the UI locale (session + user preference) and reload to apply it. */
     public function setLocale(string $locale): void
     {
         if (! Locale::isSupported($locale)) {
@@ -59,6 +61,7 @@ class Settings extends Component
         $this->redirect(route('settings'), navigate: false);
     }
 
+    /** Permanently delete the account after the user retypes their username to confirm. */
     public function deleteAccount(): void
     {
         $user = Auth::user();

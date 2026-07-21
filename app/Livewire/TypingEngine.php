@@ -28,14 +28,14 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class TypingEngine extends Component
 {
-    // Mode Utama: 'time', 'words', 'survival'
+    // Main mode: 'time', 'words', 'survival'
     public $mainMode = 'time';
 
-    // Sub Mode (Pilihan angka/panjang)
+    // Sub-mode (number/length choice)
     public $subMode = '30';
 
-    // Whitelist sub-mode sah per mode utama; gerbang server-side karena mainMode/subMode
-    // dikendalikan client dan mode_config masuk kunci filter leaderboard.
+    // Whitelist of valid sub-modes per main mode; a server-side gate because
+    // mainMode/subMode are client-controlled and mode_config is a leaderboard filter key.
     private const ALLOWED_SUBMODES = [
         'time' => ['15', '30', '60', '120'],
         'words' => ['10', '25', '50', '100'],
@@ -44,30 +44,31 @@ class TypingEngine extends Component
 
     public $textToType;
 
-    // Teks "Retry" (mode words) untuk request ini saja: di-pull dari session di mount(),
-    // dipakai generateText() menggantikan perakitan acak. Properti privat (bukan public
-    // Livewire) supaya tak dipersistensi antar-request -- retry berikutnya via restart()
-    // tetap menghasilkan teks acak, tak lengket.
+    // "Retry" text (words mode) for this request only: pulled from session in mount(),
+    // used by generateText() instead of random assembly. A private property (not public
+    // Livewire) so it isn't persisted across requests -- the next restart() still yields
+    // random text, not sticky.
     private ?string $retryText = null;
 
     public string $contentLang = TypingLanguage::DEFAULT;
 
     public int $typingSessionKey = 0;
 
-    // Penanda ghost aktif; sumber kebenaran server. Ghost hanya sah untuk time/words -
-    // pindah ke survival memaksa false (invariant, bukan sekadar event klien).
+    // Active-ghost flag; server is the source of truth. Ghost is valid only for
+    // time/words -- switching to survival forces false (an invariant, not just a client event).
     public bool $ghostActive = false;
 
-    // Clan War: id ClanWarModeClaim yang dikerjakan (dari ?war_claim=). Kalau valid, mode
-    // dikunci ke mode/config klaim & hasil ketik otomatis jadi war attempt. Null = sesi solo.
+    // Clan War: id of the ClanWarModeClaim being worked (from ?war_claim=). If valid, the
+    // mode is locked to the claim's mode/config and the typing result becomes a war attempt
+    // automatically. Null = solo session.
     #[Url(as: 'war_claim')]
     public ?int $warClaimId = null;
 
-    // Detail mode klaim war (mode+config) untuk banner view. Null kalau tidak war-lock.
+    // War claim mode detail (mode+config) for the view banner. Null when not war-locked.
     public ?array $warLock = null;
 
-    // Ghost deep-link dari leaderboard: ?ghost=<user_id>&mode=<time|words>&config=<sub>.
-    // WPM lawan diturunkan ulang dari DB (bukan dari client), sejalan dgn GhostPicker.
+    // Ghost deep-link from the leaderboard: ?ghost=<user_id>&mode=<time|words>&config=<sub>.
+    // The opponent's WPM is re-derived from the DB (not from the client), same as GhostPicker.
     #[Url(as: 'ghost')]
     public ?int $ghostUserId = null;
 
@@ -79,8 +80,8 @@ class TypingEngine extends Component
 
     public function mount()
     {
-        // War-lock dicek dulu: valid -> mode dipaksa ke klaim; tak valid -> reset ke
-        // null dan berperilaku sesi solo biasa (fail-safe).
+        // War-lock is checked first: valid -> mode is forced to the claim; invalid ->
+        // reset to null and behave as a normal solo session (fail-safe).
         $claim = $this->resolveWarClaim();
 
         if ($claim) {
@@ -89,31 +90,31 @@ class TypingEngine extends Component
         } else {
             $this->warClaimId = null;
 
-            // Pulihkan preferensi sebelumnya jika ada (hanya untuk sesi solo biasa).
-            // Lewat normalizeMode supaya nilai liar / survival-untuk-guest ikut ditolak.
+            // Restore previous preferences if any (normal solo session only). Through
+            // normalizeMode so wild values / survival-for-guest are rejected too.
             if (session()->has('typing_preferences')) {
                 $prefs = session('typing_preferences');
                 [$this->mainMode, $this->subMode] = $this->normalizeMode($prefs['mode'] ?? 'time', $prefs['subMode'] ?? '30');
             }
         }
 
-        // Bahasa konten dipulihkan terpisah: war hanya mengunci mode/config, bukan bahasa.
+        // Content language is restored separately: war only locks mode/config, not language.
         if (session()->has('typing_preferences')) {
             $this->contentLang = TypingLanguage::resolve(session('typing_preferences')['contentLang'] ?? null);
         }
 
-        // Ghost diproses setelah war-lock supaya war tetap menang; hanya berlaku untuk
-        // sesi solo & mode time/words. Deep-link (?ghost=) dicerna jadi pilihan tersimpan
-        // lebih dulu, lalu applyGhostRestore memulihkan pilihan itu (atau yang sudah ada
-        // di session dari tes sebelumnya -- inilah yang membuat ghost bertahan lintas tes).
+        // Ghost is processed after war-lock so war still wins; it applies only to solo
+        // sessions and time/words. The deep-link (?ghost=) is first digested into a stored
+        // selection, then applyGhostRestore restores that selection (or the one already in
+        // session from a previous test -- this is what makes ghost persist across tests).
         if (! $this->warLock) {
             $this->ingestGhostDeepLink();
             $this->applyGhostRestore();
         }
 
-        // Retry (mode words): pull sekali pakai. Hanya jalur solo -- war-lock menang,
-        // sama seperti ghost deep-link. Mode/config diikutkan supaya "ulang yang tadi"
-        // benar-benar sama, bukan preferensi terakhir.
+        // Retry (words mode): a one-shot pull. Solo path only -- war-lock wins, same as
+        // the ghost deep-link. Mode/config come along so "redo that one" is genuinely the
+        // same, not the last preference.
         if (! $this->warLock) {
             $this->applyRetryFromSession();
         }
@@ -122,8 +123,8 @@ class TypingEngine extends Component
     }
 
     /**
-     * Pasang teks retry dari session (sekali pakai) bila valid: mode words + teks ada.
-     * generateText() lalu memakai $retryText ketimbang merakit teks acak baru.
+     * Install the retry text from session (one-shot) if valid: words mode + text present.
+     * generateText() then uses $retryText instead of assembling new random text.
      */
     private function applyRetryFromSession(): void
     {
@@ -139,10 +140,10 @@ class TypingEngine extends Component
     }
 
     /**
-     * Cerna deep-link ?ghost=&mode=&config= (dari baris leaderboard) menjadi PILIHAN
-     * ghost tersimpan di session -- supaya ikut sticky seperti pilihan dari picker.
-     * Mengunci mode/config ke milik ghost. Hanya time/words; param liar / lawan tanpa
-     * rekor diabaikan (fail-safe). Dispatch-nya diserahkan ke applyGhostRestore().
+     * Digest the deep-link ?ghost=&mode=&config= (from a leaderboard row) into a stored
+     * ghost SELECTION in session -- so it becomes sticky like a picker selection. Locks
+     * mode/config to the ghost's. time/words only; wild params / opponent without a
+     * record are ignored (fail-safe). Dispatch is left to applyGhostRestore().
      */
     private function ingestGhostDeepLink(): void
     {
@@ -155,7 +156,7 @@ class TypingEngine extends Component
 
         [$main, $sub] = $this->normalizeMode($this->ghostMode, $this->ghostConfig);
 
-        // Validasi lawan benar-benar punya rekor di mode/config itu sebelum menyimpan.
+        // Validate the opponent actually has a record in that mode/config before storing.
         $ghost = app(GhostResolver::class)->resolve('leaderboard', $this->ghostUserId, $main, $sub, Auth::id());
 
         if ($ghost === null) {
@@ -173,18 +174,18 @@ class TypingEngine extends Component
     }
 
     /**
-     * Pulihkan ghost dari pilihan tersimpan di session untuk mode/config SAAT INI.
-     * Ini yang membuat ghost bertahan lintas Next Test / refresh: pilihan tetap di
-     * session, dan tiap mount/pindah-mode ke time-words kita turunkan ULANG WPM dari
-     * DB (bukan angka beku) lalu tampilkan.
+     * Restore the ghost from the stored session selection for the CURRENT mode/config.
+     * This is what makes ghost persist across Next Test / refresh: the selection stays in
+     * session, and on each mount/mode-switch to time-words we RE-derive WPM from the DB
+     * (not a frozen number) and display it.
      *
-     * Mode non-eligible (survival) -> ghost cuma DISEMBUNYIKAN (ghostActive false),
-     * pilihan di session TIDAK dihapus -> otomatis muncul lagi saat balik ke time/words.
+     * Non-eligible mode (survival) -> ghost is merely HIDDEN (ghostActive false), the
+     * session selection is NOT removed -> it reappears automatically on return to time/words.
      */
     private function applyGhostRestore(): void
     {
-        // Ghost dikunci untuk guest: leaderboard ditutup untuk tamu, jadi ghost tak
-        // boleh bocor lewat pintu ini -- bahkan bila ghost_selection dipalsukan.
+        // Ghost is locked for guests: the leaderboard is closed to guests, so ghost must
+        // not leak through this door -- even if ghost_selection were forged.
         if (! Auth::check()) {
             $this->ghostActive = false;
 
@@ -210,7 +211,7 @@ class TypingEngine extends Component
             Auth::id(),
         );
 
-        // Lawan tak lagi punya rekor di config ini -> sembunyikan (pilihan tetap disimpan).
+        // Opponent no longer has a record in this config -> hide (selection kept).
         if ($ghost === null) {
             $this->ghostActive = false;
 
@@ -222,9 +223,9 @@ class TypingEngine extends Component
     }
 
     /**
-     * Clear eksplisit (tombol "Clear" di arena): buang pilihan dari session supaya
-     * ghost TIDAK muncul lagi di tes berikutnya. Beda dari suspend saat survival, yang
-     * cuma menyembunyikan tanpa menghapus.
+     * Explicit clear (arena "Clear" button): drop the session selection so the ghost
+     * does NOT reappear on the next test. Different from the survival suspend, which
+     * only hides without deleting.
      */
     public function clearGhost(): void
     {
@@ -233,28 +234,28 @@ class TypingEngine extends Component
         $this->dispatch('ghost-cleared');
     }
 
-    /** Ghost Mode hanya sah untuk time & words (survival dikecualikan). */
+    /** Ghost Mode is valid only for time & words (survival excluded). */
     private function isGhostEligibleMode(): bool
     {
         return in_array($this->mainMode, ['time', 'words'], true);
     }
 
-    /** Sinkronkan state ghost server saat klien memilih/melepas ghost. */
+    /** Sync the server ghost state when the client selects/deselects a ghost. */
     #[On('ghost-selected')]
     public function onGhostSelected(): void
     {
         $this->ghostActive = $this->isGhostEligibleMode();
     }
 
-    // Sembunyikan kursor ghost (suspend saat survival ATAU clear eksplisit). SENGAJA
-    // tidak menyentuh session: penghapusan pilihan hanya lewat clearGhost()/clearOpponent().
+    // Hide the ghost cursor (suspend on survival OR explicit clear). DELIBERATELY does not
+    // touch session: the selection is only removed via clearGhost()/clearOpponent().
     #[On('ghost-cleared')]
     public function onGhostCleared(): void
     {
         $this->ghostActive = false;
     }
 
-    /** Kosongkan param ghost dari URL/state setelah diproses. */
+    /** Clear the ghost params from URL/state after processing. */
     private function clearGhostDeepLinkParams(): void
     {
         $this->ghostUserId = null;
@@ -263,8 +264,8 @@ class TypingEngine extends Component
     }
 
     /**
-     * Ambil & validasi ClanWarModeClaim dari $warClaimId: harus milik clan aktif user,
-     * war Ongoing, belum disubmit. Null kalau tak valid (tak melempar error, diabaikan saja).
+     * Fetch & validate the ClanWarModeClaim from $warClaimId: must belong to the user's
+     * active clan, war Ongoing, not yet submitted. Null if invalid (throws nothing, just ignored).
      */
     private function resolveWarClaim(): ?ClanWarModeClaim
     {
@@ -282,7 +283,7 @@ class TypingEngine extends Component
             return null;
         }
 
-        // Klaim harus milik clan aktif user ini.
+        // The claim must belong to this user's active clan.
         $myClan = Auth::user()->clan;
         if (! $myClan || $myClan->id !== $claim->clan_id) {
             return null;
@@ -292,9 +293,9 @@ class TypingEngine extends Component
     }
 
     /**
-     * Tautkan hasil ketik ke klaim war (re-validasi ulang, tak percaya $warClaimId dari
-     * client). Update bersyarat `whereNull('typing_result_id')` mencegah dua submit
-     * paralel mengisi klaim yang sama. Dipanggil dari dalam DB::transaction saveResult().
+     * Link the typing result to the war claim (re-validated, never trusting the client's
+     * $warClaimId). The conditional update `whereNull('typing_result_id')` prevents two
+     * parallel submits from filling the same claim. Called inside saveResult()'s DB::transaction.
      */
     private function attachToWarClaim(TypingResult $typingResult): void
     {
@@ -306,7 +307,7 @@ class TypingEngine extends Component
 
         $points = ClanWarScorer::score($claim->mode, $claim->mode_config, $typingResult);
 
-        // Update bersyarat: hanya isi kalau belum tersubmit (idempoten, race-safe).
+        // Conditional update: only fill if not yet submitted (idempotent, race-safe).
         ClanWarModeClaim::where('id', $claim->id)
             ->whereNull('typing_result_id')
             ->update([
@@ -316,16 +317,16 @@ class TypingEngine extends Component
             ]);
     }
 
-    // Validasi mode+sub-mode terhadap whitelist, fallback ke default aman jika liar.
-    // Satu sumber kebenaran dipakai setMode & saveResult supaya nilai client tak lolos ke DB.
+    // Validate mode+sub-mode against the whitelist, falling back to a safe default if wild.
+    // One source of truth used by setMode & saveResult so client values never reach the DB.
     private function normalizeMode($main, $sub): array
     {
         if (! array_key_exists($main, self::ALLOWED_SUBMODES)) {
             return ['time', '30'];
         }
 
-        // Survival dikunci untuk guest (butuh login): normalisasi ke Standard default.
-        // Choke point tunggal -> setMode & restore preferensi sama-sama tertutup.
+        // Survival is locked for guests (login required): normalize to the Standard default.
+        // A single choke point -> setMode & preference restore are both closed off.
         if ($main === 'survival' && ! Auth::check()) {
             return ['time', '30'];
         }
@@ -334,16 +335,16 @@ class TypingEngine extends Component
 
         $sub = (string) $sub;
         if (! in_array($sub, $allowed, true)) {
-            $sub = $allowed[0]; // default aman pertama
+            $sub = $allowed[0]; // first safe default
         }
 
         return [$main, $sub];
     }
 
-    // Ganti mode dan ambil teks baru
+    // Change mode and fetch new text.
     public function setMode($main, $sub)
     {
-        // War-lock: mode tak boleh diganti saat mengerjakan war attempt (gerbang server-side).
+        // War-lock: mode can't be changed while working a war attempt (server-side gate).
         if ($this->warClaimId !== null && $this->resolveWarClaim()) {
             return;
         }
@@ -353,7 +354,7 @@ class TypingEngine extends Component
         $this->mainMode = $main;
         $this->subMode = $sub ?? 'medium';
 
-        // Simpan preferensi pengguna ke session agar tidak reset
+        // Save the user's preferences to session so they don't reset.
         session()->put('typing_preferences', [
             'mode' => $main,
             'subMode' => $sub,
@@ -364,12 +365,12 @@ class TypingEngine extends Component
         $this->generateText();
 
         if (! $this->isGhostEligibleMode()) {
-            // Survival: sembunyikan kursor ghost (suspend). Pilihan di session SENGAJA
-            // tak dihapus -> otomatis pulih saat balik ke time/words.
+            // Survival: hide the ghost cursor (suspend). The session selection is
+            // DELIBERATELY not removed -> it restores automatically on return to time/words.
             $this->ghostActive = false;
             $this->dispatch('ghost-cleared');
         } else {
-            // time/words: pulihkan ghost tersimpan, di-derive ulang utk mode/config baru.
+            // time/words: restore the stored ghost, re-derived for the new mode/config.
             $this->applyGhostRestore();
         }
 
@@ -381,14 +382,14 @@ class TypingEngine extends Component
         );
     }
 
-    // Ganti bahasa konten yang diketik, terpisah dari bahasa UI.
+    // Change the typed content language, separate from the UI language.
     public function setContentLang($lang)
     {
-        // War-lock: teks tak boleh di-reroll saat war attempt. restart() sudah menutup
-        // jalur "refresh sampai dapat kata pendek", tapi generateText() juga terpanggil
-        // dari sini -- tanpa gerbang ini pemain tinggal bolak-balik ganti bahasa untuk
-        // mengacak ulang teksnya, celah yang sama persis lewat pintu lain. Sekali klaim,
-        // satu teks, satu kesempatan.
+        // War-lock: text can't be rerolled during a war attempt. restart() already closes
+        // the "refresh until you get short words" path, but generateText() is also called
+        // here -- without this gate a player could just flip languages back and forth to
+        // re-randomize the text, the same loophole through another door. One claim, one
+        // text, one chance.
         if ($this->warClaimId !== null && $this->resolveWarClaim()) {
             return;
         }
@@ -404,8 +405,8 @@ class TypingEngine extends Component
 
         $this->generateText();
 
-        // Teks baru dirakit -> posisi kursor ghost ikut reset; pulihkan ghost tersimpan
-        // supaya tetap tampil (self-guard: no-op kalau mode survival / tak ada pilihan).
+        // New text assembled -> the ghost cursor position resets too; restore the stored
+        // ghost so it stays visible (self-guard: no-op on survival / no selection).
         $this->applyGhostRestore();
 
         $this->dispatch(
@@ -416,10 +417,11 @@ class TypingEngine extends Component
         );
     }
 
+    /** Reroll the text for the current mode (blocked under war-lock). */
     public function restart()
     {
-        // War-lock: teks tak boleh di-reroll saat war attempt (menutup celah "refresh
-        // sampai dapat kata pendek"); gerbang server-side, sekali klaim satu kesempatan.
+        // War-lock: text can't be rerolled during a war attempt (closes the "refresh until
+        // you get short words" loophole); server-side gate, one claim one chance.
         if ($this->warClaimId !== null && $this->resolveWarClaim()) {
             return;
         }
@@ -434,13 +436,14 @@ class TypingEngine extends Component
         );
     }
 
+    /** Produce the text for the current session (retry text, fixed war text, or random). */
     public function generateText()
     {
         $this->typingSessionKey++;
 
-        // Retry (mode words): pakai teks sesi sebelumnya yang identik, bukan dirakit acak.
-        // Hanya di-set di mount() untuk jalur solo (war-lock menang), dan hanya sekali --
-        // restart()/setMode() memanggil generateText() dengan $retryText sudah null lagi.
+        // Retry (words mode): use the identical previous-session text, not random assembly.
+        // Only set in mount() for the solo path (war-lock wins), and only once --
+        // restart()/setMode() call generateText() with $retryText already null again.
         if ($this->retryText !== null) {
             $this->textToType = $this->retryText;
             $this->retryText = null;
@@ -448,14 +451,13 @@ class TypingEngine extends Component
             return;
         }
 
-        // Clan War mode Words pakai teks TETAP (identik untuk semua pemain di config yang
-        // sama) demi keadilan, bukan dirakit acak. Time/Survival war cukup restart-nya
-        // yang diblokir.
+        // Clan War Words mode uses FIXED text (identical for all players on the same config)
+        // for fairness, not random assembly. Time/Survival war just have restart blocked.
         if ($this->warClaimId !== null && $this->resolveWarClaim()) {
             if ($this->mainMode === 'words') {
                 $fixed = ClanWarFixedText::forWords($this->subMode);
 
-                // Fallback ke generate biasa kalau baris tetap tak ada (layar tak pernah kosong).
+                // Fall back to normal generation if no fixed row exists (screen is never blank).
                 if ($fixed !== null) {
                     $this->textToType = $fixed;
 
@@ -464,11 +466,16 @@ class TypingEngine extends Component
             }
         }
 
-        // Time/words/survival: teks dirakit acak dari wordlist sesuai bahasa konten.
+        // Time/words/survival: text assembled randomly from the wordlist per content language.
         $this->textToType = app(TextGeneratorService::class)
             ->forSoloMode($this->mainMode, (string) $this->subMode, $this->contentLang);
     }
 
+    /**
+     * Receive a finished solo session from the client, recompute its metrics server-side
+     * (anti-cheat), persist the result, update personal bests, XP and achievements, then
+     * redirect to the result page. Client-supplied WPM/accuracy is never trusted.
+     */
     public function saveResult(
         $durationMs,
         $totalKeystrokes,
@@ -482,25 +489,25 @@ class TypingEngine extends Component
         $ghostCharsAtFinish = null,
         $errorEvents = []
     ) {
-        // Gerbang mode: normalkan terhadap whitelist sebelum dipakai untuk score/mode_config,
-        // supaya difficulty/sub-mode liar tak masuk DB & mencemari filter leaderboard.
+        // Mode gate: normalize against the whitelist before it's used for score/mode_config,
+        // so a wild difficulty/sub-mode can't reach the DB and pollute leaderboard filters.
         [$this->mainMode, $this->subMode] = $this->normalizeMode($this->mainMode, $this->subMode);
 
-        // WPM/akurasi dari client TIDAK diterima — server selalu hitung ulang sendiri (anti-cheat).
+        // Client WPM/accuracy is NOT accepted -- the server always recomputes it (anti-cheat).
         $totalKeystrokes = (int) $totalKeystrokes;
         $correctKeystrokes = (int) $correctKeystrokes;
         $incorrectKeystrokes = max(0, $totalKeystrokes - $correctKeystrokes);
 
-        // Survival: metrik leaderboard = duration_seconds, bukan score. Kolom score jadi
-        // stat sampingan (karakter benar selama bertahan); mode lain tak pakai kolom score.
+        // Survival: the leaderboard metric is duration_seconds, not score. The score column
+        // becomes a side stat (correct chars while surviving); other modes don't use it.
         $score = $this->mainMode === 'survival' ? $correctKeystrokes : null;
 
-        // Durasi dari client dalam milidetik; simpan dalam detik (boleh pecahan) agar WPM
-        // server == WPM yang dilihat user saat mengetik.
+        // Client duration is in milliseconds; store in seconds (fractional allowed) so the
+        // server WPM == the WPM the user saw while typing.
         $duration = max(0.0, (float) $durationMs / 1000);
 
-        // Server hitung ulang WPM/akurasi dari karakter & durasi (bukan percaya client);
-        // sesi yang tak masuk akal ditolak, bukan disimpan.
+        // Server recomputes WPM/accuracy from chars & duration (not trusting the client);
+        // implausible sessions are rejected, not saved.
         $antiCheat = app(AntiCheatService::class);
 
         $check = $antiCheat->check(
@@ -509,19 +516,19 @@ class TypingEngine extends Component
             $duration,
         );
 
-        // Angka final selalu pakai hasil hitung ulang server (sumber kebenaran).
+        // Final numbers always use the server recomputation (source of truth).
         $finalNetWpm = $check['net_wpm'];
         $finalRawWpm = $check['raw_wpm'];
         $finalAccuracy = $check['accuracy'];
 
-        // Tolak hanya yang MEMANG layak ditolak (curang / sesi kosong / ngulur waktu di
-        // survival). Dulu gerbangnya `! $check['valid']`, yang ikut membuang hasil
-        // PENGETIK LAMBAT sungguhan -- throughput rendah itu lambat, bukan curang, dan
-        // di time/words durasi tak bisa dipompa untuk keuntungan apa pun.
+        // Reject only what genuinely deserves it (cheating / empty session / stalling in
+        // survival). The gate used to be `! $check['valid']`, which also threw away real
+        // SLOW-TYPER results -- low throughput is slow, not cheating, and in time/words the
+        // duration can't be pumped for any advantage.
         if ($antiCheat->rejectsSoloResult($check['reasons'], $this->mainMode)) {
             session()->flash('result_rejected', __('typing.result_rejected'));
 
-            // Full-load (lihat catatan di redirect result): hindari SPA-restore yang merusak.
+            // Full-load (see note at the result redirect): avoid the broken SPA restore.
             return $this->redirect(route('typing'));
         }
 
@@ -537,7 +544,7 @@ class TypingEngine extends Component
         if (Auth::check()) {
             $user = Auth::user();
 
-            // Ditangkap sebelum transaction menimpa highest_wpm. Survival dikecualikan dari rekor WPM.
+            // Captured before the transaction overwrites highest_wpm. Survival is excluded from the WPM record.
             $previousBest = (float) $user->highest_wpm;
             $isPersonalBest = $this->mainMode !== 'survival' && $finalNetWpm > $previousBest;
 
@@ -556,16 +563,17 @@ class TypingEngine extends Component
                 $correctKeystrokes, $incorrectKeystrokes, $score
 
             ) {
-                // EXP berbasis volume + bonus akurasi. Rumus dipusatkan di User::addExp()
-                // -> satu sumber kebenaran dengan mode multiplayer; juga akumulasi total_xp & save.
+                // XP based on volume + accuracy bonus. The formula is centralized in
+                // User::addExp() -> one source of truth with multiplayer; it also accumulates
+                // total_xp & saves.
                 $xpEarned = $user->addExp($correctKeystrokes, $finalAccuracy);
 
                 $typingResult = TypingResult::create([
                     'user_id' => $user->id,
                     'mode' => $this->mainMode, // 'time' | 'words' | 'survival'
-                    // survival: difficulty ('easy'|'medium'|'hard', kunci filter leaderboard).
+                    // survival: difficulty ('easy'|'medium'|'hard', a leaderboard filter key).
                     'mode_config' => (string) $this->subMode,
-                    // Bahasa teks yang diketik (en|id) -- sudah dinormalisasi via TypingLanguage::resolve().
+                    // Language of the typed text (en|id) -- already normalized via TypingLanguage::resolve().
                     'language' => $this->contentLang,
                     'net_wpm' => $finalNetWpm,
                     'raw_wpm' => $finalRawWpm,
@@ -573,37 +581,37 @@ class TypingEngine extends Component
                     'correct_chars' => $correctKeystrokes,
                     'incorrect_chars' => $incorrectKeystrokes,
                     'duration_seconds' => $duration,
-                    'score' => $score, // jumlah kata bersih (survival), null untuk mode lain
+                    'score' => $score, // net word count (survival), null for other modes
                     'xp_earned' => $xpEarned,
-                    'ghost_data' => null, // diisi selektif oleh ghost mode nanti
+                    'ghost_data' => null, // filled selectively by ghost mode later
                 ]);
 
-                // Tautkan ke klaim war jika sesi ini mengerjakannya (fail-safe: attempt solo
-                // tetap tersimpan normal apa pun hasilnya).
+                // Link to the war claim if this session works one (fail-safe: a solo attempt
+                // is still saved normally whatever the outcome).
                 $this->attachToWarClaim($typingResult);
 
-                // Rekor WPM hanya dari mode terukur time/words; survival dikecualikan
-                // (dicapai di bawah tekanan stamina, bukan apple-to-apple, cuma stat sampingan).
+                // WPM record only from the measured time/words modes; survival is excluded
+                // (achieved under stamina pressure, not apples-to-apples, just a side stat).
                 if ($this->mainMode !== 'survival' && $finalNetWpm > (float) $user->highest_wpm) {
                     $user->highest_wpm = $finalNetWpm;
                     $user->save();
                 }
             });
 
-            // Snapshot setelah XP masuk: level & progres untuk ditampilkan di halaman result.
+            // Snapshot after XP is applied: level & progress for the result page.
             $user = $user->fresh();
             $levelData = $user->levelData();
 
-            // Catat achievement DI SINI -- di titik prestasinya benar-benar terjadi.
-            // Dulu pencatatan menumpang render halaman Stats/Achievements, jadi pemain
-            // yang tak pernah membukanya tak pernah tercatat, dan halaman GET jadi
-            // punya efek samping tulis.
+            // Record achievements HERE -- at the point the accomplishment actually happens.
+            // Recording used to piggyback on rendering the Stats/Achievements page, so a
+            // player who never opened it was never recorded, and a GET page ended up with
+            // a write side effect.
             app(AchievementService::class)->syncUnlocks($user);
         }
 
-        // Ghost Mode: perbandingan ghost-vs-player efemeral (session-only), tidak ditulis
-        // ke DB — attempt yang mendasari tetap tersimpan normal seperti mode biasa.
-        // Gerbang server-side: ghost HANYA sah untuk time/words, apa pun yang dikirim klien.
+        // Ghost Mode: an ephemeral ghost-vs-player comparison (session-only), not written to
+        // the DB -- the underlying attempt is still saved normally like any mode.
+        // Server-side gate: ghost is ONLY valid for time/words, whatever the client sends.
         $ghostResult = null;
         if ($this->isGhostEligibleMode() && $ghostWpm !== null && (float) $ghostWpm > 0) {
             $ghostCharsAtFinish = (int) $ghostCharsAtFinish;
@@ -615,11 +623,11 @@ class TypingEngine extends Component
             ];
         }
 
-        // Stream error per-karakter: tier PRESENTASI (session-only, tak pernah menyentuh
-        // skor/XP/PB/leaderboard — jadi tak ada urusan dengan AntiCheatService). Tetap
-        // disanitasi seperti ghost: bentuk divalidasi, nilai di-cast, panjang di-cap.
-        // Beda dari missedChars yang mentah tapi aman karena cuma dibaca lewat lookup
-        // kunci yang sudah diketahui — di sini `actual` benar-benar DIRENDER.
+        // Per-character error stream: a PRESENTATION tier (session-only, never touches
+        // score/XP/PB/leaderboard -- so no business with AntiCheatService). Still sanitized
+        // like ghost: shape validated, values cast, length capped. Unlike missedChars,
+        // which is raw but safe because it's only read via known-key lookups -- here
+        // `actual` is genuinely RENDERED.
         $errorEvents = TypingErrorInspector::sanitize($errorEvents);
 
         session()->put('typing_result', [
@@ -629,10 +637,10 @@ class TypingEngine extends Component
             'time' => $duration,
             'mode' => $this->mainMode,
             'subMode' => $this->subMode,
-            // Teks sesi ini disimpan agar result page bisa menawarkan "Retry" -- mengulang
-            // rangkaian kata yang sama persis (hanya bermakna untuk mode words).
+            // This session's text is saved so the result page can offer "Retry" -- replaying
+            // the exact same word sequence (only meaningful for words mode).
             'textToType' => $this->textToType,
-            'score' => $score, // survival: karakter benar (stat sampingan); null untuk mode lain
+            'score' => $score, // survival: correct chars (side stat); null for other modes
             'totalKeystrokes' => $totalKeystrokes,
             'correctKeystrokes' => $correctKeystrokes,
             'incorrectKeystrokes' => $incorrectKeystrokes,
@@ -648,20 +656,20 @@ class TypingEngine extends Component
             'survivalPreviousBest' => $survivalPreviousBest !== null ? (float) $survivalPreviousBest : null,
             'isSurvivalPersonalBest' => $isSurvivalPersonalBest,
             'ghostResult' => $ghostResult,
-            // Ringkas by design: cuma indeks. Halaman hasil merekonstruksi kata dari
-            // textToType (sudah ada di atas) ketimbang kita menyimpan string dua kali.
+            // Compact by design: indices only. The result page reconstructs words from
+            // textToType (already above) rather than us storing the string twice.
             'errorEvents' => $errorEvents,
         ]);
         session()->save();
 
-        // Muat-halaman-penuh (TANPA navigate:true): keluar /typing via SPA membuat tombol
-        // Back me-restore snapshot mesin ketik -> @entangle undefined & $wire basi (tak bisa
-        // ketik / stats kosong / finish menggantung). Full-load bikin Back memuat ulang bersih.
+        // Full page load (WITHOUT navigate:true): leaving /typing via SPA makes the Back
+        // button restore the typing-engine snapshot -> @entangle undefined & stale $wire
+        // (can't type / empty stats / finish hangs). A full load makes Back reload cleanly.
         $this->redirect(route('typing.result'));
     }
 
-    // Consistency: seberapa stabil WPM sepanjang sesi (dari wpmHistory per-detik). 100% =
-    // kecepatan rata sempurna. Presentasi saja, bukan anti-cheat. Butuh min 2 sampel & mean > 0.
+    // Consistency: how steady WPM was across the session (from per-second wpmHistory).
+    // 100% = perfectly even speed. Presentation only, not anti-cheat. Needs >= 2 samples & mean > 0.
     private function computeConsistency(array $history): ?int
     {
         $values = array_values(array_filter($history, fn ($v) => is_numeric($v)));

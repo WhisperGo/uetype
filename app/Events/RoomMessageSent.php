@@ -9,10 +9,10 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Pesan obrolan di dalam room multiplayer. Sengaja broadcast-only (tidak disimpan
- * ke database): obrolan lobby bersifat sesaat dan ikut hilang saat room bubar, jadi
- * tak perlu tabel/migrasi. Numpang channel 'room.{code}' yang SUDAH di-subscribe
- * race-echo.js, jadi tak ada channel baru — frontend cukup menambah satu listener.
+ * A chat message inside a multiplayer room. Intentionally broadcast-only (never
+ * persisted): lobby chat is ephemeral and disappears when the room dissolves, so no
+ * table or migration is needed. Reuses the 'room.{code}' channel that race-echo.js
+ * already subscribes to, so there is no new channel — the frontend only adds one listener.
  */
 class RoomMessageSent implements ShouldBroadcastNow
 {

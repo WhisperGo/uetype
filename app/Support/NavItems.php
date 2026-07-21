@@ -3,22 +3,21 @@
 namespace App\Support;
 
 /**
- * Satu-satunya daftar tujuan navigasi.
+ * The single source of truth for navigation destinations.
  *
- * Sebelumnya tiap menu ditulis dua kali di navigation.blade.php -- sekali untuk
- * desktop, sekali untuk mobile -- lengkap dengan ekspresi `:active` yang harus
- * disinkronkan manual. Duplikasinya sudah menyimpang: leaderboard memakai
- * `route('leaderboard')` di desktop tapi `url('/leaderboard')` di mobile, dan
- * menu akun di dropdown desktop kehilangan state aktifnya sama sekali.
+ * Previously each menu item was written twice in navigation.blade.php -- once for
+ * desktop, once for mobile -- each with its own `:active` expression that had to be
+ * kept in sync by hand. The duplicates had already drifted: leaderboard used
+ * `route('leaderboard')` on desktop but `url('/leaderboard')` on mobile, and the
+ * account menu in the desktop dropdown lost its active state entirely.
  *
- * Label dibiarkan sebagai KUNCI terjemahan, bukan string jadi: kelas ini bisa
- * dipanggil sebelum locale ter-resolve, dan view yang memutuskan kapan __()
- * dijalankan.
+ * Labels are kept as translation KEYS, not resolved strings: this class can be
+ * called before the locale is resolved, and the view decides when __() runs.
  */
 class NavItems
 {
     /**
-     * Menu utama (bilah kiri desktop / blok atas mobile).
+     * Main menu (desktop left rail / mobile top block).
      *
      * @return list<array{key:string, label:string, href:string, active:bool, auth:bool}>
      */
@@ -43,7 +42,7 @@ class NavItems
                 'key' => 'klan',
                 'label' => 'nav.klan',
                 'href' => route('clans.index'),
-                // Clan war dianggap bagian dari Klan, jadi menunya tetap menyala.
+                // Clan war counts as part of Clan, so the menu item stays highlighted.
                 'active' => request()->routeIs('clans.index', 'clan-war.index'),
                 'auth' => true,
             ],
@@ -58,7 +57,7 @@ class NavItems
     }
 
     /**
-     * Menu akun (dropdown desktop / blok bawah mobile).
+     * Account menu (desktop dropdown / mobile bottom block).
      *
      * @return list<array{key:string, label:string, href:string, active:bool}>
      */

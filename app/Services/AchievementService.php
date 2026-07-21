@@ -19,8 +19,8 @@ class AchievementService
     /**
      * Compute every metric the rules need in one cheap query pass.
      *
-     * Ketiga agregat ditarik dalam SATU query (dulu: satu query per angka, padahal
-     * tabel & filternya sama persis).
+     * All three aggregates are pulled in ONE query (previously one query per figure,
+     * over the exact same table and filter).
      *
      * @return array{highest_wpm:float, level:int, total_tests:int, total_chars:int, perfect_runs:int}
      */
@@ -46,14 +46,14 @@ class AchievementService
     /**
      * List all achievements with earned status + unlock date. READ-ONLY.
      *
-     * Dulu method ini juga MENULIS (UserAchievement::create) di tengah render halaman.
-     * Dua akibatnya: (1) request GET jadi punya efek samping tulis, dan Livewire
-     * me-render ulang tiap interaksi kecil, sehingga jalur tulis itu ikut dipanggil
-     * berkali-kali; (2) achievement baru "terbuka" saat halaman kebetulan dibuka --
-     * pemain yang tak pernah membuka /stats atau /achievements tak pernah tercatat.
+     * This method used to also WRITE (UserAchievement::create) mid page render.
+     * Two consequences: (1) a GET request gained a write side effect, and since
+     * Livewire re-renders on every small interaction, that write path ran many
+     * times; (2) new achievements "unlocked" only when the page happened to be
+     * opened -- players who never visited /stats or /achievements were never recorded.
      *
-     * Sekarang pencatatan dilakukan di titik prestasinya benar-benar terjadi, lewat
-     * syncUnlocks() (dipanggil setelah hasil ketik/balapan tersimpan).
+     * Recording now happens at the point the accomplishment actually occurs, via
+     * syncUnlocks() (called after a typing/race result is saved).
      *
      * @return array{
      *   items: array<int, array{key:string,title:string,description:string,category:string,icon_value:string,icon_unit:string,earned:bool,unlocked_at:?Carbon}>,
@@ -66,7 +66,7 @@ class AchievementService
         $stats = $this->computeStats($user);
         $definitions = AchievementDefinitions::all();
 
-        // Catatan unlock yang sudah ada, untuk tanggal "unlocked at".
+        // Existing unlock records, used for the "unlocked at" date.
         $existing = UserAchievement::where('user_id', $user->id)
             ->get()
             ->keyBy('achievement_key');
@@ -89,9 +89,9 @@ class AchievementService
                 'icon_value' => $def['icon_value'],
                 'icon_unit' => $def['icon_unit'],
                 'earned' => $earned,
-                // null kalau syarat terpenuhi tapi belum sempat tercatat (mis. dicapai
-                // sebelum perubahan ini). Tampilan tetap benar; syncUnlocks() akan
-                // mencatatnya pada sesi berikutnya.
+                // null if the condition is met but not yet recorded (e.g. achieved
+                // before this change). The display stays correct; syncUnlocks() will
+                // record it on the next session.
                 'unlocked_at' => $earned ? $existing->get($def['key'])?->unlocked_at : null,
             ];
         }
@@ -104,13 +104,13 @@ class AchievementService
     }
 
     /**
-     * Catat achievement yang BARU terpenuhi. Ini satu-satunya jalur tulis, dan
-     * dipanggil di titik prestasinya terjadi (sesudah hasil ketik/balapan tersimpan),
-     * bukan saat halaman dirender.
+     * Record NEWLY met achievements. This is the only write path, called at the
+     * point the accomplishment happens (after a typing/race result is saved), not
+     * during page render.
      *
-     * Idempoten: yang sudah tercatat dilewati, jadi aman dipanggil berkali-kali.
+     * Idempotent: already-recorded ones are skipped, so it is safe to call repeatedly.
      *
-     * @return array<int, string> kunci achievement yang baru terbuka
+     * @return array<int, string> keys of the newly unlocked achievements
      */
     public function syncUnlocks(User $user): array
     {

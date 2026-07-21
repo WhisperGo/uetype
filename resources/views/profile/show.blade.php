@@ -1,3 +1,4 @@
+{{-- User profile page: identity header, level progress, stat cards, and (own profile) a link to full stats. --}}
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center gap-3">
@@ -28,7 +29,7 @@
             <div class="relative p-6 overflow-hidden border bg-surface/70 border-white/10 rounded-3xl sm:p-8">
                 <div class="relative flex flex-col gap-6 sm:flex-row sm:items-center">
 
-                    <!-- Avatar Google / fallback inisial -->
+                    <!-- Google avatar / initial fallback -->
                     @if($user->avatar)
                         <img src="{{ $user->avatar }}"
                              alt="{{ $user->username }}"
@@ -51,7 +52,7 @@
                             <span class="px-2 py-0.5 rounded-md bg-brand/25 text-muted text-xs font-mono">{{ __('profile.level', ['level' => $stats['level']]) }}</span>
                         </div>
 
-                        {{-- Email hanya di profil sendiri (privat). --}}
+                        {{-- Email shown only on your own profile (private). --}}
                         @if(! $isPublic)
                             <p class="mt-1 font-mono text-sm text-muted">{{ $user->email }}</p>
                         @endif
@@ -69,7 +70,7 @@
                             </div>
                         </div>
 
-                        {{-- Aksi pertemanan hanya di profil publik user lain (real-time). --}}
+                        {{-- Friend actions only on another user's public profile (real-time). --}}
                         @if($isPublic)
                             <div class="mt-4">
                                 <livewire:friend-button :target="$user" :key="'friend-btn-'.$user->id" />
@@ -79,7 +80,7 @@
                 </div>
             </div>
 
-            <!-- ===== STATISTIK ===== -->
+            <!-- ===== STATISTICS ===== -->
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 @php
                     $cards = [
@@ -98,8 +99,8 @@
                 @endforeach
             </div>
 
-            {{-- Statistik lengkap (grafik, rekor per mode, aktivitas) ada di /stats;
-                 profil fokus identitas. Link hanya di profil sendiri. --}}
+            {{-- Full statistics (charts, per-mode records, activity) live at /stats;
+                 the profile focuses on identity. Link shown only on your own profile. --}}
             @if(! $isPublic)
                 <a href="{{ route('stats') }}" wire:navigate
                     class="flex items-center justify-between gap-4 p-5 border bg-surface/40 border-white/5 rounded-2xl transition-colors hover:border-brand/40 hover:bg-surface/60">

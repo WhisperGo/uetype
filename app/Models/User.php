@@ -45,16 +45,16 @@ class User extends Authenticatable
     }
 
     /**
-     * Base kurva level progresif (requirement Level/EXP bag. 2, Opsi B):
-     * EXP untuk naik dari level L ke L+1 = BASE × L.
-     * Jadi EXP kumulatif untuk MENCAPAI level N = BASE × (1+2+...+(N-1)) = BASE × N(N-1)/2.
-     * Angka ini boleh di-tuning; polanya (progresif) yang dikunci.
+     * Base of the progressive level curve (Level/EXP requirement part 2, Option B):
+     * EXP to go from level L to L+1 = BASE × L.
+     * So cumulative EXP to REACH level N = BASE × (1+2+...+(N-1)) = BASE × N(N-1)/2.
+     * This number can be tuned; it's the pattern (progressive) that's fixed.
      */
     public const LEVEL_BASE = 100;
 
     /**
-     * Total EXP kumulatif yang dibutuhkan untuk MENCAPAI level $level (level mulai dari 1).
-     * Level 1 = 0 EXP. Ini fungsi turunan murni dari total_xp — tidak ada level tersimpan.
+     * Cumulative EXP needed to REACH $level (levels start at 1). Level 1 = 0 EXP.
+     * A pure function of total_xp -- no level is stored.
      */
     public static function xpToReachLevel(int $level): int
     {
@@ -66,21 +66,21 @@ class User extends Authenticatable
     }
 
     /**
-     * Hitung level dari total EXP. total_xp adalah SATU-SATUNYA sumber kebenaran;
-     * level selalu diturunkan dari sini (requirement Level/EXP bag. 3).
+     * Compute level from total EXP. total_xp is the SINGLE source of truth;
+     * level is always derived from it (Level/EXP requirement part 3).
      */
     public static function levelForXp(int $xp): int
     {
-        // Bentuk tertutup membalik N(N-1)/2 × BASE ≤ xp → N = floor((1 + sqrt(1 + 8xp/BASE)) / 2).
+        // Closed form inverting N(N-1)/2 × BASE ≤ xp → N = floor((1 + sqrt(1 + 8xp/BASE)) / 2).
         $level = (int) floor((1 + sqrt(1 + (8 * max(0, $xp)) / self::LEVEL_BASE)) / 2);
 
         return max(1, $level);
     }
 
     /**
-     * Data level untuk presentasi (satu sumber, dipakai profil/navigation/leaderboard).
-     * Mengembalikan level sekarang, EXP progres di level ini, dan EXP yang dibutuhkan
-     * untuk naik ke level berikutnya — semua diturunkan dari total_xp.
+     * Level data for display (one source, used by profile/navigation/leaderboard).
+     * Returns the current level, EXP progress within this level, and EXP needed to
+     * reach the next level -- all derived from total_xp.
      *
      * @return array{level:int, total_xp:int, progress:int, needed:int, next_level:int}
      */
@@ -89,46 +89,46 @@ class User extends Authenticatable
         $xp = (int) ($this->total_xp ?? 0);
         $level = self::levelForXp($xp);
 
-        $floor = self::xpToReachLevel($level);       // EXP untuk mencapai level ini
-        $ceil = self::xpToReachLevel($level + 1);     // EXP untuk level berikutnya
+        $floor = self::xpToReachLevel($level);       // EXP to reach this level
+        $ceil = self::xpToReachLevel($level + 1);     // EXP for the next level
 
         return [
             'level' => $level,
             'total_xp' => $xp,
             'progress' => $xp - $floor,               // 0 .. needed
-            'needed' => $ceil - $floor,               // EXP rentang level ini (= BASE × level)
+            'needed' => $ceil - $floor,               // EXP span of this level (= BASE × level)
             'next_level' => $level + 1,
         ];
     }
 
     /**
-     * Rumus EXP berbasis volume + bonus akurasi tipis. SATU sumber kebenaran yang
-     * dipakai mode solo (TypingEngine) DAN multiplayer (MultiplayerLobby) supaya
-     * keduanya konsisten. Mengakumulasi ke total_xp, menyimpan, dan mengembalikan
-     * jumlah EXP yang diperoleh.
+     * Volume-based EXP formula plus a thin accuracy bonus. The SINGLE source of truth
+     * used by both solo mode (TypingEngine) AND multiplayer (MultiplayerLobby) so they
+     * stay consistent. Accumulates into total_xp, saves, and returns the EXP earned.
      *
-     * Basis volume (jumlah karakter benar) — SENGAJA bukan berbasis WPM: menghargai
-     * usaha/latihan, bukan bakat, dan tidak menghukum pengetik lambat.
+     * Volume-based (count of correct chars) -- DELIBERATELY not WPM-based: it rewards
+     * effort/practice, not talent, and doesn't penalize slow typists.
      */
     public function addExp(int $correctChars, float $accuracy): int
     {
         $accuracyMultiplier = 0.5 + 0.5 * (max(0, min(100, $accuracy)) / 100);
         $xpEarned = (int) round(max(0, $correctChars) * 0.1 * $accuracyMultiplier);
 
-        // increment(), BUKAN `$this->total_xp += ...; save()`. Yang terakhir membaca
-        // nilai lama ke memori PHP lalu menulis balik utuh, jadi dua penulis dengan
-        // instance berbeda (hasil solo & finalisasi balapan sama-sama memanggil
-        // method ini) akan saling menimpa dan EXP hilang tanpa jejak. increment()
-        // menyerahkan penambahannya ke DB: `total_xp = total_xp + ?`.
+        // increment(), NOT `$this->total_xp += ...; save()`. The latter reads the old
+        // value into PHP memory then writes the whole thing back, so two writers with
+        // different instances (a solo result and race finalization both call this
+        // method) would overwrite each other and lose EXP silently. increment() defers
+        // the addition to the DB: `total_xp = total_xp + ?`.
         //
-        // increment() juga menyegarkan atribut di instance ini, jadi levelData()
-        // yang dibaca panel hasil tepat setelah pemanggilan ini melihat nilai baru,
-        // bukan yang basi.
+        // increment() also refreshes the attribute on this instance, so a levelData()
+        // read by the result panel right after this call sees the new value, not a
+        // stale one.
         $this->increment('total_xp', $xpEarned);
 
         return $xpEarned;
     }
 
+    /** Set a single key in the JSON preferences column and persist. */
     public function setPreference(string $key, mixed $value): void
     {
         $preferences = $this->preferences ?? [];
@@ -137,34 +137,39 @@ class User extends Authenticatable
         $this->save();
     }
 
+    /** Solo typing session results recorded by this user. */
     public function typingResults(): HasMany
     {
         return $this->hasMany(TypingResult::class);
     }
 
+    /** Friend requests this user sent (as requester). */
     public function sentFriendRequests(): HasMany
     {
         return $this->hasMany(Friendship::class, 'requester_id');
     }
 
+    /** Friend requests this user received (as addressee). */
     public function receivedFriendRequests(): HasMany
     {
         return $this->hasMany(Friendship::class, 'addressee_id');
     }
 
+    /** Achievements this user has unlocked. */
     public function achievements(): HasMany
     {
         return $this->hasMany(UserAchievement::class);
     }
 
+    /** The room this user is currently in, through their room_members row. */
     public function currentRoom()
     {
         return $this->hasOneThrough(Room::class, RoomMember::class, 'user_id', 'id', 'id', 'room_id');
     }
 
     /**
-     * Cari baris friendship antara user ini dan $otherId, ke arah mana pun
-     * (baik user ini pengirim maupun penerima). Null jika belum ada relasi.
+     * Find the friendship row between this user and $otherId in either direction
+     * (whether this user is the requester or the addressee). Null if no relation yet.
      */
     public function friendshipWith(int $otherId): ?Friendship
     {
@@ -179,16 +184,16 @@ class User extends Authenticatable
     }
 
     /**
-     * Ambang (detik) di mana user masih dianggap online. Heartbeat klien
-     * dikirim tiap ~30 detik; ambang 60 detik memberi toleransi satu heartbeat
-     * yang terlewat sebelum dianggap offline. Konstanta yang mudah di-tuning.
+     * Threshold (seconds) within which a user is still considered online. The client
+     * heartbeat fires every ~30 seconds; a 60-second threshold tolerates one missed
+     * heartbeat before treating the user as offline. Easy to tune.
      */
     public const ONLINE_THRESHOLD_SECONDS = 60;
 
     /**
-     * Apakah user dianggap online sekarang: last_seen_at ada DAN masih dalam
-     * ambang. Diturunkan murni dari timestamp — tak ada flag boolean tersimpan
-     * yang bisa "nyangkut" true saat browser tertutup tanpa event offline.
+     * Whether the user is currently online: last_seen_at is set AND still within the
+     * threshold. Derived purely from the timestamp -- no stored boolean flag that could
+     * get "stuck" at true when the browser closes without an offline event.
      */
     public function isOnline(): bool
     {
@@ -197,11 +202,11 @@ class User extends Authenticatable
     }
 
     /**
-     * Catat bahwa user ini aktif barusan (dipanggil dari endpoint heartbeat).
-     * Jika ini transisi offline->online, siarkan PresenceUpdated ke semua teman
-     * agar titik status di daftar teman mereka menyala real-time. Heartbeat
-     * lanjutan (saat sudah online) hanya meng-update timestamp tanpa broadcast,
-     * mencegah banjir pesan WebSocket tiap ~30 detik.
+     * Record that this user was just active (called from the heartbeat endpoint).
+     * If this is an offline->online transition, broadcast PresenceUpdated to all
+     * friends so their friend-list status dot lights up in real time. Subsequent
+     * heartbeats (while already online) only update the timestamp without broadcasting,
+     * avoiding a flood of WebSocket messages every ~30 seconds.
      */
     public function touchPresence(): void
     {
@@ -215,9 +220,9 @@ class User extends Authenticatable
     }
 
     /**
-     * Tandai user offline segera (dipanggil saat logout) dengan mengosongkan
-     * last_seen_at, lalu siarkan agar teman langsung melihat status offline
-     * tanpa menunggu ambang kedaluwarsa.
+     * Mark the user offline immediately (called on logout) by clearing last_seen_at,
+     * then broadcast so friends see the offline status at once without waiting for the
+     * threshold to expire.
      */
     public function markOffline(): void
     {
@@ -231,8 +236,8 @@ class User extends Authenticatable
     }
 
     /**
-     * Siarkan perubahan status ke channel friends.{id} milik SETIAP teman
-     * (status accepted). Menumpang infrastruktur toast/refresh yang sudah ada.
+     * Broadcast the status change to the friends.{id} channel of EVERY accepted friend.
+     * Rides on the existing toast/refresh infrastructure.
      */
     private function broadcastPresenceToFriends(): void
     {
@@ -247,9 +252,9 @@ class User extends Authenticatable
     }
 
     /**
-     * Baris keanggotaan clan AKTIF milik user ini (bukan yang masih pending).
-     * Tak ada kolom clan_id di tabel users -- keanggotaan diturunkan lewat
-     * pivot clan_members, mengikuti pola currentRoom() di atas.
+     * This user's ACTIVE clan membership row (not a still-pending one). There is no
+     * clan_id column on users -- membership is derived through the clan_members pivot,
+     * following the currentRoom() pattern above.
      */
     public function activeClanMembership(): HasOne
     {
@@ -258,37 +263,37 @@ class User extends Authenticatable
     }
 
     /**
-     * Clan aktif user ini, lewat pivot clan_members.
+     * This user's active clan, through the clan_members pivot.
      *
-     * RELASI SEJATI, bukan accessor. Dulu ini `getClanAttribute()` yang memanggil
-     * method biasa `clanMembership()`, dan itu punya dua akibat buruk:
+     * A REAL relation, not an accessor. This used to be `getClanAttribute()` calling a
+     * plain `clanMembership()` method, which had two bad consequences:
      *
-     *  1. TAK ADA CACHE. Tiap kali `$user->clan` (atau `$user->clan_role`) dibaca,
-     *     query-nya jalan LAGI. layouts/app.blade.php membacanya dua kali di layout
-     *     global -> 4 query tambahan di SETIAP halaman situs.
-     *  2. MUSTAHIL DI-EAGER-LOAD. `User::with('clan')` akan meledak, karena Eloquent
-     *     menuntut sebuah instance Relation. Jadi daftar user mana pun yang
-     *     menampilkan clan otomatis N+1, tanpa cara apa pun untuk menghindarinya.
+     *  1. NO CACHING. Every read of `$user->clan` (or `$user->clan_role`) re-ran the
+     *     query. layouts/app.blade.php reads it twice in the global layout -> 4 extra
+     *     queries on EVERY page of the site.
+     *  2. NOT EAGER-LOADABLE. `User::with('clan')` would blow up, because Eloquent
+     *     requires a Relation instance. So any user list showing the clan was
+     *     automatically N+1, with no way to avoid it.
      *
-     * Sebagai relasi, Eloquent menyimpan hasilnya di $relations setelah akses
-     * pertama (jadi berkali-kali dibaca = satu query) DAN `with('clan')` bekerja.
+     * As a relation, Eloquent caches the result in $relations after the first access
+     * (so repeated reads = one query) AND `with('clan')` works.
      */
     public function clan(): HasOneThrough
     {
         return $this->hasOneThrough(
             Clan::class,
             ClanMember::class,
-            'user_id',   // FK di clan_members -> users
-            'id',        // PK di clans
-            'id',        // PK lokal di users
-            'clan_id',   // FK di clan_members -> clans
+            'user_id',   // FK on clan_members -> users
+            'id',        // PK on clans
+            'id',        // local PK on users
+            'clan_id',   // FK on clan_members -> clans
         )->where('clan_members.status', ClanMemberStatus::Active);
     }
 
     /**
-     * Accessor supaya $user->clan_role dipakai apa adanya di profile view
-     * tanpa kolom tersimpan -- diturunkan dari role pada clan_members.
-     * Membaca lewat relasi activeClanMembership, jadi ikut ter-cache.
+     * Accessor so $user->clan_role can be used as-is in the profile view without a
+     * stored column -- derived from the role on clan_members. Reads via the
+     * activeClanMembership relation, so it's cached too.
      */
     public function getClanRoleAttribute(): ?string
     {

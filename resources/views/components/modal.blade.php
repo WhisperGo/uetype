@@ -1,3 +1,4 @@
+{{-- Accessible Alpine modal dialog toggled via open-modal/close-modal window events. --}}
 @props([
     'name',
     'show' => false,
@@ -46,9 +47,9 @@ $maxWidth = [
     x-on:keydown.tab.prevent="$event.shiftKey || nextFocusable().focus()"
     x-on:keydown.shift.tab.prevent="prevFocusable().focus()"
     x-show="show"
-    {{-- Focus trap saja tak cukup: tanpa role/aria-modal, pembaca layar tidak
-         mengumumkan bahwa konteks berpindah ke dialog, dan konten di belakangnya
-         tetap terbaca seolah masih aktif. --}}
+    {{-- A focus trap alone isn't enough: without role/aria-modal, screen readers
+         don't announce that the context has moved to a dialog, and the content
+         behind it stays readable as if still active. --}}
     role="dialog"
     aria-modal="true"
     :aria-hidden="show ? 'false' : 'true'"

@@ -8,15 +8,15 @@ use App\Models\TypingResult;
 use App\Models\User;
 
 /**
- * Menurunkan lawan ghost dari sebuah IDENTITAS (type + refId), bukan dari angka
- * WPM yang dikirim client. SATU sumber kebenaran untuk derive ghost.
+ * Derives a ghost opponent from an IDENTITY (type + refId), not from a WPM figure
+ * sent by the client. THE single source of truth for deriving ghosts.
  *
- * Trust boundary: client hanya menyodorkan identifier; WPM selalu diambil ulang
- * dari DB di sini -- dipakai saat memilih (GhostPicker) MAUPUN saat memulihkan
- * pilihan yang tersimpan (TypingEngine), jadi rematch tak pernah membekukan angka
- * lama dan tak bisa dipalsukan lewat state client.
+ * Trust boundary: the client only supplies an identifier; WPM is always re-fetched
+ * from the DB here -- used both when selecting (GhostPicker) AND when restoring a
+ * saved choice (TypingEngine), so a rematch never freezes a stale figure and cannot
+ * be forged through client state.
  *
- * Sebelumnya logika ini terduplikasi di GhostPicker::selectOpponent() dan
+ * This logic was previously duplicated in GhostPicker::selectOpponent() and
  * TypingEngine::resolveGhostDeepLink().
  */
 class GhostResolver
@@ -24,10 +24,10 @@ class GhostResolver
     /**
      * @param  string  $type  'own' | 'friend' | 'leaderboard'
      * @param  int|null  $refId  friendship_id (friend) | user_id (leaderboard) | null (own)
-     * @param  string  $mainMode  'time' | 'words' (ghost tak berlaku di survival)
-     * @param  string  $subMode  konfigurasi mode aktif
-     * @param  int|null  $viewerId  user yang sedang bermain
-     * @return array{type: string, wpm: float, label: string}|null null kalau tak sah / tak ada rekor
+     * @param  string  $mainMode  'time' | 'words' (ghost does not apply in survival)
+     * @param  string  $subMode  the active mode's config
+     * @param  int|null  $viewerId  the user currently playing
+     * @return array{type: string, wpm: float, label: string}|null null if invalid / no record
      */
     public function resolve(string $type, ?int $refId, string $mainMode, string $subMode, ?int $viewerId): ?array
     {
@@ -38,7 +38,7 @@ class GhostResolver
             default => null,
         };
 
-        // Gerbang tunggal: WPM harus positif, apa pun jenis lawannya.
+        // Single gate: WPM must be positive, whatever the opponent type.
         if ($resolved === null || $resolved['wpm'] <= 0) {
             return null;
         }
@@ -46,7 +46,7 @@ class GhostResolver
         return ['type' => $type] + $resolved;
     }
 
-    /** Rekor terbaik pemain sendiri (mode-independen: highest_wpm). */
+    /** The player's own best record (mode-independent: highest_wpm). */
     private function resolveOwn(?int $viewerId): ?array
     {
         if ($viewerId === null) {
@@ -59,8 +59,8 @@ class GhostResolver
     }
 
     /**
-     * Rekor terbaik seorang teman (highest_wpm). refId = friendship_id, WAJIB
-     * pertemanan accepted yang melibatkan viewer -- cegah menebak ID orang lain.
+     * A friend's best record (highest_wpm). refId = friendship_id, which MUST be an
+     * accepted friendship involving the viewer -- prevents guessing other people's IDs.
      */
     private function resolveFriend(?int $refId, ?int $viewerId): ?array
     {
@@ -90,8 +90,8 @@ class GhostResolver
     }
 
     /**
-     * Rekor terbaik seorang user di mode+config AKTIF (MAX net_wpm). refId = user_id.
-     * Kalau user tak punya rekor di config itu -> null (fail-safe; ghost tersembunyi).
+     * A user's best record in the ACTIVE mode+config (MAX net_wpm). refId = user_id.
+     * If the user has no record for that config -> null (fail-safe; ghost hidden).
      */
     private function resolveLeaderboard(?int $refId, string $mainMode, string $subMode): ?array
     {

@@ -1,5 +1,5 @@
 <div class="max-w-5xl px-4 mx-auto py-6 sm:px-6 lg:px-8 text-foreground">
-    <!-- ===== 1. HALAMAN PILIH: CREATE OR JOIN ROOM ===== -->
+    <!-- ===== 1. CHOOSE PAGE: CREATE OR JOIN ROOM ===== -->
     @if ($this->step === 'choose')
         <div class="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24 items-stretch mt-10 relative w-full">
             <div
@@ -113,9 +113,9 @@
         </div>
     @endif
 
-    <!-- ===== 2. HALAMAN RUANG TUNGGU: WAITING ROOM ===== -->
+    <!-- ===== 2. WAITING ROOM ===== -->
     @if ($this->step === 'waiting' && $this->roomData && !$showResultModal)
-        {{-- Update lobby (join/ready/leave) didorong via WebSocket .room.updated -> Livewire.dispatch('room-updated'), bukan polling. --}}
+        {{-- Lobby updates (join/ready/leave) are pushed via WebSocket .room.updated -> Livewire.dispatch('room-updated'), not polling. --}}
         <div class="space-y-8">
             <div
                 x-data="{
@@ -232,9 +232,9 @@
             @endphp
 
             <div class="pt-6 border-t border-border/30 space-y-3">
-                {{-- Baris tombol: aksi primer di kiri, aksi sekunder didorong ke kanan. --}}
+                {{-- Button row: primary action on the left, secondary actions pushed right. --}}
                 <div class="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
-                    {{-- KIRI: aksi primer sesuai peran (Mulai / Siap / badge Menonton). --}}
+                    {{-- LEFT: role-specific primary action (Start / Ready / Spectating badge). --}}
                     <div class="flex flex-wrap items-center gap-3 sm:gap-4">
                         @if ($this->isHost)
                             <button wire:click="startRace" @disabled(!$this->allReady)
@@ -254,8 +254,8 @@
                         @endif
                     </div>
 
-                    {{-- KANAN: aksi sekunder (toggle peran + keluar). Toggle tersedia untuk
-                         semua termasuk host, hanya saat waiting. --}}
+                    {{-- RIGHT: secondary actions (role toggle + leave). The toggle is available to
+                         everyone including the host, only while waiting. --}}
                     <div class="flex flex-wrap items-center gap-3 sm:gap-4">
                         @if ($this->isSpectator)
                             <button wire:click="toggleSpectator" @disabled($playersFull)
@@ -278,8 +278,8 @@
                     </div>
                 </div>
 
-                {{-- Baris hint status: menjelaskan kenapa "Mulai" belum aktif. Titik netral
-                     berdenyut agar terbaca sebagai petunjuk, bukan tombol. --}}
+                {{-- Status hint row: explains why "Start" isn't active yet. The neutral dot
+                     pulses so it reads as a hint, not a button. --}}
                 @if ($this->isHost && !$this->allReady)
                     <div class="flex items-center gap-2">
                         <span class="w-1.5 h-1.5 rounded-full bg-muted animate-pulse"></span>
@@ -290,28 +290,28 @@
                 @endif
             </div>
 
-            {{-- Chat lobby: player & spectator bisa mengobrol sambil menunggu. wire:key
-                 stabil agar state Alpine (daftar pesan) tak reset saat lobby re-render. --}}
+            {{-- Lobby chat: players & spectators can talk while waiting. Stable wire:key so
+                 Alpine state (message list) doesn't reset when the lobby re-renders. --}}
             <div wire:key="room-chat-waiting">
                 @include('livewire.partials.room-chat', ['currentUserId' => auth()->id()])
             </div>
         </div>
     @endif
 
-    <!-- ===== 3. HALAMAN ARENA PERTANDINGAN: BATTLE STAGE (TYPERACER MECHANICS) ===== -->
+    <!-- ===== 3. BATTLE STAGE (TYPERACER MECHANICS) ===== -->
     @if ($this->step === 'racing' && $this->roomData && !$showResultModal)
-        {{-- wire:key stabil: state Alpine (raceStarted/countdown/progress) tak reset lintas re-render. --}}
-        {{-- Logika Alpine ada di komponen 'raceArena' (lihat @assets), bukan inline di x-data. --}}
-        {{-- Sudden death disinkron via WebSocket + clock lokal; saat 0, lockRace() panggil checkSuddenDeath() sekali. --}}
-        {{-- Penonton ikut render arena (countdown + lane pembalap), tapi tanpa input ketik.
-             myId=null memberi tahu raceArena untuk melewati semua jalur emit/publish lokal. --}}
+        {{-- Stable wire:key: Alpine state (raceStarted/countdown/progress) doesn't reset across re-renders. --}}
+        {{-- Alpine logic lives in the 'raceArena' component (see @assets), not inline in x-data. --}}
+        {{-- Sudden death is synced via WebSocket + a local clock; when it hits 0, lockRace() calls checkSuddenDeath() once. --}}
+        {{-- Spectators also render the arena (countdown + racer lanes) but without typing input.
+             myId=null tells raceArena to skip all local emit/publish paths. --}}
         @php
             $isSpectator = $this->isSpectator;
             $racers = $this->orderedMembers;
         @endphp
         @php $arenaDense = $racers->count() >= 4; @endphp
-        {{-- Sembunyikan overlay chat selama arena balapan tampil; kembalikan saat blok ini
-             hilang (race selesai / result modal / keluar room). --}}
+        {{-- Hide the chat overlay while the race arena is shown; restore it when this block
+             goes away (race finished / result modal / leaving the room). --}}
         <div x-data="{ init() { window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: true } })); }, destroy() { window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: false } })); } }"></div>
         <div wire:key="race-arena-{{ $this->roomCode }}" class="{{ $arenaDense ? 'space-y-4' : 'space-y-6' }}"
             x-data="raceArena({
@@ -326,7 +326,7 @@
             })"
             @keydown.tab.prevent="if (raceStarted && !isFinished && !lockedByTimeout) $refs.typeInput?.focus()">
 
-            <!-- HEADER TIPIS: ROOM CODE (KANAN) + SUDDEN DEATH INLINE (KIRI SAAT AKTIF) -->
+            <!-- THIN HEADER: ROOM CODE (RIGHT) + INLINE SUDDEN DEATH (LEFT WHEN ACTIVE) -->
             <div class="flex items-center justify-between gap-4">
                 @if ($this->suddenDeathActive)
                     <span x-init="syncSuddenDeath(@js($this->suddenDeathRemaining))"
@@ -349,7 +349,7 @@
                 </span>
             </div>
 
-            <!-- OVERLAY COUNTDOWN SCREEN: hanya untuk start race; guard !suddenDeathActive agar tak muncul lagi saat countdown sudden death -->
+            <!-- COUNTDOWN OVERLAY SCREEN: only for race start; the !suddenDeathActive guard keeps it from reappearing during the sudden-death countdown -->
             <template x-if="!raceStarted && !suddenDeathActive">
                 <div class="fixed inset-0 bg-background/95 flex flex-col items-center justify-center z-50 select-none">
                     <span class="font-mono text-xs uppercase tracking-[0.4em] text-muted mb-4">{{ __('multiplayer.race_starting') }}</span>
@@ -362,26 +362,26 @@
                 $playerCount = $racers->count();
                 $dense = $playerCount >= 4;
 
-                // Progres awal tiap pemain, dipakai rankOf() untuk memeringkat pemain
-                // yang belum sekali pun mengirim payload WebSocket. Hanya pembalap.
+                // Each player's initial progress, used by rankOf() to rank players
+                // who haven't sent a single WebSocket payload yet. Racers only.
                 $laneSeeds = $racers
                     ->mapWithKeys(fn ($m) => [$m->user_id => (int) ($m->progress_percent ?? 0)]);
             @endphp
 
-            <!-- KLASEMEN LANGSUNG: LANE PER PEMAIN -->
+            <!-- LIVE STANDINGS: ONE LANE PER PLAYER -->
             <div class="border bg-surface/50 border-border/40 rounded-3xl shadow-xl {{ $dense ? 'p-4 space-y-2' : 'p-6 space-y-3' }}">
                 <span class="text-xs font-mono uppercase tracking-widest text-muted block">{{ __('multiplayer.live_standings') }}</span>
 
-                {{-- laneSeeds/raceStartMs/textLength dideklarasikan sekali di sini, lalu
-                     diwarisi tiap x-data lane. Jam bersama dijalankan sekali juga, supaya
-                     WPM tiap lane dihitung ulang tiap detik tanpa satu timer per pemain. --}}
+                {{-- laneSeeds/raceStartMs/textLength are declared once here, then inherited
+                     by each lane's x-data. The shared clock is started once too, so each
+                     lane's WPM recomputes every second without one timer per player. --}}
                 <div x-data="{
                         laneSeeds: @js($laneSeeds),
                         textLength: @js(mb_strlen($this->roomData->text_to_type)),
-                        {{-- raceStartsInMs = sisa waktu menurut server saat render (negatif
-                             kalau balapan sudah jalan). Ditambahkan ke Date.now() supaya titik
-                             mulainya berada di jam KLIEN -- kebal selisih jam server-klien.
-                             null = balapan belum dijadwalkan. --}}
+                        {{-- raceStartsInMs = time remaining per the server at render (negative
+                             if the race is already running). Added to Date.now() so the start
+                             point sits on the CLIENT's clock -- immune to server-client clock skew.
+                             null = race not scheduled yet. --}}
                         raceStartsInMs: @js($this->raceStartsInMs),
                         raceStartMs: null,
                     }"
@@ -392,8 +392,8 @@
                     class="bg-background/40 rounded-2xl border border-border/20 {{ $dense ? 'p-3 space-y-1' : 'p-4 space-y-1.5' }}">
                     @foreach ($racers as $player)
                         @php $isSelf = ! $isSpectator && $player->user_id === Auth::id(); @endphp
-                        {{-- Semua lane baca $store.race.opponents[id] seragam (termasuk diri sendiri lewat publishLocal),
-                             diisi dari payload WebSocket tanpa re-render Livewire. Nilai Blade hanya seed awal. --}}
+                        {{-- Every lane reads $store.race.opponents[id] uniformly (including yourself via publishLocal),
+                             filled from WebSocket payloads without a Livewire re-render. Blade values are only the initial seed. --}}
                         <div x-data="{
                                 playerId: @js($player->user_id),
                                 seedProgress: @js((int) ($player->progress_percent ?? 0)),
@@ -403,29 +403,29 @@
                                     return $store.race.opponents[this.playerId]?.progress ?? this.seedProgress;
                                 },
                                 /**
-                                 * WPM dihitung SENDIRI oleh tiap penonton, bukan menunggu
-                                 * kiriman pemiliknya. Tab lawan yang tidak aktif dibekukan
-                                 * browser, jadi lawan yang berhenti mengetik takkan pernah
-                                 * menyiarkan WPM-nya yang meluruh -- angkanya akan macet.
+                                 * WPM is computed LOCALLY by each viewer rather than waiting
+                                 * for the owner's broadcast. An inactive opponent tab is frozen
+                                 * by the browser, so an opponent who stops typing would never
+                                 * broadcast their decaying WPM -- the number would get stuck.
                                  *
-                                 * WPM = (karakter benar / 5) / menit berlalu, dan karakter
-                                 * benar diturunkan dari progres yang memang disiarkan.
-                                 * Pemain yang sudah finis dibekukan di angka terakhirnya.
+                                 * WPM = (correct chars / 5) / minutes elapsed, and correct
+                                 * chars are derived from the progress that IS broadcast.
+                                 * Finished players are frozen at their final number.
                                  */
                                 get liveWpmValue() {
                                     const reported = $store.race.opponents[this.playerId]?.wpm ?? this.seedWpm;
 
-                                    // Pemain yang sudah finis: WPM final dibekukan, tak meluruh lagi.
-                                    // raceStartMs null: balapan belum mulai, tak ada waktu berlalu.
+                                    // Finished player: final WPM is frozen, no longer decays.
+                                    // raceStartMs null: race hasn't started, no time elapsed.
                                     if (this.liveFinished || raceStartMs === null) return reported;
 
-                                    // $store.race.now membuat getter ini dihitung ulang tiap detik.
+                                    // $store.race.now makes this getter recompute every second.
                                     const minutes = ($store.race.now - raceStartMs) / 60000;
                                     if (minutes <= 0) return reported;
 
-                                    // progress_percent bilangan bulat, jadi karakter benar di sini
-                                    // dibulatkan ke ~1% teks -- semua lane (termasuk milik sendiri)
-                                    // memakai rumus yang sama supaya angkanya konsisten antar layar.
+                                    // progress_percent is an integer, so correct chars here are
+                                    // rounded to ~1% of the text -- every lane (including your own)
+                                    // uses the same formula so the numbers stay consistent across screens.
                                     const correctChars = (this.liveProgress / 100) * textLength;
 
                                     return Math.floor((correctChars / 5) / minutes);
@@ -444,18 +444,18 @@
                                     return `rotate(${(w / 120) * -8}deg) scale(${1 + (w / 120) * 0.12})`;
                                 },
                             }"
-                            {{-- Lane pemain sendiri disorot penuh (kartu biru), seperti di desain. --}}
+                            {{-- Your own lane is fully highlighted (blue card), as in the design. --}}
                             class="flex items-center rounded-xl transition-colors duration-300 {{ $dense ? 'gap-3 py-1.5' : 'gap-4 py-2' }} {{ $isSelf ? 'bg-brand/25 border border-gold/70 px-3' : 'border border-transparent px-3' }}">
 
-                            {{-- Peringkat hidup. Pemain yang sudah finis ditandai hijau
-                                 (desain ini tak punya badge "FINISHED" terpisah). --}}
+                            {{-- Live rank. Finished players are marked green
+                                 (this design has no separate "FINISHED" badge). --}}
                             <div class="shrink-0 rounded-md border flex items-center justify-center font-mono font-bold transition-colors duration-300 {{ $dense ? 'w-6 h-6 text-[10px]' : 'w-7 h-7 text-xs' }}"
                                 :class="liveFinished
                                     ? 'border-active/70 bg-active/15 text-active'
                                     : 'border-gold/70 bg-gold/10 text-gold'"
                                 x-text="liveRank"></div>
 
-                            {{-- Nama: lebar tetap supaya semua lintasan mulai di x yang sama. --}}
+                            {{-- Name: fixed width so all tracks start at the same x. --}}
                             <div class="shrink-0 flex items-center gap-2 font-mono {{ $dense ? 'w-32' : 'w-40' }}">
                                 <span class="truncate {{ $dense ? 'text-xs' : 'text-sm' }} {{ $isSelf ? 'text-foreground font-bold' : 'text-foreground/90' }}">{{ $player->user->username }}</span>
                                 @if ($isSelf)
@@ -463,18 +463,18 @@
                                 @endif
                             </div>
 
-                            {{-- Lintasan: garis tipis + maskot yang menungganginya + bendera finis.
-                                 Bendera ADA DI DALAM lintasan (absolute, kanan), bukan elemen sebelahnya,
-                                 supaya progres 100% benar-benar mendarat di atasnya. --}}
+                            {{-- Track: a thin line + the mascot riding it + a finish flag.
+                                 The flag lives INSIDE the track (absolute, right), not as a sibling element,
+                                 so 100% progress genuinely lands on top of it. --}}
                             @php
-                                // Setengah lebar maskot: dipakai sebagai padding kiri-kanan lintasan supaya
-                                // maskot (yang di-center pada titik progres) tak terpotong di 0% maupun 100%.
+                                // Half the mascot width: used as left/right padding on the track so the
+                                // mascot (centered on the progress point) isn't clipped at 0% or 100%.
                                 $half = $dense ? 12 : 14;
                             @endphp
                             <div class="relative flex-1 min-w-0 flex items-center {{ $dense ? 'h-8' : 'h-10' }}">
 
-                                {{-- Rel: disisipkan $half px di kiri & kanan supaya maskot (yang di-center
-                                     pada titik progres) tak terpotong di 0% maupun 100%. --}}
+                                {{-- Rail: inset by $half px on left & right so the mascot (centered
+                                     on the progress point) isn't clipped at 0% or 100%. --}}
                                 <div class="absolute rounded-full bg-elevated {{ $dense ? 'h-1' : 'h-1.5' }}"
                                     style="left: {{ $half }}px; right: {{ $half }}px;"></div>
 
@@ -482,19 +482,19 @@
                                     :class="liveFinished ? 'bg-active' : 'bg-gold'"
                                     :style="`left: {{ $half }}px; width: calc((100% - {{ $half * 2 }}px) * ${liveProgress} / 100);`"></div>
 
-                                {{-- Bendera finis: tepat di ujung kanan rel (titik 100%). --}}
+                                {{-- Finish flag: right at the rail's right end (the 100% point). --}}
                                 <div class="race-finish-flag absolute top-0 bottom-0 -translate-x-1/2 rounded-sm {{ $dense ? 'w-2.5' : 'w-3' }}"
                                     style="left: calc(100% - {{ $half }}px);"
                                     role="img" aria-label="{{ __('multiplayer.finish') }}"></div>
 
-                                {{-- Maskot di-center pada titik progres (-translate-x-1/2), jadi di 100%
-                                     titik tengahnya persis di atas bendera. z-10 supaya tak tertutup bendera. --}}
+                                {{-- Mascot is centered on the progress point (-translate-x-1/2), so at 100%
+                                     its center sits exactly over the flag. z-10 so the flag doesn't cover it. --}}
                                 <div class="absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 transition-all duration-300"
                                     :style="`left: calc({{ $half }}px + (100% - {{ $half * 2 }}px) * ${liveProgress} / 100);`">
-                                    {{-- Sengaja TIDAK memakai <x-friend-avatar>: wadah ini membawa binding
-                                         Alpine (:style transform, :class) dan tak punya wrapper relative,
-                                         sedangkan komponennya selalu membungkus dengan `relative shrink-0` --
-                                         itu akan merusak penempatan absolut pelari di lintasan. --}}
+                                    {{-- Deliberately NOT using <x-friend-avatar>: this container carries Alpine
+                                         bindings (:style transform, :class) and has no relative wrapper, whereas
+                                         the component always wraps with `relative shrink-0` --
+                                         which would break the runner's absolute placement on the track. --}}
                                     <div class="race-runner flex items-center justify-center {{ $dense ? 'w-6 h-6' : 'w-7 h-7' }}"
                                         :style="`transform: ${runnerTilt}`"
                                         :class="{ 'opacity-70': liveProgress === 0 && !liveFinished }">
@@ -518,10 +518,10 @@
             </div>
 
             @if (! $isSpectator && ! $hasGivenUp && ! $hasFinished)
-                <!-- CONTAINER UTAMA TEKS (VISUAL HIGH-RESPONSIVE TYPERACER STYLE) -->
+                <!-- MAIN TEXT CONTAINER (HIGH-RESPONSIVE TYPERACER-STYLE VISUAL) -->
                 <div class="border bg-surface/40 border-border/40 rounded-3xl shadow-xl {{ $dense ? 'p-5 space-y-4' : 'p-8 space-y-6' }}"
                     :class="{ 'race-typo': hasError }">
-                    <!-- BLOK DRAF PARAGRAF DENGAN INDIKATOR WARNA TYPERACER -->
+                    <!-- PARAGRAPH DRAFT BLOCK WITH TYPERACER COLOR INDICATORS -->
                     <div
                         class="font-mono text-xl leading-relaxed tracking-wide select-none p-5 bg-background/30 rounded-xl border border-border/20 flex flex-wrap gap-x-2 gap-y-1">
                         <template x-for="(word, wIdx) in words" :key="wIdx">
@@ -540,7 +540,7 @@
                         </template>
                     </div>
 
-                    <!-- FIELD INPUT KATA TUNGGAL DENGAN HIGHLIGHT ERROR DYNAMIC -->
+                    <!-- SINGLE-WORD INPUT FIELD WITH DYNAMIC ERROR HIGHLIGHTING -->
                     <div class="relative">
                         <input type="text" x-ref="typeInput" x-model="typedText" @input="checkInput()"
                             @keydown.space="handleSpace($event)" :disabled="!raceStarted || isFinished || lockedByTimeout"
@@ -562,7 +562,7 @@
                     </div>
                 </div>
             @else
-                <!-- LAYAR TUNGGU: PENONTON, ATAU PEMAIN YANG SUDAH SELESAI / MENYERAH -->
+                <!-- WAITING SCREEN: SPECTATORS, OR PLAYERS WHO HAVE FINISHED / GIVEN UP -->
                 @php
                     $watchTitle = $isSpectator ? __('multiplayer.spectating_title') : ($hasGivenUp ? __('multiplayer.gave_up_title') : __('multiplayer.finished_title'));
                     $watchDesc = $isSpectator ? __('multiplayer.spectating_desc') : ($hasGivenUp ? __('multiplayer.gave_up_waiting') : __('multiplayer.finished_waiting'));
@@ -584,7 +584,7 @@
         </div>
     @endif
 
-    <!-- ===== 4. HALAMAN: MATCH RESULT ===== -->
+    <!-- ===== 4. MATCH RESULT PAGE ===== -->
     @if ($showResultModal && !empty($this->resultSnapshot))
         @php
             $results = collect($this->resultSnapshot)->map(fn ($row) => (object) $row);
@@ -592,7 +592,7 @@
         @endphp
         <div class="space-y-12 animate-fade-in py-4 select-none">
 
-            <!-- HEADER MATCH RESULT -->
+            <!-- MATCH RESULT HEADER -->
             <div class="flex flex-col space-y-1">
                 <h1 class="text-fluid-title font-mono font-black text-gold tracking-wider uppercase">{{ __('multiplayer.match_result') }}</h1>
                 @php
@@ -616,7 +616,7 @@
                     @endif
                 </div>
 
-                {{-- Hasil ditolak validasi server: tidak dicatat ke statistik (average WPM tak rusak). --}}
+                {{-- Result rejected by server validation: not recorded to stats (average WPM stays intact). --}}
                 @php $me = $results->firstWhere('user_id', Auth::id()); @endphp
                 @if ($me && $me->result_recorded === false)
                     <div class="mt-2 flex items-center gap-2 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-x-small font-mono text-danger">
@@ -628,7 +628,7 @@
                 @endif
             </div>
 
-            <!-- VISUAL PODIUM 3 TERATAS -->
+            <!-- TOP-3 PODIUM VISUAL -->
             @php
                 $rank1 = $results->get(0);
                 $rank2 = $results->get(1);
@@ -636,7 +636,7 @@
             @endphp
             <div class="grid grid-cols-3 gap-4 items-end max-w-2xl mx-auto pt-16 pb-6 relative">
 
-                <!-- PODIUM 2 (KIRI) -->
+                <!-- PODIUM 2 (LEFT) -->
                 <div class="flex flex-col items-center space-y-3">
                     @if ($rank2)
                         <div class="text-center font-mono text-xs">
@@ -656,7 +656,7 @@
                     </div>
                 </div>
 
-                <!-- PODIUM 1 (TENGAH) -->
+                <!-- PODIUM 1 (CENTER) -->
                 <div class="flex flex-col items-center space-y-3">
                     @if ($rank1)
                         <div class="text-center font-mono text-xs">
@@ -676,7 +676,7 @@
                     </div>
                 </div>
 
-                <!-- PODIUM 3 (KANAN) -->
+                <!-- PODIUM 3 (RIGHT) -->
                 <div class="flex flex-col items-center space-y-3">
                     @if ($rank3)
                         <div class="text-center font-mono text-xs">
@@ -698,7 +698,7 @@
 
             </div>
 
-            <!-- TABEL FULL RESULTS -->
+            <!-- FULL RESULTS TABLE -->
             <div class="space-y-3">
                 <span class="text-[11px] font-mono uppercase tracking-[0.25em] text-muted block mb-1">{{ __('multiplayer.full_results') }}</span>
                 <div
@@ -746,7 +746,7 @@
                                         @if ($rank->finished_time_seconds && $rank->finished_time_seconds != \App\Models\RoomMember::DNF_SENTINEL_SECONDS)
                                             {{ sprintf('%02d:%02d', floor($rank->finished_time_seconds / 60), $rank->finished_time_seconds % 60) }}
                                         @else
-                                            {{-- DNF: jangan tampilkan waktu palsu. --}}
+                                            {{-- DNF: don't show a fake time. --}}
                                             <span class="text-danger/70 text-xs">{{ __('multiplayer.dnf') }}</span>
                                         @endif
                                     </td>
@@ -757,7 +757,7 @@
                 </div>
             </div>
 
-            <!-- PANEL PROGRESS REPORT XP (data nyata dari getMyXpResultProperty) -->
+            <!-- XP PROGRESS REPORT PANEL (real data from getMyXpResultProperty) -->
             @php
                 $xp = $this->isSpectator ? null : $this->myXpResult;
                 $lvl = $xp['level'] ?? null;
@@ -785,14 +785,14 @@
                 </div>
             @endif
 
-            {{-- Chat di layar hasil: dipakai untuk mengajak main lagi. Instance TERPISAH
-                 dari chat lobby (wire:key beda) -> ini state Alpine baru, jadi pesan lobby
-                 tak terbawa; sesuai sifat broadcast-only yang sesaat. --}}
+            {{-- Chat on the result screen: used to invite people to play again. A SEPARATE
+                 instance from the lobby chat (different wire:key) -> new Alpine state, so lobby
+                 messages don't carry over; consistent with its ephemeral broadcast-only nature. --}}
             <div wire:key="room-chat-result">
                 @include('livewire.partials.room-chat', ['currentUserId' => auth()->id()])
             </div>
 
-            <!-- AKSI BUTTON MENU BAWAH -->
+            <!-- BOTTOM MENU ACTION BUTTONS -->
             <div class="pt-2 flex flex-wrap gap-3 sm:gap-4">
                 @if ($this->isHost)
                     <button wire:click="playAgain"
@@ -809,8 +809,8 @@
         </div>
     @endif
 
-    {{-- Logika arena balapan ada di resources/js/race-arena.js (store Alpine 'race'
-         + komponen 'raceArena') dan resources/js/race-echo.js (langganan Echo),
-         keduanya di-bundle lewat app.js. Data dari server tetap masuk lewat
-         @js(...) di markup di atas, bukan lewat modul. --}}
+    {{-- Race arena logic lives in resources/js/race-arena.js (Alpine 'race' store
+         + 'raceArena' component) and resources/js/race-echo.js (Echo subscription),
+         both bundled via app.js. Server data still comes in through
+         @js(...) in the markup above, not through the modules. --}}
 </div>

@@ -1,3 +1,4 @@
+{{-- Renders a session status message (e.g. after login or password reset), if present. --}}
 @props(['status'])
 
 @if ($status)

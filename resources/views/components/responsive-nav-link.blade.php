@@ -1,3 +1,4 @@
+{{-- Mobile/responsive navigation link with active/inactive styling. --}}
 @props(['active'])
 
 @php

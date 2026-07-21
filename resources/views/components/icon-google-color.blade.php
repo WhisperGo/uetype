@@ -1,6 +1,6 @@
-{{-- Logo Google resmi 4-warna (biru/hijau/kuning/merah). Ikon Simple Icons hanya
-     monokrom (satu path, currentColor), jadi tak bisa multi-warna. SVG ini sama
-     persis dengan tombol "Continue with Google" di auth/_google-panel.blade.php. --}}
+{{-- Official 4-color Google logo (blue/green/yellow/red). Simple Icons only ships
+     a monochrome mark (single path, currentColor), so it can't be multi-color.
+     This SVG matches the "Continue with Google" button in auth/_google-panel.blade.php. --}}
 @props(['class' => 'w-4 h-4'])
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" {{ $attributes->merge(['class' => $class]) }}>
     <path fill="#4285F4"

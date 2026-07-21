@@ -9,37 +9,37 @@ use App\Services\AntiCheatService;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Penutupan balapan: menetapkan peringkat & durasi final, memvalidasinya lewat
- * anti-cheat, dan membekukan papan hasil.
+ * Race finalization: assigns final placements & durations, validates them through
+ * anti-cheat, and freezes the result board.
  *
- * Diekstrak karena ini SATU-SATUNYA kelompok di MultiplayerLobby yang batasnya
- * benar-benar bersih: ia hanya dipanggil MASUK (dari updateRaceProgress, giveUp,
- * dan checkSuddenDeath) dan tak memanggil balik apa pun selain read-model.
+ * Extracted because this is the ONLY cluster in MultiplayerLobby with a truly clean
+ * boundary: it's only ever called INTO (from updateRaceProgress, giveUp, and
+ * checkSuddenDeath) and calls nothing back except the read-model.
  *
- * Siklus-hidup-room dan siklus-balapan sengaja TIDAK dipisahkan: keduanya saling
- * bertaut (roomUpdated/render memanggil resetToChoose, playAgain me-reset state
- * sudden death), jadi memecahnya hanya menghasilkan trait yang saling-use tanpa
- * menambah kejelasan.
+ * Room-lifecycle and race-lifecycle are deliberately NOT split out: they're
+ * interdependent (roomUpdated/render call resetToChoose, playAgain resets sudden-death
+ * state), so splitting them would only yield mutually-using traits without adding
+ * clarity.
  */
 trait FinalizesRace
 {
     /**
-     * Seluruhnya dalam SATU transaksi: satu balapan menulis place & xp_earned untuk
-     * tiap pemain, total_xp tiap user, dan satu baris riwayat permanen per pemain.
-     * Gagal di tengah tanpa transaksi meninggalkan balapan separuh final -- dan
-     * karena guard idempoten `xp_earned IS NULL` menganggap pemain yang terlanjur
-     * diproses sudah selesai, pemanggilan ulang tak akan memperbaikinya.
+     * All in ONE transaction: a single race writes place & xp_earned for each player,
+     * each user's total_xp, and one permanent history row per player. Failing midway
+     * without a transaction leaves a half-finalized race -- and since the idempotency
+     * guard `xp_earned IS NULL` treats already-processed players as done, re-calling
+     * won't fix it.
      *
-     * Guard idempoten TETAP diperlukan: transaksi melindungi dari tulis separuh
-     * jadi, guard melindungi dari pemanggilan ganda (fast-path "semua finish" dan
-     * checkSuddenDeath bisa sama-sama sampai ke sini). Beda peran, bukan duplikasi.
+     * The idempotency guard is STILL needed: the transaction protects against partial
+     * writes, the guard protects against double calls (the "all finished" fast-path and
+     * checkSuddenDeath can both reach here). Different roles, not duplication.
      */
     public function finalizeRace(string $roomId): void
     {
         DB::transaction(fn () => $this->writeFinalStandings($roomId));
 
-        // place/xp/result_recorded baru saja berubah -> snapshot & view harus membaca
-        // ulang. Di LUAR transaksi: ini membuang cache di memori, bukan menulis DB.
+        // place/xp/result_recorded just changed -> snapshot & view must re-read. OUTSIDE
+        // the transaction: this drops the in-memory cache, it doesn't write to the DB.
         $this->forgetRoomCache();
     }
 
@@ -48,16 +48,15 @@ trait FinalizesRace
         $room = Room::find($roomId);
         $textLength = $room ? mb_strlen($room->text_to_type) : 0;
 
-        // Hanya pembalap yang difinalisasi: penonton tak punya place/XP dan tak boleh
-        // mencemari urutan podium maupun jumlah pemain di riwayat.
+        // Only racers get finalized: spectators have no place/XP and must not pollute
+        // the podium order or the player count in history.
         //
-        // "Belum finis" HARUS jadi kunci urut pertama. MySQL menaruh NULL paling awal
-        // pada ASC, jadi dengan finished_time_seconds sebagai kunci pertama, pemain
-        // yang belum selesai akan mendarat di atas penyelesai yang sah -- juara 1 untuk
-        // orang yang tak menyelesaikan balapan. Ketiga pemanggil finalizeRace() saat ini
-        // menjamin tak ada NULL yang sampai ke sini (mereka menunggu semua finis atau
-        // menyetel sentinel DNF lebih dulu), jadi ini kerapuhan, bukan bug hidup --
-        // tapi kerapuhan yang harganya satu baris.
+        // "Not finished" MUST be the first sort key. MySQL places NULL first on ASC, so
+        // with finished_time_seconds as the primary key, unfinished players would land
+        // above legitimate finishers -- 1st place for someone who never finished. The
+        // three current callers of finalizeRace() guarantee no NULL reaches here (they
+        // either wait for everyone to finish or set the DNF sentinel first), so this is
+        // fragility, not a live bug -- but fragility that costs one line to prevent.
         $members = RoomMember::with('user')
             ->where('room_id', $roomId)
             ->where('role', RoomMember::ROLE_PLAYER)
@@ -70,20 +69,20 @@ trait FinalizesRace
             $place = $index + 1;
             $updateData = ['place' => $place];
 
-            // EXP sekali per pemain: xp_earned null = belum diberi (aman dari double-award
-            // lewat fast-path "semua finish" maupun checkSuddenDeath). rooms/room_members
-            // dihapus begitu semua pemain keluar, jadi baris riwayat permanen ditulis di
-            // sini juga -- satu-satunya titik semua kolom final (place, wpm, akurasi, xp)
-            // sudah settled sebelum room bisa lenyap.
+            // EXP once per player: xp_earned null = not yet awarded (safe from double-award
+            // via the "all finished" fast-path or checkSuddenDeath). rooms/room_members are
+            // deleted once all players leave, so the permanent history row is written here
+            // too -- the only point where all final columns (place, wpm, accuracy, xp) are
+            // settled before the room can vanish.
             if (is_null($member->xp_earned) && $member->user) {
-                // correctChars diturunkan dari progress% x panjang teks (room_members tak
-                // menyimpan jumlah karakter benar), lalu pakai rumus sama dengan mode solo.
+                // correctChars derived from progress% x text length (room_members doesn't
+                // store the correct-char count), using the same formula as solo mode.
                 $progress = max(0, min(100, (int) $member->progress_percent));
                 $correctChars = (int) round(($progress / 100) * $textLength);
 
-                // Gerbang validitas sama seperti mode solo: hasil yang tak masuk akal
-                // (WPM mustahil, karakter tak konsisten, durasi mustahil) DITOLAK -- tak
-                // ditulis ke riwayat & tak dapat EXP, supaya average WPM pemain tak rusak.
+                // Same validity gate as solo mode: implausible results (impossible WPM,
+                // inconsistent chars, impossible duration) are REJECTED -- not written to
+                // history and no EXP, so the player's average WPM isn't corrupted.
                 $isValid = $this->isValidRaceResult($member, $correctChars);
                 $updateData['result_recorded'] = $isValid;
 
@@ -98,16 +97,16 @@ trait FinalizesRace
                         'player_count' => $members->count(),
                         'wpm' => (int) $member->wpm,
                         'accuracy' => (float) $member->accuracy,
-                        // Sentinel DNF (999) TAK BOLEH lewat ke riwayat permanen: di sini
-                        // kolomnya bermakna "durasi tempuh", dan 999 akan dibaca sebagai
-                        // durasi sungguhan oleh statistik apa pun yang merata-ratakannya.
+                        // The DNF sentinel (999) MUST NOT reach permanent history: here the
+                        // column means "elapsed duration", and 999 would be read as a real
+                        // duration by any stats that average it.
                         'finished_time_seconds' => $member->realFinishedSeconds(),
                         'dnf' => $member->isDnf(),
                         'xp_earned' => $xp,
                     ]);
                 } else {
-                    // Tetap tandai xp_earned (0) agar guard idempoten di atas tak
-                    // memproses ulang pemain ini pada pemanggilan finalizeRace berikutnya.
+                    // Still mark xp_earned (0) so the idempotency guard above won't
+                    // reprocess this player on the next finalizeRace call.
                     $updateData['xp_earned'] = 0;
                 }
             }
@@ -117,19 +116,19 @@ trait FinalizesRace
     }
 
     /**
-     * Nyalakan timer sudden death kalau belum menyala. Mengembalikan true HANYA pada
-     * pemanggilan yang benar-benar menyalakannya (pemanggil itulah yang broadcast).
+     * Start the sudden-death timer if it isn't running yet. Returns true ONLY on the
+     * call that actually started it (that caller is the one that broadcasts).
      *
-     * Syaratnya cuma satu -- "timer belum menyala" -- dan sengaja TIDAK bertanya
-     * "apakah saya pemain pertama yang finish". Pertanyaan kedua itu dulu ikut jadi
-     * syarat, dan berbahaya: hitungan finish dibaca SEBELUM status finish pemain ini
-     * ditulis, jadi kalau sudah ada yang tercatat finish tapi timer belum sempat
-     * menyala, pemain berikutnya gagal syarat "pertama" -> timer tak pernah menyala
-     * -> checkSuddenDeath() selalu return -> pemain sisa menggantung selamanya.
+     * The condition is just one -- "timer not yet running" -- and deliberately does NOT
+     * ask "am I the first player to finish". That second question used to be a condition,
+     * and it was dangerous: the finish count is read BEFORE this player's finish status
+     * is written, so if someone was already recorded as finished but the timer hadn't
+     * started yet, the next player fails the "first" test -> the timer never starts ->
+     * checkSuddenDeath() always returns -> the remaining players hang forever.
      *
-     * Update bersyarat `whereNull(...)` membuatnya atomik: dari dua request paralel,
-     * hanya satu yang dapat affected-rows = 1, jadi timer tak bisa di-reset oleh
-     * pemain kedua. Pola yang sama dipakai TypingEngine::attachToWarClaim().
+     * The conditional `whereNull(...)` update makes it atomic: of two parallel requests,
+     * only one gets affected-rows = 1, so the timer can't be reset by the second player.
+     * Same pattern as TypingEngine::attachToWarClaim().
      */
     private function startSuddenDeathIfNeeded(Room $room): bool
     {
@@ -141,8 +140,8 @@ trait FinalizesRace
             return false;
         }
 
-        // Muat ulang supaya pemanggil bisa membaca countdown_started_at yang baru
-        // (dipakai untuk menghitung deadline yang di-broadcast).
+        // Reload so the caller can read the fresh countdown_started_at (used to compute
+        // the broadcast deadline).
         $room->refresh();
 
         return true;
@@ -162,8 +161,8 @@ trait FinalizesRace
         $antiCheat = app(AntiCheatService::class);
         $reasons = $antiCheat->check($correctChars, $correctChars, $duration)['reasons'];
 
-        // Daftar sinyal "mustahil" hidup di AntiCheatService, bukan disalin ke sini:
-        // satu definisi kecurangan, dipakai race maupun solo.
+        // The list of "impossible" signals lives in AntiCheatService, not copied here:
+        // one definition of cheating, used by both race and solo.
         return ! $antiCheat->isCheating($reasons);
     }
 
@@ -181,7 +180,7 @@ trait FinalizesRace
             'accuracy' => $member->accuracy,
             'finished_time_seconds' => $member->finished_time_seconds,
             'place' => $member->place,
-            // false = ditolak anti-cheat (tak masuk statistik); null = belum difinalisasi.
+            // false = rejected by anti-cheat (excluded from stats); null = not yet finalized.
             'result_recorded' => $member->result_recorded,
         ])->values()->all();
     }

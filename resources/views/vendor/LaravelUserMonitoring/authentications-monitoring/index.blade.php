@@ -1,3 +1,4 @@
+{{-- Authentications monitoring table: user, action type (login/logout), IP, platform, and timestamp per event. --}}
 @extends('LaravelUserMonitoring::layouts.master')
 
 @section('title', 'Autentikasi')

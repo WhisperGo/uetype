@@ -21,8 +21,8 @@ class ClanLeaderboard extends Component
             ->orderBy('name')
             ->get();
 
-        // Hitung jumlah war yang dimenangkan tiap clan (challenger menang =
-        // result 'win'; opponent menang = result 'loss') dalam satu query set.
+        // Count wars won by each clan (challenger wins = result 'win'; opponent wins =
+        // result 'loss') in one query set.
         $finished = ClanWarModel::where('status', ClanWarStatus::Finished)->get();
 
         $wins = [];
@@ -40,9 +40,7 @@ class ClanLeaderboard extends Component
         ]);
     }
 
-    /**
-     * Id clan aktif user saat ini (untuk menyorot baris clan-nya).
-     */
+    /** The current user's active clan id (to highlight their clan's row). */
     public function getMyClanIdProperty(): ?int
     {
         return Auth::user()?->clan?->id;

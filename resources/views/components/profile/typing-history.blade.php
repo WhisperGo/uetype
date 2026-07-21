@@ -19,7 +19,7 @@ new class extends Component
             $query->where('mode', $this->filterMode);
         }
 
-        // Statistik agregat dari hasil terfilter.
+        // Aggregate statistics from the filtered results.
         $statsQuery = clone $query;
         $totalMatches = $statsQuery->count();
         $averageWpm = $totalMatches > 0 ? $statsQuery->avg('net_wpm') : 0;

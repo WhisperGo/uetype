@@ -1,12 +1,16 @@
+{{-- Floating chat overlay: a draggable toggle bubble (FAB) plus a docked drawer with
+     a conversation picker and thread view. Mirrors the full chat page in a compact form.
+     Its Echo subscription is owned by the global toast in the layout; this overlay only
+     listens to relayed window events. --}}
 <div x-data="chatOverlayDock(@entangle('open'))" class="font-mono">
-    {{-- Tombol toggle (bisa digeser): sembunyi saat sesi test/balapan aktif.
-         @entangle('open') menyinkron nilai ke server (memicu render konten segar). --}}
+    {{-- Toggle button (draggable): hidden while a test/race session is active.
+         @entangle('open') syncs the value to the server (triggering a fresh content render). --}}
     <button x-show="!hidden" x-cloak x-ref="bubble"
         @pointerdown="startDrag($event)"
         :style="bubbleStyle()"
-        {{-- Sengaja TIDAK memakai <x-btn-gold>: ini FAB bulat dengan logika drag,
-             bukan tombol teks. Memaksakannya ke komponen hanya akan menambah prop
-             yang tak dipakai siapa pun. --}}
+        {{-- Deliberately NOT using <x-btn-gold>: this is a round FAB with drag logic,
+             not a text button. Forcing it into that component would only add props no
+             one uses. --}}
         class="fixed z-[56] w-14 h-14 rounded-full bg-gold hover:bg-gold/90 text-background shadow-xl flex items-center justify-center transition-colors touch-none select-none cursor-grab active:cursor-grabbing"
         aria-label="{{ __('chat.title') }}">
         <svg class="w-6 h-6 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -19,7 +23,7 @@
         @endif
     </button>
 
-    {{-- Drawer: menempel di posisi bubble, dijaga tetap di dalam layar. --}}
+    {{-- Drawer: anchored to the bubble's position and kept within the viewport. --}}
     <div x-show="open && !hidden" x-cloak x-ref="panel"
         x-transition:enter="transition ease-out duration-200"
         x-transition:enter-start="opacity-0 translate-y-4"
@@ -131,12 +135,12 @@
                 </button>
             </div>
 
-            {{-- Daftar pesan --}}
+            {{-- Message list --}}
             <div x-data="chatOverlayScroll()" x-init="init()" id="overlay-chat-messages"
                 class="flex-1 overflow-y-auto chat-scroll p-3 space-y-2.5">
                 @if ($this->hasMoreOlder)
                     <div class="flex justify-center pb-2">
-                        {{-- Ukuran mentah: overlay pakai teks 0.65rem, di luar peta btn-ghost. --}}
+                        {{-- Raw size: the overlay uses 0.65rem text, outside the btn-ghost size map. --}}
                         <x-btn-ghost size="px-2.5 py-1 text-[0.65rem]" wire:click="loadOlder">{{ __('chat.load_older') }}</x-btn-ghost>
                     </div>
                 @endif
@@ -150,7 +154,7 @@
                 @endforelse
             </div>
 
-            {{-- Preview reply --}}
+            {{-- Reply preview --}}
             @if ($this->replyingTo)
                 <x-chat.reply-preview :message="$this->replyingTo" size="sm" />
             @endif
@@ -161,32 +165,31 @@
 
     {{-- MODAL: CLEAR CHAT --}}
     @if ($showClearModal)
-        {{-- z di atas drawer overlay (z-[55]) supaya modal tak tertimbun. --}}
+        {{-- z above the overlay drawer (z-[55]) so the modal isn't buried. --}}
         <x-chat.clear-modal z="z-[57]" />
     @endif
 
-    {{-- REAL-TIME: subscription Echo dipegang chatToasts() di layout (satu-satunya
-         subscriber). Overlay ini cukup mendengar event window yang diteruskannya.
+    {{-- REAL-TIME: the Echo subscription is owned by chatToasts() in the layout (the
+         only subscriber). This overlay just listens to the window events it relays.
 
-         Bodi runtime ada di resources/js/chat-runtime.js. Yang TIDAK ikut pindah
-         ke sana: window.__chatOverlayState. Flag itu dibaca chatToasts() untuk
-         memutuskan kapan toast disupresi, dan HANYA BOLEH ditulis overlay --
-         kalau halaman penuh ikut menulisnya, toast tertekan di halaman yang
-         salah. Karena itu ia sengaja tinggal di sini, terlihat, bukan tersembunyi
-         di modul bersama. --}}
+         The runtime body lives in resources/js/chat-runtime.js. What did NOT move there:
+         window.__chatOverlayState. chatToasts() reads that flag to decide when to
+         suppress a toast, and ONLY the overlay may write it -- if the full page wrote
+         it too, toasts would be suppressed on the wrong page. So it stays here,
+         visible, rather than hidden in the shared module. --}}
     @script
         <script>
-            // Inisialisasi dari nilai $wire saat ini (bukan asumsi default) supaya
-            // chatToasts() langsung akurat begitu script jalan, tanpa menunggu watcher
-            // pertama. Watcher $watch hanya menyala saat berubah, bukan saat init.
+            // Initialize from the current $wire values (not assumed defaults) so
+            // chatToasts() is accurate the moment this script runs, without waiting for
+            // the first watcher. $watch only fires on change, not on init.
             window.__chatOverlayState = {
                 open: $wire.open,
                 mode: $wire.activeMode,
                 withUsername: $wire.withUsername,
             };
 
-            // Umumkan status buka/tutup & thread aktif tiap kali properti Livewire berubah,
-            // supaya chatToasts() di layout tahu kapan mensupresi toast untuk thread ini.
+            // Announce open/closed state and the active thread whenever a Livewire property
+            // changes, so chatToasts() in the layout knows when to suppress a toast for this thread.
             $wire.$watch('open', (v) => { window.__chatOverlayState.open = v; });
             $wire.$watch('activeMode', (v) => { window.__chatOverlayState.mode = v; });
             $wire.$watch('withUsername', (v) => { window.__chatOverlayState.withUsername = v; });
@@ -200,8 +203,8 @@
                     edited: @js(__('chat.edited')),
                     deleted: @js(__('chat.deleted_placeholder')),
                 },
-                // Drawer tertutup = tak terlihat: jangan gambar bubble ke dalamnya
-                // dan jangan picu roundtrip Livewire tiap pesan masuk.
+                // Closed drawer = not visible: don't draw bubbles into it and don't
+                // trigger a Livewire roundtrip on every incoming message.
                 isActive: () => !!window.__chatOverlayState?.open,
             });
         </script>

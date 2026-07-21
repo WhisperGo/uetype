@@ -7,28 +7,28 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 
 /**
- * Perakit teks latihan dari wordlist JSON. SATU sumber kebenaran untuk seluruh mode.
+ * Assembles practice text from JSON wordlists. THE single source of truth for every mode.
  *
- * Dulu logika ini ada dua kali: TypingEngine::generateText() (multi-bahasa, jumlah
- * kata per mode) dan MultiplayerLobby::generateRaceText() (hardcode indonesian.json,
- * 45 kata, fallback potongan lirik lagu). Duplikasi itu bukan cuma soal kerapian --
- * ia melahirkan bug fitur: multiplayer TIDAK mendukung bahasa Inggris sama sekali,
- * padahal mode solo mendukung.
+ * This logic used to exist twice: TypingEngine::generateText() (multi-language,
+ * word count per mode) and MultiplayerLobby::generateRaceText() (hardcoded
+ * indonesian.json, 45 words, song-lyric fallback). The duplication wasn't just
+ * untidy -- it produced a feature bug: multiplayer did NOT support English at all,
+ * even though solo mode did.
  */
 class TextGeneratorService
 {
-    /** Stok kata untuk mode time: cukup panjang supaya tak habis sebelum waktu usai. */
+    /** Word stock for time mode: long enough not to run out before the clock does. */
     public const TIME_WORD_COUNT = 350;
 
-    /** Survival tak punya batas waktu/kata -> stoknya paling panjang. */
+    /** Survival has no time/word limit -> its stock is the longest. */
     public const SURVIVAL_WORD_COUNT = 500;
 
-    /** Panjang teks satu balapan multiplayer. */
+    /** Text length of a single multiplayer race. */
     public const RACE_WORD_COUNT = 45;
 
     /**
-     * Teks untuk satu sesi solo sesuai mode: 'words' sebanyak sub-mode-nya,
-     * 'survival' & 'time' memakai stok tetap.
+     * Text for one solo session per mode: 'words' uses its sub-mode count,
+     * 'survival' & 'time' use a fixed stock.
      */
     public function forSoloMode(string $mode, string $subMode, string $lang): string
     {
@@ -41,15 +41,15 @@ class TextGeneratorService
         return $this->randomWords($limit, $lang);
     }
 
-    /** Teks untuk satu balapan multiplayer. Kini ikut menghormati bahasa konten. */
+    /** Text for one multiplayer race. Now honors the content language too. */
     public function forRace(string $lang = TypingLanguage::DEFAULT): string
     {
         return $this->randomWords(self::RACE_WORD_COUNT, $lang);
     }
 
     /**
-     * Rangkai $limit kata acak dari wordlist bahasa tersebut, huruf kecil semua.
-     * Wordlist lebih pendek dari $limit tetap aman: kata diambil berulang sampai cukup.
+     * Assemble $limit random words from that language's wordlist, all lowercase.
+     * A wordlist shorter than $limit is safe: words are drawn repeatedly until enough.
      */
     public function randomWords(int $limit, string $lang): string
     {
@@ -71,11 +71,11 @@ class TextGeneratorService
     }
 
     /**
-     * Wordlist sebuah bahasa, di-cache di memori proses.
+     * A language's wordlist, cached in process memory.
      *
-     * File-nya statis (tak pernah berubah saat runtime), tapi dulu dibaca dari disk
-     * dan di-decode JSON ULANG setiap kali user ganti mode, ganti bahasa, atau
-     * restart -- padahal hasilnya selalu sama.
+     * The file is static (never changes at runtime), but it used to be read from
+     * disk and JSON-decoded AGAIN every time the user switched mode, switched
+     * language, or restarted -- even though the result is always the same.
      *
      * @return array<int, string>
      */

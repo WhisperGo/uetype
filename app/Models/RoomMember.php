@@ -8,14 +8,14 @@ use Illuminate\Database\Eloquent\Model;
 class RoomMember extends Model
 {
     /**
-     * Penanda DNF (menyerah / kehabisan waktu sudden death) di kolom
-     * finished_time_seconds. BUKAN durasi sungguhan -- cuma nilai besar supaya
-     * pemain DNF selalu terurut di bawah semua penyelesai sah.
+     * DNF marker (gave up / ran out of sudden-death time) stored in the
+     * finished_time_seconds column. NOT a real duration -- just a large value so
+     * DNF players always sort below every legitimate finisher.
      *
-     * Sentinel ini transient: rooms/room_members dihapus begitu semua pemain
-     * keluar. Ia TIDAK BOLEH ikut ke multiplayer_match_history (riwayat permanen),
-     * karena di sana kolomnya bermakna "durasi tempuh" dan 999 akan mencemari
-     * statistik apa pun yang menghitung rata-rata waktu finish.
+     * This sentinel is transient: rooms/room_members are deleted once all players
+     * leave. It MUST NOT reach multiplayer_match_history (the permanent record),
+     * where that column means "elapsed duration" and 999 would poison any statistic
+     * that averages finish time.
      */
     public const DNF_SENTINEL_SECONDS = 999;
 
@@ -33,25 +33,25 @@ class RoomMember extends Model
         'result_recorded' => 'boolean',
     ];
 
-    /** Pemain ini tidak menyelesaikan balapan (menyerah / kehabisan waktu). */
+    /** Whether this player did not finish the race (gave up / ran out of time). */
     public function isDnf(): bool
     {
         return (int) $this->finished_time_seconds === self::DNF_SENTINEL_SECONDS;
     }
 
-    /** Durasi tempuh SUNGGUHAN, atau null kalau DNF (tak ada durasi yang bermakna). */
+    /** The REAL elapsed duration, or null if DNF (no meaningful duration). */
     public function realFinishedSeconds(): ?int
     {
         return $this->isDnf() ? null : $this->finished_time_seconds;
     }
 
-    /** Penonton: menonton live, tak masuk klasemen/place/XP. */
+    /** Spectator: watches live, excluded from standings/placement/XP. */
     public function isSpectator(): bool
     {
         return $this->role === self::ROLE_SPECTATOR;
     }
 
-    /** Pembalap: ikut race, klasemen, place, dan XP. */
+    /** Racer: participates in the race, standings, placement, and XP. */
     public function isPlayer(): bool
     {
         return ! $this->isSpectator();

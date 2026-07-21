@@ -4,8 +4,8 @@
 ])
 
 @php
-    // Invarian di 22 dari 23 pemakaian sebelumnya; yang bervariasi cuma padding
-    // dan ukuran teks, jadi itu saja yang jadi prop.
+    // Invariant across 22 of 23 previous usages; only padding and text size
+    // varied, so those are the only props.
     $base = 'font-mono font-bold text-background bg-gold hover:bg-gold/90 rounded-lg transition';
 
     $sizes = [
@@ -17,15 +17,15 @@
         'xl' => 'px-5 py-2.5 text-xs',
     ];
 
-    // Nilai di luar peta dipakai apa adanya. Beberapa tombol punya padding
-    // one-off; menampungnya lewat `class=` akan bentrok dengan padding dari
-    // peta (dua utility Tailwind yang sama, urutan menang tak terduga).
+    // Values outside the map are used as-is. Some buttons have one-off padding;
+    // handling that via `class=` would clash with the map's padding (two identical
+    // Tailwind utilities, unpredictable win order).
     $classes = $base.' '.($sizes[$size] ?? $size);
 @endphp
 
-{{-- Tombol aksi utama (emas). `as` mengakomodasi pemakaian sebagai <a> untuk
-     navigasi dan <span> untuk badge non-interaktif -- keduanya sudah ada di
-     codebase, jadi memaksakan <button> akan mengubah semantik HTML. --}}
+{{-- Primary action button (gold). `as` accommodates use as <a> for navigation
+     and <span> for non-interactive badges -- both already exist in the codebase,
+     so forcing <button> would change the HTML semantics. --}}
 @if ($as === 'a')
     <a {{ $attributes->class($classes) }}>{{ $slot }}</a>
 @elseif ($as === 'span')

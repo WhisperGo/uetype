@@ -58,7 +58,7 @@ class TypingResult extends Component
 
     public $textToType;
 
-    /** Stream error ringkas dari session: [{second, index, actual}]. Di-enrich saat render. */
+    /** Compact error stream from the session: [{second, index, actual}]. Enriched at render time. */
     public $errorEvents;
 
     public function mount()
@@ -92,18 +92,18 @@ class TypingResult extends Component
         $this->isSurvivalPersonalBest = $result['isSurvivalPersonalBest'] ?? false;
         $this->ghostResult = $result['ghostResult'] ?? null;
         $this->textToType = $result['textToType'] ?? null;
-        // ?? WAJIB: sesi lama (dari request sebelum deploy) tak punya kunci ini.
+        // ?? REQUIRED: old sessions (from before this deploy) don't have this key.
         $this->errorEvents = $result['errorEvents'] ?? [];
     }
 
     /**
-     * View model penanda error: KAPAN (detik), TUTS MANA, DI KATA MANA + apa yang
-     * benar-benar ditekan.
+     * Error-marker view model: WHEN (seconds), WHICH KEY, IN WHICH WORD + what was
+     * actually pressed.
      *
-     * #[Computed], BUKAN properti publik: hasil enrich-nya berkali lipat lebih besar
-     * dari errorEvents mentah (tiap event membawa string kata), dan properti publik ikut
-     * di-serialize ke snapshot Livewire di SETIAP request — padahal ini cuma dibutuhkan
-     * saat render. Lazy juga: cabang survival tak pernah menyentuhnya.
+     * #[Computed], NOT a public property: its enriched output is many times larger than
+     * the raw errorEvents (each event carries a word string), and public properties are
+     * serialized into the Livewire snapshot on EVERY request — yet this is only needed at
+     * render time. Lazy too: the survival branch never touches it.
      */
     #[Computed]
     public function errorSeries(): array
@@ -116,14 +116,14 @@ class TypingResult extends Component
     }
 
     /**
-     * Ulang tantangan yang sama persis (hanya mode words): titipkan teks + mode sesi
-     * ini ke session lalu kembali ke /typing, yang akan memakainya sekali pakai
-     * ketimbang merakit teks acak baru. Berbeda dari "Next Test" yang selalu acak.
+     * Retry the exact same challenge (words mode only): stash this session's text + mode
+     * in the session then return to /typing, which uses it once instead of assembling
+     * fresh random text. Differs from "Next Test", which is always random.
      */
     public function retry()
     {
-        // Full-load (TANPA navigate:true): masuk /typing via SPA lalu Back akan me-restore
-        // snapshot mesin ketik yang rusak. Muat penuh menjaga /typing selalu mount bersih.
+        // Full load (WITHOUT navigate:true): entering /typing via SPA then Back would
+        // restore a broken typing-engine snapshot. A full load keeps /typing mounting clean.
         if ($this->mode !== 'words' || ! $this->textToType) {
             return $this->redirect(route('typing'));
         }

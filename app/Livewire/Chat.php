@@ -11,9 +11,9 @@ use Livewire\Component;
  * The chat page for direct messages and clan channels: active conversation,
  * paginated history, send/edit/delete, driven by the Message* broadcast events.
  *
- * Seluruh alur percakapannya ada di ManagesChatConversation, dipakai bersama
- * ChatOverlay. Yang tersisa di sini hanya yang memang khas halaman penuh:
- * state tersimpan di URL, inbox tanpa batas, dan layout.
+ * The whole conversation flow lives in ManagesChatConversation, shared with
+ * ChatOverlay. What remains here is only what's specific to the full page:
+ * URL-persisted state, an unbounded inbox, and the layout.
  */
 class Chat extends Component
 {
@@ -21,13 +21,13 @@ class Chat extends Component
 
     public const PAGE_SIZE = 30;
 
-    // Mode percakapan aktif: 'dm' | 'clan'. Null = tampilan inbox saja.
-    // #[Url] hanya di sini: halaman penuh bisa di-bookmark & dibagikan,
-    // sedangkan overlay tak boleh mengubah URL halaman yang sedang dibuka.
+    // Active conversation mode: 'dm' | 'clan'. Null = inbox view only.
+    // #[Url] only here: the full page can be bookmarked & shared, whereas the overlay
+    // must not rewrite the URL of the page it's opened over.
     #[Url(as: 'mode')]
     public ?string $activeMode = null;
 
-    // Username teman yang percakapannya sedang dibuka (mode 'dm').
+    // Username of the friend whose conversation is open (mode 'dm').
     #[Url(as: 'with')]
     public ?string $withUsername = null;
 
@@ -36,7 +36,7 @@ class Chat extends Component
         return self::PAGE_SIZE;
     }
 
-    /** Kembali ke inbox. */
+    /** Return to the inbox. */
     public function closeConversation(): void
     {
         $this->resetConversation();

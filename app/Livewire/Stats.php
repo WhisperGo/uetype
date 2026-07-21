@@ -20,21 +20,22 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Stats extends Component
 {
-    /** Rentang grafik WPM & akurasi: 7 | 30 hari terakhir, atau seluruh riwayat. */
+    /** WPM & accuracy chart range: last 7 | 30 days, or all history. */
     #[Url(as: 'range')]
     public string $range = '7';
 
-    /** Whitelist rentang; nilai di luar ini dianggap '7'. */
+    /** Range whitelist; anything outside it is treated as '7'. */
     private const RANGES = ['7', '30', 'all'];
 
+    /** Set the chart range, ignoring values outside the whitelist. */
     public function setRange(string $range): void
     {
         $this->range = in_array($range, self::RANGES, true) ? $range : '7';
     }
 
     /**
-     * Rekor WPM tertinggi per mode+config, dipetakan config => WPM.
-     * Contoh: words => ['15' => 131.0, '25' => 122.0].
+     * Best WPM per mode+config, mapped config => WPM.
+     * Example: words => ['15' => 131.0, '25' => 122.0].
      *
      * @return array<string, float>
      */
@@ -51,8 +52,8 @@ class Stats extends Component
     }
 
     /**
-     * Survival dinilai dari LAMA BERTAHAN, bukan WPM — jadi rekornya
-     * MAX(duration_seconds) per tingkat kesulitan, bukan MAX(net_wpm).
+     * Survival is judged by HOW LONG YOU SURVIVE, not WPM -- so the record is
+     * MAX(duration_seconds) per difficulty, not MAX(net_wpm).
      *
      * @return array<string, int>
      */
@@ -69,8 +70,8 @@ class Stats extends Component
     }
 
     /**
-     * Deret grafik (WPM & akurasi) untuk rentang aktif, urut kronologis.
-     * Diambil menaik lalu dibatasi agar rentang 'all' tak menarik ribuan baris.
+     * Chart series (WPM & accuracy) for the active range, in chronological order.
+     * Taken ascending then capped so the 'all' range doesn't pull thousands of rows.
      *
      * @return array{labels: list<string>, wpm: list<float>, accuracy: list<float>}
      */
@@ -94,11 +95,11 @@ class Stats extends Component
     }
 
     /**
-     * Porsi tiap mode dari total tes, dibulatkan ke persen.
+     * Each mode's share of total tests, rounded to a percent.
      *
-     * Catatan: 'ghost' TIDAK disertakan. Sesi ghost tersimpan sebagai baris
-     * 'time'/'words' biasa (TypingEngine tak pernah menulis mode 'ghost'),
-     * jadi slice ghost akan selalu 0% dan menyesatkan.
+     * Note: 'ghost' is NOT included. Ghost sessions are stored as ordinary
+     * 'time'/'words' rows (TypingEngine never writes a 'ghost' mode), so a ghost
+     * slice would always be 0% and misleading.
      *
      * @return list<array{mode: string, count: int, percent: int}>
      */
@@ -127,9 +128,9 @@ class Stats extends Component
     }
 
     /**
-     * Halaman ini hanya memajang achievement yang SUDAH diraih — semuanya, tanpa
-     * batas. Yang masih terkunci sengaja tak ditampilkan: daftar lengkap beserta
-     * progresnya sudah jadi tugas /achievements.
+     * This page shows only achievements ALREADY earned -- all of them, unbounded.
+     * Still-locked ones are deliberately hidden: the full list with progress is the
+     * job of /achievements.
      *
      * @param  array<int, array{earned: bool}>  $items
      * @return array{earned: array<int, array<string, mixed>>, total: int}
@@ -153,9 +154,9 @@ class Stats extends Component
      */
     private function multiplayerStats(int $userId): array
     {
-        // Enam angka, satu query (dulu: count/count/avg/max/avg = 5 query terpisah
-        // atas tabel & filter yang sama). Jumlah menang dihitung lewat SUM(CASE...),
-        // jadi tak perlu query kedua hanya untuk menyaring place = 1.
+        // Six numbers, one query (was: count/count/avg/max/avg = 5 separate queries over
+        // the same table & filter). Wins are counted via SUM(CASE...), so no second query
+        // just to filter place = 1.
         $agg = MultiplayerMatchHistory::where('user_id', $userId)
             ->selectRaw('
                 COUNT(*) as total_races,
@@ -238,7 +239,7 @@ class Stats extends Component
     {
         $user = Auth::user();
 
-        // Lima agregat atas tabel & filter yang PERSIS SAMA -> satu query, bukan lima.
+        // Five aggregates over the EXACT SAME table & filter -> one query, not five.
         $agg = TypingResult::where('user_id', $user->id)
             ->selectRaw('
                 COUNT(*) as total_tests,

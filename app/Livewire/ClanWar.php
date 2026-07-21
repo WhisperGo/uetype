@@ -27,10 +27,10 @@ class ClanWar extends Component
     // Durasi war setelah tantangan diterima.
     public const WAR_DURATION_DAYS = 3;
 
-    // Batas waktu tantangan harus di-accept sebelum otomatis hangus.
+    // How long a challenge has to be accepted before it auto-expires.
     public const ACCEPT_WINDOW_HOURS = 1;
 
-    /** Tutup war lewat-waktu (expire Pending, resolve Ongoing) sebelum computed property membaca data. */
+    /** Close overdue wars (expire Pending, resolve Ongoing) before computed properties read data. */
     public function mount(ClanWarResolver $resolver): void
     {
         $resolver->resolveDue();
@@ -61,7 +61,7 @@ class ClanWar extends Component
         return $this->myClan?->activeWar();
     }
 
-    /** Tantangan masuk (war Pending, clan kita opponent); hanya relevan untuk leader. */
+    /** Incoming challenge (Pending war where our clan is the opponent); only relevant to leaders. */
     public function getIncomingChallengeProperty(): ?ClanWarModel
     {
         $war = $this->myActiveWar;
@@ -73,17 +73,17 @@ class ClanWar extends Component
         return $war->opponent_clan_id === $this->myClan->id ? $war : null;
     }
 
-    /** Clan lain yang bebas ditantang; hanya untuk leader yang clan-nya sendiri juga bebas. */
+    /** Other clans free to challenge; only for a leader whose own clan is also free. */
     public function getChallengeableClansProperty()
     {
         if (! $this->isLeader || $this->myActiveWar) {
             return collect();
         }
 
-        // Penyaringan "sedang berperang" dilakukan DI DATABASE lewat satu subquery.
-        // Dulu daftarnya ditarik utuh lalu di-filter() di PHP dengan memanggil
-        // activeWar() per clan -- satu query tambahan untuk SETIAP clan, tiap kali
-        // halaman ini dirender. Dengan 50 clan itu 51 query untuk satu daftar.
+        // The "currently at war" filter runs IN THE DATABASE via a single subquery.
+        // Previously the full list was pulled then filter()ed in PHP by calling activeWar()
+        // per clan -- one extra query for EVERY clan, every time this page renders. With 50
+        // clans that's 51 queries for one list.
         $busyClanIds = ClanWarModel::query()
             ->whereIn('status', [ClanWarStatus::Pending, ClanWarStatus::Ongoing])
             ->select('challenger_clan_id')
@@ -99,7 +99,7 @@ class ClanWar extends Component
             ->get();
     }
 
-    /** Riwayat war sendiri yang sudah selesai, terbaru dulu. */
+    /** This clan's own finished war history, newest first. */
     public function getWarHistoryProperty()
     {
         if (! $this->myClan) {
@@ -118,8 +118,8 @@ class ClanWar extends Component
     }
 
     /**
-     * Grid 9 mode wajib untuk war Ongoing. Tiap entri: mode/config/ceiling + status
-     * ('open' | 'claimed' | 'done') plus baris klaim kalau ada.
+     * The 9-mode grid required for an Ongoing war. Each entry: mode/config/ceiling +
+     * status ('open' | 'claimed' | 'done') plus the claim row if any.
      */
     public function getModeGridProperty()
     {
@@ -129,8 +129,8 @@ class ClanWar extends Component
             return collect();
         }
 
-        // Ambil semua klaim sekaligus (hindari N query); typingResult eager-load untuk
-        // kartu mode yang sudah selesai.
+        // Fetch all claims at once (avoid N queries); typingResult eager-loaded for the
+        // already-finished mode cards.
         $claims = ClanWarModeClaim::with(['user', 'typingResult'])
             ->where('clan_war_id', $war->id)
             ->where('clan_id', $this->myClan->id)
@@ -155,7 +155,7 @@ class ClanWar extends Component
         });
     }
 
-    /** Total poin clan sendiri sejauh ini (hanya mode yang sudah disubmit). */
+    /** This clan's total points so far (only submitted modes). */
     public function getMyClanPointsProperty(): float
     {
         $war = $this->myActiveWar;
@@ -170,11 +170,11 @@ class ClanWar extends Component
             ->sum('points');
     }
 
-    // ---- AKSI ----
+    // ---- ACTIONS ----
 
     /**
-     * Klaim salah satu dari 9 mode, lalu arahkan ke typing engine dengan mode terkunci.
-     * Unique constraint DB jadi jaring pengaman terakhir untuk race dua member klaim bersamaan.
+     * Claim one of the 9 modes, then redirect to the typing engine with the mode locked.
+     * The DB unique constraint is the last safety net against two members claiming at once.
      */
     public function claimMode(string $mode, string $config): void
     {
@@ -190,7 +190,7 @@ class ClanWar extends Component
 
         try {
             $claim = DB::transaction(function () use ($war, $mode, $config) {
-                // Cek dulu clan ini belum mengklaim slot ini.
+                // First check this clan hasn't already claimed this slot.
                 $existing = ClanWarModeClaim::where('clan_war_id', $war->id)
                     ->where('clan_id', $this->myClan->id)
                     ->where('mode', $mode)
@@ -211,7 +211,7 @@ class ClanWar extends Component
                 ]);
             });
         } catch (QueryException $e) {
-            // Unique violation: member lain baru saja mengambil slot ini.
+            // Unique violation: another member just took this slot.
             $claim = null;
         }
 
@@ -224,7 +224,7 @@ class ClanWar extends Component
         $this->redirect(route('typing', ['war_claim' => $claim->id]), navigate: true);
     }
 
-    /** Batalkan klaim belum-disubmit (mode kembali kosong); pengklaim sendiri atau leader. */
+    /** Cancel an unsubmitted claim (the mode reopens); the claimer themselves or a leader. */
     public function cancelClaim(int $claimId): void
     {
         if (! $this->myClan) {
@@ -240,7 +240,7 @@ class ClanWar extends Component
             return;
         }
 
-        // Hanya pengklaim atau leader yang boleh membatalkan.
+        // Only the claimer or a leader may cancel.
         if ($claim->user_id !== Auth::id() && ! $this->isLeader) {
             return;
         }
@@ -256,7 +256,7 @@ class ClanWar extends Component
 
         $opponent = Clan::find($opponentClanId);
 
-        // Re-validasi server-side: jangan percaya daftar yang tampil di client.
+        // Server-side re-validation: don't trust the list shown on the client.
         if (! $opponent || $opponent->id === $this->myClan->id || $opponent->activeWar() !== null) {
             return;
         }
@@ -310,7 +310,7 @@ class ClanWar extends Component
         ]);
     }
 
-    /** War Pending di mana clan kita adalah opponent & kita leadernya. */
+    /** A Pending war where our clan is the opponent and we're its leader. */
     private function pendingChallengeForMyLeadership(int $warId): ?ClanWarModel
     {
         if (! $this->isLeader || ! $this->myClan) {

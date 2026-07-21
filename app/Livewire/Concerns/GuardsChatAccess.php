@@ -12,11 +12,11 @@ use App\Support\SafeBroadcast;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Gerbang keamanan & pengiriman pesan bersama untuk komponen chat (halaman
- * penuh Chat dan overlay ChatOverlay). Diekstrak supaya aturan "siapa boleh
- * DM/lihat pesan siapa" hanya hidup di satu tempat untuk kedua komponen
- * Livewire — ChatController tetap terpisah (alasan latency, lihat class
- * doc-comment-nya), bukan kelas Livewire jadi tak ikut memakai trait ini.
+ * Shared security gate & message sending for the chat components (the full-page Chat
+ * and the ChatOverlay drawer). Extracted so the "who may DM / see whose messages" rules
+ * live in one place for both Livewire components — ChatController stays separate (for
+ * latency reasons, see its class doc comment) and, not being a Livewire class, doesn't
+ * use this trait.
  */
 trait GuardsChatAccess
 {
@@ -33,7 +33,7 @@ trait GuardsChatAccess
         return $this->myMembership?->clan;
     }
 
-    /** Hanya teman berstatus accepted; dicek ulang server-side tiap aksi. */
+    /** Accepted friends only; re-checked server-side on every action. */
     private function isAcceptedFriend(int $otherId): bool
     {
         $friendship = Auth::user()->friendshipWith($otherId);
@@ -41,7 +41,7 @@ trait GuardsChatAccess
         return $friendship?->status === FriendshipStatus::Accepted;
     }
 
-    /** Berhak melihat (dan "delete for me") pesan: DM yang melibatkan dirinya, atau clan aktifnya. */
+    /** May see (and "delete for me") a message: a DM involving them, or their active clan's. */
     private function canSeeMessage(Message $message): bool
     {
         $me = Auth::id();

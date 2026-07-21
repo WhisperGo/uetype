@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 /** A directed friend relationship (requester -> addressee) with its status. */
 class Friendship extends Model
 {
-    // Action monitoring: log create/update/delete pertemanan (binafy/laravel-user-monitoring).
+    // Action monitoring: logs friendship create/update/delete (binafy/laravel-user-monitoring).
     use Actionable;
 
     protected $fillable = [
@@ -37,20 +37,20 @@ class Friendship extends Model
     }
 
     /**
-     * Ajukan pertemanan $requesterId -> $addresseeId, tapi hanya kalau belum ada
-     * relasi ke arah MANA PUN. Mengembalikan null kalau sudah ada.
+     * Request friendship $requesterId -> $addresseeId, but only if no relation exists
+     * in EITHER direction. Returns null if one already exists.
      *
-     * Satu pintu untuk ketiga tempat yang dulu menyalin pola "cek friendshipWith()
-     * lalu create()" sendiri-sendiri (FriendButton, Friends, leaderboard).
+     * Single entry point for the three places that used to copy the "check
+     * friendshipWith() then create()" pattern themselves (FriendButton, Friends,
+     * leaderboard).
      *
-     * PERHATIAN -- ini TIDAK menutup jendela konkurensi sesungguhnya. Unique index
-     * di DB hanya `(requester_id, addressee_id)`, jadi satu arah: A->B dan B->A bisa
-     * hidup bersamaan. Transaksi di sini menyerialkan pemeriksaan terhadap penulis
-     * lain di koneksi yang sama, tapi dua request benar-benar paralel masih bisa
-     * lolos berdua. Menutupnya butuh unique index atas pasangan yang dinormalisasi
-     * (LEAST/GREATEST sebagai generated column), yang sintaksnya berbeda antara
-     * MySQL dan sqlite -- harga yang belum sepadan untuk dampaknya: dua baris
-     * pending yang redundan, bukan kerusakan data.
+     * CAUTION -- this does NOT close the real concurrency window. The DB unique index
+     * is only `(requester_id, addressee_id)`, i.e. one-directional: A->B and B->A can
+     * coexist. The transaction here serializes the check against other writers on the
+     * same connection, but two truly parallel requests can still both get through.
+     * Closing that would need a unique index over the normalized pair (LEAST/GREATEST
+     * as a generated column), whose syntax differs between MySQL and sqlite -- not yet
+     * worth it for the impact: two redundant pending rows, not data corruption.
      */
     public static function requestBetween(int $requesterId, int $addresseeId): ?self
     {
@@ -78,15 +78,15 @@ class Friendship extends Model
     }
 
     /**
-     * Relasi $meId terhadap BANYAK user sekaligus dalam SATU query, dipetakan
+     * $meId's relation to MANY users at once in ONE query, mapped
      * user_id => ['relation', 'friendship_id'].
      *
-     * Pengganti pemanggilan User::friendshipWith() di dalam loop (satu query per
-     * baris = N+1). Dipakai daftar pencarian teman & baris leaderboard, yang
-     * sama-sama perlu tahu status relasi untuk memilih tombol yang tepat.
+     * Replaces calling User::friendshipWith() inside a loop (one query per row = N+1).
+     * Used by the friend-search list and leaderboard rows, which both need the relation
+     * status to pick the right button.
      *
-     * relation: 'friends' | 'sent' | 'incoming'. User tanpa baris friendship
-     * TIDAK muncul di peta -- pemanggil memperlakukan absennya kunci sebagai 'none'.
+     * relation: 'friends' | 'sent' | 'incoming'. Users with no friendship row are
+     * ABSENT from the map -- callers treat a missing key as 'none'.
      *
      * @param  array<int, int>  $otherIds
      * @return array<int, array{relation: string, friendship_id: int}>
@@ -108,7 +108,7 @@ class Friendship extends Model
 
                 $relation = match (true) {
                     $f->status === FriendshipStatus::Accepted => 'friends',
-                    // Pending: arah panah menentukan tombol yang ditampilkan.
+                    // Pending: the direction decides which button is shown.
                     $f->requester_id === $meId => 'sent',
                     default => 'incoming',
                 };

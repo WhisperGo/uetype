@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** A player clan (guild): identity, Elo power, members, and war history. */
 class Clan extends Model
 {
-    // Action monitoring: log create/update/delete clan (binafy/laravel-user-monitoring).
+    // Action monitoring: logs clan create/update/delete (binafy/laravel-user-monitoring).
     use Actionable;
 
     protected $fillable = [
@@ -25,7 +25,7 @@ class Clan extends Model
         'power',
     ];
 
-    /** Level clan diturunkan murni dari power (tak ada kolom level, tak pernah out-of-sync). */
+    /** Clan level is derived purely from power (no stored level column, so it can never drift out of sync). */
     public const BASE_POWER = 1000;
 
     public const POWER_PER_LEVEL = 100;

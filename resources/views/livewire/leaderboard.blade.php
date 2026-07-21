@@ -35,8 +35,8 @@ $setTimeframe = function ($timeframe) {
     $this->timeframe = $timeframe;
 };
 
-// Bahasa teks yang diketik (en|id): dimensi ortogonal, berlaku untuk semua tab.
-// Normalisasi server-side -- kode tak dikenal jatuh ke default (en).
+// Typed-text language (en|id): an orthogonal dimension that applies to every tab.
+// Normalized server-side -- an unknown code falls back to the default (en).
 $setLanguage = function ($lang) {
     $this->currentLang = TypingLanguage::resolve($lang);
 };
@@ -44,8 +44,8 @@ $setLanguage = function ($lang) {
 $sendRequest = function (int $userId) {
     $me = Auth::id();
 
-    // Cek "sudah berelasi (arah mana pun)" + insert dilakukan sebagai satu operasi
-    // di dalam Friendship::requestBetween(), bukan dua langkah terpisah.
+    // The "already related (either direction)" check + insert happen as a single
+    // operation inside Friendship::requestBetween(), not two separate steps.
     if (! Friendship::requestBetween($me, $userId)) {
         return;
     }
@@ -55,16 +55,16 @@ $sendRequest = function (int $userId) {
     FriendshipUpdated::dispatch($userId, $payload);
 };
 
-// Metrik peringkat per tab: survival dinilai dari LAMA BERTAHAN, mode lain dari WPM.
+// Ranking metric per tab: survival is scored by SURVIVAL TIME, other modes by WPM.
 $metricFor = fn (string $tab) => $tab === 'survival' ? 'duration_seconds' : 'net_wpm';
 
-// Filter dasar (mode + config + timeframe aktif). Satu sumber kebenaran yang
-// dipakai papan DAN perhitungan rank, supaya keduanya tak mungkin memfilter
-// dengan aturan yang berbeda.
+// Base filter (active mode + config + timeframe). A single source of truth used by
+// BOTH the board and the rank computation, so the two can never filter by
+// different rules.
 //
-// State dioper eksplisit sebagai argumen, bukan lewat $this: closure biasa di
-// Volt TIDAK di-bind ke komponen (hanya action & computed yang di-bind), jadi
-// $this di sini akan fatal.
+// State is passed explicitly as arguments, not via $this: a plain closure in Volt
+// is NOT bound to the component (only actions and computeds are bound), so $this
+// here would be fatal.
 $scoped = function (string $tab, string $config, string $timeframe, string $language) {
     $q = TypingResult::where('mode', $tab)
         ->where('mode_config', $config)
@@ -77,7 +77,7 @@ $scoped = function (string $tab, string $config, string $timeframe, string $lang
     return $q;
 };
 
-// Rekor terbaik per user di scope aktif.
+// Each user's best record within the active scope.
 $bestPerUser = fn (string $metric, string $tab, string $config, string $timeframe, string $language) => $scoped($tab, $config, $timeframe, $language)
     ->select('user_id', DB::raw("MAX({$metric}) as best_score"))
     ->groupBy('user_id');
@@ -85,11 +85,11 @@ $bestPerUser = fn (string $metric, string $tab, string $config, string $timefram
 $leaderboard = computed(function () use ($metricFor, $bestPerUser) {
     $metric = $metricFor($this->currentTab);
 
-    // GROUP BY di query LUAR itu wajib, bukan hiasan: join mencocokkan
-    // `tr.{metric} = pb.best_score`, jadi user yang punya DUA hasil dengan skor
-    // identik (mudah terjadi -- net_wpm cuma 2 desimal) akan menghasilkan dua
-    // baris, menggandakan dirinya di papan DAN menggeser pemain lain keluar dari
-    // top 10. Grouping menjamin satu baris per user secara struktural.
+    // The GROUP BY on the OUTER query is required, not decorative: the join matches
+    // `tr.{metric} = pb.best_score`, so a user with TWO results at an identical score
+    // (easy to hit -- net_wpm has only 2 decimals) would produce two rows, duplicating
+    // themselves on the board AND pushing another player out of the top 10. Grouping
+    // structurally guarantees one row per user.
     $rows = TypingResult::from('typing_results as tr')
         ->joinSub($bestPerUser($metric, $this->currentTab, $this->currentConfig, $this->timeframe, $this->currentLang), 'pb', function ($join) use ($metric) {
             $join->on('tr.user_id', '=', 'pb.user_id')
@@ -102,8 +102,8 @@ $leaderboard = computed(function () use ($metricFor, $bestPerUser) {
             'users.username',
             'users.avatar',
             DB::raw('pb.best_score as score'),
-            // Akurasi dari sesi rekornya; kalau beberapa sesi seri di skor yang
-            // sama, ambil yang paling akurat sebagai pemecah seri.
+            // Accuracy from the record session; if several sessions tie on the same
+            // score, take the most accurate as the tie-breaker.
             DB::raw('MAX(tr.accuracy) as accuracy'),
         )
         ->orderBy('score', 'desc')
@@ -117,8 +117,8 @@ $leaderboard = computed(function () use ($metricFor, $bestPerUser) {
         return $rows->each(fn ($row) => $row->relation = 'none');
     }
 
-    // Status relasi untuk SEMUA baris dalam satu query (dulu: satu query per
-    // baris lewat friendshipWith() -> 10 query tiap ganti tab/config).
+    // Relationship status for ALL rows in a single query (previously: one query per
+    // row via friendshipWith() -> 10 queries on every tab/config change).
     $relations = Friendship::relationMapFor($me->id, $rows->pluck('user_id')->all());
 
     return $rows->each(function ($row) use ($relations) {
@@ -133,7 +133,7 @@ $userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
 
     $metric = $metricFor($this->currentTab);
 
-    // Rekor SAYA di mode/config ini. Belum pernah main -> tak punya peringkat.
+    // MY record in this mode/config. Never played -> unranked.
     $myBest = $scoped($this->currentTab, $this->currentConfig, $this->timeframe, $this->currentLang)
         ->where('user_id', Auth::id())
         ->max($metric);
@@ -142,16 +142,15 @@ $userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
         return __('leaderboard.unranked');
     }
 
-    // Peringkat = jumlah user yang rekornya LEBIH TINGGI dari rekor saya, + 1.
-    // Dihitung DI DATABASE lewat COUNT: yang kembali ke PHP cuma satu angka.
-    // (Dulu: pluck() menarik SATU BARIS PER USER ke memori PHP lalu array_search
-    //  -- 10.000 user = 10.000 baris ditarik, setiap kali user ganti tab.)
-    // CAST-nya WAJIB, bukan hiasan. Kolom hasil MAX() di dalam subquery tak punya
-    // type affinity di sqlite, sementara Laravel mem-bind angka pecahan sebagai
-    // TEXT -- dan sqlite mengurutkan SEMUA text di atas SEMUA angka. Tanpa cast,
-    // `103 > '102.5'` bernilai FALSE dan peringkat siapa pun yang rekornya
-    // berkoma jadi terlalu tinggi. MySQL memaksa konversi diam-diam sehingga
-    // bug ini tak terlihat di sana.
+    // Rank = the number of users whose record is HIGHER than mine, + 1.
+    // Computed IN THE DATABASE via COUNT: only a single number comes back to PHP.
+    // (Previously: pluck() pulled ONE ROW PER USER into PHP memory, then array_search
+    //  -- 10,000 users = 10,000 rows pulled, every time the user switches tabs.)
+    // The CAST is required, not decorative. A MAX() result column inside the subquery
+    // has no type affinity in sqlite, while Laravel binds fractional numbers as
+    // TEXT -- and sqlite sorts ALL text above ALL numbers. Without the cast,
+    // `103 > '102.5'` evaluates to FALSE and the rank of anyone with a fractional
+    // record comes out too high. MySQL coerces silently, so this bug is invisible there.
     $better = DB::query()
         ->fromSub($bestPerUser($metric, $this->currentTab, $this->currentConfig, $this->timeframe, $this->currentLang), 'pb')
         ->whereRaw('CAST(pb.best_score AS DECIMAL(12,2)) > CAST(? AS DECIMAL(12,2))', [$myBest])
@@ -162,6 +161,8 @@ $userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
 
 ?>
 
+{{-- Leaderboard page: top-10 ranking for the selected mode/config/timeframe/language,
+     the viewer's own rank, and per-row actions (view profile, ghost race, friend request). --}}
 <div class="text-muted font-mono py-16">
     <x-page-container width="max-w-4xl">
 
@@ -180,7 +181,7 @@ $userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
                     <button wire:click="setTimeframe('daily')" class="px-4 py-2 rounded-lg transition font-bold tracking-wider uppercase {{ $timeframe === 'daily' ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">{{ __('leaderboard.daily') }}</button>
                 </div>
 
-                {{-- Bahasa teks yang diketik (bukan bahasa UI): filter ortogonal, berlaku ke semua tab. --}}
+                {{-- Typed-text language (not the UI language): an orthogonal filter applying to all tabs. --}}
                 <div class="flex gap-1 bg-surface border border-border p-1 rounded-xl text-xs" role="group" aria-label="{{ __('leaderboard.language') }}">
                     @foreach (['en' => 'EN', 'id' => 'ID'] as $code => $label)
                         <button wire:click="setLanguage('{{ $code }}')" class="px-4 py-2 rounded-lg transition font-bold tracking-wider uppercase {{ $currentLang === $code ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">{{ $label }}</button>

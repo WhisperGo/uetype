@@ -1,5 +1,6 @@
+{{-- Confirmation modal for clearing a chat (all messages, or older than N days). --}}
 @props([
-    // Halaman penuh duduk di z-50; overlay harus di atas drawer-nya sendiri (z-[55]).
+    // The full page sits at z-50; the overlay must sit above its own drawer (z-[55]).
     'z' => 'z-50',
 ])
 

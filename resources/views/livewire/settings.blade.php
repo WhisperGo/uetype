@@ -1,3 +1,5 @@
+{{-- Settings page: language, account (avatar, display name, sign out), and the
+     danger zone (account deletion, gated behind a username-match confirmation). --}}
 <div class="py-10">
     <div class="max-w-4xl px-4 mx-auto space-y-10 sm:px-6 lg:px-8">
 

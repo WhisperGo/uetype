@@ -16,14 +16,15 @@ class ClanShow extends Component
         $this->clan = $clan;
     }
 
+    /** Active members of this clan, ordered by role. */
     public function getMembersProperty()
     {
         return $this->clan->activeMembers()->with('user')->orderBy('role')->get();
     }
 
     /**
-     * Riwayat war selesai clan ini, sudah diringkas per sudut pandang clan
-     * (hasil, lawan, delta power) lewat helper di model.
+     * This clan's finished-war history, summarized from the clan's viewpoint
+     * (result, opponent, power delta) via a model helper.
      */
     public function getHistoryProperty()
     {
@@ -34,6 +35,7 @@ class ClanShow extends Component
             ));
     }
 
+    /** The leader role value, so the view can flag the leader row. */
     public function getIsLeaderRole(): string
     {
         return ClanRole::Leader->value;

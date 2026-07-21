@@ -15,19 +15,20 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Endpoint kirim pesan yang ringan & paralel, sengaja di luar Livewire supaya spam
- * pesan tak ter-serialize oleh antrean request komponen (tiap kiriman = fetch()
- * fire-and-forget). Validasi & otorisasi sama persis dengan App\Livewire\Chat.
+ * Lightweight, parallel message-send endpoint, deliberately outside Livewire so a
+ * burst of messages isn't serialized by the component's request queue (each send is
+ * a fire-and-forget fetch()). Validation & authorization match App\Livewire\Chat exactly.
  */
 class ChatController extends Controller
 {
+    /** Validate the payload and dispatch it to the DM or clan send path. */
     public function send(Request $request): JsonResponse
     {
         $data = $request->validate([
             'mode' => 'required|in:dm,clan',
             'body' => 'required|string|max:2000',
-            'with' => 'nullable|string',        // username teman (mode dm)
-            'reply_to_id' => 'nullable|integer', // pesan yang dibalas
+            'with' => 'nullable|string',        // friend's username (dm mode)
+            'reply_to_id' => 'nullable|integer', // the message being replied to
         ]);
 
         $body = trim($data['body']);
@@ -41,6 +42,7 @@ class ChatController extends Controller
             : $this->sendDm($data['with'] ?? null, $body, $data['reply_to_id'] ?? null);
     }
 
+    /** Send a DM to an accepted friend; broadcasts to the recipient. */
     private function sendDm(?string $username, string $body, ?int $replyToId): JsonResponse
     {
         $friend = $username ? User::where('username', $username)->first() : null;
@@ -63,6 +65,7 @@ class ChatController extends Controller
         return response()->json(['ok' => true, 'id' => $message->id]);
     }
 
+    /** Send a message to the sender's active clan; broadcasts to the clan. */
     private function sendClan(string $body, ?int $replyToId): JsonResponse
     {
         $clan = $this->activeClan();
@@ -85,13 +88,15 @@ class ChatController extends Controller
         return response()->json(['ok' => true, 'id' => $message->id]);
     }
 
-    // ---- otorisasi (mirror App\Livewire\Chat) ----
+    // ---- authorization (mirror App\Livewire\Chat) ----
 
+    /** Whether the given user is an accepted friend of the current user. */
     private function isAcceptedFriend(int $otherId): bool
     {
         return Auth::user()->friendshipWith($otherId)?->status === FriendshipStatus::Accepted;
     }
 
+    /** The current user's active clan, or null if they aren't in one. */
     private function activeClan()
     {
         return ClanMember::with('clan')
@@ -100,6 +105,7 @@ class ChatController extends Controller
             ->first()?->clan;
     }
 
+    /** Accept the reply target only if it belongs to this DM thread; else null. */
     private function resolveDmReply(?int $replyToId, int $friendId): ?int
     {
         if (! $replyToId) {
@@ -116,6 +122,7 @@ class ChatController extends Controller
             : null;
     }
 
+    /** Accept the reply target only if it belongs to this clan; else null. */
     private function resolveClanReply(?int $replyToId, int $clanId): ?int
     {
         if (! $replyToId) {

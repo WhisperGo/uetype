@@ -26,7 +26,7 @@ class DirectMessageSent implements ShouldBroadcastNow
         return 'dm.sent';
     }
 
-    /** Payload minimal (bukan seluruh model): hindari bocor kolom ke WebSocket publik. */
+    /** Minimal payload (not the whole model) to avoid leaking columns over the public WebSocket. */
     public function broadcastWith(): array
     {
         return [

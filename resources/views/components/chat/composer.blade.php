@@ -1,10 +1,11 @@
+{{-- Chat message input (composer). Shared by the full page and overlay variants. --}}
 @props([
     'size' => 'lg',
-    // Fungsi kirim global milik varian ini. Sengaja terpisah per varian: di /chat
-    // kedua komponen hidup bersamaan, dan satu fungsi bersama akan menulis bubble
-    // optimistic ke container yang salah.
+    // This variant's global send function. Kept per-variant on purpose: on /chat both
+    // components are alive at once, and a single shared function would write the
+    // optimistic bubble into the wrong container.
     'sendFn' => 'window.chatSend',
-    // x-ref input; harus unik antar varian agar $refs tak bertabrakan.
+    // Input x-ref; must be unique per variant so $refs don't collide.
     'inputRef' => 'msgInput',
 ])
 
@@ -14,8 +15,8 @@
         : ['form' => 'gap-3 p-4', 'input' => 'px-4 py-2.5 rounded-2xl text-sm', 'btn' => 'xl'];
 @endphp
 
-{{-- Kirim lewat fetch() ke /chat/send (paralel, di luar antrean Livewire) agar
-     spam pesan tak saling menunggu. --}}
+{{-- Sends via fetch() to /chat/send (in parallel, outside the Livewire queue) so
+     rapid messages don't wait on each other. --}}
 <form x-data="{ draft: '' }"
     @submit.prevent="
         const b = draft.trim();

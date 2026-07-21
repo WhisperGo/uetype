@@ -1,3 +1,4 @@
+{{-- Main authenticated app layout: nav, optional header, slot content, footer, and global overlays (toasts, chat, presence heartbeat). --}}
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 
@@ -9,7 +10,7 @@
     <title>{{ $pageTitle ?? config('app.name', 'UeType') }}</title>
     @include('partials.favicon')
 
-    <!-- Fonts: JetBrains Mono untuk semua teks readable; Pixelify Sans & Press Start 2P untuk aksen game -->
+    <!-- Fonts: JetBrains Mono for all readable text; Pixelify Sans & Press Start 2P for game accents -->
     @include('layouts._fonts')
 
     <!-- Scripts -->
@@ -51,27 +52,27 @@
         @auth
             <x-toast-stack />
 
-            {{-- ===== CHAT OVERLAY GLOBAL =====
-                 Drawer chat yang bisa dibuka dari halaman mana pun, mounted
-                 sekali di sini (di luar {{ '{{ $slot }}' }}) supaya bertahan
-                 lintas wire:navigate seperti toast di atas. Echo tetap hanya
-                 di-subscribe oleh <x-toast-stack />; overlay ini mendengarkan
-                 event window yang sama (message-received-remote/-mutated-remote). --}}
+            {{-- ===== GLOBAL CHAT OVERLAY =====
+                 A chat drawer openable from any page, mounted once here (outside
+                 {{ '{{ $slot }}' }}) so it survives across wire:navigate like the
+                 toast above. Echo is still subscribed only by <x-toast-stack />;
+                 this overlay listens to the same window events
+                 (message-received-remote/-mutated-remote). --}}
             <livewire:chat-overlay />
 
-            {{-- ===== HEARTBEAT PRESENCE =====
-                 Ping ringan ke /heartbeat tiap ~30 detik menandai user masih
-                 online (last_seen_at diperbarui). Server menyiarkan ke teman
-                 hanya saat transisi offline->online, jadi ping ini murah.
-                 Dijeda saat tab tersembunyi (hemat) & langsung ping lagi saat
-                 tab kembali terlihat supaya status cepat pulih. --}}
+            {{-- ===== PRESENCE HEARTBEAT =====
+                 A lightweight ping to /heartbeat every ~30s marks the user as still
+                 online (last_seen_at is updated). The server broadcasts to friends
+                 only on the offline->online transition, so this ping is cheap.
+                 Paused while the tab is hidden (to save resources) and pings again
+                 immediately when the tab becomes visible so status recovers quickly. --}}
             <script>
                 if (!window.__presenceHeartbeatRegistered) {
                     window.__presenceHeartbeatRegistered = true;
                     (function () {
                         const url = '{{ route('presence.heartbeat') }}';
                         const token = document.querySelector('meta[name="csrf-token"]')?.content;
-                        const INTERVAL = 30000; // 30s; ambang online server 60s
+                        const INTERVAL = 30000; // 30s; server online threshold is 60s
                         let timer = null;
 
                         const ping = () => {
@@ -80,7 +81,7 @@
                                 method: 'POST',
                                 headers: { 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
                                 keepalive: true,
-                            }).catch(() => {}); // diamkan error jaringan; ping berikutnya coba lagi
+                            }).catch(() => {}); // swallow network errors; the next ping retries
                         };
 
                         const start = () => {

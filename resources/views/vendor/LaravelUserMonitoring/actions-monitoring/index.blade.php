@@ -1,3 +1,4 @@
+{{-- Actions monitoring table: table name, user, action type, IP, platform, and timestamp per recorded action. --}}
 @extends('LaravelUserMonitoring::layouts.master')
 
 @section('title', 'Aksi')
@@ -19,8 +20,9 @@
             <tbody>
                 @forelse ($actions as $action)
                     @php
-                        // Map warna aksi ke token semantic (kelas tetap, tak dinamis, agar
-                        // tak ke-purge Tailwind build). create=hijau, delete=merah, update=emas.
+                        // Map the action color to a semantic token (static classes, not
+                        // dynamic, so they aren't purged by the Tailwind build).
+                        // create=green, delete=red, update=gold.
                         $badge = match ($action->getTypeColor()) {
                             'green'  => 'bg-active/15 text-active',
                             'red'    => 'bg-danger/15 text-danger',

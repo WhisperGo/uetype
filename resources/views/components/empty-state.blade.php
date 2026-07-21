@@ -5,16 +5,16 @@
     'card' => false,
 ])
 
-{{-- Keadaan kosong yang seragam: maskot pudar + judul + keterangan + CTA opsional.
+{{-- Uniform empty state: faded mascot + title + caption + optional CTA.
 
-     Sebelumnya blok ini disalin di 8 tempat dan SUDAH menyimpang jadi empat
-     varian (py-16/py-24, w-16/w-16 h-16) -- gejala klasik duplikasi yang mulai
-     lepas kendali. Maskot dikunci `w-16 h-16` (bukan `w-16` saja) supaya
-     tingginya tetap terpesan dan layout tak bergeser saat gambar lambat dimuat.
+     This block was previously copied in 8 places and had ALREADY drifted into four
+     variants (py-16/py-24, w-16/w-16 h-16) -- the classic sign of duplication
+     getting out of hand. The mascot is locked to `w-16 h-16` (not just `w-16`) so
+     its height is reserved and the layout doesn't shift while the image loads slowly.
 
-     CTA sengaja berupa slot, bukan prop: variannya terlalu beragam -- ada yang
-     tanpa tombol, satu link wire:navigate, satu button wire:click, sampai tiga
-     tombol campuran. --}}
+     The CTA is intentionally a slot, not a prop: its variants are too diverse --
+     some have no button, one is a wire:navigate link, one a wire:click button, and
+     some have three mixed buttons. --}}
 <div @class([
     'flex flex-col items-center justify-center text-center select-none',
     'py-16' => $spacing === '16',
@@ -31,8 +31,8 @@
         <p @class(['font-mono text-xs text-muted', 'mt-1' => $title])>{{ $body }}</p>
     @endif
 
-    {{-- Slot default dipakai kalau keterangannya bukan string sederhana
-         (mis. ekspresi ternary di hasil pencarian clan). --}}
+    {{-- The default slot is used when the caption isn't a simple string
+         (e.g. a ternary expression in clan search results). --}}
     @if (trim($slot) !== '')
         <div @class(['font-mono text-xs text-muted', 'mt-1' => $title])>{{ $slot }}</div>
     @endif

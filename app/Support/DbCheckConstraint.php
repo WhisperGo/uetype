@@ -5,39 +5,37 @@ namespace App\Support;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Menegakkan sebuah CHECK constraint di level DB, dengan mekanisme yang bercabang
- * per driver tapi invarian yang sama.
+ * Enforces a CHECK constraint at the DB level, branching the mechanism per driver
+ * while keeping the same invariant.
  *
- * Kenapa ini ada: Laravel tak punya API check-constraint sama sekali, jadi satu-
- * satunya jalan adalah SQL mentah -- dan SQL mentahnya berbeda per driver. Dulu
- * dua migrasi (`messages`, `message_clears`) sama-sama menulis
- * `ALTER TABLE ... ADD CONSTRAINT ... CHECK` telanjang, sintaks yang HANYA
- * dipahami MySQL. Di sqlite keduanya meledak dan mematikan SELURUH suite,
- * padahal `.env.example` justru men-default sqlite: tiap developer baru
- * menabraknya di langkah pertama setup.
+ * Why this exists: Laravel has no check-constraint API at all, so the only way is
+ * raw SQL -- and that raw SQL differs per driver. Two migrations (`messages`,
+ * `message_clears`) both wrote a bare `ALTER TABLE ... ADD CONSTRAINT ... CHECK`,
+ * syntax that ONLY MySQL understands. On sqlite both blew up and killed the ENTIRE
+ * suite -- yet `.env.example` defaults to sqlite, so every new developer hit it on
+ * the first step of setup.
  *
- * Menyeragamkan sintaksnya tidak mungkin -- sqlite hanya menerima CHECK saat
- * CREATE TABLE, tak ada ADD CONSTRAINT. Jadi sqlite memakai trigger, yang
- * menjaga hal yang sama dengan cara berbeda.
+ * Unifying the syntax is impossible -- sqlite only accepts CHECK during CREATE
+ * TABLE, there is no ADD CONSTRAINT. So sqlite uses triggers, which enforce the
+ * same thing a different way.
  *
- * PENTING -- URUTAN MIGRASI: di sqlite, menambah FOREIGN KEY ke tabel yang sudah
- * ada memaksa Laravel MEMBANGUN ULANG tabelnya, dan pembangunan ulang itu
- * MENGHAPUS trigger yang menempel padanya. Jadi enforce() harus dipanggil dari
- * migrasi yang jalan SETELAH perubahan struktur terakhir tabel tersebut, bukan
- * dari migrasi yang membuatnya. Ini pernah kejadian: trigger `messages` dibuat di
- * migrasi pembuat tabel, lalu lenyap tanpa suara saat `reply_to_id` (berikut
- * FK-nya) ditambahkan tiga migrasi kemudian -- MySQL tak terpengaruh, jadi
- * celahnya hanya muncul di sqlite.
+ * IMPORTANT -- MIGRATION ORDER: on sqlite, adding a FOREIGN KEY to an existing
+ * table forces Laravel to REBUILD the table, and that rebuild DROPS any trigger
+ * attached to it. So enforce() must be called from a migration that runs AFTER the
+ * table's last structural change, not from the migration that creates it. This
+ * actually happened: the `messages` trigger was created in the table's migration,
+ * then silently vanished when `reply_to_id` (and its FK) was added three migrations
+ * later -- MySQL is unaffected, so the gap only showed up on sqlite.
  */
 class DbCheckConstraint
 {
     /**
-     * @param  string  $table  Tabel yang dijaga.
-     * @param  string  $name  Nama constraint/trigger; dipakai juga sebagai pesan abort.
-     * @param  string  $invariant  Ekspresi boolean yang HARUS benar, ditulis dengan
-     *                             nama kolom telanjang (mis. "a IS NULL OR b IS NULL").
-     * @param  string[]  $columns  Kolom yang disebut di $invariant. Wajib untuk sqlite:
-     *                             trigger merujuk kolom lewat prefix NEW.
+     * @param  string  $table  The table being guarded.
+     * @param  string  $name  Constraint/trigger name; also used as the abort message.
+     * @param  string  $invariant  Boolean expression that MUST hold, written with bare
+     *                             column names (e.g. "a IS NULL OR b IS NULL").
+     * @param  string[]  $columns  Columns referenced in $invariant. Required for sqlite:
+     *                             the trigger references columns via the NEW prefix.
      */
     public static function enforce(string $table, string $name, string $invariant, array $columns): void
     {
@@ -50,8 +48,8 @@ class DbCheckConstraint
         }
 
         if ($driver === 'sqlite') {
-            // Terpanjang dulu: mencegah "clan_id" tergantikan lebih dulu di dalam
-            // nama kolom lain yang memuatnya sebagai substring.
+            // Longest first: prevents "clan_id" from being replaced inside another
+            // column name that contains it as a substring.
             usort($columns, fn ($a, $b) => strlen($b) <=> strlen($a));
 
             $scoped = str_replace(
@@ -60,8 +58,8 @@ class DbCheckConstraint
                 $invariant
             );
 
-            // INSERT dan UPDATE butuh trigger TERPISAH: trigger insert saja
-            // membiarkan baris sah di-update jadi melanggar.
+            // INSERT and UPDATE need SEPARATE triggers: an insert-only trigger would
+            // let a valid row be updated into a violating state.
             foreach (['insert', 'update'] as $event) {
                 DB::statement(
                     "CREATE TRIGGER {$name}_{$event}
@@ -74,23 +72,23 @@ class DbCheckConstraint
             return;
         }
 
-        // Driver lain: lewati diam-diam. Lebih baik tabelnya tetap terbuat daripada
-        // migrasi gagal total -- invariannya tetap dijaga aplikasi.
+        // Other drivers: skip silently. Better to let the table be created than to
+        // fail the migration outright -- the invariant is still enforced in the app.
     }
 
     /**
-     * Buang penjagaan bernama $name kalau ada. Aman dipanggil saat belum ada --
-     * dipakai enforce ulang di migrasi lanjutan supaya DB yang sudah terlanjur
-     * punya constraint versi lama tak menabrak error "duplicate constraint name".
+     * Drop the guard named $name if it exists. Safe to call when it doesn't --
+     * used when re-enforcing in a later migration so a DB that already has the old
+     * constraint version doesn't hit a "duplicate constraint name" error.
      */
     public static function drop(string $table, string $name): void
     {
         $driver = DB::getDriverName();
 
         if ($driver === 'mysql' || $driver === 'mariadb') {
-            // `DROP CONSTRAINT IF EXISTS` itu sintaks MariaDB; MySQL tak menerimanya
-            // (sampai 8.4 sekalipun). Jadi keberadaannya ditanyakan dulu ke
-            // information_schema, baru di-drop -- cara yang sah di kedua-duanya.
+            // `DROP CONSTRAINT IF EXISTS` is MariaDB syntax; MySQL doesn't accept it
+            // (not even through 8.4). So we ask information_schema whether it exists
+            // first, then drop it -- an approach valid on both.
             $exists = DB::selectOne(
                 'SELECT 1 AS ok FROM information_schema.TABLE_CONSTRAINTS
                  WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = ?',

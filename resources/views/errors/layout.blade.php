@@ -24,7 +24,7 @@
 
 <body class="font-mono antialiased text-foreground bg-background selection:bg-brand selection:text-foreground">
     <div class="relative min-h-screen flex flex-col justify-center items-center px-6 py-12 bg-background overflow-hidden">
-        {{-- Ambient glow, sama seperti layout guest. --}}
+        {{-- Ambient glow, same as the guest layout. --}}
         <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(var(--color-brand)/0.14),transparent_70%)]"></div>
 
         <div class="relative w-full max-w-md text-center">
@@ -34,7 +34,7 @@
                 <span class="font-display text-base text-gold leading-none pt-1">UETYPE</span>
             </a>
 
-            {{-- Kode error besar, gaya pixel/gold. --}}
+            {{-- Large error code, pixel/gold style. --}}
             <p class="font-display text-gold leading-none tracking-tight text-[clamp(3.5rem,2rem+10vw,6rem)]">
                 {{ $code ?? '???' }}
             </p>

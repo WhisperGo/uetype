@@ -21,16 +21,16 @@ use Livewire\Component;
  */
 class Clans extends Component
 {
-    // Batas member aktif per clan.
+    // Active-member cap per clan.
     public const MAX_MEMBERS = 20;
 
-    // Tab aktif: 'my-clan' | 'browse' | 'create'
+    // Active tab: 'my-clan' | 'browse' | 'create'
     public string $tab = 'my-clan';
 
-    // Kotak pencarian nama clan (tab Browse).
+    // Clan-name search box (Browse tab).
     public string $search = '';
 
-    // Form buat clan (tab Create).
+    // Create-clan form (Create tab).
     public string $newName = '';
 
     public string $newTag = '';
@@ -43,10 +43,11 @@ class Clans extends Component
 
     public function mount(): void
     {
-        // Tab default: clan sendiri kalau sudah punya, kalau belum ke Browse.
+        // Default tab: own clan if you have one, otherwise Browse.
         $this->tab = $this->myClan ? 'my-clan' : 'browse';
     }
 
+    /** Switch the active tab (whitelisted). */
     public function setTab(string $tab): void
     {
         if (in_array($tab, ['my-clan', 'browse', 'create'], true)) {
@@ -55,9 +56,9 @@ class Clans extends Component
     }
 
     /**
-     * Listener Echo clan.{me}: perubahan datang dari user LAIN (mis. leader menyetujui
-     * permintaan gabung saya), jadi cache computed harus dibuang -- kalau tidak,
-     * re-render-nya cuma memutar ulang data lama dari request ini.
+     * Echo listener for clan.{me}: the change comes from ANOTHER user (e.g. a leader
+     * approving my join request), so the computed cache must be dropped -- otherwise the
+     * re-render just replays this request's stale data.
      */
     #[On('clan-updated')]
     public function refreshClan(): void
@@ -65,21 +66,22 @@ class Clans extends Component
         $this->forgetClanCache();
     }
 
-    // ---- AKSI ----
+    // ---- ACTIONS ----
 
     /**
-     * Buang cache computed setelah keanggotaan berubah.
+     * Drop the computed cache after membership changes.
      *
-     * #[Computed] menge-cache per REQUEST, dan view dirender SESUDAH aksi jalan --
-     * jadi tanpa ini, aksi yang mengubah keanggotaan (buat/gabung/keluar/approve)
-     * akan dirender ulang memakai nilai basi dari sebelum perubahan. Harus dipanggil
-     * di setiap aksi yang menyentuh clan_members.
+     * #[Computed] caches per REQUEST, and the view renders AFTER the action runs -- so
+     * without this, an action that changes membership (create/join/leave/approve) would
+     * re-render with stale pre-change values. Must be called in every action that touches
+     * clan_members.
      */
     private function forgetClanCache(): void
     {
         unset($this->myMembership, $this->myClan, $this->myClanMembers, $this->pendingRequests, $this->browseClans);
     }
 
+    /** Create a new clan (if you're not already in one) and make the creator its leader. */
     public function createClan(): void
     {
         if ($this->myClan) {
@@ -107,7 +109,7 @@ class Clans extends Component
             'leader_id' => Auth::id(),
         ]);
 
-        // Pembuat langsung jadi member aktif berperan leader.
+        // The creator immediately becomes an active member with the leader role.
         ClanMember::create([
             'clan_id' => $clan->id,
             'user_id' => Auth::id(),
@@ -125,13 +127,14 @@ class Clans extends Component
         $this->forgetClanCache();
     }
 
+    /** Send a pending join request to a clan (blocked if already in a clan or already requested). */
     public function sendJoinRequest(int $clanId): void
     {
         if ($this->myClan) {
             return;
         }
 
-        // Cegah kirim ulang kalau sudah ada baris ke clan ini.
+        // Prevent a duplicate request if a row to this clan already exists.
         $exists = ClanMember::where('clan_id', $clanId)
             ->where('user_id', Auth::id())
             ->exists();
@@ -160,6 +163,7 @@ class Clans extends Component
         ]);
     }
 
+    /** Leader-only: approve a pending join request, enforcing the member cap. */
     public function approveMember(int $clanMemberId): void
     {
         $member = $this->pendingForMyLeadership($clanMemberId);
@@ -183,6 +187,7 @@ class Clans extends Component
         ]);
     }
 
+    /** Leader-only: reject (delete) a pending join request. */
     public function rejectMember(int $clanMemberId): void
     {
         $member = $this->pendingForMyLeadership($clanMemberId);
@@ -205,7 +210,7 @@ class Clans extends Component
             ->whereHas('clan', fn ($q) => $q->where('leader_id', Auth::id()))
             ->first();
 
-        // Leader tak bisa mengeluarkan dirinya sendiri.
+        // A leader can't kick themselves.
         if (! $member || $member->user_id === Auth::id()) {
             return;
         }
@@ -225,7 +230,7 @@ class Clans extends Component
             return;
         }
 
-        // Leader harus membubarkan/transfer clan dulu; leave diblokir untuk leader.
+        // A leader must disband/transfer the clan first; leaving is blocked for leaders.
         if ($membership->role === ClanRole::Leader) {
             return;
         }
@@ -238,7 +243,7 @@ class Clans extends Component
         $this->notify($leaderId);
     }
 
-    /** Baris ClanMember pending milik clan yang dipimpin user ini; hanya leader boleh approve/reject. */
+    /** A pending ClanMember row for the clan this user leads; only a leader may approve/reject. */
     private function pendingForMyLeadership(int $clanMemberId): ?ClanMember
     {
         return ClanMember::where('id', $clanMemberId)
@@ -254,12 +259,12 @@ class Clans extends Component
 
     // ---- DATA (computed) ----
     //
-    // #[Computed] penting di sini, bukan kosmetik: getter gaya lama
-    // (getMyMembershipProperty) TIDAK di-cache Livewire, jadi query yang sama
-    // dijalankan ulang tiap kali propertinya dibaca. myMembership dibaca dari
-    // mount(), createClan(), myClan, myClanMembers, pendingRequests, dan view --
-    // 5-6 query identik per render. #[Computed] menge-cache-nya per request.
-    // Nama akses di view tak berubah ($this->myClan), jadi tak ada view yang perlu disentuh.
+    // #[Computed] matters here, it's not cosmetic: old-style getters
+    // (getMyMembershipProperty) are NOT cached by Livewire, so the same query re-runs on
+    // every property read. myMembership is read from mount(), createClan(), myClan,
+    // myClanMembers, pendingRequests, and the view -- 5-6 identical queries per render.
+    // #[Computed] caches it per request. The view access name is unchanged ($this->myClan),
+    // so no view needs touching.
 
     #[Computed]
     public function myMembership(): ?ClanMember
@@ -313,8 +318,8 @@ class Clans extends Component
 
         $clans = $query->orderBy('name')->limit(20)->get();
 
-        // Status keanggotaan SAYA untuk semua clan sekaligus (dulu: satu query per
-        // baris -> 20 clan = 20 query hanya untuk memilih label tombolnya).
+        // MY membership status for all clans at once (previously: one query per row ->
+        // 20 clans = 20 queries just to pick each button's label).
         $myMemberships = ClanMember::where('user_id', Auth::id())
             ->whereIn('clan_id', $clans->pluck('id'))
             ->get()

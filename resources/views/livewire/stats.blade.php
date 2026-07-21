@@ -1,17 +1,16 @@
 {{--
-    Halaman Statistik (app/Livewire/Stats.php). Semua angka di sini agregat dari
-    typing_results, dihitung ulang tiap render — tak ada kolom ringkasan tersimpan.
+    Statistics page (app/Livewire/Stats.php). Every number here is aggregated from
+    typing_results and recomputed on each render — there are no stored summary columns.
 
-    Grafik dirender Chart.js di dalam wire:ignore supaya Livewire tak menimpa
-    <canvas> yang sudah dipegang Chart.js saat rentang hari diganti; pergantian
-    rentang mem-broadcast event 'stats-series' yang dipakai skrip untuk mengganti
-    data grafik in-place.
+    Charts are rendered by Chart.js inside wire:ignore so Livewire doesn't overwrite the
+    <canvas> that Chart.js already owns when the day range changes; changing the range
+    re-runs draw() (via the morph.updated hook) to swap the chart data in place.
 --}}
 <div class="py-8 text-muted font-mono" x-data="{ tab: 'solo' }">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
 
         @php
-            // "1m 24s" / "48h 22m": satuan dipangkas kalau nilainya nol supaya ringkas.
+            // "1m 24s" / "48h 22m": zero-valued units are trimmed to keep it compact.
             $fmtDuration = function (int $s) {
                 if ($s <= 0) return '0s';
                 $h = intdiv($s, 3600);
@@ -28,7 +27,7 @@
                 return (string) $n;
             };
 
-            // Urutkan config numerik (15, 25, 50) secara angka, bukan leksikografis.
+            // Sort numeric configs (15, 25, 50) numerically, not lexicographically.
             $sortNumeric = function (array $rows) {
                 uksort($rows, fn ($a, $b) => (int) $a <=> (int) $b);
                 return $rows;
@@ -43,12 +42,12 @@
                 'survival' => 'bg-gold',
             ];
 
-            // Kolom `mode` bisa memuat nilai enum yang belum punya terjemahan;
-            // pakai teks mentahnya daripada membocorkan kunci lang ke layar.
+            // The `mode` column may hold an enum value without a translation yet;
+            // use its raw text rather than leaking a lang key to the screen.
             $modeLabel = fn (string $m) => Lang::has('stats.mode.' . $m) ? __('stats.mode.' . $m) : ucfirst($m);
 
-            // Sama seperti multiplayer-lobby.blade.php: sufiks ordinal hanya dipakai locale
-            // Inggris (Indonesia pakai "ke-N" polos, lihat stats.multiplayer.place_prefix).
+            // Same as multiplayer-lobby.blade.php: the ordinal suffix is English-only
+            // (Indonesian uses a plain "ke-N", see stats.multiplayer.place_prefix).
             $placeOrdinal = function (int $place) {
                 if (app()->getLocale() !== 'en') {
                     return __('stats.multiplayer.place_prefix') . $place;
@@ -64,7 +63,7 @@
             };
         @endphp
 
-        {{-- Tab halaman: Solo (terisi) vs Multiplayer (belum ada datanya). --}}
+        {{-- Page tabs: Solo (populated) vs Multiplayer. --}}
         <div class="flex justify-center gap-8">
             @foreach (['solo', 'multiplayer'] as $t)
                 <button type="button" x-on:click="tab = '{{ $t }}'"
@@ -89,7 +88,7 @@
         {{-- ===================== TAB: SOLO ===================== --}}
         <div x-show="tab === 'solo'" x-transition.opacity class="space-y-8">
 
-            {{-- Identitas + bar XP --}}
+            {{-- Identity + XP bar --}}
             <div class="relative rounded-2xl border border-border bg-surface/60 p-5 sm:p-6">
                 <a href="{{ route('profile.me') }}" title="{{ __('stats.edit_profile') }}"
                     class="absolute top-5 right-5 text-muted hover:text-gold transition-colors">
@@ -151,7 +150,7 @@
                                     <div class="grid gap-2" style="grid-template-columns: repeat({{ count($group['rows']) }}, minmax(0, 1fr))">
                                         @foreach ($group['rows'] as $config => $wpm)
                                             <div class="text-center">
-                                                {{-- Rekor terbaik dalam grup ini disorot emas. --}}
+                                                {{-- The best record in this group is highlighted gold. --}}
                                                 <p class="font-pixel text-h3 leading-none tabular-nums {{ $wpm >= max($group['rows']) ? 'text-gold' : 'text-foreground' }}">
                                                     {{ round($wpm) }}
                                                 </p>
@@ -166,7 +165,7 @@
 
                     @if (! empty($bestSurvival))
                         @php
-                            // Urutkan easy -> medium -> hard, apa pun urutan baris dari DB.
+                            // Order easy -> medium -> hard, regardless of the DB row order.
                             $order = ['easy' => 0, 'medium' => 1, 'hard' => 2];
                             uksort($bestSurvival, fn ($a, $b) => ($order[$a] ?? 9) <=> ($order[$b] ?? 9));
                         @endphp
@@ -179,8 +178,8 @@
                                             <p class="font-pixel text-h3 leading-none tabular-nums {{ $seconds >= max($bestSurvival) ? 'text-gold' : 'text-foreground' }}">
                                                 {{ $fmtDuration($seconds) }}
                                             </p>
-                                            {{-- mode_config survival bisa berisi nilai lama di luar easy/medium/hard;
-                                                 jatuh balik ke teks mentahnya daripada menampilkan kunci lang. --}}
+                                            {{-- survival mode_config may hold legacy values outside easy/medium/hard;
+                                                 fall back to its raw text rather than showing a lang key. --}}
                                             <p class="text-x-small text-muted mt-2">
                                                 {{ Lang::has('stats.difficulty.' . $difficulty) ? __('stats.difficulty.' . $difficulty) : ucfirst($difficulty) }}
                                             </p>
@@ -211,7 +210,7 @@
                     </a>
                 </div>
 
-                {{-- Hanya yang sudah diraih. Yang terkunci beserta progresnya di /achievements. --}}
+                {{-- Only earned ones. Locked ones and their progress live at /achievements. --}}
                 @if (empty($achievements['earned']))
                     <div class="rounded-2xl border border-border bg-surface/40 px-5 py-8 text-center text-small text-muted">
                         {{ __('stats.no_achievements') }}
@@ -282,7 +281,7 @@
                     @endforeach
                 </div>
 
-                {{-- Mode Distribution: lebar tiap segmen = porsi tesnya. --}}
+                {{-- Mode Distribution: each segment's width = its share of tests. --}}
                 <div class="mt-4 rounded-2xl border border-border bg-surface/40 p-4 sm:p-5">
                     <h3 class="text-small text-foreground mb-3">{{ __('stats.mode_distribution') }}</h3>
 
@@ -294,7 +293,6 @@
                                 <div class="{{ $modeColors[$slice['mode']] ?? 'bg-muted' }} rounded-lg px-3 py-2.5 min-w-0 overflow-hidden"
                                     style="flex: {{ max($slice['percent'], 1) }} 1 0%">
                                     <span class="text-x-small text-background font-bold whitespace-nowrap">
-                                        {{-- {{ $modeLabel($slice['mode']) }}  --}}
                                         {{ $slice['percent'] }}%
                                     </span>
                                 </div>
@@ -358,7 +356,7 @@
                         @endforeach
                     </div>
 
-                    {{-- Placement Distribution: sama pola dengan Mode Distribution di tab Solo. --}}
+                    {{-- Placement Distribution: same pattern as Mode Distribution on the Solo tab. --}}
                     <div class="mt-4 rounded-2xl border border-border bg-surface/40 p-4 sm:p-5">
                         <h3 class="text-small text-foreground mb-3">{{ __('stats.multiplayer.placements') }}</h3>
 
@@ -423,9 +421,9 @@
     </div>
 
     {{--
-        Chart.js dimuat sekali (dari CDN, seperti halaman profil) lalu dipakai ulang.
-        Data dikirim ulang tiap render lewat event, karena <canvas> ada di wire:ignore
-        sehingga Livewire tidak akan memperbarui isinya sendiri.
+        Chart.js comes from the Vite bundle (window.Chart via app.js) and is reused.
+        The chart is redrawn on each render via the morph.updated hook, since the
+        <canvas> sits in wire:ignore and Livewire won't update its contents itself.
     --}}
     @script
     <script>
@@ -470,7 +468,7 @@
             const accEl = document.getElementById('statsAccuracyChart');
             if (accEl && series.accuracy.length >= 2) {
                 accChart?.destroy();
-                // Akurasi jarang di bawah 90%: mulai sumbu dari 90 agar variasinya terbaca.
+                // Accuracy is rarely below 90%: start the axis at 90 so the variation reads.
                 const lowest = Math.min(...series.accuracy);
                 accChart = new Chart(accEl.getContext('2d'), {
                     type: 'line',
@@ -480,10 +478,10 @@
             }
         };
 
-        // Chart datang dari bundle Vite (window.Chart di app.js), bukan CDN runtime.
+        // Chart comes from the Vite bundle (window.Chart via app.js), not a CDN runtime.
         draw();
 
-        // Ganti rentang hari -> Livewire render ulang -> gambar ulang grafik.
+        // Change the day range -> Livewire re-renders -> redraw the charts.
         Livewire.hook('morph.updated', ({ component }) => {
             if (component.id === $wire.id) draw();
         });

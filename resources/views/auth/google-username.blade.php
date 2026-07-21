@@ -1,3 +1,4 @@
+{{-- Onboarding step after Google sign-in: prompts the new user to choose a username. --}}
 <x-guest-layout>
     <div class="flex flex-col items-center text-center">
         <img src="{{ asset('icon/uetype_mascot.png') }}" alt="Maskot UeType"

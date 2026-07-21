@@ -18,7 +18,7 @@ class FriendshipUpdated implements ShouldBroadcastNow
     public $notification;
 
     /**
-     * @param  array|null  $notification  ['type' => 'request'|'accepted', 'message' => string]; null = refresh UI tanpa toast.
+     * @param  array|null  $notification  ['type' => 'request'|'accepted', 'message' => string]; null = refresh the UI without showing a toast.
      */
     public function __construct($userId, ?array $notification = null)
     {

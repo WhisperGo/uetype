@@ -3,17 +3,17 @@
 namespace App\Services;
 
 /**
- * Formula Elo standar untuk power rating Clan War. Zero-sum: delta yang didapat
- * satu clan sama besar dengan yang hilang dari lawannya. Asimetris terhadap
- * selisih power: menang melawan clan lebih kuat menambah power lebih banyak.
+ * Standard Elo formula for Clan War power rating. Zero-sum: the delta one clan
+ * gains equals what the other loses. Asymmetric in the power gap: beating a
+ * stronger clan gains more power.
  */
 class EloCalculator
 {
     public const K_FACTOR = 32;
 
     /**
-     * @param  float  $scoreA  1.0 menang, 0.5 seri, 0.0 kalah (sudut pandang A)
-     * @return array{0: int, 1: int} [deltaA, deltaB] -- selalu berlawanan tanda
+     * @param  float  $scoreA  1.0 win, 0.5 draw, 0.0 loss (from A's perspective)
+     * @return array{0: int, 1: int} [deltaA, deltaB] -- always opposite signs
      */
     public static function calculate(int $powerA, int $powerB, float $scoreA): array
     {

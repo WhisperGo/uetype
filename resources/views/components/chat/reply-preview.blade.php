@@ -1,3 +1,4 @@
+{{-- Preview bar shown above the composer for the message being replied to. --}}
 @props([
     'message',
     'size' => 'lg',

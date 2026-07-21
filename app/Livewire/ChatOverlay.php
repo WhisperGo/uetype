@@ -14,7 +14,7 @@ use Livewire\Component;
  * it never rewrites the host page's query string — that's the full /chat
  * page's job, and stays reachable via the "Buka penuh" link.
  *
- * Alur percakapannya dipakai bersama Chat lewat ManagesChatConversation.
+ * The conversation flow is shared with Chat via ManagesChatConversation.
  */
 class ChatOverlay extends Component
 {
@@ -22,13 +22,13 @@ class ChatOverlay extends Component
 
     public const OVERLAY_PAGE_SIZE = 15;
 
-    /** Daftar kontak dibatasi: drawer sempit, bukan inbox penuh. */
+    /** Contact list is capped: narrow drawer, not the full inbox. */
     public const CONTACT_LIMIT = 8;
 
     public bool $open = false;
 
-    // Mode percakapan aktif: 'dm' | 'clan'. Null = tampilan picker kontak.
-    // Tanpa #[Url] -- lihat class doc-comment.
+    // Active conversation mode: 'dm' | 'clan'. Null = contact picker view.
+    // No #[Url] -- see the class doc-comment.
     public ?string $activeMode = null;
 
     public ?string $withUsername = null;
@@ -43,16 +43,17 @@ class ChatOverlay extends Component
         return self::CONTACT_LIMIT;
     }
 
-    // ---- AKSI: BUKA/TUTUP ----
+    // ---- ACTIONS: OPEN/CLOSE ----
 
+    /** Toggle the drawer open/closed. */
     public function toggleOverlay(): void
     {
         $this->open = ! $this->open;
     }
 
     /**
-     * Kembali ke daftar kontak TANPA menutup drawer. Beda semantik dari
-     * closeConversation() di halaman penuh, karena itu namanya sendiri.
+     * Return to the contact list WITHOUT closing the drawer. Semantically different
+     * from the full page's closeConversation(), hence its own name.
      */
     public function backToPicker(): void
     {
@@ -60,14 +61,15 @@ class ChatOverlay extends Component
     }
 
     /**
-     * Alias untuk view overlay. Nama berbeda dari halaman penuh karena isinya
-     * memang dibatasi CONTACT_LIMIT, bukan inbox lengkap.
+     * Alias for the overlay view. Named differently from the full page because its
+     * contents are capped by CONTACT_LIMIT, not the full inbox.
      */
     public function getRecentContactsProperty()
     {
         return $this->conversations;
     }
 
+    /** Unread badge count for the drawer toggle. */
     public function getUnreadCountProperty(): int
     {
         return $this->totalUnread;

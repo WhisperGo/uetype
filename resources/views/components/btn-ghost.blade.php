@@ -4,7 +4,7 @@
 ])
 
 @php
-    // Tombol sekunder: duplikasi terbesar kedua setelah btn-gold (14 pemakaian).
+    // Secondary button: the second most duplicated pattern after btn-gold (14 usages).
     $base = 'font-mono text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition';
 
     $sizes = [
@@ -15,7 +15,7 @@
         'lg' => 'px-5 py-2 text-xs',
     ];
 
-    // Nilai di luar peta dipakai apa adanya (lihat btn-gold).
+    // Values outside the map are used as-is (see btn-gold).
     $classes = $base.' '.($sizes[$size] ?? $size);
 @endphp
 

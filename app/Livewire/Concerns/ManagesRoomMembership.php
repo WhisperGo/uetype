@@ -6,38 +6,35 @@ use App\Models\Room;
 use App\Models\RoomMember;
 
 /**
- * Perpindahan pemain antar-room: keluar dari yang lama, merawat apa yang
- * ditinggalkan.
+ * Player movement between rooms: leave the old one, tend to what's left behind.
  *
- * Trait ini MENULIS, dan karena itu sengaja terpisah dari ReadsRoomState yang
- * murni read-model -- keduanya digabung akan mengaburkan mana yang aman dipanggil
- * di dalam render.
+ * This trait WRITES, and is therefore deliberately kept separate from ReadsRoomState
+ * (pure read-model) -- merging them would blur which methods are safe to call inside
+ * render.
  *
- * Alasannya ada: aturan "satu pemain, paling banyak satu room" dulu hanya
- * dihormati leaveRoom(). createRoom() menghapus baris room_members milik user
- * tapi tak pernah memeriksa apakah room lamanya jadi kosong -- baris `rooms`
- * yatim menumpuk selamanya. joinRoom() lebih buruk: ia tak membuang keanggotaan
- * lama sama sekali, jadi pemain bisa terdaftar di dua room, mengunci slot di room
- * yang sudah ditinggalkan dan menyisakan host yang tak ada orangnya.
+ * There's a reason: the "one player, at most one room" rule used to be honored only by
+ * leaveRoom(). createRoom() deleted the user's room_members row but never checked whether
+ * their old room became empty -- orphan `rooms` rows piled up forever. joinRoom() was
+ * worse: it never dropped the old membership at all, so a player could be registered in
+ * two rooms, locking a slot in an abandoned room and leaving behind an ownerless host.
  *
- * Sekarang ketiga jalur memakai satu pintu yang sama.
+ * Now all three paths go through the same door.
  */
 trait ManagesRoomMembership
 {
     /**
-     * Keluarkan $userId dari room yang sedang ia diami, lalu rawat setiap room
-     * yang ditinggalkan: kosong -> dihapus, masih berisi -> host dialihkan bila
-     * yang pergi adalah host-nya.
+     * Remove $userId from whatever room they currently occupy, then tend to each
+     * abandoned room: empty -> deleted, still occupied -> host reassigned if the one who
+     * left was the host.
      *
-     * $exceptRoomId dikecualikan. Ini penting untuk joinRoom(): kalau pemain
-     * memasukkan kode room yang SUDAH ia diami, tanpa pengecualian ini ia akan
-     * "keluar" lebih dulu -- dan kalau ia host, room-nya berpindah tangan lalu ia
-     * masuk lagi sebagai anggota biasa. Bergabung ke room sendiri tak boleh
-     * membuat siapa pun kehilangan status host.
+     * $exceptRoomId is excluded. This matters for joinRoom(): if the player enters the
+     * code of a room they ALREADY occupy, without this exception they'd "leave" first --
+     * and if they're the host, the room changes hands before they rejoin as a regular
+     * member. Joining your own room must not make anyone lose host status.
      *
-     * Dipanggil dari dalam transaksi (lihat createRoom/joinRoom): antara
-     * penghapusan keanggotaan lama dan pembuatan yang baru tak boleh ada jendela
-     * di mana pemain tak ada di room mana pun -- atau, lebih buruk, ada di dua.
+     * Called from inside a transaction (see createRoom/joinRoom): between deleting the old
+     * membership and creating the new one there must be no window where the player is in
+     * no room at all -- or, worse, in two.
      */
     private function departCurrentRooms(int $userId, ?int $exceptRoomId = null): void
     {
@@ -58,13 +55,13 @@ trait ManagesRoomMembership
     }
 
     /**
-     * Room yang baru saja ditinggal $leavingUserId: buang kalau tak bersisa
-     * anggota, kalau tidak pastikan ia masih punya host yang benar-benar ada.
+     * A room just left by $leavingUserId: delete it if no members remain, otherwise
+     * ensure it still has a host who actually exists.
      */
     private function settleAbandonedRoom(Room $room, int $leavingUserId): void
     {
-        // lockForUpdate: dua pemain terakhir yang keluar bersamaan tak boleh
-        // sama-sama membaca "masih ada sisa" lalu tak seorang pun menghapus room.
+        // lockForUpdate: the last two players leaving simultaneously must not both read
+        // "members remain" and then have no one delete the room.
         $remaining = RoomMember::where('room_id', $room->id)->lockForUpdate()->count();
 
         if ($remaining === 0) {

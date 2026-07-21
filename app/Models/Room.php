@@ -8,14 +8,14 @@ use Illuminate\Database\Eloquent\Model;
 /** A race lobby: shared text, status, and countdown/start timestamps. */
 class Room extends Model
 {
-    // Action monitoring: log create/update/delete room (binafy/laravel-user-monitoring).
+    // Action monitoring: logs room create/update/delete (binafy/laravel-user-monitoring).
     use Actionable;
 
     protected $fillable = ['code', 'host_id', 'status', 'text_to_type', 'countdown_started_at', 'race_starts_at'];
 
-    // Kolom waktu WAJIB di-cast ke datetime supaya selalu jadi objek Carbon, bukan
-    // string. Tanpa ini, setelah refresh()/query kolomnya berupa string sehingga
-    // ->copy()/->diffInSeconds() gagal ("Call to a member function copy() on string").
+    // Time columns MUST be cast to datetime so they are always Carbon objects, not
+    // strings. Without this, after refresh()/query they come back as strings and
+    // ->copy()/->diffInSeconds() fail ("Call to a member function copy() on string").
     protected $casts = [
         'countdown_started_at' => 'datetime',
         'race_starts_at' => 'datetime',
@@ -33,13 +33,13 @@ class Room extends Model
         return $this->hasMany(RoomMember::class, 'room_id');
     }
 
-    /** Members yang ikut balapan: masuk klasemen, place, dan XP. */
+    /** Members racing: they count toward the standings, placement, and XP. */
     public function players()
     {
         return $this->members()->where('role', RoomMember::ROLE_PLAYER);
     }
 
-    /** Members yang hanya menonton: tak masuk perhitungan finish/place/XP. */
+    /** Members only watching: excluded from finish/placement/XP calculations. */
     public function spectators()
     {
         return $this->members()->where('role', RoomMember::ROLE_SPECTATOR);

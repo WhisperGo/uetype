@@ -1,3 +1,4 @@
+{{-- Alpine-driven dropdown: a trigger slot toggles a positioned content panel. --}}
 @props(['align' => 'right', 'width' => '48', 'contentClasses' => 'py-1 bg-surface'])
 
 @php

@@ -1,3 +1,4 @@
+{{-- Clan leaderboard: top-3 podium plus the remaining ranking, ordered by clan power. --}}
 <div class="py-10">
     <x-page-container>
 
@@ -45,7 +46,7 @@
                 @endforeach
             </div>
 
-            {{-- ===== SISA PERINGKAT ===== --}}
+            {{-- ===== REMAINING RANKING ===== --}}
             @if ($rest->count() > 0)
                 <div class="space-y-2">
                     @foreach ($rest as $i => $row)

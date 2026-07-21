@@ -14,20 +14,20 @@ namespace App\Services;
 class TypingErrorInspector
 {
     /**
-     * Batas event yang diterima. 500 error dalam satu tes ≈ akurasi di bawah 50% pada
-     * mode time 120 -- itu mashing, bukan latihan. Di atas cap, titik grafik & panel
-     * ikut terpotong sementara heatmap tidak (lihat docs: divergensi tiga-angka).
+     * Cap on accepted events. 500 errors in one test ≈ below 50% accuracy in time 120
+     * -- that is mashing, not practice. Above the cap, chart points & panel are
+     * truncated while the heatmap is not (see docs: three-figure divergence).
      */
     public const MAX_EVENTS = 500;
 
     /**
-     * Validasi bentuk + cast payload klien. Tier presentasi (session-only, tak pernah
-     * menyentuh skor/XP/PB/leaderboard), jadi tak ada urusan dengan AntiCheatService --
-     * tapi tetap disanitasi seperti preseden ghost.
+     * Validate shape + cast the client payload. A presentation tier (session-only,
+     * never touches score/XP/PB/leaderboard), so it has no business with
+     * AntiCheatService -- but it is still sanitized, following the ghost precedent.
      *
-     * Beda dari missedChars yang mentah tapi aman karena cuma dibaca lewat lookup kunci
-     * yang sudah diketahui: di sini `actual` benar-benar DIRENDER, jadi tak boleh ada
-     * string sembarang dari klien yang lolos.
+     * Unlike missedChars, which is raw but safe because it is only read via known-key
+     * lookups: here `actual` is genuinely RENDERED, so no arbitrary client string may
+     * get through.
      *
      * @return list<array{second:int,index:int,actual:?string}>
      */
@@ -54,13 +54,13 @@ class TypingErrorInspector
             $second = (int) $event['second'];
             $index = (int) $event['index'];
 
-            // Koordinat negatif mustahil dari jalur normal.
+            // Negative coordinates are impossible from the normal path.
             if ($second < 0 || $index < 0) {
                 continue;
             }
 
-            // Dipotong ke 1 karakter: itu memang semua yang bisa dihasilkan handleInput
-            // (e.key.length dijaga === 1 di sana). null = karakter DILEWATI, state sah.
+            // Truncated to 1 character: that is all handleInput can produce
+            // (e.key.length is kept === 1 there). null = character SKIPPED, a valid state.
             $actual = $event['actual'] ?? null;
             $actual = is_string($actual) && $actual !== '' ? mb_substr($actual, 0, 1) : null;
 
@@ -74,9 +74,9 @@ class TypingErrorInspector
      * Build the chart/panel view model: per-second error counts plus, for each error,
      * the word it landed in and what was typed instead.
      *
-     * @param  list<array{second:int,index:int,actual:?string}>  $events  sudah lewat sanitize()
-     * @param  string|null  $textToType  null -> degradasi anggun (word/expected jadi null)
-     * @param  int  $sampleCount  count($wpmHistory) -- panjang sumbu x grafik
+     * @param  list<array{second:int,index:int,actual:?string}>  $events  already passed through sanitize()
+     * @param  string|null  $textToType  null -> graceful degradation (word/expected become null)
+     * @param  int  $sampleCount  count($wpmHistory) -- length of the chart's x-axis
      * @return array{counts: list<int>, events: list<array{second:int,label:int,word:?string,offset:?int,expected:?string,actual:?string}>}
      */
     public static function inspect(array $events, ?string $textToType, int $sampleCount): array
@@ -84,26 +84,27 @@ class TypingErrorInspector
         $sampleCount = max(0, $sampleCount);
         $counts = array_fill(0, $sampleCount, 0);
 
-        // Tanpa sampel wpmHistory tak ada sumbu x untuk ditempeli -- grafiknya memang
-        // kosong. Heatmap tetap utuh (sumbernya missedChars, jalur terpisah).
+        // Without wpmHistory samples there is no x-axis to attach to -- the chart is
+        // simply empty. The heatmap stays intact (sourced from missedChars, a separate path).
         if ($sampleCount === 0 || $events === []) {
             return ['counts' => $counts, 'events' => []];
         }
 
-        // mb_str_split: server mengindeks per CODEPOINT, klien (targetArray = split(''))
-        // per UTF-16 code unit. Identik sampai U+FFFF; wordlist en/id murni a-z, jadi
-        // index selalu cocok. Karakter astral (emoji) di teks akan membuatnya meleset.
+        // mb_str_split: the server indexes per CODEPOINT, the client (targetArray =
+        // split('')) per UTF-16 code unit. Identical up to U+FFFF; the en/id wordlists
+        // are pure a-z, so indexes always match. Astral characters (emoji) in the text
+        // would make them diverge.
         $chars = ($textToType !== null && $textToType !== '') ? mb_str_split($textToType) : [];
         $bounds = self::wordBounds($chars);
 
         $enriched = [];
 
         foreach ($events as $event) {
-            // Detik terakhir tes `time` tak pernah masuk wpmHistory: tick yang memicu
-            // finish() men-set isFinished sebelum baris push-nya jalan. Error di detik
-            // itu di-CLAMP ke sampel terakhir, BUKAN dibuang -- membuangnya merusak
-            // invarian "jumlah titik === jumlah missedChars" yang dipakai halaman ini
-            // untuk menyamakan grafik dengan heatmap tepat di bawahnya.
+            // The last second of a `time` test never enters wpmHistory: the tick that
+            // triggers finish() sets isFinished before its push line runs. An error in
+            // that second is CLAMPED to the last sample, NOT dropped -- dropping it would
+            // break the "point count === missedChars count" invariant this page relies on
+            // to align the chart with the heatmap right below it.
             $second = min($event['second'], $sampleCount - 1);
             $counts[$second]++;
 
@@ -111,8 +112,8 @@ class TypingErrorInspector
 
             $enriched[] = [
                 'second' => $second,
-                // label = yang tertulis di sumbu x. Di-emit eksplisit supaya tak ada
-                // template yang berhitung sendiri -- off-by-one adalah risiko utama fitur ini.
+                // label = what is written on the x-axis. Emitted explicitly so no
+                // template does its own arithmetic -- off-by-one is this feature's main risk.
                 'label' => $second + 1,
                 'word' => $word['text'] ?? null,
                 'offset' => $word !== null ? $event['index'] - $word['start'] : null,
@@ -125,10 +126,10 @@ class TypingErrorInspector
     }
 
     /**
-     * Batas kata (index absolut) dari teks target. Cerminan perakitan wordBounds di
-     * typingGame(): kata = deretan karakter antar spasi. Satu beda yang disengaja --
-     * kata kosong (spasi ganda) dilewati, supaya teks cacat tak melahirkan kata
-     * dengan end < start.
+     * Word bounds (absolute indices) of the target text. Mirrors the wordBounds
+     * assembly in typingGame(): a word = a run of characters between spaces. One
+     * deliberate difference -- empty words (double spaces) are skipped, so malformed
+     * text can't produce a word with end < start.
      *
      * @param  list<string>  $chars
      * @return list<array{start:int,end:int,text:string}>
@@ -155,8 +156,8 @@ class TypingErrorInspector
             $start = $i + 1;
         }
 
-        // Kata terakhir tak diakhiri spasi -- cabang inilah yang menangani "error di
-        // kata terakhir", yang di klien tak pernah lewat completeWord().
+        // The last word has no trailing space -- this branch handles "an error in the
+        // last word", which on the client never goes through completeWord().
         if ($len > $start) {
             $bounds[] = [
                 'start' => $start,
@@ -176,7 +177,7 @@ class TypingErrorInspector
     {
         foreach ($bounds as $word) {
             if ($index < $word['start']) {
-                return null;    // jatuh di celah spasi
+                return null;    // falls in a space gap
             }
 
             if ($index <= $word['end']) {
@@ -184,6 +185,6 @@ class TypingErrorInspector
             }
         }
 
-        return null;            // di luar teks
+        return null;            // outside the text
     }
 }

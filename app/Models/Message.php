@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\DB;
 /** A chat message (direct or clan), with an edit window and soft delete/clear. */
 class Message extends Model
 {
-    // Action monitoring: log create/update/delete pesan (binafy/laravel-user-monitoring).
-    // on_read dimatikan di config supaya baca massal (paginasi chat) tak membanjiri log.
+    // Action monitoring: logs message create/update/delete (binafy/laravel-user-monitoring).
+    // on_read is disabled in config so bulk reads (chat pagination) don't flood the log.
     use Actionable;
 
     /** How long after sending a message may still be edited (minutes). */
@@ -110,18 +110,17 @@ class Message extends Model
     }
 
     /**
-     * Pesan TERAKHIR dari setiap lawan bicara sekaligus, dipetakan partner_id => Message.
+     * The LAST message from each conversation partner at once, mapped partner_id => Message.
      *
-     * Pengganti pemanggilan between()->visibleTo()->latest()->first() di dalam loop
-     * daftar teman. Loop itu menembak TIGA query per teman -- pesan terakhir, lookup
-     * MessageClear di dalam scopeVisibleTo(), dan hitungan unread -- sehingga inbox
-     * dengan 30 teman butuh ~90 query hanya untuk merender satu daftar.
+     * Replaces calling between()->visibleTo()->latest()->first() inside a friend-list
+     * loop. That loop fired THREE queries per friend -- last message, the MessageClear
+     * lookup inside scopeVisibleTo(), and the unread count -- so a 30-friend inbox needed
+     * ~90 queries just to render one list.
      *
-     * Aturan visibilitas dijaga sama persis dengan scopeVisibleTo():
-     *   - pesan yang di-"delete for me" oleh user ini disembunyikan (baris tetap ada
-     *     untuk lawan bicaranya),
-     *   - pesan sebelum "clear chat" per-percakapan disembunyikan.
-     * Bedanya cuma: keduanya dikerjakan di dalam SATU query, bukan per baris.
+     * Visibility rules are kept identical to scopeVisibleTo():
+     *   - messages this user "deleted for me" are hidden (the row stays for the partner),
+     *   - messages before a per-conversation "clear chat" are hidden.
+     * The only difference: both are done in ONE query instead of per row.
      *
      * @param  array<int, int>  $partnerIds
      * @return Collection<int, self>
@@ -134,12 +133,12 @@ class Message extends Model
             return collect();
         }
 
-        // Lawan bicara = pihak yang bukan saya. Dipakai untuk mengelompokkan DAN
-        // untuk mencocokkan baris message_clears milik percakapan itu.
+        // The partner is whoever isn't me. Used both to group and to match the
+        // message_clears row for that conversation.
         $partner = 'CASE WHEN messages.sender_id = ? THEN messages.recipient_id ELSE messages.sender_id END';
 
-        // id auto-increment & pesan append-only -> MAX(id) = pesan terbaru. Ini juga
-        // urutan yang dipakai kode lama (latest('id')).
+        // IDs are auto-increment and messages are append-only, so MAX(id) = newest. This
+        // matches the ordering the old code used (latest('id')).
         $rows = DB::select(
             "SELECT {$partner} AS partner_id, MAX(messages.id) AS last_id
                FROM messages
@@ -171,8 +170,8 @@ class Message extends Model
     }
 
     /**
-     * Jumlah pesan belum dibaca dari SETIAP pengirim sekaligus (pengirim => jumlah).
-     * Pengirim tanpa pesan belum dibaca tidak muncul di peta.
+     * Unread message count from EACH sender at once (sender_id => count).
+     * Senders with no unread messages are absent from the map.
      *
      * @param  array<int, int>  $senderIds
      * @return Collection<int, int>
@@ -197,7 +196,7 @@ class Message extends Model
     /** Scope: hide messages this user cleared/deleted-for-me (rows stay for others). */
     public function scopeVisibleTo($query, int $userId, ?int $otherUserId = null, ?int $clanId = null)
     {
-        // "Delete for me" per-pesan: sembunyikan untuk user ini saja, tetap ada untuk lainnya.
+        // Per-message "delete for me": hide from this user only, keep it for everyone else.
         $query->whereNotExists(function ($sub) use ($userId) {
             $sub->selectRaw('1')
                 ->from('message_deletes')

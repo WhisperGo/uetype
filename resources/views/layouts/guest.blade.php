@@ -1,3 +1,4 @@
+{{-- Guest layout for unauthenticated pages (login, onboarding): centered card with logo. --}}
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
@@ -8,7 +9,7 @@
         <title>{{ $pageTitle ?? config('app.name', 'UeType') }}</title>
         @include('partials.favicon')
 
-        <!-- Fonts: JetBrains Mono untuk semua teks readable; Pixelify Sans & Press Start 2P untuk aksen game -->
+        <!-- Fonts: JetBrains Mono for all readable text; Pixelify Sans & Press Start 2P for game accents -->
         @include('layouts._fonts')
 
         <!-- Scripts -->

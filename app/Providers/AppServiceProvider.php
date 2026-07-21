@@ -33,8 +33,8 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->guardAgainstNPlusOne();
 
-        // Di belakang reverse proxy request bisa masuk sebagai http; paksa https
-        // agar URL yang digenerate tak jadi mixed content.
+        // Behind a reverse proxy a request can arrive as http; force https so
+        // generated URLs don't become mixed content.
         if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }
@@ -53,18 +53,19 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Detektor N+1. Lazy loading sebuah relasi = query tambahan yang tak direncanakan;
-     * di dalam loop, ia berubah jadi N+1.
+     * N+1 detector. Lazy loading a relation = an unplanned extra query; inside a loop
+     * it turns into N+1.
      *
-     * Di LOKAL & TESTING ini melempar exception, jadi N+1 ketahuan saat dibuat --
-     * bukan setelah produksi melambat. Ini penting karena test fungsional biasa TIDAK
-     * bisa menangkapnya: halaman dengan 500 query tetap "lulus" selama outputnya benar.
+     * In LOCAL & TESTING this throws, so an N+1 is caught the moment it's introduced --
+     * not after production slows down. This matters because ordinary functional tests
+     * can't catch it: a page with 500 queries still "passes" as long as the output is
+     * correct.
      *
-     * Di PRODUKSI dimatikan: sebuah N+1 yang lolos lebih baik pelan daripada
-     * meledak di muka user.
+     * In PRODUCTION it's off: an N+1 that slipped through is better slow than blowing up
+     * in a user's face.
      *
-     * Kalau ini melempar, JANGAN dimatikan -- eager-load relasinya (`with()` /
-     * `loadMissing()`), itulah perbaikannya.
+     * If this throws, do NOT disable it -- eager-load the relation (`with()` /
+     * `loadMissing()`); that's the fix.
      */
     private function guardAgainstNPlusOne(): void
     {

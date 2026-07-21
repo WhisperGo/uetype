@@ -1,3 +1,4 @@
+{{-- Confirmation modal for signing out; posts to the logout route. --}}
 <x-modal name="confirm-sign-out" maxWidth="md" focusable>
     <form method="POST" action="{{ route('logout') }}" class="p-5 sm:p-6">
         @csrf

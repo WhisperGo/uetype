@@ -1,18 +1,19 @@
+{{-- A single chat message bubble: reply quote, edit form, and per-message action menu.
+     Shared by the full page ('lg') and overlay ('sm') variants. --}}
 @props([
     'message',
     'activeMode',
     'editingId',
-    // 'lg' = halaman penuh, 'sm' = overlay drawer.
+    // 'lg' = full page, 'sm' = overlay drawer.
     'size' => 'lg',
-    // Prefix wire:key. WAJIB berbeda antar varian: di /chat kedua komponen hidup
-    // bersamaan, dan key yang sama membuat morph Livewire menukar bubble antar
-    // komponen.
+    // wire:key prefix. MUST differ per variant: on /chat both components are alive at
+    // once, and a shared key makes Livewire's morph swap bubbles between components.
     'keyPrefix' => 'msg',
-    // id container daftar pesan; dipakai menu aksi untuk mengukur ruang.
+    // id of the message-list container; used by the action menu to measure space.
     'containerId' => 'chat-messages',
-    // Event window yang menutup menu aksi saat daftar digulir.
+    // Window event that closes the action menu when the list is scrolled.
     'scrollEvent' => 'chat-scrolled',
-    // Fungsi global untuk melompat ke pesan yang dikutip.
+    // Global function to jump to a quoted message.
     'scrollFn' => 'window.chatScrollToMessage',
 ])
 
@@ -23,8 +24,8 @@
     $canEdit = $mine && $message->canBeEditedBy(auth()->id());
     $canDeleteEveryone = $mine && $message->canBeDeletedForEveryoneBy(auth()->id());
 
-    // Satu-satunya perbedaan nyata antara kedua varian adalah token ukuran.
-    // Logika PHP di atas identik -- itulah sebabnya keduanya bisa disatukan.
+    // The only real difference between the two variants is the size tokens.
+    // The PHP logic above is identical -- which is why they can share this component.
     $t = $size === 'sm'
         ? [
             'wrap' => 'max-w-[85%]',
@@ -77,7 +78,7 @@
         @endif
 
         @if ($editing)
-            {{-- Form edit inline --}}
+            {{-- Inline edit form --}}
             <form wire:submit.prevent="saveEdit" class="flex items-center {{ $t['editGap'] }}">
                 <input type="text" wire:model="editBody" maxlength="2000" autocomplete="off"
                     x-init="$nextTick(() => $el.focus())"
@@ -95,7 +96,7 @@
                 <div class="{{ $t['bubble'] }} font-mono break-words
                     {{ $mine ? 'bg-gold text-background rounded-br-md' : 'bg-white/5 text-foreground rounded-bl-md' }}
                     {{ $deleted ? 'opacity-60 italic' : '' }}">
-                    {{-- Kutipan pesan yang dibalas (kalau ini reply & pesan asli masih ada). --}}
+                    {{-- Quote of the replied-to message (when this is a reply and the original still exists). --}}
                     @if (! $deleted && $message->reply_to_id && $message->replyTo)
                         <button type="button" onclick="{{ $scrollFn }}({{ $message->reply_to_id }})"
                             class="block w-full text-left {{ $t['quote'] }} border-l-2 rounded-r
@@ -125,7 +126,7 @@
                     </p>
                 </div>
 
-                {{-- Menu aksi per-pesan; tak muncul untuk pesan yang sudah dihapus-untuk-semua. --}}
+                {{-- Per-message action menu; hidden for messages already deleted for everyone. --}}
                 @unless ($deleted)
                     <div x-data="{
                             open: false,
@@ -135,11 +136,11 @@
                                 if (this.open) { this.open = false; return; }
                                 this.placed = false;
                                 this.open = true;
-                                // Posisikan setelah dirender agar tingginya terukur (2-4 item).
+                                // Position after render so the height (2-4 items) can be measured.
                                 this.$nextTick(() => { this.place(); this.placed = true; });
                             },
-                            // Buka ke bawah; kalau tak muat ke atas; lalu clamp agar menu
-                            // selalu utuh di dalam container daftar pesan.
+                            // Open downward; if it doesn't fit, open upward; then clamp so the
+                            // menu always stays fully inside the message-list container.
                             place() {
                                 const box = document.getElementById(@js($containerId));
                                 const menu = this.$refs.menu;
@@ -150,19 +151,19 @@
                                 const h = menu.offsetHeight;
                                 const gap = 4, pad = 8;
 
-                                let top = btn.bottom + gap;                 // buka ke bawah
+                                let top = btn.bottom + gap;                 // open downward
                                 if (top + h > area.bottom - pad) {
-                                    top = btn.top - gap - h;                // buka ke atas
+                                    top = btn.top - gap - h;                // open upward
                                 }
                                 const maxTop = area.bottom - pad - h;
                                 const minTop = area.top + pad;
                                 top = Math.max(minTop, Math.min(top, maxTop));
 
-                                // Menu absolute terhadap wrapper -> simpan relatif ke tombol.
+                                // Menu is absolute to the wrapper -> store relative to the button.
                                 this.topPx = top - btn.top;
                             },
                         }" @click.outside="open = false"
-                        {{-- x-on: (bukan @) karena nama event-nya diinterpolasi Blade. --}}
+                        {{-- x-on: (not @) because the event name is interpolated by Blade. --}}
                         x-on:{{ $scrollEvent }}.window="open = false"
                         class="relative shrink-0">
                         <button x-ref="trigger" @click="toggle()"

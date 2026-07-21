@@ -27,9 +27,9 @@ use Livewire\Component;
  * countdown, then race. Persists a server-recomputed Net WPM (never the client's),
  * broadcasts room/race state, and finalizes placements and XP at the end.
  *
- * Read-model dan penutupan balapan hidup di trait-nya sendiri. Siklus-hidup-room
- * dan siklus-balapan sengaja tetap di sini: keduanya saling bertaut, jadi memecahnya
- * hanya menghasilkan trait yang saling-use tanpa menambah kejelasan.
+ * The read-model and race finalization live in their own traits. Room lifecycle
+ * and race lifecycle deliberately stay here: they are interwoven, so splitting them
+ * would only produce traits that use each other without adding clarity.
  */
 class MultiplayerLobby extends Component
 {
@@ -49,27 +49,28 @@ class MultiplayerLobby extends Component
 
     public array $resultSnapshot = [];
 
-    // Durasi sudden death (detik). Konstanta tunggal dipakai checkSuddenDeath() dan
-    // getSuddenDeathRemainingProperty() agar selalu sinkron.
+    // Sudden death duration (seconds). Single constant shared by checkSuddenDeath()
+    // and getSuddenDeathRemainingProperty() so they never drift apart.
     private const SUDDEN_DEATH_SECONDS = 15;
 
-    // Durasi countdown awal race ("3, 2, 1, GO!"). Server set race_starts_at = now() + ini
-    // agar semua klien sinkron.
+    // Initial race countdown ("3, 2, 1, GO!"). Server sets race_starts_at = now() + this
+    // so all clients stay in sync.
     private const COUNTDOWN_SECONDS = 3;
 
-    // Kapasitas terpisah: pembalap dan penonton dibatasi masing-masing 5. Konstanta
-    // tunggal supaya join/toggle/guard tak memakai angka ajaib yang tersebar.
+    // Separate capacities: racers and spectators are each capped at 5. Single constants
+    // so join/toggle/guard don't scatter magic numbers.
     public const MAX_PLAYERS = 5;
 
     public const MAX_SPECTATORS = 5;
 
+    /** Create a fresh room, make the caller its host, and subscribe to its channel. */
     public function createRoom(): void
     {
         $user = Auth::user();
         $code = strtoupper(Str::random(6));
 
-        // Satu transaksi: keluar dari room lama + masuk ke yang baru. Kalau dipecah,
-        // ada jendela di mana pemain tak ada di room mana pun (atau ada di dua).
+        // One transaction: leave old rooms + join the new one. If split, there is a
+        // window where the player belongs to no room (or to two).
         DB::transaction(function () use ($user, $code) {
             $this->departCurrentRooms($user->id);
 
@@ -100,11 +101,11 @@ class MultiplayerLobby extends Component
     }
 
     /**
-     * Teks satu balapan. Dulu method ini merakit sendiri dari wordlist -- salinan
-     * logika TypingEngine, tapi HARDCODE indonesian.json. Akibatnya multiplayer tak
-     * pernah mendukung bahasa Inggris, padahal solo mendukung; itu bug fitur yang
-     * lahir dari duplikasi kode. Sekarang keduanya memakai TextGeneratorService yang
-     * sama, jadi bahasa konten pemain ikut dihormati di sini.
+     * Text for one race. This used to assemble its own from the wordlist -- a copy of
+     * TypingEngine's logic, but with indonesian.json HARDCODED. As a result multiplayer
+     * never supported English while solo did: a feature bug born from code duplication.
+     * Both now share the same TextGeneratorService, so the player's content language
+     * is honored here too.
      */
     private function generateRaceText(): string
     {
@@ -113,6 +114,7 @@ class MultiplayerLobby extends Component
         );
     }
 
+    /** Join an existing waiting room by code; overflow racers become spectators. */
     public function joinRoom(): void
     {
         $code = strtoupper(implode('', $this->joinCodeInput));
@@ -131,27 +133,27 @@ class MultiplayerLobby extends Component
             return;
         }
 
-        // Satu transaksi menutup dua hal sekaligus:
+        // One transaction covers two things at once:
         //
-        //  1. Keluar-lalu-masuk harus atomik. Tanpa ini pemain bisa terdaftar di dua
-        //     room sekaligus -- dan dulu memang begitu, karena joinRoom() tak pernah
-        //     membuang keanggotaan lamanya sama sekali.
-        //  2. Hitung-kapasitas-lalu-daftar juga harus atomik. `count() >= MAX` yang
-        //     dibaca di luar transaksi bisa dilewati dua pemain bersamaan sehingga
-        //     room menampung lebih dari kuotanya; lockForUpdate menyerialkannya.
+        //  1. Leave-then-join must be atomic. Without it a player can be registered in
+        //     two rooms at once -- and that used to happen, because joinRoom() never
+        //     dropped the old membership at all.
+        //  2. Count-capacity-then-register must be atomic too. `count() >= MAX` read
+        //     outside the transaction can be passed by two players simultaneously, so
+        //     a room ends up over quota; lockForUpdate serializes it.
         $full = DB::transaction(function () use ($room) {
             $players = $room->players()->lockForUpdate()->count();
             $playersFull = $players >= self::MAX_PLAYERS;
 
-            // Room "penuh" hanya untuk pembalap: slot pemain ke-6+ tidak ditolak,
-            // melainkan diarahkan jadi penonton (luapan otomatis). Room dianggap penuh
-            // untuk menonton hanya kalau kuota penonton juga habis.
+            // "Full" only applies to racers: a 6th+ player slot is not rejected but
+            // routed to spectator (automatic overflow). The room counts as full for
+            // watching only when the spectator quota is also exhausted.
             if ($playersFull && $room->spectators()->lockForUpdate()->count() >= self::MAX_SPECTATORS) {
                 return true;
             }
 
-            // Room tujuan dikecualikan: bergabung ke room yang sudah didiami tak
-            // boleh membuat host kehilangan status host-nya (lihat departCurrentRooms).
+            // Exclude the target room: joining a room you already occupy must not make
+            // the host lose host status (see departCurrentRooms).
             $this->departCurrentRooms(Auth::id(), $room->id);
 
             RoomMember::updateOrCreate(
@@ -183,26 +185,27 @@ class MultiplayerLobby extends Component
 
         SafeBroadcast::run(fn () => broadcast(new RoomUpdated($code))->toOthers());
 
-        // Notif kehadiran ke anggota lain: "<user> masuk". ->toOthers() supaya yang
-        // baru masuk tak melihat notif dirinya sendiri.
+        // Presence notice to other members: "<user> joined". ->toOthers() so the
+        // joiner doesn't see a notice about themselves.
         SafeBroadcast::run(fn () => broadcast(new RoomPresenceChanged($code, Auth::user()->username, 'join'))->toOthers());
     }
 
+    /** React to a room change broadcast by another player and re-sync local step/state. */
     #[On('room-updated')]
     public function roomUpdated()
     {
-        // Event ini dipicu perubahan dari pemain LAIN -> apa pun yang sempat
-        // ter-cache di request ini sudah basi.
+        // This event is triggered by a change from ANOTHER player -> anything cached
+        // during this request is stale.
         $this->forgetRoomCache();
 
         $room = Room::where('code', $this->roomCode)->first();
 
-        // Room hilang (host keluar / room dibubarkan): kembalikan pemain yang
-        // tersisa ke halaman pilih, bukan dibiarkan di step 'racing' tanpa data
-        // (semua blok view butuh roomData -> halaman jadi kosong).
+        // Room gone (host left / room dissolved): return the remaining player to the
+        // choose page rather than leaving them on step 'racing' with no data
+        // (every view block needs roomData -> the page would be blank).
         if (! $room) {
             $this->resetToChoose();
-            // Lepas langganan channel room yang sudah tak ada.
+            // Unsubscribe from the channel of a room that no longer exists.
             $this->dispatch('leave-room');
 
             return;
@@ -224,6 +227,7 @@ class MultiplayerLobby extends Component
         }
     }
 
+    /** Toggle the caller's ready flag (non-host racers only) and broadcast the change. */
     public function toggleReady(): void
     {
         $room = Room::where('code', $this->roomCode)->first();
@@ -246,11 +250,11 @@ class MultiplayerLobby extends Component
     }
 
     /**
-     * Berpindah peran pembalap <-> penonton, hanya saat room masih 'waiting'.
+     * Switch role racer <-> spectator, only while the room is still 'waiting'.
      *
-     * Host boleh jadi penonton (host_id terpisah dari role): ia tetap pengendali
-     * yang memegang "Mulai Balapan", cuma tak ikut membalap. Karena itu tak perlu
-     * reassign host di sini. Guard kapasitas per sisi (5 pemain / 5 penonton).
+     * The host may become a spectator (host_id is separate from role): they remain the
+     * controller holding "Start Race", just not racing. So no host reassignment is
+     * needed here. Per-side capacity guard (5 players / 5 spectators).
      */
     public function toggleSpectator(): void
     {
@@ -273,8 +277,8 @@ class MultiplayerLobby extends Component
                 return;
             }
 
-            // Kembali jadi pembalap: reset state race & ready. Host yang kembali jadi
-            // pembalap tetap auto-ready (konsisten dengan createRoom).
+            // Back to racer: reset race & ready state. A host returning to racer stays
+            // auto-ready (consistent with createRoom).
             $member->update([
                 'role' => RoomMember::ROLE_PLAYER,
                 'is_ready' => $room->host_id === Auth::id(),
@@ -303,33 +307,25 @@ class MultiplayerLobby extends Component
         SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
     }
 
+    /** Leave the current room, settle what's left behind, and reset back to choose. */
     public function leaveRoom(): void
     {
         $room = Room::where('code', $this->roomCode)->first();
 
         if ($room) {
-<<<<<<< HEAD
-            // Jalur yang sama dengan createRoom/joinRoom. Dulu logika ini ditulis
-            // sendiri di sini, dan hanya DI SINI yang merawat room yang ditinggalkan
-            // -- itulah kenapa dua jalur lain bocor. Satu pintu, satu perilaku.
-            DB::transaction(fn () => $this->departCurrentRooms(Auth::id()));
-=======
-            $leavingUserId = Auth::id();
+            // Read the username before departing, while the membership row still exists.
             $leavingUsername = Auth::user()->username;
 
-            RoomMember::where('room_id', $room->id)->where('user_id', $leavingUserId)->delete();
+            // Same path as createRoom/joinRoom. This logic used to be written inline here,
+            // and only HERE tended the abandoned room -- which is why the other two paths
+            // leaked. One door, one behavior.
+            DB::transaction(fn () => $this->departCurrentRooms(Auth::id()));
 
-            $remaining = RoomMember::where('room_id', $room->id)->count();
-
-            if ($remaining === 0) {
-                $room->delete();
-            } else {
-                $this->reassignHostIfNeeded($room, $leavingUserId);
-
-                // Notif "<user> keluar" hanya kalau masih ada yang mendengarkan di room.
+            // "<user> left" notice only if someone is still listening in the room
+            // (departCurrentRooms deletes the room once its last member leaves).
+            if (Room::where('id', $room->id)->exists()) {
                 SafeBroadcast::run(fn () => broadcast(new RoomPresenceChanged($this->roomCode, $leavingUsername, 'leave')));
             }
->>>>>>> 3464cd665d9d82a04307e4edcef700f991640815
 
             SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
         }
@@ -340,13 +336,13 @@ class MultiplayerLobby extends Component
     }
 
     /**
-     * Kirim satu pesan obrolan ke seluruh anggota room. Broadcast-only: tidak disimpan
-     * (obrolan lobby bersifat sesaat). Boleh dilakukan pembalap maupun penonton, selama
-     * masih tergabung di room. Sengaja diblokir saat 'racing' agar tak mengganggu balapan
-     * -- di fase itu panel chat memang tidak dirender.
+     * Send one chat message to every room member. Broadcast-only: not persisted (lobby
+     * chat is ephemeral). Allowed for racers and spectators alike, as long as they are
+     * still in the room. Deliberately blocked during 'racing' so it can't distract from
+     * the race -- the chat panel isn't even rendered in that phase.
      *
-     * ->toOthers(): pengirim menampilkan pesannya sendiri secara optimistik di klien,
-     * jadi kalau ikut menerima siaran ini pesannya akan dobel.
+     * ->toOthers(): the sender renders their own message optimistically on the client,
+     * so receiving this broadcast too would double it.
      */
     public function sendRoomMessage(string $body): void
     {
@@ -356,7 +352,7 @@ class MultiplayerLobby extends Component
             return;
         }
 
-        // Batasi panjang agar payload WebSocket tetap ringan (senada max chat global).
+        // Cap length to keep the WebSocket payload light (matches the global chat max).
         $body = mb_substr($body, 0, 500);
 
         $room = Room::where('code', $this->roomCode)->first();
@@ -365,7 +361,7 @@ class MultiplayerLobby extends Component
             return;
         }
 
-        // Harus benar-benar anggota room ini (mencegah kirim ke room yang bukan miliknya).
+        // Must genuinely be a member of this room (prevents sending to a room not theirs).
         $isMember = RoomMember::where('room_id', $room->id)
             ->where('user_id', Auth::id())
             ->exists();
@@ -384,14 +380,15 @@ class MultiplayerLobby extends Component
         ))->toOthers());
     }
 
+    /** If the leaver was the host, hand host to another member (racers preferred). */
     private function reassignHostIfNeeded(Room $room, int $leavingUserId): void
     {
         if ($room->host_id !== $leavingUserId) {
             return;
         }
 
-        // Host baru diutamakan dari pembalap (mereka yang benar-benar bertanding);
-        // hanya kalau tak ada pembalap tersisa, penonton jadi host-penonton.
+        // The new host is preferably a racer (those actually competing); only if no
+        // racer remains does a spectator become a spectator-host.
         $newHost = RoomMember::where('room_id', $room->id)
             ->where('user_id', '!=', $leavingUserId)
             ->orderByRaw("role = '".RoomMember::ROLE_PLAYER."' DESC")
@@ -401,14 +398,14 @@ class MultiplayerLobby extends Component
         if ($newHost) {
             $room->update(['host_id' => $newHost->user_id]);
 
-            // is_ready hanya bermakna untuk pembalap; host-penonton tak perlu di-ready-kan.
+            // is_ready only means something for racers; a spectator-host needn't be readied.
             if ($newHost->isPlayer()) {
                 $newHost->update(['is_ready' => true]);
             }
         }
     }
 
-    /** Bersihkan seluruh state room & kembali ke halaman create/join. */
+    /** Clear all room state and return to the create/join page. */
     private function resetToChoose(): void
     {
         $this->roomCode = '';
@@ -421,14 +418,13 @@ class MultiplayerLobby extends Component
     }
 
     /**
-     * Buang seluruh state hasil satu balapan.
+     * Clear all state from one race outcome.
      *
-     * Dijadikan satu method karena keempat properti ini SELALU harus dibuang
-     * bersamaan, dan dulu tidak: resetToChoose() dan startRace() melewatkan
-     * $hasFinished. Akibatnya host yang pernah menyelesaikan balapan lalu keluar
-     * dan membuat room baru mendapati panel ketiknya tersembunyi -- host tak
-     * menerima broadcast room.updated miliknya sendiri (->toOthers()), jadi tak
-     * ada jalur lain yang membersihkannya.
+     * Kept as one method because these four properties must ALWAYS be cleared
+     * together, and once weren't: resetToChoose() and startRace() missed $hasFinished.
+     * As a result a host who had finished a race, then left and made a new room, found
+     * their typing panel hidden -- the host doesn't receive their own room.updated
+     * broadcast (->toOthers()), so no other path cleared it.
      */
     private function resetRaceOutcome(): void
     {
@@ -439,11 +435,11 @@ class MultiplayerLobby extends Component
     }
 
     /**
-     * Catatan integritas: parameter $liveWpm dari client SENGAJA tidak dipakai untuk
-     * angka resmi. Server menghitung ulang Net WPM sendiri (karakter benar / waktu) via
-     * AntiCheatService -- selaras dengan mode solo (TypingEngine::saveResult) -- supaya
-     * ketik ngasal-cepat (WPM tinggi, akurasi rendah) tak bisa menyulap rekor.
-     * $liveWpm tetap ada demi kompatibilitas payload client yang sudah ada.
+     * Integrity note: the client's $liveWpm is DELIBERATELY not used for official
+     * numbers. The server recomputes Net WPM itself (correct chars / time) via
+     * AntiCheatService -- aligned with solo mode (TypingEngine::saveResult) -- so that
+     * fast-garbage typing (high WPM, low accuracy) can't conjure a record. $liveWpm is
+     * kept only for compatibility with the existing client payload.
      */
     public function updateRaceProgress(int $progressPercent, int $liveWpm = 0, int $accuracy = 100): void
     {
@@ -454,7 +450,7 @@ class MultiplayerLobby extends Component
 
         $member = RoomMember::where('room_id', $room->id)->where('user_id', Auth::id())->first();
 
-        // Pemain yang sudah finish tak boleh lagi mem-broadcast progress.
+        // A player who has already finished may no longer broadcast progress.
         if (! $member || ! is_null($member->finished_time_seconds)) {
             return;
         }
@@ -462,24 +458,24 @@ class MultiplayerLobby extends Component
         $progressPercent = min(100, max(0, $progressPercent));
         $accuracy = min(100, max(0, $accuracy));
 
-        // Net WPM otoritatif: diturunkan dari progres (progress% x panjang teks = karakter
-        // benar, pola sama dengan finalizeRace) dan durasi race di server, BUKAN dari WPM
-        // client. Karakter salah tak menambah progres, jadi ini otomatis "net".
+        // Authoritative Net WPM: derived from progress (progress% x text length = correct
+        // chars, same pattern as finalizeRace) and the server-side race duration, NOT the
+        // client's WPM. Wrong characters don't advance progress, so this is automatically "net".
         $textLength = mb_strlen($room->text_to_type);
         $correctChars = (int) round(($progressPercent / 100) * $textLength);
 
         $raceStart = $room->race_starts_at ?? $room->updated_at;
         $durationSeconds = max(0.0, (float) $raceStart->diffInSeconds(now(), true));
 
-        // Rumus Net WPM sama persis dengan mode solo (satu sumber kebenaran).
-        // totalChars = correctChars: progress hanya naik dari karakter benar, jadi net WPM
-        // tak bisa dipompa dengan ketik ngasal.
+        // Net WPM formula is identical to solo mode (one source of truth).
+        // totalChars = correctChars: progress only rises from correct characters, so net
+        // WPM can't be pumped by typing garbage.
         $antiCheat = app(AntiCheatService::class);
         $wpmCheck = $antiCheat->check($correctChars, $correctChars, $durationSeconds);
 
-        // Yang MENOLAK hanyalah sinyal mustahil (WPM > batas manusiawi / karakter tak
-        // konsisten). Throughput rendah / durasi pendek itu keadaan wajar di awal & pemain
-        // lambat -- WPM-nya memang kecil, bukan curang -- jadi angkanya dipakai apa adanya.
+        // Only impossible signals are REJECTED (WPM beyond human limits / inconsistent
+        // chars). Low throughput / short duration are normal early on and for slow players
+        // -- their WPM is genuinely small, not cheating -- so the number is used as-is.
         $netWpm = $antiCheat->isCheating($wpmCheck['reasons']) ? 0 : (int) round($wpmCheck['net_wpm']);
 
         $updateData = [
@@ -494,21 +490,19 @@ class MultiplayerLobby extends Component
         if ($progressPercent >= 100) {
             $justFinished = true;
 
-            // Durasi tempuh = sekarang - race_starts_at (titik countdown selesai);
-            // fallback ke updated_at hanya kalau race_starts_at kosong.
-            // absolute: true -> cegah hasil negatif.
+            // Elapsed = now - race_starts_at (the point the countdown ends); fall back to
+            // updated_at only if race_starts_at is empty. absolute: true -> no negatives.
             $updateData['finished_time_seconds'] = (int) round($durationSeconds);
 
-            // Peringkat SEMENTARA, bukan otoritatif. Hitung-lalu-tambah-satu ini tidak
-            // atomik: dua pemain yang finis dalam milidetik yang sama bisa sama-sama
-            // membaca hitungan yang sama dan mendapat angka yang identik.
+            // TEMPORARY place, not authoritative. This count-then-plus-one is not atomic:
+            // two players finishing in the same millisecond can read the same count and
+            // get identical numbers.
             //
-            // Sengaja TIDAK dikunci. Nilai ini hanya hidup beberapa detik sebagai
-            // umpan balik di layar, lalu ditimpa seluruhnya oleh finalizeRace() yang
-            // mengurutkan ulang semua pemain dalam satu query di dalam transaksi --
-            // itulah sumber kebenaran peringkat. Menambahkan lock di sini berarti
-            // membayar ongkos kontensi pada jalur terpanas balapan demi angka yang
-            // memang akan dibuang.
+            // Deliberately NOT locked. This value lives only a few seconds as on-screen
+            // feedback, then is fully overwritten by finalizeRace(), which re-ranks every
+            // player in one query inside a transaction -- that is the source of truth for
+            // placement. Adding a lock here would pay contention cost on the hottest path
+            // of the race for a number that gets discarded anyway.
             $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
                 ->where('role', RoomMember::ROLE_PLAYER)
                 ->whereNotNull('finished_time_seconds')
@@ -523,8 +517,9 @@ class MultiplayerLobby extends Component
         $member->update($updateData);
         $this->forgetRoomCache();
 
-        // Gerakan maskot lawan: payload langsung lewat WebSocket (channel race.{code}),
-        // klien lain cukup baca & geser maskot di Alpine store tanpa round-trip server.
+        // Opponent mascot movement: payload goes straight over the WebSocket (channel
+        // race.{code}); other clients just read it and shift the mascot in the Alpine
+        // store without a server round-trip.
         SafeBroadcast::run(fn () => broadcast(new RaceProgressUpdated($this->roomCode, Auth::id(), [
             'progress_percent' => $progressPercent,
             'wpm' => $netWpm,
@@ -532,8 +527,9 @@ class MultiplayerLobby extends Component
             'finished' => $justFinished,
         ]))->toOthers());
 
-        // Pemain pertama finish -> sudden death mulai. Kirim timestamp akhir yang sama ke
-        // semua klien agar countdown tersinkron; server tetap gerbang final via checkSuddenDeath().
+        // First player finishes -> sudden death starts. Send the same end timestamp to
+        // all clients so the countdown stays in sync; the server remains the final gate
+        // via checkSuddenDeath().
         if ($suddenDeathJustStarted) {
             SafeBroadcast::run(fn () => broadcast(new SuddenDeathTriggered(
                 $this->roomCode,
@@ -541,9 +537,9 @@ class MultiplayerLobby extends Component
             )));
         }
 
-        // Lifecycle (bukan sekadar gerakan): room berubah (badge, modal, place) -> re-render via RoomUpdated.
+        // Lifecycle (not just movement): the room changed (badge, modal, place) -> re-render via RoomUpdated.
         if ($justFinished) {
-            // Fast-path: kalau semua peserta sudah finish, tutup room tanpa menunggu timeout.
+            // Fast-path: if every participant has finished, close the room without waiting for the timeout.
             $unfinished = RoomMember::where('room_id', $room->id)
                 ->where('role', RoomMember::ROLE_PLAYER)
                 ->whereNull('finished_time_seconds')
@@ -559,6 +555,7 @@ class MultiplayerLobby extends Component
         }
     }
 
+    /** Concede the current race: mark the caller DNF, maybe start sudden death, maybe finalize. */
     public function giveUp(): void
     {
         $room = Room::where('code', $this->roomCode)->first();
@@ -609,6 +606,7 @@ class MultiplayerLobby extends Component
         SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
     }
 
+    /** Poll-driven gate: once the sudden-death window elapses, force-finish the race. */
     public function checkSuddenDeath(): void
     {
         if (! $this->roomCode || $this->step !== 'racing') {
@@ -620,15 +618,15 @@ class MultiplayerLobby extends Component
             return;
         }
 
-        // Detik yang sudah berlalu sejak sudden death dimulai (maju, 0 -> 15), hanya
-        // syarat auto-finish. Untuk tampilan mundur, pakai getSuddenDeathRemainingProperty().
+        // Seconds elapsed since sudden death began (counts up, 0 -> 15); only the
+        // auto-finish condition. For the countdown display, use getSuddenDeathRemainingProperty().
         $secondsPassed = now()->diffInSeconds($room->countdown_started_at, true);
 
         if ($secondsPassed >= self::SUDDEN_DEATH_SECONDS) {
             $room->update(['status' => 'finished']);
 
-            // Peringkat default (DNF) untuk pemain yang belum selesai. Hanya pembalap:
-            // penonton memang tak punya finished_time_seconds dan bukan DNF.
+            // Default (DNF) placement for players who didn't finish. Racers only:
+            // spectators have no finished_time_seconds and are not DNF.
             RoomMember::where('room_id', $room->id)
                 ->where('role', RoomMember::ROLE_PLAYER)
                 ->whereNull('finished_time_seconds')
@@ -642,22 +640,23 @@ class MultiplayerLobby extends Component
             $this->showResultModal = true;
             $this->captureResultSnapshot();
 
-            // Kunci input klien ini sekarang; guard di atas membuat method idempoten
-            // meski dipicu beberapa klien sekaligus.
+            // Lock this client's input now; the guard above keeps the method idempotent
+            // even if triggered by several clients at once.
             $this->dispatch('force-finish');
 
-            // Broadcast ke semua (bukan toOthers): klien pemicu juga perlu status final.
+            // Broadcast to everyone (not toOthers): the triggering client also needs the final status.
             SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
         }
     }
 
+    /** Host-only: reset the finished room back to waiting with fresh text for a rematch. */
     public function playAgain(): void
     {
         $room = Room::where('code', $this->roomCode)->first();
         if ($room && $room->host_id === Auth::id()) {
             $room->update([
                 'status' => 'waiting',
-                // Reset agar checkSuddenDeath() tak langsung auto-finish dari timer race lama.
+                // Reset so checkSuddenDeath() doesn't auto-finish immediately off the old race timer.
                 'countdown_started_at' => null,
                 'text_to_type' => $this->generateRaceText(),
             ]);
@@ -668,7 +667,7 @@ class MultiplayerLobby extends Component
                 'accuracy' => 100,
                 'finished_time_seconds' => null,
                 'place' => null,
-                'xp_earned' => null, // race berikutnya bisa memberi EXP lagi
+                'xp_earned' => null, // next race can award XP again
             ]);
 
             $this->step = 'waiting';
@@ -682,9 +681,9 @@ class MultiplayerLobby extends Component
 
     public function render()
     {
-        // Penjaga terakhir sebelum view dievaluasi: kalau masih menahan roomCode
-        // tapi room-nya sudah tak ada (host keluar), pulihkan ke halaman pilih.
-        // Tanpa ini semua blok view gagal syarat -> halaman kosong.
+        // Last guard before the view is evaluated: if we still hold a roomCode but the
+        // room is gone (host left), recover to the choose page. Without this every view
+        // block fails its condition -> blank page.
         if ($this->step !== 'choose' && $this->roomCode !== ''
             && ! Room::where('code', $this->roomCode)->exists()) {
             $this->resetToChoose();
@@ -694,6 +693,7 @@ class MultiplayerLobby extends Component
         return view('livewire.multiplayer-lobby')->layout('layouts.app');
     }
 
+    /** Host-only: schedule the synced countdown and flip the room to 'racing'. */
     public function startRace(): void
     {
         $room = Room::where('code', $this->roomCode)->first();
@@ -702,8 +702,8 @@ class MultiplayerLobby extends Component
             return;
         }
 
-        // Tak boleh mulai balapan tanpa pembalap: host bisa jadi penonton, dan jika
-        // semua orang penonton, tak ada yang bertanding.
+        // Can't start without racers: the host may be a spectator, and if everyone is a
+        // spectator, no one is competing.
         if ($room->players()->count() === 0) {
             session()->flash('error', __('multiplayer.error_no_players'));
 
@@ -716,15 +716,15 @@ class MultiplayerLobby extends Component
             'accuracy' => 100,
             'finished_time_seconds' => null,
             'place' => null,
-            'xp_earned' => null, // defense in depth: pastikan bisa memberi EXP sekali lagi
+            'xp_earned' => null, // defense in depth: ensure XP can be awarded once more
         ]);
 
         $room->update([
             'status' => 'racing',
-            // Defense in depth: pastikan sudden death timer bersih tiap race baru.
+            // Defense in depth: ensure the sudden death timer is clean for each new race.
             'countdown_started_at' => null,
-            // Start ditetapkan server: now() + 3 detik, semua klien hitung mundur ke waktu
-            // absolut ini agar countdown sinkron.
+            // Start is set by the server: now() + 3 seconds; all clients count down to this
+            // absolute time so the countdown stays in sync.
             'race_starts_at' => now()->addSeconds(self::COUNTDOWN_SECONDS),
         ]);
 
@@ -733,9 +733,9 @@ class MultiplayerLobby extends Component
 
         $this->forgetRoomCache();
 
-        // toOthers(): host SUDAH masuk 'racing' di baris atas. Tanpa ini host ikut
-        // menerima room.updated-nya sendiri -> Livewire re-render di tengah hitung
-        // mundur -> arena di-morph -> countdown Alpine mulai lagi dari awal.
+        // toOthers(): the host ALREADY entered 'racing' above. Without this the host also
+        // receives their own room.updated -> Livewire re-renders mid-countdown -> the arena
+        // is morphed -> the Alpine countdown restarts from the beginning.
         SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
     }
 }

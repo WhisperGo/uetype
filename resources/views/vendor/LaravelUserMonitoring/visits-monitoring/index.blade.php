@@ -1,3 +1,4 @@
+{{-- Visits monitoring table: page, user, browser, IP, platform, and timestamp per recorded visit. --}}
 @extends('LaravelUserMonitoring::layouts.master')
 
 @section('title', 'Kunjungan')

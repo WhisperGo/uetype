@@ -1,3 +1,5 @@
+{{-- Clan War page: shows the current war state (incoming challenge, pending, ongoing,
+     or open to challenge), the per-mode claim grid, and past-war history. --}}
 <div class="py-10">
     <x-page-container>
 
@@ -28,7 +30,7 @@
             {{ __('clan.war.clan_power', ['name' => $this->myClan->name, 'power' => number_format($this->myClan->power)]) }}
         </p>
 
-        {{-- ================= TANTANGAN MASUK (khusus leader) ================= --}}
+        {{-- ================= INCOMING CHALLENGE (leader only) ================= --}}
         @if ($this->incomingChallenge)
             @php $war = $this->incomingChallenge; @endphp
             <div class="p-5 border bg-surface/40 border-gold/30 rounded-2xl mb-6">
@@ -54,7 +56,7 @@
                 </div>
             </div>
 
-        {{-- ================= WAR SEDANG DITANTANGKAN (menunggu accept lawan) ================= --}}
+        {{-- ================= WAR CHALLENGE SENT (waiting for opponent to accept) ================= --}}
         @elseif ($this->myActiveWar && $this->myActiveWar->status->value === 'pending')
             @php $war = $this->myActiveWar; @endphp
             <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl mb-6">
@@ -73,7 +75,7 @@
                 </div>
             </div>
 
-        {{-- ================= WAR SEDANG BERJALAN ================= --}}
+        {{-- ================= WAR ONGOING ================= --}}
         @elseif ($this->myActiveWar && $this->myActiveWar->status->value === 'ongoing')
             @php
                 $war = $this->myActiveWar;
@@ -156,7 +158,7 @@
                                 @break
 
                             @default
-                                {{-- Sudah selesai: tampilkan pengerja + HASIL KETIK ASLI di balik poinnya. --}}
+                                {{-- Done: show who played it plus the ORIGINAL TYPING RESULT behind the points. --}}
                                 @php $tr = $slot['claim']->typingResult; @endphp
                                 <div class="flex flex-col gap-1.5">
                                     <span class="font-mono text-[0.7rem] text-muted truncate">✓ {{ $slot['claim']->user->username }}</span>
@@ -176,7 +178,7 @@
                 @endforeach
             </div>
 
-        {{-- ================= BEBAS: BISA MENANTANG (khusus leader) ================= --}}
+        {{-- ================= FREE: CAN CHALLENGE (leader only) ================= --}}
         @elseif ($this->isLeader)
             <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">{{ __('clan.war.challenge_heading') }}</p>
             @if ($this->challengeableClans->count() > 0)
@@ -204,7 +206,7 @@
             <p class="font-mono text-sm text-muted py-6 mb-8">{{ __('clan.war.not_in_war') }}</p>
         @endif
 
-        {{-- ================= RIWAYAT WAR ================= --}}
+        {{-- ================= WAR HISTORY ================= --}}
         @if ($this->warHistory->count() > 0)
             <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">{{ __('clan.war.history_heading') }}</p>
             <div class="space-y-3">
@@ -214,11 +216,11 @@
                         $opponent = $isChallenger ? $war->opponent : $war->challenger;
                         $myDelta = $isChallenger ? $war->challenger_power_delta : $war->opponent_power_delta;
 
-                        // 'result' tersimpan dari sudut pandang challenger; balik kalau kita opponent.
+                        // 'result' is stored from the challenger's point of view; flip it if we're the opponent.
                         if ($war->result === 'draw') {
                             $myResult = 'draw';
                         } elseif ($isChallenger) {
-                            $myResult = $war->result; // 'win' atau 'loss' apa adanya
+                            $myResult = $war->result; // 'win' or 'loss' as-is
                         } else {
                             $myResult = $war->result === 'win' ? 'loss' : 'win';
                         }
@@ -241,7 +243,7 @@
         @endif
     @endif
 
-    {{-- ===== MODAL KONFIRMASI (bertema, gantikan wire:confirm/aksi langsung) ===== --}}
+    {{-- ===== CONFIRMATION MODAL (themed, replaces wire:confirm / direct action) ===== --}}
     @if ($this->myClan)
         <div x-data="{ claimId: null, claimLabel: '' }"
             @open-modal.window="if ($event.detail?.name === 'confirm-cancel-claim') { claimId = $event.detail.id; claimLabel = $event.detail.label; $dispatch('open-modal', 'confirm-cancel-claim') }">
@@ -265,7 +267,7 @@
         </div>
     @endif
 
-    {{-- ===== REAL-TIME (reuse subscriber toast global di layout) ===== --}}
+    {{-- ===== REAL-TIME (reuses the global toast subscriber in the layout) ===== --}}
     @script
         <script>
             const onRemote = () => $wire.dispatch('clan-updated');

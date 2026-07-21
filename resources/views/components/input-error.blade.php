@@ -1,3 +1,4 @@
+{{-- Renders validation error messages for a form field as a list, if any. --}}
 @props(['messages'])
 
 @if ($messages)

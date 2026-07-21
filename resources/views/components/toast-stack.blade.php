@@ -1,11 +1,11 @@
-{{-- ===== TUMPUKAN TOAST GLOBAL =====
-     SATU container untuk semua notifikasi (pertemanan, clan, chat). Dulu tiga
-     komponen terpisah merender tiga container di koordinat yang sama persis,
-     sehingga toast yang datang bersamaan saling menimpa alih-alih menumpuk.
+{{-- ===== GLOBAL TOAST STACK =====
+     ONE container for all notifications (friends, clan, chat). Previously three
+     separate components rendered three containers at the exact same coordinates,
+     so toasts arriving at once overlapped instead of stacking.
 
-     Berlaku di SEMUA halaman: pemain bisa sedang mengetik atau di multiplayer
-     saat notifikasinya masuk. Berada di luar {{ '{{ $slot }}' }} supaya bertahan
-     lintas wire:navigate. Logikanya di resources/js/toasts.js. --}}
+     Applies on ALL pages: a player may be typing or in multiplayer when a
+     notification arrives. Kept outside {{ '{{ $slot }}' }} so it survives across
+     wire:navigate. Logic lives in resources/js/toasts.js. --}}
 @auth
     <div x-data="toastStack(@js([
         'userId' => Auth::id(),
@@ -46,27 +46,27 @@
                         'bg-danger/15 text-danger': t.tone === 'danger',
                         'bg-brand/15 text-brand-bright': t.tone === 'brand',
                     }">
-                    {{-- Diterima (teman / gabung clan / war) --}}
+                    {{-- Accepted (friend / clan join / war) --}}
                     <template x-if="t.icon === 'check'">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
                     </template>
-                    {{-- Ditolak --}}
+                    {{-- Declined --}}
                     <template x-if="t.icon === 'x'">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                     </template>
-                    {{-- Tantangan war masuk: pedang menyilang --}}
+                    {{-- Incoming war challenge: crossed swords --}}
                     <template x-if="t.icon === 'swords'">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2" /></svg>
                     </template>
-                    {{-- Permintaan pertemanan masuk --}}
+                    {{-- Incoming friend request --}}
                     <template x-if="t.icon === 'user-plus'">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
                     </template>
-                    {{-- Permintaan gabung clan / update umum --}}
+                    {{-- Clan join request / general update --}}
                     <template x-if="t.icon === 'group'">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-1a4 4 0 00-3-3.87M9 20H4v-1a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-1a4 4 0 10-4-4" /></svg>
                     </template>
-                    {{-- Pesan masuk --}}
+                    {{-- Incoming message --}}
                     <template x-if="t.icon === 'chat'">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8-1.17 0-2.29-.2-3.32-.56L3 21l1.56-4.68C3.57 15.19 3 13.65 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
                     </template>

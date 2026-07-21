@@ -1,10 +1,9 @@
 {{--
-    Ini view Livewire component (app/Livewire/About.php), BUKAN dipanggil
-    lewat @extends atau <x-layouts.app>. Livewire yang otomatis membungkus
-    isi file ini ke dalam layouts/app.blade.php dan mengisi {{ $slot }} di
-    sana, karena component-nya pakai atribut #[Layout('layouts.app')].
-    Makanya di sini TIDAK ada <html>, <x-layouts.app>, atau @extends —
-    langsung konten saja.
+    About page: view for the About Livewire component (app/Livewire/About.php).
+    This is NOT rendered via @extends or <x-layouts.app>. Livewire wraps this
+    file's content into layouts/app.blade.php automatically and fills its {{ $slot }},
+    because the component uses the #[Layout('layouts.app')] attribute. That is why
+    there is no <html>, <x-layouts.app>, or @extends here — just the content.
 --}}
 <div class="text-muted font-mono">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-16">
@@ -29,8 +28,8 @@
             </div>
         </div>
 
-        {{-- The team: kartu diklik -> overlay profil (satu modal, isinya diisi Alpine
-             dari member yang dipilih, bukan 5 modal terpisah di DOM). --}}
+        {{-- The team: clicking a card -> profile overlay (one modal, its content filled
+             by Alpine from the selected member, rather than 5 separate modals in the DOM). --}}
         <div class="mb-10" x-data="{ selected: null }">
             <h2 class="text-x-small font-mono uppercase tracking-[0.25em] text-muted mb-3">
                 {{ __('about.team') }}
@@ -38,9 +37,9 @@
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 @foreach ($team as $member)
                     @php
-                        // File foto dicek dari public/ (bukan storage/) supaya tidak perlu
-                        // `php artisan storage:link`. Kalau belum ada filenya, otomatis
-                        // fallback ke avatar inisial (gradient bulat + huruf depan nama).
+                        // Photo file is checked in public/ (not storage/) so no
+                        // `php artisan storage:link` is needed. If the file is missing, it
+                        // falls back to an initial avatar (round gradient + first letter of the name).
                         $photoPath = $member['photo'] ?? null;
                         $hasPhoto = $photoPath && file_exists(public_path($photoPath));
                         $initial = strtoupper(mb_substr($member['name'], 0, 1));
@@ -77,9 +76,9 @@
                 @endforeach
             </div>
 
-            {{-- Overlay profil: x-modal sudah menangani backdrop, Esc & klik-luar.
-                 Tanpa `focusable`: isinya dibungkus <template x-if>, jadi firstFocusable()
-                 bisa undefined saat modal baru dibuka. --}}
+            {{-- Profile overlay: x-modal already handles the backdrop, Esc, and outside-click.
+                 No `focusable`: the content is wrapped in <template x-if>, so firstFocusable()
+                 could be undefined right when the modal opens. --}}
             <x-modal name="team-member" maxWidth="lg">
                 <template x-if="selected">
                     <div class="p-6 sm:p-8">
@@ -122,9 +121,10 @@
             </h2>
             <div class="flex flex-wrap gap-2">
                 @foreach ($stack as $tech)
-                    {{-- color=null => ikon SVG berwarna sendiri (mis. logo Google 4-warna);
-                         jangan paksa currentColor. Directive @if TIDAK boleh di dalam tag
-                         komponen (merusak parser), jadi style dihitung dulu ke variabel. --}}
+                    {{-- color=null => the SVG icon keeps its own colors (e.g. the 4-color
+                         Google logo); don't force currentColor. An @if directive can't sit
+                         inside a component tag (it breaks the parser), so the style is
+                         computed into a variable first. --}}
                     @php $iconStyle = $tech['color'] ? 'color: ' . $tech['color'] : ''; @endphp
                     <span
                         class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-surface text-x-small font-mono text-muted">

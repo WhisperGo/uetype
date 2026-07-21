@@ -1,3 +1,4 @@
+{{-- Master layout for the user-monitoring dashboard: header, tab nav, content panel, and auto-refresh. --}}
 <!doctype html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
@@ -8,7 +9,7 @@
         <title>@yield('title') · UeType Monitoring</title>
         @includeIf('partials.favicon')
 
-        {{-- Pakai design system UeType (token semantic + font), bukan Tailwind CDN. --}}
+        {{-- Uses the UeType design system (semantic tokens + fonts), not the Tailwind CDN. --}}
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link
@@ -18,8 +19,9 @@
 
         @yield('style')
 
-        {{-- Auto-refresh dashboard (reload halaman berkala). Log dicatat realtime di DB;
-             ini menyegarkan TAMPILAN. Bisa di-toggle & state disimpan di localStorage. --}}
+        {{-- Dashboard auto-refresh (periodic page reload). Logs are recorded in the DB
+             in real time; this only refreshes the VIEW. Toggleable, with state stored
+             in localStorage. --}}
         <script>
             (function () {
                 const KEY = 'umAutoRefresh';
@@ -64,7 +66,7 @@
                 </a>
             </div>
 
-            {{-- Tab navigasi --}}
+            {{-- Navigation tabs --}}
             <div class="flex flex-wrap items-center gap-1 p-1 rounded-xl bg-surface border border-border mb-4">
                 @php
                     $tabs = [
@@ -84,7 +86,7 @@
                 @endforeach
             </div>
 
-            {{-- Panel isi --}}
+            {{-- Content panel --}}
             <div class="bg-surface border border-border rounded-2xl p-4 sm:p-6">
                 @if (session()->has('message'))
                     <div class="flex items-center gap-2 mb-4 px-4 py-3 rounded-lg bg-brand/10 border border-brand/30 text-brand-bright text-small font-mono">
@@ -93,7 +95,7 @@
                     </div>
                 @endif
 
-                {{-- Kontrol auto-refresh --}}
+                {{-- Auto-refresh control --}}
                 <div class="flex items-center justify-end gap-2 mb-4 text-x-small font-mono text-muted">
                     <label class="inline-flex items-center gap-2 cursor-pointer select-none">
                         <input id="um-autorefresh-toggle" type="checkbox"

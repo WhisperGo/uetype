@@ -38,10 +38,10 @@ class ProfileController extends Controller
      */
     private function profilePayload(User $user, bool $public = false): array
     {
-        // Profil fokus identitas: cuma ringkasan. Grafik, rekor per mode, & aktivitas
-        // lengkap ada di halaman /stats (App\Livewire\Stats).
+        // Profile is identity-focused: just a summary. Charts, per-mode records, and
+        // full activity live on the /stats page (App\Livewire\Stats).
         //
-        // Empat agregat atas tabel & filter yang sama -> satu query, bukan empat.
+        // Four aggregates over the same table & filter -> one query, not four.
         $agg = TypingResult::where('user_id', $user->id)
             ->selectRaw('
                 COUNT(*) as total_matches,
@@ -58,11 +58,11 @@ class ProfileController extends Controller
             'total_seconds' => (int) $agg->total_seconds,
         ];
 
-        // Level diturunkan dari total_xp lewat satu sumber kebenaran (User::levelData()).
+        // Level is derived from total_xp via a single source of truth (User::levelData()).
         $levelData = $user->levelData();
         $stats['level'] = $levelData['level'];
-        $stats['level_progress'] = $levelData['progress']; // EXP di dalam level ini
-        $stats['level_needed'] = $levelData['needed'];     // EXP rentang menuju level berikutnya
+        $stats['level_progress'] = $levelData['progress']; // EXP within the current level
+        $stats['level_needed'] = $levelData['needed'];     // EXP span to the next level
 
         return [
             'user' => $user,
