@@ -22,6 +22,8 @@ return [
     'restart' => 'restart',
     'then' => 'then',
     'war_locked_restart' => 'restart locked (clan war)',
+    'war_lock_label' => 'Clan War',
+    'war_lock_cancel' => 'Cancel & back to Clan War',
 
     'caps_lock' => 'Caps Lock is on',
 

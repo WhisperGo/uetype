@@ -1,5 +1,5 @@
 <div class="flex flex-col items-center text-center">
-    <img src="{{ asset('icon/uetype_mascot.png') }}" alt="Maskot UeType"
+    <img src="{{ asset('icon/uetype_mascot.png') }}" alt="{{ __('auth.mascot_alt') }}"
         class="h-20 w-20 object-contain drop-shadow-[0_0_18px_rgba(var(--color-brand)/0.35)]">
 
     <p class="mt-4 font-mono text-[0.7rem] uppercase tracking-[0.35em] text-gold">

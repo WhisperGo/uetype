@@ -2,6 +2,7 @@
 
 return [
     'welcome' => 'Selamat datang',
+    'mascot_alt' => 'Maskot UeType',
     'headline_start' => 'Mulai',
     'headline_accent' => 'mengetik',
     'tagline' => 'Masuk untuk menyimpan progres dan bermain bersama teman.',
