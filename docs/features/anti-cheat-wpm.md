@@ -117,8 +117,16 @@ akurasi tak diberlakukan.
 **Yang tetap dicatat (sengaja):** finisher **lambat** (WPM rendah nyata), **DNF yang benar-benar
 mengetik** (sentinel 999s), dan pemain **progress rendah** dengan akurasi rendah (upaya lemah) —
 semua hasil sah. Hanya yang **mustahil** (termasuk fast-garbage) dan **benar-benar kosong** yang
-dibuang. Pemain yang ditolak melihat **badge "Tidak dihitung"** di tabel hasil (terlihat semua
-peserta) plus banner penjelasan untuk dirinya sendiri.
+dibuang.
+
+**Feedback ke pemain (alasan spesifik).** Pemain yang hasilnya ditolak melihat **banner berisi
+alasan konkret** — akurasi (`reject_accuracy`), WPM mustahil (`reject_wpm`), char inkonsisten
+(`reject_inconsistent`), atau sesi kosong (`reject_empty`) — bukan sekadar "tidak valid". Alasan
+**diturunkan saat render** oleh `ReadsRoomState::getMyRejectReasonProperty()` dari data snapshot
+(wpm/akurasi/progress/durasi) lewat `AntiCheatService::raceResultReasons()` — **tanpa kolom/migrasi
+baru**, dan tak akan pernah menyimpang dari aturan penolakan sesungguhnya. Alasan detail **hanya
+terlihat oleh pemain itu sendiri**; peserta lain hanya melihat **badge "Tidak dihitung"** (tanpa
+alasan) di tabel hasil — menjaga agar tak mempermalukan.
 
 Aturan penolakan hidup di `AntiCheatService` (bukan disalin ke trait) — **satu definisi "hasil race
 invalid"** untuk semua titik finalisasi. Lihat detail alur di

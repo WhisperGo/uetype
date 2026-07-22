@@ -184,6 +184,9 @@ trait FinalizesRace
             'avatar' => $member->user->avatar,
             'wpm' => (int) $member->wpm,
             'accuracy' => $member->accuracy,
+            // Kept so the result screen can re-derive WHY a result was rejected (the
+            // accuracy/progress cross-check needs progress) without a DB round-trip.
+            'progress_percent' => (int) $member->progress_percent,
             'finished_time_seconds' => $member->finished_time_seconds,
             'place' => $member->place,
             // false = rejected by anti-cheat (excluded from stats); null = not yet finalized.

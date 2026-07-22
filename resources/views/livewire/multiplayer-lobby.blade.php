@@ -617,13 +617,15 @@
                 </div>
 
                 {{-- Result rejected by server validation: not recorded to stats (average WPM stays intact). --}}
-                @php $me = $results->firstWhere('user_id', Auth::id()); @endphp
-                @if ($me && $me->result_recorded === false)
+                {{-- The banner shows the SPECIFIC reason (accuracy/WPM/inconsistent/empty), derived --}}
+                {{-- server-side in getMyRejectReasonProperty(). Only the player themselves sees the --}}
+                {{-- reason; others just see the "not counted" badge in the results table. --}}
+                @if ($this->myRejectReason)
                     <div class="mt-2 flex items-center gap-2 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-x-small font-mono text-danger">
                         <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
                         </svg>
-                        <span>{{ __('multiplayer.result_invalid') }}</span>
+                        <span>{{ __($this->myRejectReason) }}</span>
                     </div>
                 @endif
             </div>

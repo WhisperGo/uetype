@@ -4,6 +4,7 @@ namespace App\Livewire\Concerns;
 
 use App\Models\Room;
 use App\Models\RoomMember;
+use App\Services\AntiCheatService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 
@@ -167,6 +168,42 @@ trait ReadsRoomState
             'earned' => $earned,
             'level' => $user->levelData(),
         ];
+    }
+
+    /**
+     * Why the CURRENT user's race result was rejected -- a lang key for the result
+     * banner, or null if their result was recorded (or they aren't in the snapshot).
+     *
+     * Re-derived from the snapshot (wpm/accuracy/progress/duration) rather than stored:
+     * no extra column/migration, and the reason can never drift from the actual
+     * rejection rule in AntiCheatService. Only surfaced to the player themselves; other
+     * players just see the generic "not counted" badge (no reason).
+     */
+    public function getMyRejectReasonProperty(): ?string
+    {
+        $me = collect($this->resultSnapshot)->firstWhere('user_id', Auth::id());
+
+        // null result_recorded = not finalized; true = accepted. Only false is a rejection.
+        if (! $me || ($me['result_recorded'] ?? null) !== false) {
+            return null;
+        }
+
+        $progress = max(0, min(100, (int) ($me['progress_percent'] ?? 0)));
+        $duration = (float) ($me['finished_time_seconds'] ?? 0);
+        $correctChars = (int) round(($progress / 100) * mb_strlen($this->roomData?->text_to_type ?? ''));
+
+        $reasons = app(AntiCheatService::class)
+            ->raceResultReasons($correctChars, $duration, $progress, (float) ($me['accuracy'] ?? 0));
+
+        // Map to a specific message, most-informative first. One reason wins the banner;
+        // the rest still block recording but a single clear cause reads better.
+        return match (true) {
+            in_array('accuracy_progress_inconsistent', $reasons, true) => 'multiplayer.reject_accuracy',
+            in_array('wpm_too_high', $reasons, true) => 'multiplayer.reject_wpm',
+            in_array('char_count_inconsistent', $reasons, true) => 'multiplayer.reject_inconsistent',
+            in_array('no_input', $reasons, true) => 'multiplayer.reject_empty',
+            default => 'multiplayer.result_invalid', // fallback: rejected but no single mapped cause
+        };
     }
 
     public function getIsHostProperty(): bool

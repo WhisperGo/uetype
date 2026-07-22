@@ -155,6 +155,82 @@ it('keeps a slow-but-real finish recorded', function () {
         ->and(MultiplayerMatchHistory::where('user_id', $slow->id)->exists())->toBeTrue();
 });
 
+/**
+ * Build a finalized 2-player room where the SECOND player is rejected for a specific
+ * reason, then return that player's `myRejectReason` as seen on the result screen.
+ * Renders as the rejected player so the snapshot + computed reflect their row.
+ */
+function rejectReasonFor(array $badMember): ?string
+{
+    $host = User::factory()->create();
+    $bad = User::factory()->create();
+
+    // Unique code per call: this helper runs several times within one test.
+    static $seq = 0;
+    $code = 'REJ'.(++$seq);
+
+    $room = Room::create([
+        'code' => $code, 'host_id' => $host->id, 'status' => 'racing',
+        'text_to_type' => str_repeat('ab cde fgh ', 9).'a',
+        'race_starts_at' => now()->subSeconds(60),
+    ]);
+
+    RoomMember::create([
+        'room_id' => $room->id, 'user_id' => $host->id, 'is_ready' => true,
+        'progress_percent' => 100, 'wpm' => 60, 'accuracy' => 98, 'finished_time_seconds' => 30,
+    ]);
+    RoomMember::create(array_merge([
+        'room_id' => $room->id, 'user_id' => $bad->id, 'is_ready' => true,
+    ], $badMember));
+
+    // Finalize as the rejected player, then set the result snapshot via its public
+    // property (mirrors captureResultSnapshot()'s output without the private method) so
+    // the myRejectReason computed reads a realistic finished-race snapshot.
+    $component = Livewire::actingAs($bad)->test(MultiplayerLobby::class)
+        ->set('roomCode', $code)->set('step', 'racing')
+        ->call('finalizeRace', $room->id);
+
+    $badRow = RoomMember::where('room_id', $room->id)->where('user_id', $bad->id)->first();
+
+    $component->set('resultSnapshot', [[
+        'user_id' => $bad->id,
+        'username' => $bad->username,
+        'avatar' => $bad->avatar,
+        'wpm' => (int) $badRow->wpm,
+        'accuracy' => $badRow->accuracy,
+        'progress_percent' => (int) $badRow->progress_percent,
+        'finished_time_seconds' => $badRow->finished_time_seconds,
+        'place' => $badRow->place,
+        'result_recorded' => $badRow->result_recorded,
+    ]])->set('showResultModal', true);
+
+    return $component->instance()->myRejectReason;
+}
+
+it('tells the player the SPECIFIC reason their result was rejected', function () {
+    // fast garbage: high progress, impossibly low accuracy
+    expect(rejectReasonFor([
+        'progress_percent' => 100, 'wpm' => 200, 'accuracy' => 3, 'finished_time_seconds' => 14,
+    ]))->toBe('multiplayer.reject_accuracy');
+
+    // superhuman WPM
+    expect(rejectReasonFor([
+        'progress_percent' => 100, 'wpm' => 900, 'accuracy' => 100, 'finished_time_seconds' => 1,
+    ]))->toBe('multiplayer.reject_wpm');
+
+    // empty session: never typed
+    expect(rejectReasonFor([
+        'progress_percent' => 0, 'wpm' => 0, 'accuracy' => 0,
+        'finished_time_seconds' => RoomMember::DNF_SENTINEL_SECONDS,
+    ]))->toBe('multiplayer.reject_empty');
+});
+
+it('returns no reject reason for a valid result', function () {
+    expect(rejectReasonFor([
+        'progress_percent' => 100, 'wpm' => 55, 'accuracy' => 96, 'finished_time_seconds' => 40,
+    ]))->toBeNull();
+});
+
 it('shares one rejection rule between the empty and the impossible', function () {
     $anti = app(AntiCheatService::class);
 
