@@ -8,9 +8,17 @@
     // split out from the left group -- but the data source stays the same.
     $navLeaderboard = collect($navMain)->firstWhere('key', 'leaderboard');
     $navPrimary = collect($navMain)->reject(fn ($i) => $i['key'] === 'leaderboard');
+
+    // Pending incoming friend requests -> nav badge. Server-rendered here for an
+    // accurate baseline on load/navigate; the Alpine root below refreshes it live.
+    $pendingFriendRequests = Auth::check()
+        ? App\Models\Friendship::where('addressee_id', Auth::id())
+            ->where('status', App\Enums\FriendshipStatus::Pending)
+            ->count()
+        : 0;
 @endphp
 
-<nav x-data="{ open: false }" class="{{ request()->is('typing') || request()->is('/') ? '' : 'sticky top-0' }} z-40 border-b border-white/5 bg-background/80 backdrop-blur-md">
+<nav x-data="navBadges({{ $pendingFriendRequests }})" class="{{ request()->is('typing') || request()->is('/') ? '' : 'sticky top-0' }} z-40 border-b border-white/5 bg-background/80 backdrop-blur-md">
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
             <div class="flex">
@@ -44,22 +52,35 @@
                     <div class="h-6 w-px bg-border"></div>
                 @endauth
 
+                @auth
+                    {{-- Endpoint URL for the live friend-request badge (see nav-badges.js). --}}
+                    <script>window.__friendPendingCountUrl = @js(route('friends.pending-count'));</script>
+                @endauth
+
                 <!-- Settings Dropdown -->
                 <x-dropdown align="right" width="w-56">
                     <x-slot name="trigger">
                         <button
-                            class="inline-flex items-center gap-2.5 px-2 py-1.5 leading-tight transition rounded-lg hover:bg-surface focus:outline-none focus-visible:ring-1 focus-visible:ring-border">
+                            class="relative inline-flex items-center gap-2.5 px-2 py-1.5 leading-tight transition rounded-lg hover:bg-surface focus:outline-none focus-visible:ring-1 focus-visible:ring-border">
                             @auth
-                                @if (Auth::user()->avatar)
-                                    <img src="{{ Auth::user()->avatar }}" alt="{{ Auth::user()->username }}"
-                                        class="object-cover rounded-lg w-9 h-9 border-2 border-gold/70 shadow-sm shrink-0"
-                                        referrerpolicy="no-referrer">
-                                @else
-                                    <span
-                                        class="flex items-center justify-center text-sm font-bold uppercase rounded-lg w-9 h-9 border-2 border-gold/70 bg-gradient-to-br from-brand to-gold text-background shrink-0">
-                                        {{ Str::substr(Auth::user()->username, 0, 1) }}
-                                    </span>
-                                @endif
+                                <span class="relative shrink-0">
+                                    @if (Auth::user()->avatar)
+                                        <img src="{{ Auth::user()->avatar }}" alt="{{ Auth::user()->username }}"
+                                            class="object-cover rounded-lg w-9 h-9 border-2 border-gold/70 shadow-sm"
+                                            referrerpolicy="no-referrer">
+                                    @else
+                                        <span
+                                            class="flex items-center justify-center text-sm font-bold uppercase rounded-lg w-9 h-9 border-2 border-gold/70 bg-gradient-to-br from-brand to-gold text-background">
+                                            {{ Str::substr(Auth::user()->username, 0, 1) }}
+                                        </span>
+                                    @endif
+                                    {{-- Friend-request indicator: small gold dot on the avatar, --}}
+                                    {{-- visible without opening the menu. Ring matches the nav background --}}
+                                    {{-- so the dot reads as a badge, not part of the avatar art. --}}
+                                    <span x-show="friendRequests > 0" x-cloak
+                                        class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-gold ring-2 ring-background"
+                                        :aria-label="friendRequests + ' {{ __('nav.friend_requests_pending') }}'"></span>
+                                </span>
 
                                 <span class="flex flex-col items-start font-mono">
                                     <span class="text-sm font-bold text-foreground leading-tight">{{ Auth::user()->username }}</span>
@@ -80,7 +101,16 @@
                     <x-slot name="content">
                         @auth
                             @foreach ($navAccount as $item)
-                                <x-dropdown-link :href="$item['href']">{{ __($item['label']) }}</x-dropdown-link>
+                                <x-dropdown-link :href="$item['href']">
+                                    <span class="inline-flex items-center gap-2">
+                                        {{ __($item['label']) }}
+                                        {{-- Same gold friend-request dot next to the Friends item. --}}
+                                        @if ($item['key'] === 'friends')
+                                            <span x-show="friendRequests > 0" x-cloak
+                                                class="w-2 h-2 rounded-full bg-gold shrink-0"></span>
+                                        @endif
+                                    </span>
+                                </x-dropdown-link>
                             @endforeach
 
                             <div class="my-1 border-t border-white/5"></div>
@@ -161,8 +191,15 @@
                 </div>
                 <div class="mt-3 space-y-1">
                     @foreach ($navAccount as $item)
-                        <x-responsive-nav-link :href="$item['href']"
-                            :active="$item['active']">{{ __($item['label']) }}</x-responsive-nav-link>
+                        <x-responsive-nav-link :href="$item['href']" :active="$item['active']">
+                            <span class="inline-flex items-center gap-2">
+                                {{ __($item['label']) }}
+                                @if ($item['key'] === 'friends')
+                                    <span x-show="friendRequests > 0" x-cloak
+                                        class="w-2 h-2 rounded-full bg-gold shrink-0"></span>
+                                @endif
+                            </span>
+                        </x-responsive-nav-link>
                     @endforeach
                     <button type="button"
                         x-on:click="$dispatch('open-modal', 'confirm-sign-out'); open = false"

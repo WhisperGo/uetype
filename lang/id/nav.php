@@ -9,6 +9,7 @@ return [
     'achievements' => 'Pencapaian',
     'user_stats' => 'Statistik',
     'friends' => 'Daftar Teman',
+    'friend_requests_pending' => 'permintaan pertemanan tertunda',
     'chat' => 'Chat',
     'settings' => 'Pengaturan',
     'soon' => 'segera',

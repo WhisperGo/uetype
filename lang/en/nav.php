@@ -9,6 +9,7 @@ return [
     'achievements' => 'Achievements',
     'user_stats' => 'Stats',
     'friends' => 'Friends',
+    'friend_requests_pending' => 'pending friend request(s)',
     'chat' => 'Chat',
     'settings' => 'Settings',
     'soon' => 'soon',

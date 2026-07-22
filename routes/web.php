@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AchievementController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\FriendController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PresenceController;
@@ -55,6 +56,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/stats', Stats::class)->name('stats');
 
     Route::get('/friends', Friends::class)->name('friends.index');
+    // Pending-request count for the nav badge: the nav is a static partial and can't
+    // re-query itself, so it polls this lightweight endpoint on friendship events.
+    Route::get('/friends/pending-count', [FriendController::class, 'pendingCount'])
+        ->name('friends.pending-count');
     Route::get('/chat', Chat::class)->name('chat.index');
     // Kirim pesan lewat endpoint ringan (paralel, di luar antrean Livewire)
     // supaya spam pesan tak saling menunggu.

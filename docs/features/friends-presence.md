@@ -84,6 +84,19 @@ public function refreshFriends(): void { /* kosong */ }
 otomatis mengambil ulang computed properties (daftar teman terbaru). Tak perlu logika di dalam
 listener — pola ini berulang di `Friends`, `Clans`, `Chat`.
 
+### 3.7 Badge friend request di nav (titik indikator)
+
+Menu akun di nav menampilkan **titik kecil bernuansa brand** saat ada permintaan pertemanan
+**masuk** yang tertunda — di **trigger dropdown** (terlihat tanpa membuka menu) dan di sebelah item
+**Friends** di dalam menu.
+
+| Aspek | Keputusan | Justifikasi |
+|-------|-----------|-------------|
+| **Hitungan** | Hanya `Pending` di mana user adalah **addressee** (incoming), bukan yang dikirim | Badge menandai "ada yang perlu kamu respons"; request yang kamu kirim bukan urusan tindakan. |
+| **Baseline** | Di-render **server** di `navigation.blade.php` (`$pendingFriendRequests`) | Akurat tepat saat load/`wire:navigate`, tanpa menunggu round-trip JS. |
+| **Real-time** | Endpoint ringan [`GET /friends/pending-count`](../../app/Http/Controllers/FriendController.php) yang di-*fetch* oleh [`nav-badges.js`](../../resources/js/nav-badges.js) saat event `friendship-updated-remote` | Nav adalah **partial statis** (bukan Livewire), jadi tak bisa query ulang sendiri. Endpoint memastikan badge selalu akurat — **naik** saat request masuk, **turun** saat dibatalkan/diterima/ditolak. Penghitung optimistic (+1 saja) akan meleset pada cancel/reject. |
+| **Tanpa langganan Echo baru** | Mendengar `friendship-updated-remote` yang **sudah** disiarkan `toasts.js` | Satu subscriber `friends.{id}` (lihat §3.6 & [chat.md](chat.md)); nav numpang event window yang sama, tak menambah listener Echo. |
+
 ## 4. Real-time Aman
 
 Semua broadcast presence/friendship lewat [`SafeBroadcast`](../../app/Support/SafeBroadcast.php) —

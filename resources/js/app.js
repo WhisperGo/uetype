@@ -2,6 +2,7 @@ import './bootstrap';
 
 import Chart from 'chart.js/auto';
 import toastStack from './toasts';
+import navBadges from './nav-badges';
 import typingGame from './typing-game';
 import chatOverlayDock from './chat-dock';
 import createChatRuntime from './chat-runtime';
@@ -27,5 +28,6 @@ window.createChatRuntime = createChatRuntime;
 // seluruh view repo ini.
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('toastStack', toastStack);
+    window.Alpine.data('navBadges', navBadges);
     window.Alpine.data('chatOverlayDock', chatOverlayDock);
 });
