@@ -47,7 +47,7 @@ return [
 
     'members' => ':count members',
 
-    // Edit & delete pesan
+    // Message edit & delete
     'edited' => 'edited',
     'message_actions' => 'Message actions',
     'edit' => 'Edit',

@@ -8,17 +8,16 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Pisahkan "tidak menyelesaikan balapan" dari "durasi tempuh".
+     * Separate "did not finish the race" from "elapsed duration".
      *
-     * Dulu keduanya ditumpuk di satu kolom: pemain DNF disimpan dengan
-     * finished_time_seconds = 999 (nilai sentinel dari RoomMember). Angka itu
-     * lalu ikut tertulis ke riwayat permanen ini sebagai kalau-kalau durasi
-     * sungguhan, sehingga statistik apa pun yang merata-ratakan waktu finish
-     * akan tercemar -- dan sorting-nya cuma "kebetulan" benar selama tak ada
-     * balapan yang berlangsung lebih dari 999 detik.
+     * These used to be crammed into one column: a DNF player was stored with
+     * finished_time_seconds = 999 (RoomMember's sentinel value). That number then got
+     * written into this permanent history as if it were a real duration, so any statistic
+     * that averaged finish time was polluted -- and its sorting was only "accidentally"
+     * correct as long as no race ran longer than 999 seconds.
      *
-     * Sekarang: dnf = true, finished_time_seconds = null (SQL AVG/MAX otomatis
-     * mengabaikan NULL, jadi statistik ikut bersih tanpa filter tambahan).
+     * Now: dnf = true, finished_time_seconds = null (SQL AVG/MAX ignore NULL automatically,
+     * so the statistics come out clean without an extra filter).
      */
     public function up(): void
     {
@@ -26,7 +25,7 @@ return new class extends Migration
             $table->boolean('dnf')->default(false)->after('finished_time_seconds');
         });
 
-        // Bersihkan baris lama yang sudah terlanjur menyimpan sentinel sebagai durasi.
+        // Clean up old rows that already stored the sentinel as a duration.
         DB::table('multiplayer_match_history')
             ->where('finished_time_seconds', 999)
             ->update(['dnf' => true, 'finished_time_seconds' => null]);
@@ -34,7 +33,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Kembalikan sentinel supaya kolomnya konsisten dengan skema lama.
+        // Restore the sentinel so the column is consistent with the old schema.
         DB::table('multiplayer_match_history')
             ->where('dnf', true)
             ->update(['finished_time_seconds' => 999]);

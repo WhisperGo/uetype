@@ -10,10 +10,10 @@ return new class extends Migration
     {
         Schema::table('rooms', function (Blueprint $table) {
             // Waktu absolut (server) kapan race resmi MULAI (setelah countdown 3 detik).
-            // Di-set saat startRace() = now()+3s dan disiarkan ke semua klien, supaya
-            // countdown 3-2-1 di setiap layar dihitung dari titik yang SAMA (mundur ke
-            // waktu ini), bukan dari saat masing-masing klien kebetulan me-render race.
-            // Ini menghilangkan delay ~1 detik antar-layar pada awal balapan.
+            // Set in startRace() = now()+3s and broadcast to all clients, so the 3-2-1
+            // countdown on every screen is computed from the SAME point (counting down to
+            // this time), not from whenever each client happens to render the race. This
+            // removes the ~1-second delay between screens at the start of a race.
             $table->timestamp('race_starts_at')->nullable()->after('countdown_started_at');
         });
     }

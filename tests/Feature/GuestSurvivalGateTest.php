@@ -5,9 +5,9 @@ use App\Models\User;
 use Livewire\Livewire;
 
 /**
- * Survival dikunci untuk guest (keputusan produk 2026-07-16, membalik keputusan
- * sebelumnya). Tamu melihat CTA login, dan server menolak setMode('survival').
- * Sejalan dengan penguncian Ghost -- UI + server-side.
+ * Survival is locked for guests (product decision 2026-07-16, reversing the earlier one).
+ * Guests see a login CTA, and the server rejects setMode('survival'). In line with the
+ * Ghost lock -- UI + server-side.
  */
 it('menolak setMode survival untuk guest (normalisasi ke Standard)', function () {
     Livewire::test(TypingEngine::class)

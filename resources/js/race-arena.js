@@ -1,23 +1,23 @@
 /**
- * Arena balapan multiplayer: store Alpine 'race' (posisi lawan) + komponen
- * 'raceArena' (mengetik, countdown, sudden death).
+ * Multiplayer race arena: the Alpine 'race' store (opponent positions) + the 'raceArena'
+ * component (typing, countdown, sudden death).
  *
- * Sebelumnya 533 baris ini hidup sebagai <script> di dalam blok @assets pada
- * multiplayer-lobby.blade.php -- tak bisa di-lint, di-minify, maupun di-cache
- * browser sebagai aset terpisah.
+ * These 533 lines used to live as a <script> inside the @assets block of
+ * multiplayer-lobby.blade.php -- couldn't be linted, minified, or browser-cached as a
+ * separate asset.
  *
- * Blok aslinya nol interpolasi Blade, jadi pemindahannya murni copy-paste.
- * Semua data dari server tetap masuk lewat @js(...) di markup (config raceArena
- * dan laneSeeds), bukan lewat file ini.
+ * The original block had zero Blade interpolation, so the move was a pure copy-paste. All
+ * server data still comes in through @js(...) in the markup (raceArena config and
+ * laneSeeds), not through this file.
  */
-// Komponen Alpine 'raceArena': logika typing + sudden death.
-// registerRaceArena() idempoten (flag global).
+// Alpine 'raceArena' component: typing + sudden-death logic.
+// registerRaceArena() is idempotent (global flag).
 const registerRaceArena = (Alpine) => {
     if (window.__raceArenaRegistered) return;
     window.__raceArenaRegistered = true;
 
-    // Store global 'race': posisi maskot lawan dari payload WebSocket. Store (bukan state
-    // komponen) agar bertahan lintas Livewire morph. opponents = { [userId]: {progress, wpm, finished} }.
+    // Global 'race' store: opponent mascot positions from WebSocket payloads. A store (not
+    // component state) so it survives Livewire morphs. opponents = { [userId]: {progress, wpm, finished} }.
     if (!Alpine.store('race')) {
         Alpine.store('race', {
             opponents: {},
@@ -30,15 +30,15 @@ const registerRaceArena = (Alpine) => {
                 };
 
                 if (prev) {
-                    // Pemain yang sudah finish tetap finish di 100%: paket lama
-                    // yang menyusul tak boleh menariknya mundur dari garis finis.
+                    // A player who already finished stays finished at 100%: a late-arriving
+                    // old packet must not drag them back from the finish line.
                     if (prev.finished) {
                         next.finished = true;
                         next.progress = Math.max(next.progress, prev.progress);
                     }
                 }
 
-                // Reassign object agar reaktivitas Alpine ter-trigger.
+                // Reassign the object so Alpine reactivity triggers.
                 this.opponents = { ...this.opponents, [userId]: next };
             },
             leaderId() {
@@ -53,10 +53,9 @@ const registerRaceArena = (Alpine) => {
                 }
                 return bestId;
             },
-            // Peringkat hidup pemain: 1 + jumlah pemain yang progresnya lebih jauh.
-            // Seri -> peringkat sama (dua pemain di 0% sama-sama peringkat 1).
-            // seeds = { [userId]: progress } dari Blade, dipakai untuk pemain
-            // yang belum pernah mengirim payload WebSocket.
+            // A player's live rank: 1 + the number of players further ahead. A tie -> the
+            // same rank (two players at 0% are both rank 1). seeds = { [userId]: progress }
+            // from Blade, used for players who haven't yet sent a WebSocket payload.
             rankOf(userId, seeds = {}) {
                 const at = (id) => this.opponents[id]?.progress ?? seeds[id] ?? 0;
                 const mine = at(userId);
@@ -66,23 +65,23 @@ const registerRaceArena = (Alpine) => {
                 }
                 return ahead + 1;
             },
-            // Race yang sedang "dimiliki" store ini. Dipakai untuk membedakan
-            // "race baru" (boleh dibersihkan) dari "re-init race yang sama".
+            // The race this store currently "owns". Used to tell a "new race" (safe to
+            // clear) from a "re-init of the same race".
             raceKey: null,
 
-            // Tenggat countdown pada jam MONOTONIK (performance.now()), bukan
-            // Date.now(). Disimpan di store, bukan di komponen, supaya morph
-            // Livewire / re-init Alpine tak pernah mengulang hitung mundur.
+            // Countdown deadline on the MONOTONIC clock (performance.now()), not Date.now().
+            // Kept in the store, not the component, so a Livewire morph / Alpine re-init
+            // never restarts the countdown.
             deadline: null,
 
             /**
-             * Detak jam bersama (ms epoch), dinaikkan tiap detik selama balapan.
+             * Shared clock tick (ms epoch), bumped every second during the race.
              *
-             * WPM tiap pemain = f(karakter benar, waktu berlalu). Karena waktu
-             * terus jalan walau tak ada yang mengetik, lane harus dihitung ulang
-             * secara berkala. Nilai reaktif ini yang memicunya -- SATU timer untuk
-             * seluruh lane, dan tak bergantung pada tab lawan (tab latar dibekukan
-             * browser, jadi lawan yang diam takkan pernah menyiarkan WPM barunya).
+             * Each player's WPM = f(correct chars, elapsed time). Since time keeps moving
+             * even when nobody types, lanes must be recomputed periodically. This reactive
+             * value drives that -- ONE timer for all lanes, independent of opponent tabs (a
+             * background tab is frozen by the browser, so an idle opponent never broadcasts
+             * a fresh WPM).
              */
             now: Date.now(),
             _nowInterval: null,
@@ -101,9 +100,9 @@ const registerRaceArena = (Alpine) => {
             },
 
             /**
-             * Kunci tenggat SEKALI per race. Panggilan berikutnya untuk race yang
-             * sama diabaikan, jadi countdown terus berjalan menuju tenggat semula.
-             * `remainingMs` datang dari server (sisa waktu saat halaman dirender).
+             * Lock the deadline ONCE per race. Later calls for the same race are ignored,
+             * so the countdown keeps running toward the original deadline. `remainingMs`
+             * comes from the server (time left when the page was rendered).
              */
             armCountdown(key, remainingMs) {
                 if (this.raceKey === key && this.deadline !== null) return;
@@ -111,7 +110,7 @@ const registerRaceArena = (Alpine) => {
                 this.deadline = performance.now() + remainingMs;
             },
 
-            /** Sisa milidetik menuju start; <= 0 berarti race sudah boleh mulai. */
+            /** Milliseconds left until start; <= 0 means the race may begin. */
             remainingMs() {
                 if (this.deadline === null) return 0;
                 return this.deadline - performance.now();
@@ -125,16 +124,15 @@ const registerRaceArena = (Alpine) => {
             },
 
             /**
-             * Bersihkan HANYA kalau ini benar-benar race lain. Re-init pada race
-             * yang sama (morph Livewire, sudden death, komponen di-mount ulang)
-             * tak boleh menghapus posisi -- itulah yang dulu menarik semua maskot
-             * kembali ke 0 saat pemain berhenti mengetik sejenak.
+             * Clear ONLY if this is genuinely a different race. A re-init of the same race
+             * (Livewire morph, sudden death, component re-mount) must not wipe positions --
+             * that's what used to snap every mascot back to 0 when a player paused typing.
              */
             resetForRace(key) {
                 if (this.raceKey === key) return;
                 this.opponents = {};
                 this.raceKey = key;
-                this.deadline = null; // race lain -> tenggat lama tak berlaku
+                this.deadline = null; // different race -> the old deadline no longer applies
             },
         });
     }
@@ -143,16 +141,16 @@ const registerRaceArena = (Alpine) => {
         countdown: 3,
         raceStarted: false,
         myId: config.myId,
-        // Penonton: ikut render arena (countdown + lane pembalap) tapi tak pernah
-        // mengetik, meng-emit progress, atau menyerah. Semua jalur input dijaga ini.
+        // Spectator: renders the arena (countdown + racer lanes) but never types, emits
+        // progress, or gives up. This gates every input path.
         isSpectator: !!config.isSpectator,
         roomCode: config.roomCode || '',
         textToType: config.textToType || '',
-        // Waktu absolut (ms epoch) race mulai; hanya dipakai sebagai titik awal WPM
-        // & identitas race, BUKAN untuk countdown (jam klien tak bisa dipercaya).
+        // Absolute race-start time (ms epoch); used only as the WPM start point & race
+        // identity, NOT for the countdown (the client clock can't be trusted).
         raceStartsAtMs: config.raceStartsAt ? new Date(config.raceStartsAt).getTime() : null,
-        // Sisa waktu menuju start menurut SERVER saat halaman ini dirender.
-        // null = race belum dijadwalkan.
+        // Time left until start per the SERVER when this page was rendered.
+        // null = race not scheduled yet.
         raceStartsInMs: config.raceStartsInMs ?? null,
         _countdownInterval: null,
         words: [],
@@ -165,21 +163,21 @@ const registerRaceArena = (Alpine) => {
         totalKeystrokes: 0,
         totalMistakes: 0,
         prevTypedLength: 0,
-        // true kalau kata itu dilewati salah/belum lengkap (space tanpa exact match) - untuk highlight visual riwayat error per kata.
+        // true if the word was passed wrong/incomplete (space without an exact match) - for the per-word error-history highlight.
         wordHadError: [],
 
-        // Progress & WPM pemain lokal, reaktif, dibaca lane maskot sendiri di view. Diperbarui tiap checkInput().
+        // Local player's progress & WPM, reactive, read by the own mascot lane in the view. Updated each checkInput().
         progressPercent: 0,
         liveWpm: 0,
 
-        // Throttle emit progress ke server: visual lokal instan, jaringan dibatasi ~120ms + trailing flush.
+        // Throttle progress emits to the server: local visuals instant, network capped at ~120ms + a trailing flush.
         _lastEmit: 0,
         _emitTimer: null,
 
-        // Ticker WPM (1 detik): menyegarkan angka saat pemain berhenti mengetik.
+        // WPM ticker (1s): refreshes the number while the player has stopped typing.
         _wpmInterval: null,
 
-        // Sudden death: timer client-side, tapi checkSuddenDeath() di server tetap sumber kebenaran final.
+        // Sudden death: a client-side timer, but the server's checkSuddenDeath() is still the final source of truth.
         suddenDeathActive: !!config.suddenDeathActive,
         suddenDeathRemaining: config.suddenDeathRemaining ?? 15,
         lockedByTimeout: false,
@@ -188,21 +186,21 @@ const registerRaceArena = (Alpine) => {
         init() {
             this.words = this.textToType.split(' ');
 
-            // Bersihkan posisi HANYA saat masuk race yang berbeda. Kalau komponen
-            // ini di-init ulang untuk race yang sama (morph Livewire, sudden death),
-            // posisi tiap maskot dipertahankan -- kalau dihapus, semua lane jatuh
-            // ke seed lama (0) sampai payload berikutnya tiba.
+            // Clear positions ONLY when entering a different race. If this component is
+            // re-init'd for the same race (Livewire morph, sudden death), each mascot's
+            // position is kept -- if wiped, every lane falls back to the old seed (0) until
+            // the next payload arrives.
             if (this.$store.race) {
                 this.$store.race.resetForRace(this.raceKey());
             }
 
-            // Sudden death aktif saat (re)init = race sudah berjalan -> skip overlay countdown.
+            // Sudden death active at (re)init = the race is already running -> skip the countdown overlay.
             if (this.suddenDeathActive) {
                 this.raceStarted = true;
                 this.countdown = 'GO!';
                 this.startTime = Date.now();
                 this.startSuddenDeathClock();
-                // Penonton tak mengetik: tak perlu WPM lokal maupun fokus input.
+                // A spectator doesn't type: no local WPM or input focus needed.
                 if (!this.isSpectator) {
                     this.startWpmTicker();
                     this.$nextTick(() => {
@@ -210,32 +208,31 @@ const registerRaceArena = (Alpine) => {
                     });
                 }
             } else {
-                // Hitung mundur ke race_starts_at server: waktu absolut sama di semua layar.
+                // Count down to the server's race_starts_at: the same absolute time on every screen.
                 this.startSyncedCountdown();
             }
 
-            // Sinyal server saat room ditutup paksa -> kunci total.
+            // Server signal when the room is force-closed -> lock everything.
             this.$wire.on('force-finish', () => this.lockRace());
 
-            // Bridge event .race.sudden_death -> hitung mundur komponen ini. Disimpan agar bisa di-remove saat destroy.
+            // Bridge the .race.sudden_death event -> this component's countdown. Stored so it can be removed on destroy.
             this._onSuddenDeath = (ev) => this.syncSuddenDeath(ev.detail.remaining);
             window.addEventListener('race-sudden-death', this._onSuddenDeath);
         },
 
-        // Identitas satu balapan: room + waktu mulai. Rematch di room yang sama
-        // memakai race_starts_at baru -> key berubah -> store dibersihkan.
+        // One race's identity: room + start time. A rematch in the same room uses a new
+        // race_starts_at -> the key changes -> the store is cleared.
         raceKey() {
             return `${this.roomCode}@${this.raceStartsAtMs ?? 'pending'}`;
         },
 
         /**
-         * Hitung mundur ke tenggat yang dikunci di store saat race ini pertama
-         * kali terlihat. Karena tenggatnya monotonik & di luar komponen, morph
-         * Livewire atau re-init Alpine hanya melanjutkan hitungan yang sama --
-         * tidak pernah mengulanginya dari 3.
+         * Count down to the deadline locked in the store when this race was first seen.
+         * Because the deadline is monotonic & outside the component, a Livewire morph or
+         * Alpine re-init just continues the same count -- never restarts it from 3.
          */
         startSyncedCountdown() {
-            // Server tak menjadwalkan race -> tak ada yang perlu dihitung mundur.
+            // The server didn't schedule a race -> nothing to count down.
             if (this.raceStartsInMs === null) {
                 this.beginRace();
                 return;
@@ -243,8 +240,8 @@ const registerRaceArena = (Alpine) => {
 
             this.$store.race.armCountdown(this.raceKey(), this.raceStartsInMs);
 
-            // Tenggat sudah lewat saat komponen ini di-mount (mis. arena di-morph
-            // di tengah balapan): langsung masuk race, jangan tampilkan "3" lagi.
+            // The deadline already passed when this component mounted (e.g. the arena was
+            // morphed mid-race): jump straight into the race, don't show "3" again.
             if (this.$store.race.remainingMs() <= 0) {
                 this.countdown = 'GO!';
                 this.beginRace();
@@ -262,7 +259,7 @@ const registerRaceArena = (Alpine) => {
                     }
                     setTimeout(() => this.beginRace(), 400);
                 } else {
-                    // ceil supaya 2001ms..3000ms => "3", dst. Minimal tampil "1".
+                    // ceil so 2001ms..3000ms => "3", etc. Show at least "1".
                     this.countdown = Math.max(1, Math.ceil(remainingMs / 1000));
                 }
             };
@@ -271,12 +268,12 @@ const registerRaceArena = (Alpine) => {
             this._countdownInterval = setInterval(tick, 100);
         },
 
-        // startTime dipatok ke race_starts_at server agar WPM antar pemain pakai titik awal sama.
+        // startTime is pinned to the server's race_starts_at so every player's WPM shares the same start point.
         beginRace() {
             if (this.raceStarted) return;
             this.raceStarted = true;
             this.startTime = this.raceStartsAtMs ?? Date.now();
-            // Penonton hanya menonton: tak ada WPM lokal maupun fokus input.
+            // A spectator only watches: no local WPM or input focus.
             if (this.isSpectator) return;
             this.startWpmTicker();
             this.$nextTick(() => {
@@ -307,10 +304,10 @@ const registerRaceArena = (Alpine) => {
             }
         },
 
-        // Sinkronkan sisa waktu dari server & pastikan clock lokal jalan.
+        // Sync the remaining time from the server & make sure the local clock is running.
         syncSuddenDeath(remainingFromServer) {
             this.suddenDeathActive = true;
-            // Ambil nilai paling konservatif kalau clock sudah jalan (hindari mundur naik).
+            // Take the most conservative value if the clock is already running (avoid ticking back up).
             if (this._sdInterval) {
                 this.suddenDeathRemaining = Math.min(this.suddenDeathRemaining, remainingFromServer);
             } else {
@@ -331,7 +328,7 @@ const registerRaceArena = (Alpine) => {
             }, 1000);
         },
 
-        // Kunci paksa input & pengiriman progress. Idempoten.
+        // Force-lock input & progress emits. Idempotent.
         lockRace() {
             if (this.lockedByTimeout) return;
             this.lockedByTimeout = true;
@@ -340,7 +337,7 @@ const registerRaceArena = (Alpine) => {
                 clearInterval(this._sdInterval);
                 this._sdInterval = null;
             }
-            // WPM berhenti di angka terakhir; balapan sudah usai bagi pemain ini.
+            // WPM stops at its last value; the race is over for this player.
             if (this._wpmInterval) {
                 clearInterval(this._wpmInterval);
                 this._wpmInterval = null;
@@ -351,7 +348,7 @@ const registerRaceArena = (Alpine) => {
             }
             if (this.$refs.typeInput) this.$refs.typeInput.blur();
 
-            // checkSuddenDeath() idempoten: aman dipanggil beberapa klien bersamaan.
+            // checkSuddenDeath() is idempotent: safe to call from several clients at once.
             if (this.$wire) this.$wire.checkSuddenDeath();
         },
 
@@ -372,22 +369,22 @@ const registerRaceArena = (Alpine) => {
             }
             this.prevTypedLength = this.typedText.length;
 
-            // Satu rumus dipakai bersama ticker WPM (lihat correctCharsSoFar/currentWpm).
+            // One formula shared with the WPM ticker (see correctCharsSoFar/currentWpm).
             let totalCorrectChars = this.correctCharsSoFar();
             let progressPercent = Math.floor((totalCorrectChars / this.textToType.length) * 100);
 
             let accuracyPercent = this.currentAccuracy();
             let liveWpm = this.currentWpm();
 
-            // State reaktif lokal diperbarui langsung -> maskot sendiri gerak instan, tak menunggu jaringan.
+            // Local reactive state updated directly -> the own mascot moves instantly, no network wait.
             this.liveWpm = liveWpm;
 
-            // Kata terakhir selesai otomatis saat huruf terakhir benar.
+            // The last word auto-completes when its final letter is correct.
             if (this.currentWordIndex === this.words.length - 1 && this.typedText === targetWord) {
                 this.isFinished = true;
                 this.progressPercent = 100;
                 this.publishLocal(100, liveWpm, true);
-                // force=true: finish wajib dikirim segera, tak di-throttle.
+                // force=true: finish must be sent immediately, not throttled.
                 this.emitProgress(100, liveWpm, accuracyPercent, true);
                 return;
             }
@@ -398,8 +395,8 @@ const registerRaceArena = (Alpine) => {
         },
 
         /**
-         * Jumlah karakter benar yang sudah diketik sejauh ini: kata-kata yang
-         * sudah lewat + awalan benar pada kata yang sedang diketik.
+         * Correct characters typed so far: the words already passed + the correct prefix
+         * of the word currently being typed.
          */
         correctCharsSoFar() {
             const targetWord = this.words[this.currentWordIndex] ?? '';
@@ -413,7 +410,7 @@ const registerRaceArena = (Alpine) => {
             return this.correctCharsFromPastWords + correctInCurrent;
         },
 
-        /** WPM standar: (karakter benar / 5) dibagi menit yang berlalu. */
+        /** Standard WPM: (correct chars / 5) divided by minutes elapsed. */
         currentWpm() {
             const minutes = (Date.now() - this.startTime) / 60000;
             if (minutes <= 0) return 0;
@@ -422,13 +419,13 @@ const registerRaceArena = (Alpine) => {
         },
 
         /**
-         * Menjaga `liveWpm` lokal tetap segar saat pemain berhenti mengetik,
-         * agar nilai yang dikirim ke server (mis. saat finish) tak basi.
+         * Keeps the local `liveWpm` fresh while the player has stopped typing, so the value
+         * sent to the server (e.g. on finish) isn't stale.
          *
-         * TIDAK mengirim apa pun ke jaringan: tiap lane sudah menghitung WPM
-         * lawannya sendiri dari progres + waktu (lihat liveWpmValue). Kalau
-         * mengandalkan kiriman pemiliknya, tab lawan yang tidak aktif dibekukan
-         * browser dan angkanya macet -- persis bug yang diperbaiki di sini.
+         * Sends NOTHING over the network: each lane already computes its opponent's WPM from
+         * progress + time (see liveWpmValue). Relying on the owner's emits would stall the
+         * number, because an inactive opponent tab is frozen by the browser -- exactly the
+         * bug fixed here.
          */
         startWpmTicker() {
             if (this._wpmInterval) return;
@@ -440,14 +437,14 @@ const registerRaceArena = (Alpine) => {
             }, 1000);
         },
 
-        /** Akurasi berjalan; dipisah agar ticker tak menduplikasi rumusnya. */
+        /** Running accuracy; split out so the ticker doesn't duplicate the formula. */
         currentAccuracy() {
             return this.totalKeystrokes > 0
                 ? Math.round(((this.totalKeystrokes - this.totalMistakes) / this.totalKeystrokes) * 100)
                 : 100;
         },
 
-        // Publikasikan posisi lokal ke store (key userId sendiri) agar lane sendiri & lawan seragam.
+        // Publish the local position to the store (under our own userId key) so the own lane & opponents are uniform.
         publishLocal(progress, wpm, finished) {
             if (this.myId == null) return;
             this.$store.race.apply(this.myId, {
@@ -457,7 +454,7 @@ const registerRaceArena = (Alpine) => {
             });
         },
 
-        // Throttle ~120ms + trailing-edge flush agar posisi terakhir tak hilang; `force` selalu segera.
+        // Throttle ~120ms + a trailing-edge flush so the last position isn't lost; `force` is always immediate.
         emitProgress(progress, wpm, accuracy, force) {
             const now = Date.now();
             const MIN_INTERVAL = 120;
@@ -473,7 +470,7 @@ const registerRaceArena = (Alpine) => {
                 return;
             }
 
-            // Terlalu cepat: jadwalkan trailing-edge flush dengan nilai terbaru saat timer menyala.
+            // Too soon: schedule a trailing-edge flush with the latest values when the timer fires.
             const delay = MIN_INTERVAL - (now - this._lastEmit);
             this._emitTimer = setTimeout(() => {
                 this._emitTimer = null;
@@ -486,14 +483,14 @@ const registerRaceArena = (Alpine) => {
             }, delay);
         },
 
-        // Permisif seperti Solo: spasi selalu pindah kata (tak pernah mengunci); huruf salah/terlewat
-        // dicatat sebagai mistake tapi progres tetap jalan.
+        // Permissive like Solo: space always advances the word (never locks); wrong/skipped
+        // letters are recorded as mistakes but progress keeps going.
         handleSpace(e) {
             if (this.lockedByTimeout || this.isFinished || !this.raceStarted) return;
 
             let targetWord = this.words[this.currentWordIndex];
 
-            // Cegah spam spasi di kata kosong (tak boleh "melompat" kata tanpa mengetik apa pun).
+            // Prevent space-spam on an empty word (can't "skip" a word without typing anything).
             if (this.typedText.length === 0) {
                 e.preventDefault();
                 return;
@@ -505,7 +502,7 @@ const registerRaceArena = (Alpine) => {
             this.wordHadError[this.currentWordIndex] = !isExactMatch;
 
             if (!isExactMatch) {
-                // Hanya huruf ekor yang belum diketik; yang sudah diketik dihitung di checkInput().
+                // Only the trailing letters not yet typed; those already typed are counted in checkInput().
                 const missingCount = Math.max(0, targetWord.length - this.typedText.length);
                 this.totalKeystrokes += missingCount;
                 this.totalMistakes += missingCount;
@@ -517,12 +514,12 @@ const registerRaceArena = (Alpine) => {
             this.hasError = false;
             this.prevTypedLength = 0;
 
-            // Kata terakhir juga bisa finish lewat spasi (bukan hanya lewat exact match di checkInput()).
+            // The last word can also finish via space (not only via an exact match in checkInput()).
             if (this.currentWordIndex >= this.words.length) {
                 this.isFinished = true;
                 this.progressPercent = 100;
 
-                // typedText sudah kosong & tak ada kata berikutnya, jadi
+                // typedText is empty & there's no next word, so
                 // correctCharsSoFar() == correctCharsFromPastWords.
                 const accuracyPercent = this.currentAccuracy();
                 const liveWpm = this.currentWpm();
@@ -538,7 +535,7 @@ const registerRaceArena = (Alpine) => {
     }));
 };
 
-// Alpine mungkin sudah booting (daftar langsung) atau belum (daftar saat alpine:init).
+// Alpine may already be booting (register immediately) or not yet (register on alpine:init).
 if (window.Alpine) {
     registerRaceArena(window.Alpine);
 }

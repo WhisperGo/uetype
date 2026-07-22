@@ -15,21 +15,18 @@ registerMultiplayerNav();
 
 window.Chart = Chart;
 
-// Global, bukan Alpine.data(): typing-engine men-SPREAD komponen ini ke dalam
-// x-data agar berbagi scope dengan @entangle('mainMode'/'subMode') yang ditulis
-// dua arah oleh tombol pemilih mode. Alpine.data tidak dirancang untuk di-spread,
-// jadi kontrak pemanggilannya dipertahankan apa adanya.
+// Global, not Alpine.data(): typing-engine SPREADS this component into its x-data so it
+// shares scope with @entangle('mainMode'/'subMode'), which the mode-picker buttons write
+// two-way. Alpine.data isn't built to be spread, so the call contract is kept as-is.
 window.typingGame = typingGame;
 
-// Runtime chat dipanggil dari @script tiap komponen chat (halaman penuh &
-// overlay) karena butuh $wire dan 4 nilai dari Blade: auth()->id(),
-// route('chat.send'), dan dua label terjemahan. Modul hanya menyediakan
-// factory-nya; Blade yang menyuntikkan nilainya.
+// The chat runtime is invoked from each chat component's @script (full page & overlay)
+// because it needs $wire and 4 values from Blade: auth()->id(), route('chat.send'), and
+// two translated labels. The module only provides the factory; Blade injects the values.
 window.createChatRuntime = createChatRuntime;
 
-// Alpine datang dari @livewireScripts (bukan di-start manual di sini), jadi
-// komponen didaftarkan lewat hook alpine:init -- pola yang sama dipakai di
-// seluruh view repo ini.
+// Alpine comes from @livewireScripts (not started manually here), so components are
+// registered via the alpine:init hook -- the same pattern used across every view here.
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('toastStack', toastStack);
     window.Alpine.data('navBadges', navBadges);

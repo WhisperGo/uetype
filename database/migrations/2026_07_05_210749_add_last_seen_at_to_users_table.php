@@ -7,11 +7,11 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Kolom presence untuk deteksi online/offline. Klien mengirim heartbeat
-     * ringan secara berkala yang meng-update kolom ini; user dianggap "online"
-     * jika last_seen_at masih dalam ambang (User::ONLINE_THRESHOLD_SECONDS).
-     * Model timestamp-based ini tahan crash/tutup-tab: status kedaluwarsa
-     * sendiri tanpa perlu event "offline" eksplisit.
+     * Presence column for online/offline detection. The client periodically sends a light
+     * heartbeat that updates this column; a user is considered "online" if last_seen_at is
+     * still within the threshold (User::ONLINE_THRESHOLD_SECONDS). This timestamp-based
+     * model is crash/tab-close proof: the status expires on its own, no explicit "offline"
+     * event needed.
      */
     public function up(): void
     {

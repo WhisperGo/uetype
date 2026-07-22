@@ -89,7 +89,7 @@ return [
     'spectating_desc' => 'Menonton balapan secara langsung. Nikmati pertandingannya!',
     'you_spectated' => 'Kamu menonton pertandingan ini',
 
-    // Chat lobby (broadcast-only, tidak disimpan)
+    // Lobby chat (broadcast-only, not stored)
     'chat_title' => 'Obrolan Ruang',
     'chat_placeholder' => 'Ketik pesan...',
     'chat_send' => 'Kirim',

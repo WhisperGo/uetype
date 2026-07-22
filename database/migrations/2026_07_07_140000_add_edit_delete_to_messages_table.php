@@ -9,10 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('messages', function (Blueprint $table) {
-            // Diisi saat pesan diedit -> UI menampilkan label "(edited)".
+            // Filled when a message is edited -> the UI shows an "(edited)" label.
             $table->timestamp('edited_at')->nullable()->after('body');
-            // Diisi saat "delete for everyone" -> body diganti placeholder untuk
-            // SEMUA orang, tapi baris tetap ada (jejak bahwa pesan pernah ada).
+            // Filled on "delete for everyone" -> the body is replaced with a placeholder for
+            // EVERYONE, but the row stays (a trace that the message once existed).
             $table->timestamp('deleted_for_everyone_at')->nullable()->after('edited_at');
         });
     }

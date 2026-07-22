@@ -160,7 +160,7 @@ return [
         'mode_taken' => 'This mode was just taken by another member.',
     ],
 
-    // Pesan notifikasi ke user LAIN (toast). Pola sama dengan friends.notify.*.
+    // Notification messages to ANOTHER user (toast). Same pattern as friends.notify.*.
     'notify' => [
         'join_request' => ':name requested to join :clan',
         'join_accepted' => 'Your request to join :clan was accepted',

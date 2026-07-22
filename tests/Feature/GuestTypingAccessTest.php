@@ -5,9 +5,8 @@ use App\Models\User;
 use function Pest\Laravel\actingAs;
 
 /**
- * Mode solo terbuka untuk tamu: '/' me-redirect ke '/typing', dan '/typing'
- * harus bisa diakses tanpa login. Tamu mengetik & melihat hasil, hanya tak
- * mendapat XP/rekor.
+ * Solo mode is open to guests: '/' redirects to '/typing', and '/typing' must be reachable
+ * without logging in. Guests type & see results, they just don't earn XP/records.
  */
 it('lets a guest open the solo typing page without being redirected to login', function () {
     // Sebelum perbaikan: '/typing' ada di grup middleware auth -> 302 ke /login.
@@ -32,7 +31,7 @@ function guestResultSession(): array
         'totalKeystrokes' => 100, 'correctKeystrokes' => 95, 'incorrectKeystrokes' => 5,
         'wpmHistory' => [40, 42, 44], 'rawHistory' => [42, 45, 47],
         'missedChars' => ['a' => 1],
-        // Tamu: tak ada XP & level.
+        // Guest: no XP & level.
         'xpEarned' => 0, 'levelData' => null,
         'isPersonalBest' => false, 'previousBest' => 0, 'consistency' => 90,
         'drainEventCount' => 0, 'survivalPreviousBest' => null, 'isSurvivalPersonalBest' => false,

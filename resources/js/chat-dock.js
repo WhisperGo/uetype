@@ -1,49 +1,47 @@
 /**
- * Dock chat overlay: posisi bubble (draggable + clamp ke layar) & hide saat
- * sesi ketik/balapan aktif.
+ * Chat overlay dock: bubble positioning (draggable + clamped to the screen) & hiding
+ * while a typing/racing session is active.
  *
- * State posisi disimpan di window, bukan di komponen, supaya bubble tak
- * "lompat" balik ke sudut tiap kali wire:navigate mengganti halaman.
+ * Position state is stored on window, not in the component, so the bubble doesn't "jump"
+ * back to the corner each time wire:navigate swaps the page.
  *
- * Dulu ini <script> inline di chat-overlay.blade.php dengan penjaga
- * __chatOverlayDockRegistered, karena script inline ikut dieksekusi ulang tiap
- * komponen dirender. Sebagai modul ia dievaluasi sekali per page load, jadi
- * penjaga itu tak lagi diperlukan.
+ * This used to be an inline <script> in chat-overlay.blade.php guarded by
+ * __chatOverlayDockRegistered, because inline scripts re-run on every component render.
+ * As a module it's evaluated once per page load, so that guard is no longer needed.
  */
 
-const BUBBLE = 56;   // ukuran tombol (w-14 h-14)
-const MARGIN = 20;   // jarak minimum dari tepi layar (setara bottom-5/right-5)
+const BUBBLE = 56;   // button size (w-14 h-14)
+const MARGIN = 20;   // minimum gap from the screen edge (matches bottom-5/right-5)
 
 export default function chatOverlayDock(open) {
     return {
         open,
         hidden: false,
-        // Posisi disimpan sebagai JARAK ke tepi terdekat (bukan px absolut dari
-        // sudut kiri-atas). ex/ey = jarak px ke tepi yang dipilih sideX/sideY.
-        // Kebal zoom: saat innerWidth/innerHeight berubah, px absolut dihitung
-        // ULANG dari jarak-tepi ini (lihat resolvePx), jadi bubble tetap menempel
-        // di sudut/sisi yang sama. null = pakai default sudut kanan-bawah.
+        // Position stored as the DISTANCE to the nearest edge (not absolute px from the
+        // top-left corner). ex/ey = px distance to the chosen sideX/sideY edge. Zoom-proof:
+        // when innerWidth/innerHeight changes, absolute px is RECOMPUTED from this edge
+        // distance (see resolvePx), so the bubble stays pinned to the same corner/side.
+        // null = use the default bottom-right corner.
         anchor: window.__chatOverlayAnchor || null,
-        // Dependensi reaktif buatan: resolvePx() membaca window.innerWidth/Height
-        // (bukan state Alpine), jadi resize/zoom tak otomatis memicu re-evaluasi
-        // :style. Menaikkan angka ini pada resize memaksa bubbleStyle/panelStyle
-        // dihitung ulang.
+        // A synthetic reactive dependency: resolvePx() reads window.innerWidth/Height (not
+        // Alpine state), so resize/zoom doesn't automatically re-evaluate :style. Bumping
+        // this on resize forces bubbleStyle/panelStyle to recompute.
         viewportTick: 0,
 
         init() {
             this.place();
             window.addEventListener('resize', () => this.reanchor());
 
-            // Sembunyikan saat sesi ketik/balapan aktif; tutup drawer juga.
+            // Hide while a typing/racing session is active; also close the drawer.
             window.addEventListener('test-activity', (e) => {
                 this.hidden = !!(e.detail && e.detail.active);
                 if (this.hidden) this.open = false;
             });
-            // Ganti halaman: reset hide (sesi test halaman lama sudah berakhir).
+            // Page change: reset hide (the old page's test session has ended).
             document.addEventListener('livewire:navigated', () => { this.hidden = false; });
         },
 
-        // Default: sudut kanan-bawah dengan jarak MARGIN dari kedua tepi.
+        // Default: bottom-right corner, MARGIN away from both edges.
         place() {
             if (!this.anchor) {
                 this.anchor = { ex: MARGIN, ey: MARGIN, sideX: 'right', sideY: 'bottom' };
@@ -51,8 +49,8 @@ export default function chatOverlayDock(open) {
             this.reanchor();
         },
 
-        // Terjemahkan jarak-tepi -> px absolut kiri-atas memakai viewport SAAT INI,
-        // lalu clamp agar bubble tetap utuh. Dipanggil tiap render & tiap resize/zoom.
+        // Translate edge distance -> absolute top-left px using the CURRENT viewport, then
+        // clamp so the bubble stays whole. Called on every render & every resize/zoom.
         resolvePx() {
             void this.viewportTick;
             const a = this.anchor || { ex: MARGIN, ey: MARGIN, sideX: 'right', sideY: 'bottom' };
@@ -67,15 +65,15 @@ export default function chatOverlayDock(open) {
             return { x, y };
         },
 
-        // Hitung ulang posisi dari jarak-tepi setelah viewport berubah (resize/zoom):
-        // naikkan viewportTick agar :style dievaluasi ulang, lalu persist anchor.
+        // Recompute position from edge distance after the viewport changes (resize/zoom):
+        // bump viewportTick so :style re-evaluates, then persist the anchor.
         reanchor() {
             this.viewportTick++;
             window.__chatOverlayAnchor = this.anchor;
         },
 
-        // Ubah px absolut kiri-atas -> model jarak-tepi (pilih tepi terdekat pada
-        // tiap sumbu). Dipakai saat drag selesai supaya posisi baru kebal zoom.
+        // Convert absolute top-left px -> the edge-distance model (pick the nearest edge on
+        // each axis). Used when a drag ends so the new position is zoom-proof.
         pxToAnchor(x, y) {
             const rightGap = window.innerWidth - BUBBLE - x;
             const bottomGap = window.innerHeight - BUBBLE - y;
@@ -89,13 +87,12 @@ export default function chatOverlayDock(open) {
             };
         },
 
-        // Satu-satunya penentu buka/tutup: keputusan diambil di pointerup, BUKAN
-        // lewat event click sintetis (yang bisa balapan / tak konsisten antar
-        // browser). Kalau selama gesture pointer bergeser >4px = drag (chat tak
-        // di-toggle); kalau diam = tap (toggle). Jadi menggeser TIDAK PERNAH
-        // membuka/menutup chat.
+        // The sole open/close decider: the decision is made on pointerup, NOT via a
+        // synthetic click event (which can race / be inconsistent across browsers). If the
+        // pointer moves >4px during the gesture = drag (chat isn't toggled); if it stays
+        // put = tap (toggle). So dragging NEVER opens/closes the chat.
         startDrag(e) {
-            // Hanya tombol kiri; abaikan klik kanan/tengah.
+            // Left button only; ignore right/middle click.
             if (e.button !== undefined && e.button !== 0) return;
             e.preventDefault();
 
@@ -105,8 +102,8 @@ export default function chatOverlayDock(open) {
             let moved = false;
             let last = origin;
 
-            // Pointer capture: semua pointermove/up dialihkan ke tombol ini,
-            // meski kursor keluar dari tombol saat menggeser.
+            // Pointer capture: all pointermove/up are routed to this button, even if the
+            // cursor leaves the button while dragging.
             try { btn.setPointerCapture(e.pointerId); } catch (_) {}
 
             const move = (ev) => {
@@ -119,7 +116,7 @@ export default function chatOverlayDock(open) {
                 const x = Math.max(MARGIN, Math.min(origin.x + dx, maxX));
                 const y = Math.max(MARGIN, Math.min(origin.y + dy, maxY));
                 last = { x, y };
-                // Selama gesture pakai anchor kiri-atas sementara (gerak halus).
+                // During the gesture use a temporary top-left anchor (smooth movement).
                 this.anchor = { ex: x, ey: y, sideX: 'left', sideY: 'top' };
             };
             const up = (ev) => {
@@ -130,7 +127,7 @@ export default function chatOverlayDock(open) {
                     // Tap -> toggle chat.
                     this.open = ! this.open;
                 } else {
-                    // Drag selesai -> kunci ke tepi terdekat (kebal zoom) & persist.
+                    // Drag done -> lock to the nearest edge (zoom-proof) & persist.
                     this.anchor = this.pxToAnchor(last.x, last.y);
                     window.__chatOverlayAnchor = this.anchor;
                 }
@@ -139,16 +136,16 @@ export default function chatOverlayDock(open) {
             window.addEventListener('pointerup', up);
         },
 
-        // Object-form :style (bukan string) supaya Alpine MERGE properti posisi
-        // dan tak menimpa `display` yang dikelola x-show — kalau string, x-show
-        // yang menyembunyikan bubble/panel akan ter-clobber tiap :style re-run.
+        // Object-form :style (not a string) so Alpine MERGES the position properties and
+        // doesn't overwrite the `display` managed by x-show — with a string, the x-show that
+        // hides the bubble/panel would get clobbered on every :style re-run.
         bubbleStyle() {
             const p = this.resolvePx();
             return { left: p.x + 'px', top: p.y + 'px', right: 'auto', bottom: 'auto' };
         },
 
-        // Drawer menempel ke bubble, lalu di-clamp agar tak keluar layar.
-        // Buka ke atas kalau ruang di bawah kurang; geser kiri kalau mepet kanan.
+        // The drawer sticks to the bubble, then is clamped so it stays on-screen. Opens
+        // upward if there isn't room below; shifts left if it's tight against the right.
         panelStyle() {
             const p = this.resolvePx();
             const gap = 12;
@@ -156,11 +153,11 @@ export default function chatOverlayDock(open) {
             const pw = panel?.offsetWidth || Math.min(384, window.innerWidth - MARGIN * 2);
             const ph = panel?.offsetHeight || Math.min(512, window.innerHeight * 0.7);
 
-            // Kanan-selaraskan drawer dengan bubble; clamp horizontal.
+            // Right-align the drawer with the bubble; clamp horizontally.
             let left = p.x + BUBBLE - pw;
             left = Math.max(MARGIN, Math.min(left, window.innerWidth - pw - MARGIN));
 
-            // Default buka ke atas bubble; kalau tak muat, buka ke bawah.
+            // Default to opening above the bubble; if it doesn't fit, open below.
             let top = p.y - gap - ph;
             if (top < MARGIN) {
                 const below = p.y + BUBBLE + gap;

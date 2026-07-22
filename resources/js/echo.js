@@ -3,8 +3,8 @@ import Pusher from 'pusher-js';
 
 window.Pusher = Pusher;
 
-// Skema dari env: 'http' -> ws, 'https' -> wss (browser memblokir ws:// dari halaman
-// https). VITE_* di-bake saat `npm run build`, jadi build ulang tiap kali .env berubah.
+// Scheme from env: 'http' -> ws, 'https' -> wss (browsers block ws:// from an https
+// page). VITE_* is baked at `npm run build`, so rebuild whenever .env changes.
 const scheme = import.meta.env.VITE_REVERB_SCHEME ?? 'http';
 const isSecure = scheme === 'https';
 
@@ -20,10 +20,10 @@ window.Echo = new Echo({
     enabledTransports: isSecure ? ['ws', 'wss'] : ['ws'],
 });
 
-// Guard socket ID: saat WebSocket belum terhubung, Livewire tetap mengirim header
-// X-Socket-ID bernilai "undefined" -> Reverb menolak (500) pada broadcast()->toOthers().
-// Hapus header itu bila socket ID belum valid; broadcast tetap jalan, hanya tak bisa
-// meng-exclude pengirim.
+// Socket-ID guard: before the WebSocket connects, Livewire still sends an X-Socket-ID
+// header of "undefined" -> Reverb rejects (500) on broadcast()->toOthers(). Drop that
+// header when the socket ID isn't valid yet; the broadcast still runs, it just can't
+// exclude the sender.
 document.addEventListener('livewire:init', () => {
     if (!window.Livewire) return;
     window.Livewire.hook('request', ({ options }) => {

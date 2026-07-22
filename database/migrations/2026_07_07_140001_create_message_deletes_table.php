@@ -7,10 +7,9 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * "Delete for me" per-PESAN. Satu baris = satu user menyembunyikan satu
-     * pesan HANYA dari dirinya sendiri; baris pesan aslinya tetap utuh di DB
-     * untuk semua orang lain. Pola sama dengan message_clears, tapi granular
-     * per-pesan (bukan per-percakapan).
+     * "Delete for me" per-MESSAGE. One row = one user hiding one message ONLY from
+     * themselves; the original message row stays intact in the DB for everyone else. Same
+     * pattern as message_clears, but granular per-message (not per-conversation).
      */
     public function up(): void
     {
@@ -19,7 +18,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('message_id')->constrained('messages')->onDelete('cascade');
             $table->timestamps();
-            // Satu user tak bisa "delete for me" pesan yang sama dua kali.
+            // One user can't "delete for me" the same message twice.
             $table->unique(['user_id', 'message_id']);
         });
     }

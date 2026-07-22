@@ -27,27 +27,27 @@ use Livewire\Volt\Volt;
 
 Route::redirect('/', '/typing')->name('home');
 
-// Mesin ketik solo & halaman hasilnya terbuka untuk tamu (sama seperti '/'):
-// TypingEngine menjaga tiap akses Auth dengan Auth::check(), dan TypingResult
-// membaca dari session. Tamu bisa mengetik, cuma tak dapat XP/rekor.
+// The solo typing engine & its result page are open to guests (same as '/'): TypingEngine
+// guards each auth-only access with Auth::check(), and TypingResult reads from the session.
+// Guests can type, they just don't earn XP/records.
 Route::get('/typing', TypingEngine::class)->name('typing');
 Route::get('/result', TypingResult::class)->name('typing.result');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'me'])->name('profile.me');
 
-    // Profil publik user lain (dibuka dari daftar teman / hasil pencarian).
-    // Dirujuk lewat username, bukan ID, supaya ID user (dan jumlah total
-    // user terdaftar) tidak bisa dienumerasi dengan mengubah angka di URL.
+    // Another user's public profile (opened from the friends list / search results).
+    // Referenced by username, not ID, so user IDs (and the total registered-user count)
+    // can't be enumerated by changing a number in the URL.
     Route::get('/users/{user:username}', [ProfileController::class, 'show'])->name('profile.show');
 
     Route::get('/settings', Settings::class)->name('settings');
 
-    // Heartbeat presence: klien ping berkala supaya last_seen_at tetap segar
-    // (deteksi online/offline di daftar teman).
-    // Throttle 30/menit: klien normal hanya 2/menit (interval 30 detik), tapi tiap
-    // tab kembali visible memicu ping ekstra -- batas ini menyisakan ruang untuk
-    // burst wajar itu tanpa membiarkan endpoint dibanjiri.
+    // Presence heartbeat: the client pings periodically to keep last_seen_at fresh
+    // (online/offline detection in the friends list).
+    // Throttle 30/min: a normal client is only 2/min (30-second interval), but every time a
+    // tab becomes visible again it triggers an extra ping -- this limit leaves room for that
+    // reasonable burst without letting the endpoint be flooded.
     Route::post('/heartbeat', [PresenceController::class, 'heartbeat'])
         ->middleware('throttle:30,1')
         ->name('presence.heartbeat');
@@ -62,10 +62,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/friends/pending-count', [FriendController::class, 'pendingCount'])
         ->name('friends.pending-count');
     Route::get('/chat', Chat::class)->name('chat.index');
-    // Kirim pesan lewat endpoint ringan (paralel, di luar antrean Livewire)
-    // supaya spam pesan tak saling menunggu.
-    // Throttle longgar (60/menit) justru KARENA endpoint ini didesain untuk burst:
-    // batas ketat akan memutus pengetik cepat, bukan penyerang.
+    // Send a message via a lightweight endpoint (parallel, outside the Livewire queue) so
+    // rapid messages don't wait on each other.
+    // A loose throttle (60/min) precisely BECAUSE this endpoint is designed for bursts: a
+    // tight limit would cut off fast typers, not attackers.
     Route::post('/chat/send', [ChatController::class, 'send'])
         ->middleware('throttle:60,1')
         ->name('chat.send');
@@ -94,9 +94,9 @@ Route::post('/locale', LocaleController::class)
     ->middleware('throttle:20,1')
     ->name('locale.update');
 
-// Autentikasi Google-only. Nama route 'login' WAJIB dipertahankan: middleware
-// `auth` bawaan Laravel me-redirect tamu ke route bernama itu, jadi menghapusnya
-// membuat setiap halaman terproteksi melempar RouteNotFoundException.
+// Google-only authentication. The route name 'login' MUST be kept: Laravel's built-in
+// `auth` middleware redirects guests to that named route, so removing it would make every
+// protected page throw a RouteNotFoundException.
 Route::get('/login', [GoogleAuthController::class, 'showLogin'])
     ->middleware('guest')
     ->name('login');
@@ -107,7 +107,7 @@ Route::post('/logout', [GoogleAuthController::class, 'logout'])
 Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])->name('auth.google');
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
 
-// Route Baru khusus untuk alur pemilihan username setelah Google Auth
+// Routes for the username-selection flow after Google Auth
 Route::get('/auth/google/username', [GoogleAuthController::class, 'showChooseUsernameForm'])->name('auth.google.choose-username');
 Route::post('/auth/google/username', [GoogleAuthController::class, 'storeUsername'])->name('auth.google.store-username');
 
@@ -115,10 +115,10 @@ Route::get('/about', About::class)->name('about');
 
 Route::get('/privacy-policy', Terms::class)->name('terms');
 
-// Login cepat sebagai user dummy untuk TESTING. Hanya aktif di environment lokal.
-// Buka /dev-login (opsional /dev-login?email=other@uetype.test) untuk langsung masuk.
+// Quick login as a dummy user for TESTING. Only active in the local environment.
+// Open /dev-login (optionally /dev-login?email=other@uetype.test) to log straight in.
 if (app()->environment('local')) {
-    // Acuan design system (token, tipografi, komponen) — alat internal, lokal saja.
+    // Design-system reference (tokens, typography, components) — an internal tool, local only.
     Route::get('/style-guide', fn () => view('style-guide'))->name('style-guide');
 
     Route::get('/dev-login', function () {
@@ -126,7 +126,7 @@ if (app()->environment('local')) {
         $user = User::where('email', $email)->first();
 
         if (! $user) {
-            abort(404, "User dummy '{$email}' tidak ditemukan. Jalankan: php artisan db:seed --class=DummyUserSeeder");
+            abort(404, "Dummy user '{$email}' not found. Run: php artisan db:seed --class=DummyUserSeeder");
         }
 
         Auth::login($user);

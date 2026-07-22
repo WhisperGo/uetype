@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('paragraphs', function (Blueprint $table) {
             $table->id();
-            $table->text('content'); // Kolom penampung teks paragraf mengetik
+            $table->text('content'); // Holds the typing-paragraph text
             $table->timestamps();
         });
     }

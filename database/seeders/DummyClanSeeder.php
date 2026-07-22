@@ -30,8 +30,8 @@ class DummyClanSeeder extends Seeder
         $icons = ClanEmblem::iconKeys();
         $colors = ClanEmblem::colorKeys();
 
-        // User dummy yang belum tergabung ke clan mana pun, dipakai sebagai
-        // leader/member. Idempoten: user yang sudah punya baris clan_member dilewati.
+        // Dummy users not yet in any clan, used as leaders/members. Idempotent: a user who
+        // already has a clan_member row is skipped.
         $takenIds = ClanMember::pluck('user_id')->all();
 
         $available = User::whereNotIn('id', $takenIds)->get()->shuffle();

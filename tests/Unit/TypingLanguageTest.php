@@ -3,9 +3,9 @@
 use App\Support\TypingLanguage;
 use Tests\TestCase;
 
-// wordlistPath() memakai base_path(), jadi file ini butuh app Laravel yang
-// ter-boot (test Unit polos di sini tak mem-boot framework). Ikat ke TestCase
-// TANPA RefreshDatabase -- semua fungsi di sini murni, tak menyentuh DB.
+// wordlistPath() uses base_path(), so this file needs a booted Laravel app (a plain Unit
+// test here wouldn't boot the framework). Bind to TestCase WITHOUT RefreshDatabase -- every
+// function here is pure and doesn't touch the DB.
 uses(TestCase::class);
 
 /*

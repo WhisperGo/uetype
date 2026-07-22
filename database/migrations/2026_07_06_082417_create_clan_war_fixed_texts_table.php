@@ -11,11 +11,10 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Teks tetap untuk mode Words di Clan War. Digenerate SEKALI di sini lalu
-     * beku selamanya, sehingga setiap pemain yang mengerjakan "Words {N}" di
-     * war/clan mana pun mendapat daftar kata yang IDENTIK -- menutup celah
-     * refresh (reroll kata sampai dapat yang pendek) sekaligus membuat
-     * perbandingan antar-clan benar-benar apple-to-apple.
+     * Fixed text for the Words mode in Clan War. Generated ONCE here then frozen forever,
+     * so every player doing "Words {N}" in any war/clan gets an IDENTICAL word list --
+     * closing the refresh exploit (rerolling words until you get short ones) and making
+     * cross-clan comparison truly apples-to-apples.
      */
     public function up(): void
     {
@@ -38,9 +37,9 @@ return new class extends Migration
     }
 
     /**
-     * Isi satu baris per config Words (10/25/50/100) memakai teknik shuffle
-     * wordlist yang SAMA dengan TypingEngine::generateText() (bahasa default),
-     * supaya konten sejenis dengan sesi solo -- hanya saja dibekukan.
+     * Fill one row per Words config (10/25/50/100) using the SAME wordlist-shuffle
+     * technique as TypingEngine::generateText() (default language), so the content is like
+     * a solo session -- only frozen.
      */
     private function seedWordsTexts(): void
     {

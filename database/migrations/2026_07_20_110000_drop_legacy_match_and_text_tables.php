@@ -7,26 +7,24 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Buang pulau mati: `matches`, `match_participants`, `texts`, `languages`,
+     * Drop the dead islands: `matches`, `match_participants`, `texts`, `languages`,
      * `paragraphs`.
      *
-     * Kelimanya peninggalan rancangan awal yang digantikan rooms/room_members
-     * (balapan), multiplayer_match_history (riwayat), dan TextGeneratorService
-     * (teks dari wordlist JSON, bukan dari tabel). Tak satu pun komponen Livewire
-     * atau controller menyentuhnya -- mereka cuma saling mereferensi, ditambah dua
-     * seeder yang mengisinya untuk tak pernah dibaca.
+     * All five are leftovers from the initial design, replaced by rooms/room_members
+     * (racing), multiplayer_match_history (history), and TextGeneratorService (text from a
+     * JSON wordlist, not from a table). No Livewire component or controller touches them --
+     * they only reference each other, plus two seeders that fill them to never be read.
      *
-     * URUTAN DROP TAK BOLEH DIACAK: rantai foreign key-nya
+     * THE DROP ORDER MUST NOT BE SHUFFLED: the foreign-key chain is
      *     typing_results.text_id -> texts.language_id -> languages
      *     match_participants.match_id -> matches.text_id -> texts
-     * jadi anak harus lepas sebelum induknya.
+     * so the child must detach before its parent.
      */
     public function up(): void
     {
-        // typing_results HIDUP dan tetap tinggal; hanya jembatannya ke `texts` yang
-        // dibuang. Kolom ini selalu null (teks dirakit dari wordlist, bukan dari
-        // tabel), jadi tak ada data yang ikut hilang -- tapi selama ia ada, `texts`
-        // tak bisa di-drop.
+        // typing_results is ALIVE and stays; only its bridge to `texts` is dropped. This
+        // column is always null (text is assembled from the wordlist, not from a table), so
+        // no data is lost -- but while it exists, `texts` can't be dropped.
         Schema::table('typing_results', function (Blueprint $table) {
             $table->dropForeign(['text_id']);
             $table->dropColumn('text_id');
@@ -40,13 +38,13 @@ return new class extends Migration
     }
 
     /**
-     * Mengembalikan STRUKTUR, bukan isinya.
+     * Restores the STRUCTURE, not its contents.
      *
-     * Ini disebut terang-terangan karena rollback di sini TIDAK memulihkan keadaan
-     * semula: baris `texts`/`languages` yang dulu diisi seeder hilang permanen, dan
-     * `typing_results.text_id` kembali sebagai kolom kosong. Untuk data yang memang
-     * sudah tak dibaca siapa pun ini dapat diterima -- yang tidak dapat diterima
-     * adalah `down()` yang diam-diam berpura-pura reversibel.
+     * Stated plainly because the rollback here does NOT restore the original state: the
+     * `texts`/`languages` rows the seeder once filled are gone permanently, and
+     * `typing_results.text_id` comes back as an empty column. For data nobody reads anymore
+     * this is acceptable -- what isn't acceptable is a `down()` that quietly pretends to be
+     * reversible.
      */
     public function down(): void
     {

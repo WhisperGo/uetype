@@ -89,7 +89,7 @@ return [
     'spectating_desc' => 'Watching the race live. Enjoy the show!',
     'you_spectated' => 'You spectated this match',
 
-    // Chat lobby (broadcast-only, tidak disimpan)
+    // Lobby chat (broadcast-only, not stored)
     'chat_title' => 'Room Chat',
     'chat_placeholder' => 'Type a message...',
     'chat_send' => 'Send',

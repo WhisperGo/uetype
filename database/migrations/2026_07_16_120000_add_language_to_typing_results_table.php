@@ -7,16 +7,16 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Bahasa teks yang diketik (en|id) sebagai dimensi leaderboard, sejajar dengan
-     * mode + mode_config. Sebelumnya `contentLang` ada di TypingEngine tapi dibuang
-     * saat simpan, jadi papan tak bisa memisahkan rekor Inggris vs Indonesia.
+     * The typed text's language (en|id) as a leaderboard dimension, alongside
+     * mode + mode_config. Previously `contentLang` existed in TypingEngine but was dropped
+     * on save, so the board couldn't separate English vs. Indonesian records.
      *
-     * default('en') membuat migrasi non-breaking: baris lama (data dummy seeder) dan
-     * setiap TypingResult::create([...]) di test yang tak menyebut language tetap sah.
+     * default('en') makes this migration non-breaking: old rows (seeder dummy data) and
+     * every TypingResult::create([...]) in tests that doesn't mention language stay valid.
      *
-     * Index leaderforce terpanas berbentuk
-     *     WHERE mode = ? AND mode_config = ? AND language = ?  ... MAX(metrik) ... GROUP BY user_id
-     * jadi `language` disisipkan SEBELUM kolom metrik supaya index tetap covering.
+     * The hottest leaderboard index has the shape
+     *     WHERE mode = ? AND mode_config = ? AND language = ?  ... MAX(metric) ... GROUP BY user_id
+     * so `language` is inserted BEFORE the metric column to keep the index covering.
      */
     public function up(): void
     {

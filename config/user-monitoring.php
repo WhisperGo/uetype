@@ -133,8 +133,8 @@ return [
         'on_store' => true,
         'on_update' => true,
         'on_destroy' => true,
-        // on_read dimatikan: model seperti Message dibaca puluhan kali per halaman
-        // chat, akan membanjiri tabel actions_monitoring. Hanya aksi tulis yang dilog.
+        // on_read is off: models like Message are read dozens of times per chat page, which
+        // would flood the actions_monitoring table. Only write actions are logged.
         'on_read' => false,
         'on_restore' => false,
         'on_replicate' => false,

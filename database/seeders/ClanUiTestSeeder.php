@@ -10,15 +10,14 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
- * Seeder khusus untuk MENCOBA UI clan (Kick, Leave, Join Requests, modal konfirmasi)
- * di environment lokal. Idempoten - aman dijalankan berulang.
+ * A dedicated seeder for TRYING OUT the clan UI (Kick, Leave, Join Requests, confirmation
+ * modal) in the local environment. Idempotent - safe to run repeatedly.
  *
- * Membuat 2 user dummy (dummy@ / dummy2@uetype.test, cocok dengan /dev-login &
- * /dev-login2), menautkan mereka sebagai anggota clan milik LEADER pertama, plus satu
- * request Pending. Dengan ini:
- *  - Login sebagai leader  -> hover baris anggota -> tombol Kick -> modal.
- *  - Buka /dev-login2 (dummy2 = member biasa) -> /clans -> tombol Leave -> modal.
- *  - Leader juga melihat blok "Join Requests" (dummy pending) untuk Accept/Reject.
+ * Creates 2 dummy users (dummy@ / dummy2@uetype.test, matching /dev-login & /dev-login2),
+ * links them as members of the first LEADER's clan, plus one Pending request. With this:
+ *  - Log in as the leader   -> hover a member row -> Kick button -> modal.
+ *  - Open /dev-login2 (dummy2 = a regular member) -> /clans -> Leave button -> modal.
+ *  - The leader also sees the "Join Requests" block (a pending dummy) for Accept/Reject.
  */
 class ClanUiTestSeeder extends Seeder
 {
@@ -27,7 +26,7 @@ class ClanUiTestSeeder extends Seeder
         $clan = Clan::query()->orderBy('id')->first();
 
         if (! $clan) {
-            $this->command->warn('Belum ada clan. Buat clan dulu lewat /clans, lalu jalankan seeder ini lagi.');
+            $this->command->warn('No clan yet. Create one via /clans first, then run this seeder again.');
 
             return;
         }
@@ -42,19 +41,19 @@ class ClanUiTestSeeder extends Seeder
             ['username' => 'DummyTyper2', 'google_id' => null, 'is_admin' => false],
         );
 
-        // dummy = anggota AKTIF (bisa di-kick oleh leader).
+        // dummy = an ACTIVE member (can be kicked by the leader).
         ClanMember::updateOrCreate(
             ['clan_id' => $clan->id, 'user_id' => $dummy1->id],
             ['role' => ClanRole::Member, 'status' => ClanMemberStatus::Active],
         );
 
-        // dummy2 = anggota AKTIF juga (login via /dev-login2 untuk mencoba Leave).
+        // dummy2 = also an ACTIVE member (log in via /dev-login2 to try Leave).
         ClanMember::updateOrCreate(
             ['clan_id' => $clan->id, 'user_id' => $dummy2->id],
             ['role' => ClanRole::Member, 'status' => ClanMemberStatus::Active],
         );
 
         $this->command->info("Clan '{$clan->name}' kini punya 2 anggota dummy (aktif).");
-        $this->command->info('Leader: hover baris anggota -> Kick. Member: buka /dev-login2 lalu /clans -> Leave.');
+        $this->command->info('Leader: hover a member row -> Kick. Member: open /dev-login2 then /clans -> Leave.');
     }
 }

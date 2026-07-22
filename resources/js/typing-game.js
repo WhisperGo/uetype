@@ -1,34 +1,32 @@
 /**
- * Mesin ketik solo (Time / Words / Survival), termasuk Ghost Mode.
+ * Solo typing engine (Time / Words / Survival), including Ghost Mode.
  *
- * Sebelumnya 846 baris ini hidup sebagai <script> inline di dalam
- * typing-engine.blade.php: tak bisa di-lint, tak bisa di-minify, tak bisa
- * di-cache browser sebagai aset terpisah, dan ikut terkirim ulang setiap kali
- * halaman /typing dimuat.
+ * These 846 lines used to live as an inline <script> in typing-engine.blade.php: couldn't
+ * be linted, minified, or browser-cached as a separate asset, and were re-sent every time
+ * the /typing page loaded.
  *
- * Dipasang lewat spread di x-data (`...typingGame(teks)`) karena komponen ini
- * berbagi scope dengan dua properti @entangle (currentMain/currentSub) yang
- * ditulis dua arah dari tombol pemilih mode di markup.
+ * Installed via a spread into x-data (`...typingGame(text)`) because this component shares
+ * scope with two @entangle properties (currentMain/currentSub) written two-way from the
+ * mode-picker buttons in the markup.
  *
- * PENTING: karena objek ini di-SPREAD, jangan pernah memakai getter di sini --
- * spread mengevaluasi getter satu kali lalu membekukan hasilnya. Pakai method
- * biasa (lihat sparklinePoints()).
+ * IMPORTANT: because this object is SPREAD, never use a getter here -- a spread evaluates
+ * the getter once then freezes the result. Use a plain method (see sparklinePoints()).
  */
-// Preset stamina Survival.
-//   sMax/sStart : kapasitas & stamina awal
-//   graceSec    : detik awal dengan drain dilembutkan
-//   dStart      : drain pasif per detik
-//   dAccel      : percepatan drain per detik²
-//   refill      : stamina per karakter benar
-//   penalty     : drain ekstra saat kata kotor di-commit (cap per-kata)
+// Survival stamina presets.
+//   sMax/sStart : capacity & starting stamina
+//   graceSec    : opening seconds with softened drain
+//   dStart      : passive drain per second
+//   dAccel      : drain acceleration per second²
+//   refill      : stamina per correct character
+//   penalty     : extra drain when a dirty word is committed (per-word cap)
 const SURVIVAL_PRESETS = {
     easy:   { sMax: 120, sStart: 120, graceSec: 4, dStart: 3.0, dAccel: 0.11, refill: 2.4, penalty: 7 },
     medium: { sMax: 100, sStart: 100, graceSec: 3, dStart: 3.8, dAccel: 0.20, refill: 1.9, penalty: 10 },
     hard:   { sMax: 85,  sStart: 70,  graceSec: 0, dStart: 5.5, dAccel: 0.40, refill: 1.3, penalty: 16 },
 };
 
-// Batas event error yang dikirim ke server. Sesi latihan wajar jauh di bawah ini;
-// 500 error dalam satu tes ≈ akurasi di bawah 50% di mode time 120 -- itu mashing.
+// Cap on error events sent to the server. A normal practice session is well below this;
+// 500 errors in one test ≈ below 50% accuracy in time 120 -- that's mashing.
 const MAX_ERROR_EVENTS = 500;
 
 function survivalConfig(difficulty) {
@@ -62,7 +60,7 @@ export default function typingGame(initialText) {
         cursorLeft: 0,
         cursorTop: 0,
 
-        // --- Ghost Mode: cursor kedua ber-pacing linear (WPM konstan), diisi lewat event 'ghost-selected'. ---
+        // --- Ghost Mode: a second cursor with linear pacing (constant WPM), filled via the 'ghost-selected' event. ---
         ghostActive: false,
         ghostWpm: 0,
         ghostLabel: '',
@@ -82,20 +80,20 @@ export default function typingGame(initialText) {
         wpmHistory: [],
         rawHistory: [],
         missedChars: {},
-        // Satu entri per karakter target yang gagal diketik benar: {second, index, actual}.
-        // missedChars tahu TUTS APA yang meleset; ini juga tahu KAPAN & DI KATA MANA.
+        // One entry per target character that wasn't typed correctly: {second, index, actual}.
+        // missedChars knows WHICH KEY was missed; this also knows WHEN & IN WHICH WORD.
         errorEvents: [],
         modeChangedCleanup: null,
 
-        // --- Survival: stamina menyusut per detik, terisi per karakter benar, habis = game over. ---
-        stamina: 100,         // nilai stamina sekarang
-        staminaMax: 100,      // kapasitas/cap bar (di-set dari preset difficulty)
-        staminaPct: 100,      // persentase untuk UI (0–100)
-        survivalCfg: null,    // preset parameter aktif (lihat SURVIVAL_PRESETS)
-        staminaInterval: null,// loop tick drain (halus, ~100ms)
-        lastTickTime: 0,      // timestamp tick terakhir (untuk Δt presisi)
-        currentWordDirty: false, // apakah kata yang sedang diketik sudah pernah error
-        committedWordResults: {}, // {wordIndex: 'clean'|'dirty'} — kata yang sudah dinilai (idempoten)
+        // --- Survival: stamina drains per second, refills per correct character, empty = game over. ---
+        stamina: 100,         // current stamina value
+        staminaMax: 100,      // bar capacity/cap (set from the difficulty preset)
+        staminaPct: 100,      // percentage for the UI (0–100)
+        survivalCfg: null,    // active parameter preset (see SURVIVAL_PRESETS)
+        staminaInterval: null,// drain tick loop (smooth, ~100ms)
+        lastTickTime: 0,      // last tick timestamp (for a precise Δt)
+        currentWordDirty: false, // whether the word being typed has already errored
+        committedWordResults: {}, // {wordIndex: 'clean'|'dirty'} — words already scored (idempotent)
 
         staminaCells: Array.from({ length: 16 }, (_, i) => i + 1),
         drainFlash: false,
@@ -118,16 +116,15 @@ export default function typingGame(initialText) {
             this.resetProgress();
             this.restoreGhostSelection();
 
-            // Cleanup disimpan agar listener tak menumpuk saat Alpine remount.
+            // Cleanup is stored so listeners don't stack up on Alpine remount.
             const cleanup = this.$wire.on('mode-changed', (payload) => {
                 this.resetForNewText(payload.text ?? '');
             });
             this.modeChangedCleanup = typeof cleanup === 'function' ? cleanup : null;
         },
 
-        // Ghost hanya sah di time/words. Kalau state global tersisa dari mode
-        // sebelumnya sementara mode sekarang survival, buang -- jangan
-        // dihidupkan lagi saat Alpine remount.
+        // Ghost is only valid in time/words. If global state lingers from a previous mode
+        // while the current mode is survival, drop it -- don't revive it on Alpine remount.
         ghostEligible() {
             return ['time', 'words'].includes(this.currentMain);
         },
@@ -161,13 +158,13 @@ export default function typingGame(initialText) {
             });
         },
 
-        // Reset penuh untuk teks BARU yang dikirim lewat event Livewire.
+        // Full reset for NEW text sent via a Livewire event.
         resetForNewText(newText) {
             this.targetArray = newText.split('');
             this.resetProgress();
         },
 
-        // Reset state (wordBounds, survival, dsb) dari targetArray saat ini.
+        // Reset state (wordBounds, survival, etc.) from the current targetArray.
         resetProgress() {
             this.stopRuntime();
 
@@ -177,7 +174,7 @@ export default function typingGame(initialText) {
             this.isStarted = false;
             this.isFinished = false;
 
-            // Reset (mis. restart / ganti mode di tengah sesi) -> overlay chat tampil lagi.
+            // Reset (e.g. restart / mode change mid-session) -> the chat overlay shows again.
             window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: false } }));
             this.timer = (this.currentMain === 'time') ? parseInt(this.currentSub) : 0;
             this.wpm = 0;
@@ -191,7 +188,7 @@ export default function typingGame(initialText) {
             this.caretHeight = 0;
             this.isTyping = false;
 
-            // Preset survival diambil dari currentSub (easy|medium|hard).
+            // The survival preset is taken from currentSub (easy|medium|hard).
             this.survivalCfg = survivalConfig(this.currentSub);
             this.staminaMax = this.survivalCfg.sMax;
             this.stamina = this.survivalCfg.sStart;
@@ -238,16 +235,16 @@ export default function typingGame(initialText) {
 
             this.caretInstant = true;
             this.caretDrawn = false;
-            // Gambar caret dengan RETRY antar-frame sampai benar-benar tergambar.
-            // Kenapa retry: sesudah remount ganti mode, char-0 kadang BELUM ter-render saat
-            // draw pertama -> updatePosition() return awal (activeEl null) -> moveCaret tak
-            // pernah jalan -> transform:translate() TAK PERNAH di-set -> caret nyangkut di 0,0
-            // (pojok kiri-atas baris). Ini paling sering di Survival karena DOM-nya jauh lebih
-            // berat (16 sel stamina x-for) sehingga layout teks telat satu-dua frame; Standard
-            // yang ringan hampir selalu sukses di draw pertama. caretDrawn baru true setelah
-            // moveCaret sungguh menggambar, jadi kita ulang tiap frame (maks 12 ~200ms) sampai
-            // char-0 ada & caret tergambar. caretInstant tetap true -> semua penempatan ini
-            // instan (tanpa transisi), sesuai gate isTyping di kelas caret.
+            // Draw the caret with a per-frame RETRY until it's actually drawn.
+            // Why retry: after a mode-change remount, char-0 is sometimes NOT rendered yet on
+            // the first draw -> updatePosition() returns early (activeEl null) -> moveCaret
+            // never runs -> transform:translate() is NEVER set -> the caret sticks at 0,0
+            // (top-left of the line). This is most common in Survival because its DOM is much
+            // heavier (16 stamina cells via x-for) so text layout lags a frame or two; the
+            // lighter Standard almost always succeeds on the first draw. caretDrawn only
+            // becomes true after moveCaret truly draws, so we retry each frame (max 12 ~200ms)
+            // until char-0 exists & the caret is drawn. caretInstant stays true -> all these
+            // placements are instant (no transition), matching the isTyping gate on the caret class.
             const drawWhenReady = (retries) => {
                 this.updatePosition();
                 if (!this.caretDrawn && retries > 0) {
@@ -271,14 +268,14 @@ export default function typingGame(initialText) {
             return false;
         },
 
-        // Catat SATU karakter target yang gagal diketik benar. WAJIB dipanggil dari
-        // dalam guard yang sama persis dengan yang menaikkan missedChars -- itu yang
-        // membuat jumlah event === jumlah missedChars, invarian yang dipakai halaman
-        // hasil untuk menyamakan titik di grafik dengan angka di heatmap tepat di bawahnya.
-        //   charIndex : index absolut di targetArray
-        //   actual    : tuts yang ditekan (handleInput sudah menjamin panjangnya 1),
-        //               atau null untuk karakter yang DILEWATI -- user menekan spasi,
-        //               tak pernah ada tuts untuk karakter ini.
+        // Record ONE target character that wasn't typed correctly. MUST be called from
+        // inside the exact same guard that increments missedChars -- that's what keeps the
+        // event count === the missedChars count, the invariant the result page uses to line
+        // up the chart points with the heatmap numbers right below them.
+        //   charIndex : absolute index in targetArray
+        //   actual    : the key pressed (handleInput already guarantees length 1), or null
+        //               for a SKIPPED character -- the user pressed space, there was never a
+        //               keystroke for this character.
         recordError(charIndex, actual) {
             if (this.errorEvents.length >= MAX_ERROR_EVENTS) return;
             this.errorEvents.push({
@@ -288,16 +285,16 @@ export default function typingGame(initialText) {
             });
         },
 
-        // --- Helper Survival ---
+        // --- Survival helpers ---
 
-        // Tandai kata aktif "kotor" saat error. Nyawa dipotong nanti saat commit, bukan di sini.
+        // Mark the active word "dirty" on an error. Stamina is docked later on commit, not here.
         markWordDirty() {
             if (this.currentMain !== 'survival' || this.isFinished) return;
             this.currentWordDirty = true;
         },
 
-        // Nilai satu kata yang selesai. Kata kotor kena penalti stamina sekali saja
-        // (cap per-kata, idempoten kalau di-commit ulang); kata bersih tak kena apa-apa.
+        // Score one completed word. A dirty word takes the stamina penalty just once (per-word
+        // cap, idempotent if re-committed); a clean word takes nothing.
         completeWord(wordIndex) {
             if (this.currentMain !== 'survival') return;
 
@@ -321,8 +318,8 @@ export default function typingGame(initialText) {
             this.committedWordResults[wordIndex] = 'clean';
         },
 
-        // Backspace mundur ke kata sebelumnya: batalkan penilaian commit terakhir.
-        // Status 'dirty' dipertahankan agar penalti tak dikenakan dua kali saat re-commit.
+        // Backspacing into the previous word: undo its last commit scoring. The 'dirty'
+        // status is kept so the penalty isn't applied twice on re-commit.
         uncommitWord(wordIndex) {
             if (this.currentMain !== 'survival') return;
 
@@ -334,14 +331,14 @@ export default function typingGame(initialText) {
             }
         },
 
-        // Refill stamina tiap satu karakter benar (cap di staminaMax).
+        // Refill stamina on each correct character (capped at staminaMax).
         refillStamina() {
             if (this.currentMain !== 'survival' || this.isFinished) return;
             this.stamina = Math.min(this.staminaMax, this.stamina + this.survivalCfg.refill);
             this.syncStaminaPct();
         },
 
-        // Satu tick drain pasif; Δt presisi dari tick sebelumnya, drain naik seiring waktu.
+        // One passive drain tick; precise Δt from the previous tick, drain rises over time.
         staminaTick() {
             if (this.currentMain !== 'survival' || this.isFinished || !this.startTime) return;
 
@@ -364,7 +361,7 @@ export default function typingGame(initialText) {
             if (this.stamina <= 0) this.survivalGameOver();
         },
 
-        // Sinkronkan persentase bar untuk UI (0–100).
+        // Sync the bar percentage for the UI (0–100).
         syncStaminaPct() {
             const nextPct = Math.max(0, Math.min(100, Math.round((this.stamina / this.staminaMax) * 100)));
             if (nextPct !== this.staminaPct) {
@@ -372,7 +369,7 @@ export default function typingGame(initialText) {
             }
         },
 
-        // Stamina habis: hentikan loop tick, selesaikan sesi lewat finish() seperti mode lain.
+        // Stamina empty: stop the tick loop, end the session via finish() like other modes.
         survivalGameOver() {
             if (this.isFinished) return;
             if (this.staminaInterval) {
@@ -414,7 +411,7 @@ export default function typingGame(initialText) {
             }
         },
 
-        // Lookup posisi DOM char-{index}; fallback ke karakter terakhir bila index melewati teks.
+        // Look up the DOM position of char-{index}; fall back to the last character if the index runs past the text.
         getCharPosition(index) {
             let activeEl = document.getElementById('char-' + index);
             let isEnd = false;
@@ -432,9 +429,9 @@ export default function typingGame(initialText) {
             };
         },
 
-        // Posisi ghost dari progres waktu (pacing linear); dipanggil per-frame lewat rAF.
-        // ghostCharIndex (integer) dipakai untuk menang/kalah di finish(); posisi visual
-        // dihitung dari nilai pecahan agar cursor bergerak halus melintasi tiap karakter.
+        // Ghost position from time progress (linear pacing); called per-frame via rAF.
+        // ghostCharIndex (integer) decides win/lose at finish(); the visual position is
+        // computed from the fractional value so the cursor glides smoothly across each character.
         updateGhostPosition() {
             if (!this.startTime || this.ghostFinished) return;
 
@@ -460,7 +457,7 @@ export default function typingGame(initialText) {
                 return;
             }
 
-            // Interpolasi pixel antar karakter; hanya bila keduanya sebaris (kalau wrap, lompat langsung).
+            // Pixel interpolation between characters; only when both are on the same line (on a wrap, jump directly).
             const fraction = fractionalChars - flooredIndex;
             const currentPos = this.getCharPosition(flooredIndex);
             if (!currentPos) return;
@@ -476,9 +473,9 @@ export default function typingGame(initialText) {
             }
         },
 
-        // Loop animasi ghost via rAF (~60fps), terpisah dari timerInterval 1 detik.
+        // Ghost animation loop via rAF (~60fps), separate from the 1-second timerInterval.
         startGhostAnimationLoop() {
-            if (this._ghostRafId) return; // sudah berjalan
+            if (this._ghostRafId) return; // already running
 
             const tick = () => {
                 if (!this.ghostActive || this.isFinished) {
@@ -505,17 +502,17 @@ export default function typingGame(initialText) {
             let activeEl;
             let isEnd = false;
 
-            // Cek overtyping di spasi
+            // Check for overtyping at the space
             if (this.extraChars[this.currentWordIndex] && this.extraChars[this.currentWordIndex].length > 0 && this
                 .currentIndex === this.wordBounds[this.currentWordIndex].space) {
                 let lastIdx = this.extraChars[this.currentWordIndex].length - 1;
                 activeEl = document.getElementById('extra-' + this.currentWordIndex + '-' + lastIdx);
-                isEnd = true; // Taruh kursor di KANAN karakter ekstra
+                isEnd = true; // Put the cursor to the RIGHT of the extra character
             } else {
                 activeEl = document.getElementById('char-' + this.currentIndex);
                 if (!activeEl) {
                     activeEl = document.getElementById('char-' + (this.currentIndex - 1));
-                    isEnd = true; // Taruh kursor di KANAN karakter terakhir
+                    isEnd = true; // Put the cursor to the RIGHT of the last character
                 }
             }
 
@@ -528,15 +525,16 @@ export default function typingGame(initialText) {
                     if (!this.lineHeight) this.lineHeight = firstChar.offsetHeight;
                 }
                 if (!this.caretHeight) {
-                    // Tinggi caret = 1.2em (kelas h-[1.2em]) DIHITUNG dari font-size ter-resolusi,
-                    // BUKAN diukur via offsetHeight. Alasan: sesudah remount ganti mode, DOM
-                    // Survival jauh lebih berat (16 sel stamina x-for) sehingga layout caret belum
-                    // jadi saat diukur -> offsetHeight 0. Fallback `caretHeight || height` lalu
-                    // memakai tinggi KARAKTER (line-height 1.6em), bukan 1.2em, jadi pemusatan
-                    // (height - caretHeight)/2 = 0 -> caret nempel ke ATAS baris (naik) & terlihat
-                    // beda dengan Standard (yang sempat terukur benar). getComputedStyle font-size
-                    // selalu ter-resolusi tanpa menunggu layout, jadi nilainya identik di semua
-                    // mode & anti-race. (Kalau kelas tinggi caret diubah, sesuaikan 1.2 di sini.)
+                    // Caret height = 1.2em (the h-[1.2em] class) COMPUTED from the resolved
+                    // font-size, NOT measured via offsetHeight. Reason: after a mode-change
+                    // remount, the Survival DOM is much heavier (16 stamina cells via x-for) so
+                    // the caret layout isn't ready when measured -> offsetHeight 0. The fallback
+                    // `caretHeight || height` would then use the CHARACTER height (line-height
+                    // 1.6em), not 1.2em, so centering (height - caretHeight)/2 = 0 -> the caret
+                    // sticks to the TOP of the line (rides up) and looks different from Standard
+                    // (which happened to measure correctly). getComputedStyle font-size always
+                    // resolves without waiting for layout, so the value is identical across all
+                    // modes & race-proof. (If the caret-height class changes, adjust the 1.2 here.)
                     const fs = parseFloat(getComputedStyle(this.$refs.caret || activeEl).fontSize);
                     if (fs) this.caretHeight = fs * 1.2;
                 }
@@ -557,10 +555,11 @@ export default function typingGame(initialText) {
             const lh = this.lineHeight || 48;
             this.scrollOffset = currentTop >= lh * 2 ? currentTop - lh : 0;
 
-            // Transform caret di-render REAKTIF via :style pada elemen caret (cursorLeft/cursorTop).
-            // Di sini cukup tandai bahwa caret sudah berhasil diposisikan (char-0 ketemu) supaya
-            // retry drawWhenReady() di resetProgress berhenti. Instan/meluncur ditentukan gate
-            // isTyping di :class caret, bukan lagi flag imperatif.
+            // The caret transform is rendered REACTIVELY via :style on the caret element
+            // (cursorLeft/cursorTop). Here we just mark that the caret was positioned
+            // successfully (char-0 found) so the drawWhenReady() retry in resetProgress stops.
+            // Instant vs. gliding is decided by the isTyping gate on the caret :class, no
+            // longer an imperative flag.
             this.caretDrawn = true;
         },
 
@@ -622,7 +621,7 @@ export default function typingGame(initialText) {
             if (e.key === ' ') e.preventDefault();
             if (e.key.length > 1 && e.key !== 'Backspace') return;
 
-            // Kursor berhenti berkedip selama mengetik.
+            // The cursor stops blinking while typing.
             this.isTyping = true;
             clearTimeout(this.typingTimeout);
             this.typingTimeout = setTimeout(() => {
@@ -633,21 +632,21 @@ export default function typingGame(initialText) {
                 this.isStarted = true;
                 this.startTime = Date.now();
 
-                // Mulai mengetik -> caret baru boleh meluncur mulus antar-karakter.
-                // Sebelum titik ini caretInstant tetap true (di-set di resetProgress) supaya
-                // penempatan awal / reset / ganti mode selalu instan, tanpa animasi meluncur.
+                // Typing starts -> the caret may now glide smoothly between characters. Before
+                // this point caretInstant stays true (set in resetProgress) so the initial
+                // placement / reset / mode change is always instant, without a glide animation.
                 this.caretInstant = false;
 
-                // Sembunyikan overlay chat selama sesi ketik berjalan.
+                // Hide the chat overlay while the typing session runs.
                 window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: true } }));
 
-                // Survival: loop drain ~100ms agar tekanan terasa mulus (drain & game over di staminaTick).
+                // Survival: ~100ms drain loop so the pressure feels smooth (drain & game over in staminaTick).
                 if (this.currentMain === 'survival') {
                     this.lastTickTime = this.startTime;
                     this.staminaInterval = setInterval(() => this.staminaTick(), 100);
                 }
 
-                // Ghost: loop rAF terpisah dari timerInterval 1 detik di bawah.
+                // Ghost: an rAF loop separate from the 1-second timerInterval below.
                 if (this.ghostActive) {
                     this.startGhostAnimationLoop();
                 }
@@ -693,13 +692,13 @@ export default function typingGame(initialText) {
                 return;
             }
 
-            // Sejak titik ini: user menekan karakter/spasi, bukan backspace.
+            // From this point on: the user pressed a character/space, not backspace.
             this.totalKeystrokes++;
 
-            // Kursor di posisi spasi pembatas antar kata.
+            // Cursor at the word-separator space position.
             if (this.currentIndex === bounds.space) {
                 if (e.key !== ' ') {
-                    // Overtyping: karakter berlebih ditampung, kata ditandai kotor.
+                    // Overtyping: the extra characters are buffered, the word is marked dirty.
                     if (!this.extraChars[this.currentWordIndex]) this.extraChars[this.currentWordIndex] = [];
                     if (this.extraChars[this.currentWordIndex].length < 15) {
                         this.extraChars[this.currentWordIndex].push(e.key);
@@ -709,7 +708,7 @@ export default function typingGame(initialText) {
                     this.schedulePositionUpdate();
                     return;
                 } else {
-                    // Spasi ditekan: pindah ke kata berikutnya & nilai kata yang baru selesai.
+                    // Space pressed: advance to the next word & score the just-completed word.
                     this.correctKeystrokes++;
                     this.refillStamina();
                     this.inputResults[this.currentIndex] = true;
@@ -723,9 +722,9 @@ export default function typingGame(initialText) {
                 }
             }
 
-            // Spasi di tengah kata: sisa huruf ditandai terlewat (kata di-skip).
+            // Space mid-word: the remaining letters are marked skipped (the word is skipped).
             if (e.key === ' ') {
-                // Abaikan spasi kalau kata ini belum diketik sama sekali (cegah spam spasi).
+                // Ignore the space if this word hasn't been typed at all (prevent space-spam).
                 if (this.currentIndex === bounds.start) {
                     return;
                 }
@@ -736,14 +735,14 @@ export default function typingGame(initialText) {
                     const expectedChar = this.targetArray[i].toLowerCase();
                     if (expectedChar !== ' ' && expectedChar.length === 1) {
                         this.missedChars[expectedChar] = (this.missedChars[expectedChar] || 0) + 1;
-                        // null: user menekan spasi SEKALI lalu melewati sisa kata -- tak
-                        // pernah ada tuts untuk karakter ini.
+                        // null: the user pressed space ONCE then skipped the rest of the word --
+                        // there was never a keystroke for this character.
                         this.recordError(i, null);
                     }
                 }
                 this.markWordDirty();
                 if (bounds.space !== null) {
-                    this.inputResults[bounds.space] = 'skipped'; // spasi di-skip tak dihitung benar
+                    this.inputResults[bounds.space] = 'skipped'; // a skipped space isn't counted correct
                     this.currentIndex = bounds.space + 1;
                     this.currentWordIndex++;
                     this.completeWord(this.currentWordIndex - 1);
@@ -756,7 +755,7 @@ export default function typingGame(initialText) {
                 return;
             }
 
-            // Pengetikan normal.
+            // Normal typing.
             const isCorrect = (e.key === this.targetArray[this.currentIndex]);
             if (isCorrect) {
                 this.correctKeystrokes++;
@@ -783,20 +782,20 @@ export default function typingGame(initialText) {
 
             const elapsedMs = Date.now() - this.startTime;
 
-            // Lantai 1 detik: cegah WPM meledak di awal ketikan.
+            // 1-second floor: keep WPM from exploding at the very start of typing.
             const effectiveMs = (elapsedMs < 1000 && !this.isFinished) ? 1000 : elapsedMs;
             const timeElapsed = effectiveMs / 60000;
 
             if (timeElapsed <= 0) return;
 
-            // Net WPM dari correctKeystrokes — sumber yang sama dengan finish/server,
-            // sehingga angka live identik dengan angka di halaman hasil.
+            // Net WPM from correctKeystrokes — the same source as finish/server, so the live
+            // number is identical to the one on the result page.
             this.wpm = Math.round((this.correctKeystrokes / 5) / timeElapsed) || 0;
 
-            // Raw WPM: mengabaikan error (total tuts / 5).
+            // Raw WPM: ignores errors (total keystrokes / 5).
             this.rawWpm = Math.round((this.totalKeystrokes / 5) / timeElapsed) || 0;
 
-            // Akurasi berbasis tuts fisik (gaya Monkeytype).
+            // Accuracy based on physical keystrokes (Monkeytype-style).
             if (this.totalKeystrokes > 0) {
                 this.accuracy = Math.round((this.correctKeystrokes / this.totalKeystrokes) * 100);
             } else {
@@ -804,13 +803,13 @@ export default function typingGame(initialText) {
             }
         },
 
-        // wpmHistory[] -> string `points` untuk <polyline> sparkline, auto-scale ke min/max.
+        // wpmHistory[] -> a `points` string for the <polyline> sparkline, auto-scaled to min/max.
         //
-        // METHOD, bukan getter. Sebagai getter, grafik ini TIDAK PERNAH tergambar:
-        // objek ini di-spread ke dalam x-data, dan spread mengevaluasi getter satu
-        // kali lalu menyalin hasilnya sebagai nilai statis. Saat itu wpmHistory masih
-        // kosong, jadi hasilnya '' dan terkunci selamanya -- kotak SVG-nya muncul
-        // tapi isinya kosong. Method tidak dievaluasi saat spread, jadi tetap hidup.
+        // A METHOD, not a getter. As a getter this chart would NEVER draw: this object is
+        // spread into x-data, and a spread evaluates the getter once then copies the result as
+        // a static value. At that moment wpmHistory is still empty, so the result is '' and
+        // locked forever -- the SVG box appears but is empty. A method isn't evaluated on
+        // spread, so it stays live.
         sparklinePoints() {
             const h = this.wpmHistory;
             if (h.length < 2) return '';
@@ -827,7 +826,7 @@ export default function typingGame(initialText) {
 
         finish() {
             this.isFinished = true;
-            // Sesi ketik selesai — tampilkan lagi overlay chat.
+            // Typing session done — show the chat overlay again.
             window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: false } }));
             clearInterval(this.timerInterval);
             if (this.staminaInterval) {
@@ -835,14 +834,14 @@ export default function typingGame(initialText) {
                 this.staminaInterval = null;
             }
 
-            // Durasi presisi (ms) sejak keystroke pertama — sumber yang sama dengan
-            // perhitungan live, agar WPM final identik dengan WPM saat mengetik.
+            // Precise duration (ms) since the first keystroke — the same source as the live
+            // calculation, so the final WPM is identical to the WPM while typing.
             const durationMs = this.startTime ? (Date.now() - this.startTime) : 0;
 
             const correct = this.correctKeystrokes;
             const total = this.totalKeystrokes;
 
-            // Hitung posisi ghost tepat pada momen finish (bukan snapshot rAF terakhir).
+            // Compute the ghost position exactly at the finish moment (not the last rAF snapshot).
             if (this.ghostActive && !this.ghostFinished) {
                 this.updateGhostPosition();
             }

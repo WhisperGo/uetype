@@ -6,30 +6,28 @@ use Illuminate\Database\Migrations\Migration;
 return new class extends Migration
 {
     /**
-     * Penjagaan DB-level "tepat satu target terisi" untuk `messages` dan
-     * `message_clears`: DM mengisi recipient_id/other_user_id, clan chat mengisi
-     * clan_id, tak boleh keduanya dan tak boleh kosong dua-duanya.
+     * DB-level "exactly one target set" guard for `messages` and `message_clears`: a DM
+     * sets recipient_id/other_user_id, clan chat sets clan_id, never both and never neither.
      *
-     * Kenapa berdiri sendiri di akhir, bukan di migrasi pembuat tabelnya:
+     * Why it stands alone at the end, not in the table-creating migration:
      *
-     * 1. Sintaksnya beda per driver. `ALTER TABLE ... ADD CONSTRAINT ... CHECK`
-     *    hanya dipahami MySQL; di sqlite migrasinya meledak dan mematikan SELURUH
-     *    suite, padahal .env.example justru men-default sqlite. DbCheckConstraint
-     *    yang menangani percabangannya (CHECK di MySQL, trigger di sqlite).
+     * 1. The syntax differs per driver. `ALTER TABLE ... ADD CONSTRAINT ... CHECK` is only
+     *    understood by MySQL; on sqlite the migration blows up and kills the WHOLE suite --
+     *    yet .env.example defaults to sqlite. DbCheckConstraint handles the branching (CHECK
+     *    on MySQL, a trigger on sqlite).
      *
-     * 2. Di sqlite, menambah FOREIGN KEY ke tabel yang sudah ada memaksa Laravel
-     *    MEMBANGUN ULANG tabel itu, dan pembangunan ulang MENGHAPUS trigger yang
-     *    menempel padanya. `messages` masih ditambahi `reply_to_id` (berikut FK-nya)
-     *    tiga migrasi setelah dibuat -- jadi trigger yang dipasang di migrasi
-     *    pembuat tabel akan lenyap tanpa suara. MySQL tak terpengaruh, sehingga
-     *    celah ini HANYA muncul di sqlite dan mudah luput.
+     * 2. On sqlite, adding a FOREIGN KEY to an existing table forces Laravel to REBUILD that
+     *    table, and the rebuild DROPS any trigger attached to it. `messages` still gets
+     *    `reply_to_id` (with its FK) added three migrations after creation -- so a trigger
+     *    installed in the table-creating migration would silently vanish. MySQL isn't
+     *    affected, so this pitfall appears ONLY on sqlite and is easy to miss.
      *
-     * Menempatkannya setelah semua perubahan struktur menutup keduanya sekaligus.
+     * Placing it after all structural changes closes both at once.
      */
     public function up(): void
     {
-        // drop dulu: DB yang sudah terlanjur punya constraint dari versi lama
-        // migrasi ini tak menabrak "duplicate constraint name".
+        // drop first: a DB that already has the constraint from an old version of this
+        // migration won't hit "duplicate constraint name".
         DbCheckConstraint::drop('messages', 'messages_exactly_one_target');
         DbCheckConstraint::enforce(
             'messages',

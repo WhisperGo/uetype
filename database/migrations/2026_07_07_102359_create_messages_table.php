@@ -7,14 +7,14 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Satu tabel untuk dua jenis chat, target lewat kolom nullable:
-     *   - DM: recipient_id terisi, clan_id null.
-     *   - Clan chat: clan_id terisi, recipient_id null.
+     * One table for two kinds of chat, targeted via nullable columns:
+     *   - DM: recipient_id set, clan_id null.
+     *   - Clan chat: clan_id set, recipient_id null.
      *
-     * Penjagaan DB-level-nya TIDAK dipasang di sini melainkan di migrasi
-     * 2026_07_20_100000_enforce_message_target_invariants: tabel ini masih
-     * diubah tiga migrasi berikutnya, dan di sqlite penambahan FOREIGN KEY
-     * membangun ulang tabel sehingga trigger apa pun ikut terhapus.
+     * The DB-level guard is NOT installed here but in the migration
+     * 2026_07_20_100000_enforce_message_target_invariants: this table is still altered by
+     * the next three migrations, and on sqlite adding a FOREIGN KEY rebuilds the table,
+     * which would drop any trigger along with it.
      */
     public function up(): void
     {
@@ -24,10 +24,10 @@ return new class extends Migration
             $table->foreignId('recipient_id')->nullable()->constrained('users')->onDelete('cascade');
             $table->foreignId('clan_id')->nullable()->constrained('clans')->onDelete('cascade');
             $table->text('body');
-            $table->timestamp('read_at')->nullable(); // Hanya relevan utk DM, null utk clan chat.
+            $table->timestamp('read_at')->nullable(); // Only relevant for DMs, null for clan chat.
             $table->timestamps();
 
-            // Hindari full scan untuk riwayat DM & riwayat clan.
+            // Avoid a full scan for DM history & clan history.
             $table->index(['sender_id', 'recipient_id']);
             $table->index(['recipient_id', 'read_at']);
             $table->index(['clan_id', 'created_at']);

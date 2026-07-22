@@ -9,9 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('room_members', function (Blueprint $table) {
-            // EXP yang diperoleh pemain dari match ini. Null selama race berlangsung;
-            // diisi SEKALI saat finalizeRace() sebagai penanda "sudah diberi EXP"
-            // (mencegah double-award) sekaligus nilai untuk ditampilkan di panel hasil.
+            // EXP the player earned from this match. Null while the race is running; filled
+            // ONCE in finalizeRace() as a "EXP already awarded" marker (prevents double-award)
+            // and also the value to display in the result panel.
             $table->integer('xp_earned')->nullable()->after('place');
         });
     }

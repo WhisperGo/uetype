@@ -26,16 +26,16 @@ class DummyDataSeeder extends Seeder
             ]);
         }
 
-        // Kumpulan konfigurasi game yang akan diisi datanya
+        // The set of game configs to be filled with data
         $modes = [
             ['mode' => 'time', 'configs' => ['15', '30', '60', '120']],
             ['mode' => 'words', 'configs' => ['10', '25', '50', '100']],
             ['mode' => 'survival', 'configs' => ['easy', 'medium', 'hard']],
         ];
 
-        // 2. Generasikan Riwayat Typing Results untuk setiap user
+        // 2. Generate typing-result history for each user
         foreach ($users = User::all() as $user) {
-            // Setiap user disimulasikan bermain antara 5 sampai 15 kali sesi ketik
+            // Each user is simulated playing between 5 and 15 typing sessions
             $sessionCount = rand(5, 15);
             $maxWpmRecorded = 0;
 
@@ -66,7 +66,7 @@ class DummyDataSeeder extends Seeder
                     'user_id' => $user->id,
                     'mode' => $selectedMode['mode'],
                     'mode_config' => $selectedConfig,
-                    // Bobot ke en agar realistis; ID mengisi papan berbahasa Indonesia.
+                    // Weighted toward en for realism; id populates the Indonesian-language board.
                     'language' => $faker->randomElement(['en', 'en', 'id']),
                     'net_wpm' => $netWpm,
                     'raw_wpm' => $rawWpm,

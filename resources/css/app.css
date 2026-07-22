@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Token semantic (tema default "moonlight"). Ganti/tambah blok ini untuk tema lain (Deep Blue, Midnight, Carbon). */
+/* Semantic tokens (default "moonlight" theme). Swap/add this block for other themes (Deep Blue, Midnight, Carbon). */
 @layer base {
     :root {
         --color-background: 25 31 40;
@@ -24,10 +24,10 @@
 }
 
 @layer utilities {
-    /* Scrollbar ramping bertema emas, dipakai di daftar pesan chat.
-       Firefox pakai scrollbar-width/color; WebKit (Chrome/Edge) pakai
-       pseudo-element ::-webkit-scrollbar. Thumb transparan yang menebal saat
-       hover supaya tak mengganggu tapi tetap terlihat. */
+    /* Slim gold-themed scrollbar, used in the chat message list. Firefox uses
+       scrollbar-width/color; WebKit (Chrome/Edge) uses the ::-webkit-scrollbar
+       pseudo-element. A transparent thumb that thickens on hover so it's unobtrusive
+       but still visible. */
     .chat-scroll {
         scrollbar-width: thin;
         scrollbar-color: rgb(var(--color-gold) / 0.35) transparent;
@@ -48,7 +48,7 @@
         background-color: rgb(var(--color-gold) / 0.6);
     }
 
-    /* Sorotan sekejap saat menggulir ke pesan asli dari kutipan reply. */
+    /* A brief highlight when scrolling to the original message from a reply quote. */
     @keyframes chat-flash-highlight {
         0%, 100% { background-color: transparent; }
         30% { background-color: rgb(var(--color-gold) / 0.18); }
@@ -94,8 +94,8 @@
         will-change: transform;
     }
 
-    /* Garis finis: papan catur 2x2 dari satu conic-gradient yang di-tile.
-       Ukuran kotak = setengah lebar pita, jadi selalu 2 kolom berapa pun tingginya. */
+    /* Finish line: a 2x2 checkerboard from a single tiled conic-gradient.
+       Square size = half the ribbon width, so it's always 2 columns at any height. */
     .race-finish-flag {
         --square: 6px;
         background-image: conic-gradient(
@@ -108,14 +108,13 @@
     }
 }
 
-/* Hormati preferensi sistem "kurangi gerakan".
+/* Respect the system "reduce motion" preference.
 
-   Aplikasi ini padat gerak: countdown balapan, transisi toast, animasi caret,
-   pulse stamina, dan race-surge. Bagi pengguna dengan sensitivitas vestibular
-   (migrain, vertigo, gangguan keseimbangan) gerakan sebanyak itu bisa memicu
-   gejala fisik nyata. Durasi tidak dinolkan penuh (0.01ms) supaya event
-   transitionend/animationend tetap terpicu -- menolkannya total akan membuat
-   logika yang menunggu event itu menggantung. */
+   This app is motion-heavy: race countdowns, toast transitions, caret animation, stamina
+   pulse, and race-surge. For users with vestibular sensitivity (migraine, vertigo, balance
+   disorders) that much motion can trigger real physical symptoms. Durations aren't fully
+   zeroed (0.01ms) so transitionend/animationend events still fire -- zeroing them entirely
+   would leave logic that waits on those events hanging. */
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

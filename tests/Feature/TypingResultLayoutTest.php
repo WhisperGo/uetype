@@ -27,7 +27,7 @@ it('keeps the original survival game-over card layout (separate from solo 2-colu
         ->assertSee('game over')
         ->assertSee(__('result.play_again_title'))
         ->assertSee('drain events')
-        ->assertDontSee('error heatmap'); // heatmap hanya untuk cabang non-survival
+        ->assertDontSee('error heatmap'); // heatmap is only for the non-survival branch
 });
 
 it('keeps the normal time-mode layout unchanged (performance chart + heatmap + ghost field)', function () {
@@ -53,8 +53,8 @@ it('keeps the normal time-mode layout unchanged (performance chart + heatmap + g
         ->assertSee('performance')
         ->assertSee('raw wpm')
         // Duration DIBUANG di mode time: cuma mengulang label "Time · 30s" di atas hero.
-        // Cek teks label `>duration<` -- BUKAN kata "duration" polos, yang juga muncul di
-        // class Tailwind nav (transition duration-150) dan selalu ada di tiap halaman.
+        // Check the label text `>duration<` -- NOT the bare word "duration", which also
+        // appears in a Tailwind nav class (transition duration-150) present on every page.
         ->assertDontSee('>duration<', false)
         ->assertSee('new personal best')
         ->assertSee('error heatmap')

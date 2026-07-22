@@ -1,26 +1,25 @@
 /**
- * Satu toast global untuk SEMUA notifikasi (pertemanan, clan, chat).
+ * One global toast for ALL notifications (friends, clan, chat).
  *
- * Dulu ada tiga komponen Alpine terpisah yang masing-masing merender container
- * sendiri -- dan ketiganya memakai posisi identik (`fixed bottom-5 right-5 z-[60]`).
- * Akibatnya toast teman dan toast chat yang datang bersamaan saling MENIMPA.
- * Menyatukannya memperbaiki bug itu sekaligus membuang ~280 baris markup yang
- * tersalin tiga kali.
+ * There used to be three separate Alpine components each rendering their own container
+ * -- all three at the identical position (`fixed bottom-5 right-5 z-[60]`). A friend
+ * toast and a chat toast arriving together would OVERLAP. Merging them fixed that bug
+ * and dropped ~280 lines of markup that had been copied three times.
  *
- * Kebijakan tampilan: HANYA SATU toast di kanan bawah pada satu waktu. Notifikasi
- * baru menggantikan yang lama (lihat push()) supaya request beruntun tak menumpuk
- * memenuhi layar.
+ * Display policy: ONLY ONE toast at the bottom-right at a time. A new notification
+ * replaces the old one (see push()) so rapid-fire notifications don't stack up and fill
+ * the screen.
  *
- * Langganan Echo tetap per-kanal (payload & aturan tampilnya beda-beda), tapi
- * semuanya mendorong ke satu slot lewat push().
+ * Echo subscriptions stay per-channel (their payloads & display rules differ), but they
+ * all push into the single slot via push().
  */
 
 const AUTO_DISMISS_MS = 6000;
 
 /**
- * @param {object} config disuplai dari Blade -- label terjemahan, URL route, dan
- *   identitas user. Semua yang perlu dirender server tinggal di sini supaya modul
- *   ini tetap JavaScript murni yang bisa di-lint & di-bundle.
+ * @param {object} config supplied by Blade -- translated labels, route URLs, and the
+ *   user's identity. Everything that needs server rendering lives here so this module
+ *   stays pure JavaScript that can be linted & bundled.
  */
 export default function toastStack(config) {
     return {
@@ -29,24 +28,24 @@ export default function toastStack(config) {
         _dismissTimer: null,
 
         init() {
-            if (!window.Echo) return; // Echo dimuat via app.js
+            if (!window.Echo) return; // Echo is loaded via app.js
 
             this.listenFriends();
             this.listenClan();
             this.listenChat();
         },
 
-        // ---- LANGGANAN ----
+        // ---- SUBSCRIPTIONS ----
 
         listenFriends() {
             const channel = window.Echo.channel(`friends.${config.userId}`);
 
-            // wire:navigate bisa menjalankan init() berkali-kali; lepas listener lama
-            // dulu agar callback tak menumpuk (1 event = 1 toast).
+            // wire:navigate can run init() several times; drop the old listener first so
+            // callbacks don't stack up (1 event = 1 toast).
             channel.stopListening('.friendship.updated');
             channel.listen('.friendship.updated', (e) => {
-                // Satu-satunya subscriber friends.{id}: selain toast, teruskan sebagai
-                // event window agar halaman Friends menyegarkan diri tanpa subscribe lagi.
+                // The only subscriber of friends.{id}: besides the toast, re-broadcast a
+                // window event so the Friends page refreshes itself without subscribing again.
                 window.dispatchEvent(new CustomEvent('friendship-updated-remote'));
 
                 if (!e?.notification?.message) return;
@@ -61,7 +60,7 @@ export default function toastStack(config) {
                 });
             });
 
-            // Status online/offline: tanpa toast, hanya menyegarkan daftar teman.
+            // Online/offline status: no toast, just refreshes the friends list.
             channel.stopListening('.presence.updated');
             channel.listen('.presence.updated', () => {
                 window.dispatchEvent(new CustomEvent('friendship-updated-remote'));
@@ -95,12 +94,12 @@ export default function toastStack(config) {
 
             dmChannel.stopListening('.dm.sent');
             dmChannel.listen('.dm.sent', (e) => {
-                // Payload lengkap agar halaman chat bisa menampilkan pesan seketika.
+                // Full payload so the chat page can show the message instantly.
                 window.dispatchEvent(new CustomEvent('message-received-remote', {
                     detail: { ...e, kind: 'dm' },
                 }));
 
-                // Toast hanya kalau percakapan dengan pengirim ini tak sedang dibuka.
+                // Toast only if the conversation with this sender isn't currently open.
                 if (e?.body && e.senderUsername && !this.isViewingDm(e.senderUsername)) {
                     this.push({
                         icon: 'chat',
@@ -112,12 +111,12 @@ export default function toastStack(config) {
                 }
             });
 
-            // Edit/hapus DM: teruskan payload agar bubble di-patch langsung di client.
+            // DM edit/delete: forward the payload so the bubble is patched directly client-side.
             this.forwardMutations(dmChannel);
 
             if (!config.clanId) return;
 
-            // Clan chat: channel per-clan, semua anggota subscribe yang sama.
+            // Clan chat: a per-clan channel that every member subscribes to.
             const clanChannel = window.Echo.channel(`clan-chat.${config.clanId}`);
 
             clanChannel.stopListening('.clan-message.sent');
@@ -126,7 +125,7 @@ export default function toastStack(config) {
                     detail: { ...e, kind: 'clan' },
                 }));
 
-                // Jangan toast pesan sendiri, atau kalau chat clan sedang dibuka.
+                // Don't toast your own message, or when the clan chat is already open.
                 if (e?.body && e.senderUsername && e.senderId !== config.userId && !this.isViewingClan()) {
                     this.push({
                         icon: 'chat',
@@ -153,8 +152,8 @@ export default function toastStack(config) {
             ));
         },
 
-        // ---- PENEKANAN TOAST ----
-        // Baca URL: percakapan mana yang sedang dibuka (agar toast-nya dilewati).
+        // ---- TOAST SUPPRESSION ----
+        // Read the URL: which conversation is currently open (so its toast is skipped).
 
         isViewingDm(username) {
             if (location.pathname.endsWith('/chat')) {
@@ -162,7 +161,7 @@ export default function toastStack(config) {
                 if (p.get('mode') === 'dm' && p.get('with') === username) return true;
             }
 
-            // Overlay global juga bisa sedang membuka thread yang sama.
+            // The global overlay may also have the same thread open.
             const s = window.__chatOverlayState;
 
             return !!(s && s.open && s.mode === 'dm' && s.withUsername === username);
@@ -178,18 +177,17 @@ export default function toastStack(config) {
             return !!(s && s.open && s.mode === 'clan');
         },
 
-        // ---- ANTREAN (satu toast pada satu waktu) ----
-        // Hanya SATU notifikasi ditampilkan di kanan bawah. Notifikasi baru
-        // MENGGANTIKAN yang lama, bukan menumpuk ke atas -- request beruntun
-        // (mis. banyak "join request") tak lagi memenuhi layar. Karena `x-for`
-        // memakai :key=id, mengganti isi array memicu transisi leave (yang lama
-        // keluar) + enter (yang baru masuk) sekaligus.
+        // ---- QUEUE (one toast at a time) ----
+        // Only ONE notification shows at the bottom-right. A new notification REPLACES the
+        // old one instead of stacking upward -- rapid-fire notifications (e.g. many "join
+        // request"s) no longer fill the screen. Since `x-for` uses :key=id, replacing the
+        // array contents triggers a leave transition (old one out) + enter (new one in) at once.
 
         push(toast) {
             const id = ++this._seq;
 
-            // Batalkan timer auto-dismiss toast sebelumnya: kalau tidak, timer lama
-            // bisa memanggil dismiss() setelah toast baru muncul dan menghapusnya.
+            // Cancel the previous toast's auto-dismiss timer: otherwise the old timer could
+            // call dismiss() after the new toast appears and remove it.
             if (this._dismissTimer) clearTimeout(this._dismissTimer);
 
             this.toasts = [{ id, ...toast }];

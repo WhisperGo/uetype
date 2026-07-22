@@ -138,9 +138,10 @@ Dua pola arsitektur yang berulang di seluruh proyek (detail alasan ada di
 ### Infrastruktur
 - `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs` — tabel bawaan Laravel.
 
-**Catatan gaya:** komentar migrasi ditulis dalam Bahasa Indonesia dan cenderung
-menjelaskan *alasan* keputusan skema, bukan cuma deskripsi kolom — konvensi yang
-konsisten di seluruh proyek.
+**Catatan gaya:** seluruh komentar kode (termasuk migrasi) memakai **Bahasa Inggris**
+sebagai standar, dan cenderung menjelaskan *alasan* keputusan (skema/desain), bukan cuma
+deskripsi kolom — konvensi yang konsisten di seluruh proyek. Komentar berbahasa Indonesia
+yang tersisa hanya ada di **file test** (di luar kode yang di-ship).
 
 ## 5. Model & Relasi Kunci
 

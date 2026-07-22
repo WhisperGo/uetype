@@ -1,18 +1,16 @@
 /**
- * Runtime chat: bubble optimistic, kirim lewat fetch(), patch edit/hapus dari
- * WebSocket, dan auto-scroll.
+ * Chat runtime: optimistic bubbles, sending via fetch(), patching edits/deletes from the
+ * WebSocket, and auto-scroll.
  *
- * Satu factory dipakai DUA komponen yang hidup bersamaan di DOM saat /chat
- * dibuka: halaman penuh dan overlay drawer. Karena keduanya bersamaan, tiap
- * varian WAJIB punya namespace sendiri -- id container, prefix wire:key, nama
- * fungsi global, nama event, dan counter pending. Kalau dipakai bersama, satu
- * varian akan membuang bubble optimistic milik varian lain dan menggulir
- * container yang salah.
+ * One factory serves TWO components alive in the DOM at once when /chat is open: the full
+ * page and the overlay drawer. Because they coexist, each variant MUST have its own
+ * namespace -- container id, wire:key prefix, global function names, event names, and the
+ * pending counter. Shared, one variant would drop the other's optimistic bubbles and
+ * scroll the wrong container.
  *
- * Yang SENGAJA tidak ada di sini: window.__chatOverlayState. Flag itu dibaca
- * toasts.js untuk mensupresi toast, dan hanya boleh ditulis varian overlay --
- * jadi ia tetap tinggal di @script chat-overlay.blade.php, bukan di runtime
- * bersama ini.
+ * DELIBERATELY not here: window.__chatOverlayState. That flag is read by toasts.js to
+ * suppress toasts and may only be written by the overlay variant -- so it stays in
+ * chat-overlay.blade.php's @script, not in this shared runtime.
  */
 
 const VARIANTS = {
@@ -29,9 +27,9 @@ const VARIANTS = {
             appendOutgoing: 'chatAppendOutgoing',
             scrollTo: 'chatScrollToMessage',
         },
-        // Selector bubble untuk patch edit/hapus. Beda radius per varian, jadi
-        // beda selector -- keduanya sengaja TIDAK diseragamkan supaya patch
-        // tak pernah mengenai bubble milik varian lain.
+        // Bubble selector for edit/delete patching. Different radius per variant, so a
+        // different selector -- the two are DELIBERATELY not unified so a patch never hits
+        // the other variant's bubbles.
         bubbleSelector: '.rounded-2xl',
         cls: {
             wrap: 'max-w-[75%]',
@@ -70,7 +68,7 @@ const VARIANTS = {
 const DELETED_ICON_PATH =
     'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636';
 
-/** Payload WebSocket = input user lain; escape sebelum masuk DOM. */
+/** A WebSocket payload = another user's input; escape it before it enters the DOM. */
 const esc = (s) => {
     const d = document.createElement('div');
     d.textContent = s ?? '';
@@ -83,15 +81,15 @@ const clockLabel = () =>
 /**
  * @param {object}   o
  * @param {'page'|'overlay'} o.variant
- * @param {object}   o.wire      $wire komponen Livewire pemanggil
+ * @param {object}   o.wire      the calling Livewire component's $wire
  * @param {number}   o.meId      auth()->id()
  * @param {string}   o.sendUrl   route('chat.send')
- * @param {object}   o.labels    { edited, deleted } hasil __() -- runtime tak
- *                               boleh memanggil translator sendiri
- * @param {Function} [o.isActive] true kalau varian ini sedang terlihat user.
- *                               Halaman penuh selalu true; overlay hanya saat
- *                               drawer terbuka -- itu yang mencegah overlay
- *                               menggambar bubble ke drawer yang tertutup.
+ * @param {object}   o.labels    { edited, deleted } from __() -- the runtime must not
+ *                               call the translator itself
+ * @param {Function} [o.isActive] true when this variant is visible to the user. The full
+ *                               page is always true; the overlay only while the drawer is
+ *                               open -- that's what stops the overlay from drawing bubbles
+ *                               into a closed drawer.
  */
 export default function createChatRuntime({ variant, wire, meId, sendUrl, labels, isActive }) {
     const v = VARIANTS[variant];
@@ -104,7 +102,7 @@ export default function createChatRuntime({ variant, wire, meId, sendUrl, labels
         });
     };
 
-    // Apakah pesan masuk termasuk percakapan yang sedang dibuka?
+    // Does the incoming message belong to the currently-open conversation?
     const belongsToOpenConversation = (d) => {
         if (!active()) return false;
         if (d.kind === 'dm') {
@@ -116,12 +114,12 @@ export default function createChatRuntime({ variant, wire, meId, sendUrl, labels
         return false;
     };
 
-    // Gambar bubble langsung dari payload WS tanpa menunggu render server.
-    // wire:key sama dengan render Livewire nanti -> tak terduplikasi.
+    // Draw the bubble straight from the WS payload without waiting for a server render.
+    // The wire:key matches the later Livewire render -> no duplication.
     const appendBubble = (d) => {
         const list = container();
         if (!list) return;
-        if (document.querySelector(`[wire\\:key="${v.keyPrefix}-${d.messageId}"]`)) return; // sudah ada
+        if (document.querySelector(`[wire\\:key="${v.keyPrefix}-${d.messageId}"]`)) return; // already there
 
         const showName = d.kind === 'clan' && d.senderId !== meId;
         const wrap = document.createElement('div');
@@ -139,12 +137,12 @@ export default function createChatRuntime({ variant, wire, meId, sendUrl, labels
         scrollToBottom(list);
     };
 
-    // Bubble pesan sendiri tampil seketika saat submit (mendukung spam beruntun).
-    // wire:key unik "opt-N" agar Livewire morph tak menyentuhnya (tak kedip);
-    // dibuang serentak saat semua kiriman selesai, digantikan bubble asli.
+    // Your own bubble shows instantly on submit (supports rapid-fire sends). A unique
+    // "opt-N" wire:key keeps Livewire morph from touching it (no flicker); they're dropped
+    // together once all sends finish, replaced by the real bubbles.
     let optSeq = 0;
-    // Counter di window agar hook morph.updated global tetap membaca nilai yang
-    // benar setelah wire:navigate.
+    // Counter on window so the global morph.updated hook still reads the right value after
+    // wire:navigate.
     window[v.pendingKey] = window[v.pendingKey] || 0;
 
     const appendOutgoing = (body) => {
@@ -168,15 +166,15 @@ export default function createChatRuntime({ variant, wire, meId, sendUrl, labels
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
     let syncTimer = null;
 
-    // Kirim via fetch() paralel (bukan Livewire) agar spam tak saling menunggu.
-    // Setelah semua kiriman selesai, sinkron sekali (debounced) ke server.
+    // Send via parallel fetch() (not Livewire) so rapid sends don't wait on each other.
+    // Once all sends finish, sync to the server once (debounced).
     const send = (body) => {
         const mode = wire.activeMode;
         if (!mode) return;
 
         appendOutgoing(body);
 
-        // Reply hanya berlaku untuk kiriman pertama sejak preview dibuka.
+        // Reply only applies to the first send since the preview was opened.
         const replyId = wire.replyingToId || null;
         if (replyId) wire.cancelReply();
 
@@ -199,16 +197,16 @@ export default function createChatRuntime({ variant, wire, meId, sendUrl, labels
             .finally(() => {
                 window[v.pendingKey]--;
                 if (window[v.pendingKey] === 0) {
-                    // Hanya minta re-render (debounced). Bubble optimistic dibuang
-                    // di morph.updated, setelah bubble asli ada di DOM, agar pesan
-                    // tak sempat hilang lalu muncul lagi.
+                    // Just ask for a re-render (debounced). Optimistic bubbles are dropped
+                    // in morph.updated, after the real bubbles are in the DOM, so a message
+                    // never disappears and reappears.
                     clearTimeout(syncTimer);
                     syncTimer = setTimeout(() => wire.dispatch('message-received'), 120);
                 }
             });
     };
 
-    // Klik kutipan reply -> gulir ke pesan asli & kedipkan sebentar.
+    // Click a reply quote -> scroll to the original message & flash it briefly.
     const scrollToMessage = (id) => {
         const el = document.querySelector(`[wire\\:key="${v.keyPrefix}-${id}"]`);
         if (!el) return;
@@ -217,8 +215,8 @@ export default function createChatRuntime({ variant, wire, meId, sendUrl, labels
         setTimeout(() => el.classList.remove('chat-flash'), 1200);
     };
 
-    // Edit/hapus dari sisi lain: patch bubble langsung dari payload (instan),
-    // server tetap disinkronkan di belakang layar.
+    // Edit/delete from the other side: patch the bubble straight from the payload
+    // (instant); the server is still synced in the background.
     const patchMutation = (d) => {
         const node = document.querySelector(`[wire\\:key="${v.keyPrefix}-${d.messageId}"]`);
         if (!node) return false;
@@ -226,7 +224,7 @@ export default function createChatRuntime({ variant, wire, meId, sendUrl, labels
         if (!bubble) return false;
 
         if (d.action === 'edited') {
-            // Bangun ulang isi: buang semua kecuali <p> waktu, sisipkan teks baru.
+            // Rebuild the content: drop everything except the time <p>, insert the new text.
             const timeP = bubble.querySelector('p.opacity-60');
             [...bubble.childNodes].forEach((n) => {
                 if (n !== timeP) n.remove();
@@ -252,9 +250,9 @@ export default function createChatRuntime({ variant, wire, meId, sendUrl, labels
         if (d && belongsToOpenConversation(d)) {
             appendBubble(d);
         }
-        // Tetap sinkronkan state otoritatif (read receipt, dedup, dsb) -- tapi
-        // hanya kalau varian ini terlihat, supaya drawer yang tertutup tak
-        // memicu roundtrip Livewire tiap pesan masuk.
+        // Still sync the authoritative state (read receipt, dedup, etc.) -- but only if
+        // this variant is visible, so a closed drawer doesn't trigger a Livewire round-trip
+        // on every incoming message.
         if (active()) {
             wire.dispatch('message-received');
         }
@@ -264,7 +262,7 @@ export default function createChatRuntime({ variant, wire, meId, sendUrl, labels
         const d = ev.detail;
         if (!active()) return;
         if (d && d.messageId) patchMutation(d);
-        // Sinkron server (mis. untuk pesan yang belum termuat / kutipan reply).
+        // Server sync (e.g. for a not-yet-loaded message / reply quote).
         wire.dispatch('message-received');
     };
 
@@ -280,12 +278,12 @@ export default function createChatRuntime({ variant, wire, meId, sendUrl, labels
         { once: true }
     );
 
-    // Auto-scroll ke pesan terbaru tiap daftar berubah. Hook didaftarkan sekali
-    // secara global agar tak menumpuk tiap jendela dibuka/tutup.
+    // Auto-scroll to the newest message whenever the list changes. The hook is registered
+    // once globally so it doesn't stack up each time a window opens/closes.
     if (!window[v.hookKey]) {
         window[v.hookKey] = true;
         window.Livewire.hook('morph.updated', () => {
-            // Bubble asli sudah ada di DOM -> baru buang placeholder optimistic.
+            // The real bubbles are in the DOM now -> only then drop the optimistic placeholders.
             if (window[v.pendingKey] === 0) {
                 document
                     .querySelectorAll(`#${v.containerId} [data-optimistic]`)
@@ -303,8 +301,8 @@ export default function createChatRuntime({ variant, wire, meId, sendUrl, labels
                 if (!el) return;
                 el.scrollTop = el.scrollHeight;
 
-                // Tutup menu aksi yang terbuka saat daftar di-scroll, supaya
-                // posisinya (yang dihitung sekali saat dibuka) tak jadi basi.
+                // Close any open action menu when the list is scrolled, so its position
+                // (computed once when opened) doesn't go stale.
                 el.addEventListener(
                     'scroll',
                     () => {
@@ -316,8 +314,8 @@ export default function createChatRuntime({ variant, wire, meId, sendUrl, labels
         },
     }));
 
-    // Markup memanggil fungsi ini lewat onclick=/@submit, jadi keduanya harus
-    // ada di window dengan nama yang khas per varian.
+    // The markup calls these via onclick=/@submit, so they must live on window under a
+    // name that's distinct per variant.
     window[v.globals.send] = send;
     window[v.globals.appendOutgoing] = appendOutgoing;
     window[v.globals.scrollTo] = scrollToMessage;

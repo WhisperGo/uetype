@@ -1,17 +1,17 @@
 /**
- * Langganan Echo untuk multiplayer: channel lifecycle room (join/ready/start)
- * dan channel race berfrekuensi tinggi (posisi lawan).
+ * Echo subscriptions for multiplayer: the room lifecycle channel (join/ready/start) and
+ * the high-frequency race channel (opponent positions).
  *
- * Dipisah dari race-arena.js karena butuh `Livewire` global. Blok aslinya ada di
- * @script (bukan @assets) justru karena alasan itu; di modul, ketergantungan yang
- * sama dipenuhi dengan menunggu event `livewire:init` -- saat modul dieksekusi,
- * Livewire belum tentu ada.
+ * Split out from race-arena.js because it needs the global `Livewire`. The original block
+ * lived in @script (not @assets) for exactly that reason; in a module, the same dependency
+ * is satisfied by waiting for the `livewire:init` event -- Livewire may not exist yet when
+ * the module runs.
  */
-// Komponen Alpine untuk panel chat lobby (partials/room-chat.blade.php). Didaftarkan
-// di 'alpine:init' agar tersedia sebelum view di-mount. State pesan hidup di sini
-// (bukan Livewire) karena chat bersifat broadcast-only & sesaat.
+// Alpine component for the lobby chat panel (partials/room-chat.blade.php). Registered on
+// 'alpine:init' so it's available before the view mounts. Message state lives here (not in
+// Livewire) because the chat is broadcast-only & ephemeral.
 document.addEventListener('alpine:init', () => {
-    // joinLabel/leaveLabel: template lokal dengan ':name', diisi dari view.
+    // joinLabel/leaveLabel/kickLabel: local templates with ':name', filled from the view.
     window.Alpine.data('roomChat', ({ me, youLabel, joinLabel, leaveLabel, kickLabel }) => ({
         me,
         youLabel,
@@ -22,17 +22,17 @@ document.addEventListener('alpine:init', () => {
         messages: [],
 
         init() {
-            // Pesan dari peserta LAIN (di-relay race-echo listener '.room.message').
+            // Message from ANOTHER participant (relayed by the '.room.message' listener).
             this._onRemote = (e) => {
                 const d = e.detail || {};
-                // Abaikan gema pesan sendiri kalau sempat lolos (kirim pakai ->toOthers,
-                // tapi ini jaga-jaga bila suatu saat berubah jadi broadcast ke semua).
+                // Ignore an echo of our own message if one slips through (we send with
+                // ->toOthers, but this guards against a future switch to broadcast-to-all).
                 if (Number(d.senderId) === Number(this.me)) { return; }
                 this.push({ username: d.senderUsername, body: d.body, mine: false });
             };
             window.addEventListener('room-message-received', this._onRemote);
 
-            // Notif kehadiran (join/leave/kick) -> pesan sistem di tengah.
+            // Presence notice (join/leave/kick) -> a centered system message.
             this._onPresence = (e) => {
                 const d = e.detail || {};
                 const tpl = {
@@ -53,15 +53,15 @@ document.addEventListener('alpine:init', () => {
             const body = this.draft.trim();
             if (body === '') { return; }
             this.draft = '';
-            // Optimistic: tampilkan langsung di sisi pengirim.
+            // Optimistic: show it immediately on the sender's side.
             this.push({ username: this.youLabel, body, mine: true });
-            // Siarkan ke peserta lain (server broadcast ->toOthers, tak menyimpan).
+            // Broadcast to the other participants (server broadcasts ->toOthers, no storage).
             this.$wire.sendRoomMessage(body);
         },
 
         push(msg) {
             this.messages.push(msg);
-            // Batasi buffer agar tak tumbuh tanpa batas selama room panjang.
+            // Cap the buffer so it doesn't grow unbounded over a long-lived room.
             if (this.messages.length > 200) { this.messages.splice(0, this.messages.length - 200); }
             this.$nextTick(() => {
                 if (this.$refs.log) { this.$refs.log.scrollTop = this.$refs.log.scrollHeight; }
@@ -83,7 +83,7 @@ document.addEventListener('livewire:init', () => {
             window.Echo.leave(currentRaceChannel);
             currentRaceChannel = null;
         }
-        // Bersihkan posisi lawan agar room berikutnya tak kebawa state basi.
+        // Clear opponent positions so the next room doesn't carry stale state over.
         if (window.Alpine && window.Alpine.store('race')) {
             window.Alpine.store('race').reset();
         }
@@ -94,24 +94,24 @@ document.addEventListener('livewire:init', () => {
 
         leaveChannels();
 
-        // Channel lifecycle (low-frequency): join/ready/leave/start/finish -> tetap re-render Livewire penuh.
+        // Lifecycle channel (low-frequency): join/ready/leave/start/finish -> still a full Livewire re-render.
         currentRoomChannel = `room.${room}`;
         window.Echo
             .channel(currentRoomChannel)
             .listen('.room.updated', () => {
                 Livewire.dispatch('room-updated');
             })
-            // Chat lobby: numpang channel room yang sama. Broadcast-only (tak disimpan),
-            // jadi cukup relay ke window event -> ditangkap Alpine (roomChat) di view.
+            // Lobby chat: rides the same room channel. Broadcast-only (not stored), so just
+            // relay to a window event -> picked up by Alpine (roomChat) in the view.
             .listen('.room.message', (e) => {
                 window.dispatchEvent(new CustomEvent('room-message-received', { detail: e }));
             })
-            // Notif kehadiran (join/leave) -> pesan sistem di tengah panel chat.
+            // Presence notice (join/leave/kick) -> a centered system message in the chat panel.
             .listen('.room.presence', (e) => {
                 window.dispatchEvent(new CustomEvent('room-presence-changed', { detail: e }));
             });
 
-        // Channel race (high-frequency): posisi maskot lawan diterapkan langsung ke Alpine store, tanpa round-trip Livewire.
+        // Race channel (high-frequency): opponent mascot positions applied straight to the Alpine store, no Livewire round-trip.
         currentRaceChannel = `race.${room}`;
         window.Echo
             .channel(currentRaceChannel)
@@ -121,7 +121,7 @@ document.addEventListener('livewire:init', () => {
                 }
             })
             .listen('.race.sudden_death', (e) => {
-                // Semua klien hitung sisa waktu dari timestamp akhir server yang sama -> tersinkron.
+                // Every client computes the remaining time from the same server end timestamp -> in sync.
                 const endMs = new Date(e.endTimeIso).getTime();
                 const remaining = Math.max(0, Math.ceil((endMs - Date.now()) / 1000));
                 window.dispatchEvent(new CustomEvent('race-sudden-death', {

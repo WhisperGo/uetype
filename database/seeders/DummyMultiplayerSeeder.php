@@ -9,19 +9,19 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
- * Seeder untuk keperluan TESTING di environment lokal.
+ * Seeder for local-environment TESTING.
  *
- * Mengisi multiplayer_match_history milik user dummy (sama dengan DummyUserSeeder:
- * dummy@uetype.test) supaya tab Multiplayer di halaman /stats langsung terisi tanpa
- * harus menjalankan balapan sungguhan berkali-kali.
+ * Fills the dummy user's multiplayer_match_history (same as DummyUserSeeder:
+ * dummy@uetype.test) so the Multiplayer tab on /stats is populated right away without
+ * running many real races.
  *
- * Login user ini lewat route dev: /dev-login (hanya aktif saat APP_ENV=local).
+ * Log in as this user via the dev route: /dev-login (only active when APP_ENV=local).
  */
 class DummyMultiplayerSeeder extends Seeder
 {
     public function run(): void
     {
-        // Pakai user dummy yang sama dengan DummyUserSeeder (idempotent by email).
+        // Use the same dummy user as DummyUserSeeder (idempotent by email).
         $user = User::firstOrCreate(
             ['email' => 'dummy@uetype.test'],
             [
@@ -35,31 +35,31 @@ class DummyMultiplayerSeeder extends Seeder
             ],
         );
 
-        // Bersihkan riwayat lama milik user ini agar seeder bisa diulang dengan bersih.
+        // Clear this user's old history so the seeder can be re-run cleanly.
         MultiplayerMatchHistory::where('user_id', $user->id)->delete();
 
-        // ~18 balapan tersebar 20 hari ke belakang; WPM perlahan naik (biar terlihat progres).
+        // ~18 races spread over the last 20 days; WPM slowly rising (so progress shows).
         $races = 18;
 
         for ($i = 0; $i < $races; $i++) {
-            // Jumlah lawan bervariasi 2-5 pemain.
+            // Opponent count varies 2-5 players.
             $playerCount = mt_rand(2, 5);
 
-            // Peringkat realistis: menang cukup sering tapi tak selalu; sesekali DNF.
+            // Realistic placement: wins fairly often but not always; occasional DNF.
             $place = mt_rand(1, $playerCount);
-            $gaveUp = mt_rand(1, 10) === 1; // ~10% menyerah/DNF.
+            $gaveUp = mt_rand(1, 10) === 1; // ~10% give up/DNF.
 
-            // WPM cenderung naik seiring waktu + sedikit noise (selaras DummyUserSeeder).
+            // WPM tends to rise over time + a little noise (matches DummyUserSeeder).
             $baseWpm = 45 + ($i * 1.3);
             $wpm = (int) round(max(20, $baseWpm + mt_rand(-7, 7)));
 
             $accuracy = round(mt_rand(870, 995) / 10, 2); // 87.0% - 99.5%
 
-            // Menyerah -> pakai sentinel 999 (selaras giveUp() di MultiplayerLobby);
-            // selesai -> waktu tempuh wajar berdasarkan panjang teks & WPM.
+            // Gave up -> use the 999 sentinel (matches giveUp() in MultiplayerLobby);
+            // finished -> a reasonable elapsed time based on text length & WPM.
             $finishedSeconds = $gaveUp ? 999 : mt_rand(18, 55);
 
-            // EXP selaras rumus User::addExp(): correctChars diperkirakan dari WPM & waktu.
+            // EXP matches the User::addExp() formula: correctChars estimated from WPM & time.
             $correctChars = $gaveUp ? mt_rand(20, 80) : (int) round(($wpm / 60) * $finishedSeconds * 5);
             $accuracyMultiplier = 0.5 + 0.5 * ($accuracy / 100);
             $xpEarned = (int) round($correctChars * 0.1 * $accuracyMultiplier);
@@ -78,6 +78,6 @@ class DummyMultiplayerSeeder extends Seeder
             ]);
         }
 
-        $this->command->info("Riwayat multiplayer dummy siap: {$user->email} ({$races} balapan). Login via /dev-login lalu buka /stats tab Multiplayer.");
+        $this->command->info("Dummy multiplayer history ready: {$user->email} ({$races} races). Log in via /dev-login then open /stats, Multiplayer tab.");
     }
 }

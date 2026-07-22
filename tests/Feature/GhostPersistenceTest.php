@@ -40,7 +40,7 @@ it('menyimpan user_id untuk pilihan leaderboard', function () {
 
 /**
  * INTI TEMUAN: sesudah menyelesaikan tes lalu "Next Test" (mount ulang TypingEngine),
- * ghost yang tadi dipasang harus MUNCUL LAGI, bukan hilang.
+ * the ghost that was set must APPEAR AGAIN, not vanish.
  */
 it('memulihkan ghost dari session saat mount berikutnya (skenario Next Test)', function () {
     $user = User::factory()->create(['highest_wpm' => 77]);
@@ -65,7 +65,7 @@ it('menurunkan ULANG wpm dari DB saat restore, bukan angka beku', function () {
     lbResult($target, 'time', '30', 100);
     session(['ghost_selection' => ['type' => 'leaderboard', 'ref_id' => $target->id]]);
 
-    // Lawan memperbaiki rekor -> restore harus mengikuti angka BARU.
+    // The opponent improves their record -> the restore must follow the NEW number.
     lbResult($target, 'time', '30', 140);
 
     Livewire::actingAs($viewer)->test(TypingEngine::class, ['mainMode' => 'time', 'subMode' => '30'])
@@ -81,7 +81,7 @@ it('suspend saat pindah ke survival TANPA menghapus pilihan session', function (
         ->call('setMode', 'survival', 'medium')
         ->assertSet('ghostActive', false);
 
-    // Pilihan MASIH ada di session (cuma disembunyikan).
+    // The selection is STILL in the session (just hidden).
     expect(session('ghost_selection'))->toBe(['type' => 'own', 'ref_id' => null]);
 });
 
@@ -116,7 +116,7 @@ it('setelah clearGhost, ghost tidak muncul lagi di mount berikutnya', function (
 
     Livewire::actingAs($user)->test(TypingEngine::class)->call('clearGhost');
 
-    // Mount baru (simulasi Next Test) -> tetap tak ada ghost.
+    // A fresh mount (simulating Next Test) -> still no ghost.
     Livewire::actingAs($user)->test(TypingEngine::class)
         ->assertSet('ghostActive', false)
         ->assertNotDispatched('ghost-selected');
@@ -152,7 +152,7 @@ it('deep-link ?ghost= yang valid menulis pilihan ke session (jadi sticky)', func
 it('deep-link tak valid (lawan tanpa rekor) tidak menulis session', function () {
     $target = User::factory()->create();
     $viewer = User::factory()->create();
-    // Tak ada rekor untuk target.
+    // No record for the target.
 
     Livewire::actingAs($viewer)->withQueryParams([
         'ghost' => $target->id, 'mode' => 'time', 'config' => '30',
@@ -174,7 +174,7 @@ it('ghost teman ikut sticky lintas mount', function () {
     Livewire::actingAs($me)->test(GhostPicker::class, ['mainMode' => 'time', 'subMode' => '30'])
         ->call('selectOpponent', 'friend', $f->id);
 
-    // ...lalu mount TypingEngine baru -> ghost teman pulih.
+    // ...then a fresh TypingEngine mount -> the friend ghost is restored.
     Livewire::actingAs($me)->test(TypingEngine::class, ['mainMode' => 'time', 'subMode' => '30'])
         ->assertSet('ghostActive', true)
         ->assertDispatched('ghost-selected', fn ($name, $params) => (float) $params['wpm'] === 82.0 && $params['label'] === 'kawan');

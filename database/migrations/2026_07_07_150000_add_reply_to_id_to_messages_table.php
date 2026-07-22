@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('messages', function (Blueprint $table) {
-            // Pesan yang dibalas (reply). Null = pesan biasa. onDelete null:
-            // kalau pesan asli terhapus dari DB, reply tetap ada (kutipan hilang).
+            // The message being replied to. Null = a normal message. onDelete null: if the
+            // original message is deleted from the DB, the reply stays (the quote is lost).
             $table->foreignId('reply_to_id')->nullable()->after('body')
                 ->constrained('messages')->nullOnDelete();
         });

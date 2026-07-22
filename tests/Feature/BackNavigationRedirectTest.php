@@ -5,10 +5,10 @@ use App\Models\User;
 use Livewire\Livewire;
 
 /**
- * Transisi keluar/masuk /typing dibuat MUAT-HALAMAN-PENUH (tanpa navigate:true) supaya
- * tombol Back browser tidak me-restore snapshot SPA yang merusak mesin ketik (entangle
- * undefined + $wire basi). Test ini mengunci TARGET redirect-nya tetap benar; perilaku
- * Back/bfcache sendiri bersifat browser-level dan diverifikasi manual.
+ * The transition into/out of /typing is made a FULL PAGE LOAD (no navigate:true) so the
+ * browser Back button doesn't restore an SPA snapshot that breaks the typing engine
+ * (entangle undefined + stale $wire). This test locks the redirect TARGET as correct; the
+ * Back/bfcache behavior itself is browser-level and verified manually.
  */
 it('redirects to the result page after a valid solo result', function () {
     $user = User::factory()->create();

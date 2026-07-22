@@ -8,19 +8,19 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
 /**
- * Seeder untuk keperluan TESTING di environment lokal.
+ * Seeder for local-environment TESTING.
  *
- * Membuat satu user dummy + sejumlah hasil typing (typing_results) yang variatif
- * supaya halaman profil, riwayat, grafik progres, dan heatmap langsung terisi
- * tanpa perlu mengetik manual berkali-kali.
+ * Creates one dummy user + a varied set of typing results (typing_results) so the profile
+ * page, history, progress chart, and heatmap are populated right away without typing many
+ * sessions by hand.
  *
- * Login user ini lewat route khusus dev: /dev-login (hanya aktif saat APP_ENV=local).
+ * Log in as this user via the dev-only route: /dev-login (only active when APP_ENV=local).
  */
 class DummyUserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Buat / ambil user dummy (idempotent berdasarkan email).
+        // Create / fetch the dummy user (idempotent by email).
         $user = User::firstOrCreate(
             [
                 'email' => 'dummy@uetype.test',
@@ -36,7 +36,7 @@ class DummyUserSeeder extends Seeder
             ],
         );
 
-        // Bersihkan hasil lama milik user ini agar seeder bisa dijalankan ulang dengan bersih.
+        // Clear this user's old results so the seeder can be re-run cleanly.
         TypingResult::where('user_id', $user->id)->delete();
 
         $modes = [
@@ -52,22 +52,22 @@ class DummyUserSeeder extends Seeder
         $totalXp = 0;
         $highestWpm = 0.0;
 
-        // ~20 sesi tersebar 20 hari ke belakang, WPM perlahan naik (biar grafik progres terlihat).
+        // ~20 sessions spread over the last 20 days, WPM slowly rising (so the progress chart shows).
         $sessions = 20;
 
         for ($i = 0; $i < $sessions; $i++) {
             $pick = $modes[array_rand($modes)];
 
-            // WPM cenderung naik seiring waktu + sedikit noise acak.
+            // WPM tends to rise over time + a little random noise.
             $baseWpm = 45 + ($i * 1.2);
             $netWpm = round($baseWpm + mt_rand(-6, 6), 2);
             $netWpm = max(20, $netWpm);
 
             $accuracy = round(mt_rand(880, 995) / 10, 2); // 88.0% - 99.5%
-            $rawWpm = round($netWpm / ($accuracy / 100), 2); // raw selalu >= net
+            $rawWpm = round($netWpm / ($accuracy / 100), 2); // raw always >= net
 
-            // Survival dinilai dari lama bertahan (detik), makin sulit makin pendek;
-            // time pakai durasi config; words durasi acak wajar.
+            // Survival is scored by how long you survived (seconds), harder = shorter;
+            // time uses the config duration; words gets a reasonable random duration.
             $duration = match ($pick['mode']) {
                 'time' => (float) $pick['config'],
                 'survival' => (float) match ($pick['config']) {
@@ -78,20 +78,20 @@ class DummyUserSeeder extends Seeder
                 default => (float) mt_rand(20, 70),
             };
 
-            // Perkiraan jumlah karakter dari net wpm & durasi (1 kata = 5 karakter).
+            // Estimated character count from net wpm & duration (1 word = 5 characters).
             $correctChars = (int) round(($netWpm / 60) * $duration * 5);
             $incorrectChars = (int) round($correctChars * ((100 - $accuracy) / 100));
 
-            // Survival menyimpan jumlah kata bersih di kolom score; mode lain null.
+            // Survival stores the clean word count in the score column; other modes null.
             $score = $pick['mode'] === 'survival' ? (int) round($correctChars / 5) : null;
 
-            // EXP berbasis volume + bonus akurasi tipis — selaras dengan rumus di TypingEngine.
+            // EXP based on volume + a slight accuracy bonus — matches the TypingEngine formula.
             $accuracyMultiplier = 0.5 + 0.5 * ($accuracy / 100);
             $xpEarned = (int) round($correctChars * 0.1 * $accuracyMultiplier);
             $totalXp += $xpEarned;
 
-            // Rekor WPM tak mencakup survival (dicapai di bawah tekanan stamina),
-            // selaras dengan TypingEngine.
+            // The WPM record excludes survival (achieved under stamina pressure), matching
+            // TypingEngine.
             if ($pick['mode'] !== 'survival') {
                 $highestWpm = max($highestWpm, $netWpm);
             }
@@ -100,7 +100,7 @@ class DummyUserSeeder extends Seeder
                 'user_id' => $user->id,
                 'mode' => $pick['mode'],
                 'mode_config' => $pick['config'],
-                // Bobot ke en agar realistis; ID mengisi papan berbahasa Indonesia.
+                // Weighted toward en for realism; id populates the Indonesian-language board.
                 'language' => fake()->randomElement(['en', 'en', 'id']),
                 'net_wpm' => $netWpm,
                 'raw_wpm' => $rawWpm,
@@ -115,11 +115,11 @@ class DummyUserSeeder extends Seeder
             ]);
         }
 
-        // Selaraskan agregat user dengan hasil yang baru disemai.
+        // Sync the user's aggregates with the freshly seeded results.
         $user->total_xp = $totalXp;
         $user->highest_wpm = $highestWpm;
         $user->save();
 
-        $this->command->info("User dummy siap: {$user->email} ({$sessions} hasil typing). Login via /dev-login.");
+        $this->command->info("Dummy user ready: {$user->email} ({$sessions} typing results). Log in via /dev-login.");
     }
 }

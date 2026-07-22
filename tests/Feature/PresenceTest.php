@@ -51,7 +51,7 @@ it('broadcasts presence to friends only on the offline to online transition', fu
     Event::assertDispatched(PresenceUpdated::class, fn ($e) => $e->friendId === $friend->id);
     Event::assertNotDispatched(PresenceUpdated::class, fn ($e) => $e->friendId === $stranger->id);
 
-    // Heartbeat lanjutan (sudah online): tidak broadcast lagi.
+    // A follow-up heartbeat (already online): no broadcast again.
     Event::fake([PresenceUpdated::class]);
     $me->fresh()->touchPresence();
     Event::assertNotDispatched(PresenceUpdated::class);
