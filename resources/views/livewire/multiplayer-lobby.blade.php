@@ -9,6 +9,19 @@
     $mpWaiting = $this->step === 'waiting';
 @endphp
 <div class="max-w-5xl px-4 mx-auto py-6 sm:px-6 lg:px-8 text-foreground"
+    x-data="{
+        kickId: null,
+        kickName: '',
+        askKick(id, name) {
+            this.kickId = id;
+            this.kickName = name;
+            $dispatch('open-modal', 'confirm-kick-member');
+        },
+        confirmKick() {
+            if (this.kickId !== null) { $wire.kickMember(this.kickId); }
+            $dispatch('close-modal', 'confirm-kick-member');
+        },
+    }"
     data-mp-flags
     data-mp-in-room="{{ $mpInRoom ? '1' : '0' }}"
     data-mp-waiting="{{ $mpWaiting ? '1' : '0' }}"
@@ -190,10 +203,9 @@
                                                 @if ($spectator->user_id === $this->roomData->host_id)
                                                     <span class="text-[9px] font-mono font-bold uppercase tracking-wider text-gold shrink-0">{{ __('multiplayer.host') }}</span>
                                                 @elseif ($this->isHost)
-                                                    {{-- Host may also kick a spectator (they hold a slot too). --}}
+                                                    {{-- Host may also kick a spectator (they hold a slot too). Opens the overlay. --}}
                                                     <button type="button"
-                                                        wire:click="kickMember({{ $spectator->user_id }})"
-                                                        wire:confirm="{{ __('multiplayer.kick_confirm', ['name' => $spectator->user->username]) }}"
+                                                        x-on:click="askKick({{ $spectator->user_id }}, @js($spectator->user->username))"
                                                         title="{{ __('multiplayer.kick_player', ['name' => $spectator->user->username]) }}"
                                                         class="ml-auto w-5 h-5 rounded-full flex items-center justify-center border border-danger/40 text-danger/70 bg-danger/5 hover:bg-danger/20 hover:text-danger transition shrink-0"
                                                         aria-label="{{ __('multiplayer.kick_player', ['name' => $spectator->user->username]) }}">
@@ -226,9 +238,9 @@
                                 class="p-5 border flex flex-col items-center justify-center text-center rounded-2xl relative transition duration-300 {{ $member->user_id === Auth::id() ? 'bg-elevated/60 border-brand-bright' : 'bg-surface/40 border-border/40' }}">
                                 @if ($canKick)
                                     {{-- Host-only kick control: a small circled X in the card corner. --}}
+                                    {{-- Opens the confirm-kick overlay (see bottom of view) instead of a browser confirm. --}}
                                     <button type="button"
-                                        wire:click="kickMember({{ $member->user_id }})"
-                                        wire:confirm="{{ __('multiplayer.kick_confirm', ['name' => $member->user->username]) }}"
+                                        x-on:click="askKick({{ $member->user_id }}, @js($member->user->username))"
                                         title="{{ __('multiplayer.kick_player', ['name' => $member->user->username]) }}"
                                         class="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center border border-danger/40 text-danger/70 bg-danger/5 hover:bg-danger/20 hover:text-danger hover:border-danger/60 transition focus:outline-none focus-visible:ring-1 focus-visible:ring-danger/50"
                                         aria-label="{{ __('multiplayer.kick_player', ['name' => $member->user->username]) }}">
@@ -888,6 +900,38 @@
                         x-on:click="window.__mpConfirmLeave && window.__mpConfirmLeave()"
                         class="rounded-lg px-3 py-1.5 font-mono text-sm font-medium text-danger transition-colors duration-150 hover:bg-danger/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                         {{ __('multiplayer.leave_confirm_ok') }}
+                    </button>
+                </div>
+            </div>
+        </x-modal>
+    @endauth
+
+    {{-- Host kick confirmation overlay. Opened by askKick(id, name) from a kick button
+         (player card or spectator list), which stashes the target in Alpine state. The
+         Confirm button calls confirmKick() -> $wire.kickMember(kickId). Same x-modal
+         component as the leave/sign-out overlays. --}}
+    @auth
+        <x-modal name="confirm-kick-member" maxWidth="md" focusable>
+            <div class="p-5 sm:p-6">
+                <h2 class="font-mono text-xl font-semibold leading-tight text-foreground">
+                    {{ __('multiplayer.kick_confirm_title') }}
+                </h2>
+                <p class="mt-2 text-sm leading-6 text-muted">
+                    {{-- :name resolved client-side from the stashed target. --}}
+                    <span x-text="@js(__('multiplayer.kick_confirm_body', ['name' => '__NAME__'])).replace('__NAME__', kickName)"></span>
+                </p>
+
+                <div class="mt-6 flex items-center justify-end gap-2">
+                    <button type="button"
+                        x-on:click="$dispatch('close-modal', 'confirm-kick-member')"
+                        class="rounded-lg px-3 py-1.5 font-mono text-sm text-muted transition-colors duration-150 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                        {{ __('multiplayer.kick_confirm_cancel') }}
+                    </button>
+
+                    <button type="button"
+                        x-on:click="confirmKick()"
+                        class="rounded-lg px-3 py-1.5 font-mono text-sm font-medium text-danger transition-colors duration-150 hover:bg-danger/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                        {{ __('multiplayer.kick_confirm_ok') }}
                     </button>
                 </div>
             </div>

@@ -196,7 +196,7 @@ kunjung menekan **Ready** sehingga race tak bisa dimulai.
 | **Siapa** | Hanya **host**, dan **bukan dirinya sendiri** | Guard di `kickMember()`: `host_id === Auth::id()` + `userId !== Auth::id()`. Otorisasi di server, bukan sekadar menyembunyikan tombol. |
 | **Kapan** | Hanya saat `status === 'waiting'` | Mengeluarkan pembalap **di tengah race** akan merusak akuntansi finish/placement. Diblokir setelah `racing` dimulai. |
 | **Sasaran** | Pemain **maupun** penonton (keduanya menahan slot) | Tombol X muncul di kartu pemain dan di daftar penonton (keduanya non-host). |
-| **UI** | Lingkaran "X" merah samar di sudut kartu | `wire:click="kickMember(id)"` + `wire:confirm` (dialog konfirmasi native), hanya dirender kalau `$this->isHost`. |
+| **UI** | Lingkaran "X" merah samar di sudut kartu | Tombol (hanya dirender kalau `$this->isHost`) memanggil Alpine `askKick(id, name)` yang menyimpan sasaran lalu membuka **overlay konfirmasi** `<x-modal name="confirm-kick-member">` — bukan dialog `confirm()`/`wire:confirm` native, konsisten dengan overlay leave/sign-out. Tombol Keluarkan → `confirmKick()` → `$wire.kickMember(id)`. |
 | **Notif** | `RoomPresenceChanged` action `'kick'` → "… dikeluarkan dari ruang" di chat | Sama seperti join/leave, pesan sistem di tengah panel chat. |
 
 **Bagaimana pemain yang di-kick tahu:** baris `RoomMember`-nya dihapus, lalu `RoomUpdated`
