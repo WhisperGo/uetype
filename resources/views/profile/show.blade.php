@@ -16,10 +16,16 @@
     </x-slot>
 
     @php
-        $totalSeconds = $stats['total_seconds'] ?? 0;
-        $hours = intdiv($totalSeconds, 3600);
-        $minutes = intdiv($totalSeconds % 3600, 60);
-        $timeLabel = $hours > 0 ? "{$hours}h {$minutes}m" : "{$minutes}m";
+        // Total practice time as HH:MM:SS (zero-padded, precise to the second). Hours are
+        // NOT capped at 24 -- past a day it keeps counting up (e.g. 25:00:00), since this
+        // is cumulative practice time, not a clock.
+        $totalSeconds = (int) ($stats['total_seconds'] ?? 0);
+        $timeLabel = sprintf(
+            '%02d:%02d:%02d',
+            intdiv($totalSeconds, 3600),
+            intdiv($totalSeconds % 3600, 60),
+            $totalSeconds % 60,
+        );
     @endphp
 
     <div class="py-10">
