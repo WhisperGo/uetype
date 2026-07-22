@@ -600,4 +600,105 @@ describe('multiplayer room presence', function () {
         // Tak ada yang mendengarkan lagi -> notif keluar tak perlu disiarkan.
         Event::assertNotDispatched(RoomPresenceChanged::class);
     });
+
+    it('lets the host kick a member while waiting', function () {
+        Event::fake([RoomUpdated::class, RoomPresenceChanged::class]);
+
+        $host = User::factory()->create();
+        $target = User::factory()->create();
+
+        $room = Room::create([
+            'code' => 'KICK01', 'host_id' => $host->id, 'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $target->id, 'role' => 'player', 'is_ready' => false]);
+
+        Livewire::actingAs($host)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'KICK01')->set('step', 'waiting')
+            ->call('kickMember', $target->id);
+
+        // The target is removed; the host and room remain.
+        $this->assertDatabaseMissing('room_members', ['room_id' => $room->id, 'user_id' => $target->id]);
+        $this->assertDatabaseHas('room_members', ['room_id' => $room->id, 'user_id' => $host->id]);
+
+        // A 'kick' presence notice is broadcast for the chat.
+        Event::assertDispatched(RoomPresenceChanged::class, fn ($e) => $e->action === 'kick' && $e->username === $target->username);
+    });
+
+    it('does not let a non-host kick anyone', function () {
+        $host = User::factory()->create();
+        $member = User::factory()->create();
+        $other = User::factory()->create();
+
+        $room = Room::create([
+            'code' => 'KICK02', 'host_id' => $host->id, 'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        foreach ([$host, $member, $other] as $u) {
+            RoomMember::create(['room_id' => $room->id, 'user_id' => $u->id, 'role' => 'player', 'is_ready' => false]);
+        }
+
+        // A regular member tries to kick someone else -> ignored.
+        Livewire::actingAs($member)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'KICK02')->set('step', 'waiting')
+            ->call('kickMember', $other->id);
+
+        $this->assertDatabaseHas('room_members', ['room_id' => $room->id, 'user_id' => $other->id]);
+    });
+
+    it('does not let the host kick themselves', function () {
+        $host = User::factory()->create();
+        $member = User::factory()->create();
+
+        $room = Room::create([
+            'code' => 'KICK03', 'host_id' => $host->id, 'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $member->id, 'role' => 'player', 'is_ready' => false]);
+
+        Livewire::actingAs($host)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'KICK03')->set('step', 'waiting')
+            ->call('kickMember', $host->id);
+
+        $this->assertDatabaseHas('room_members', ['room_id' => $room->id, 'user_id' => $host->id]);
+    });
+
+    it('does not allow kicking once the race has started', function () {
+        $host = User::factory()->create();
+        $target = User::factory()->create();
+
+        $room = Room::create([
+            'code' => 'KICK04', 'host_id' => $host->id, 'status' => 'racing',
+            'text_to_type' => 'the quick brown fox', 'race_starts_at' => now()->subSeconds(5),
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $target->id, 'role' => 'player', 'is_ready' => true]);
+
+        Livewire::actingAs($host)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'KICK04')->set('step', 'racing')
+            ->call('kickMember', $target->id);
+
+        // Mid-race kick is blocked -> the target stays.
+        $this->assertDatabaseHas('room_members', ['room_id' => $room->id, 'user_id' => $target->id]);
+    });
+
+    it('sends the kicked player back to choose on the next room update', function () {
+        $host = User::factory()->create();
+        $target = User::factory()->create();
+
+        $room = Room::create([
+            'code' => 'KICK05', 'host_id' => $host->id, 'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+
+        // The target's membership is already gone (host kicked them); the target's client
+        // still thinks it's in the 'waiting' room until the room-updated event arrives.
+        Livewire::actingAs($target)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'KICK05')->set('step', 'waiting')
+            ->call('roomUpdated')
+            ->assertSet('step', 'choose');
+    });
 });

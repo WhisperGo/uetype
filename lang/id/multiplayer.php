@@ -97,4 +97,8 @@ return [
     'chat_you' => 'Kamu',
     'chat_joined' => ':name masuk ke ruang',
     'chat_left' => ':name keluar dari ruang',
+    'chat_kicked' => ':name dikeluarkan dari ruang',
+    'kick_player' => 'Keluarkan :name',
+    'kick_confirm' => 'Keluarkan :name dari ruang?',
+    'you_were_kicked' => 'Kamu dikeluarkan dari ruang oleh host.',
 ];

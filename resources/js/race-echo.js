@@ -12,11 +12,12 @@
 // (bukan Livewire) karena chat bersifat broadcast-only & sesaat.
 document.addEventListener('alpine:init', () => {
     // joinLabel/leaveLabel: template lokal dengan ':name', diisi dari view.
-    window.Alpine.data('roomChat', ({ me, youLabel, joinLabel, leaveLabel }) => ({
+    window.Alpine.data('roomChat', ({ me, youLabel, joinLabel, leaveLabel, kickLabel }) => ({
         me,
         youLabel,
         joinLabel,
         leaveLabel,
+        kickLabel,
         draft: '',
         messages: [],
 
@@ -31,10 +32,13 @@ document.addEventListener('alpine:init', () => {
             };
             window.addEventListener('room-message-received', this._onRemote);
 
-            // Notif kehadiran (join/leave) -> pesan sistem di tengah.
+            // Notif kehadiran (join/leave/kick) -> pesan sistem di tengah.
             this._onPresence = (e) => {
                 const d = e.detail || {};
-                const tpl = d.action === 'leave' ? this.leaveLabel : this.joinLabel;
+                const tpl = {
+                    leave: this.leaveLabel,
+                    kick: this.kickLabel,
+                }[d.action] || this.joinLabel;
                 this.push({ system: true, body: tpl.replace(':name', d.username || '') });
             };
             window.addEventListener('room-presence-changed', this._onPresence);

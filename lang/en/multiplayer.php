@@ -97,4 +97,8 @@ return [
     'chat_you' => 'You',
     'chat_joined' => ':name joined the room',
     'chat_left' => ':name left the room',
+    'chat_kicked' => ':name was kicked from the room',
+    'kick_player' => 'Kick :name',
+    'kick_confirm' => 'Kick :name from the room?',
+    'you_were_kicked' => 'You were kicked from the room by the host.',
 ];

@@ -145,13 +145,16 @@ Peserta room (pemain **maupun** penonton) bisa mengobrol saat menunggu di lobby 
 [`RoomMessageSent`](../../app/Events/RoomMessageSent.php) `->toOthers()` → Reverb → `.room.message`
 → window event → Alpine append + auto-scroll.
 
-**Notifikasi kehadiran** ([`RoomPresenceChanged`](../../app/Events/RoomPresenceChanged.php)):
+**Notifikasi kehadiran** ([`RoomPresenceChanged`](../../app/Events/RoomPresenceChanged.php), action
+`'join'|'leave'|'kick'`):
 - **Join** disiarkan di `joinRoom()` dengan `->toOthers()` (yang masuk tak melihat notif dirinya sendiri).
 - **Leave** disiarkan di `leaveRoom()` **sebelum** `RoomMember` dihapus (agar username masih terbaca),
   dan **hanya jika room masih punya anggota** — kalau anggota terakhir keluar, room dihapus sehingga
   notif tak perlu (tak ada yang mendengarkan).
+- **Kick** disiarkan di `kickMember()` (lihat §3.11).
 - Ditampilkan sebagai **pesan sistem di tengah** panel chat (pil samar `bg-white/[0.03]` +
   `text-muted/60`), dibedakan dari bubble chat biasa lewat flag `msg.system` di komponen Alpine.
+  Label per-action (`chat_joined`/`chat_left`/`chat_kicked`) dipetakan di `race-echo.js`.
 
 **Konsistensi visual:** bubble, input, tombol send, dan scrollbar (`chat-scroll`) disamakan dengan
 halaman chat global — pesan sendiri = bubble emas (`bg-gold`), pesan orang lain = `bg-white/5`.
@@ -179,6 +182,26 @@ dibatasi konstanta `MAX_PLAYERS = 5` / `MAX_SPECTATORS = 5`.
   menghitung `ROLE_PLAYER`; penonton tak punya `finished_time_seconds` dan bukan DNF.
 - **Reassign host** saat host keluar mengutamakan pembalap yang tersisa; hanya jika tak ada
   pembalap, penonton menjadi host-penonton.
+
+### 3.11 Host kick member (di lobby)
+
+Host bisa **mengeluarkan** anggota lain saat masih `waiting` — mengatasi kasus pemain yang tak
+kunjung menekan **Ready** sehingga race tak bisa dimulai.
+
+| Aspek | Keputusan | Justifikasi |
+|-------|-----------|-------------|
+| **Siapa** | Hanya **host**, dan **bukan dirinya sendiri** | Guard di `kickMember()`: `host_id === Auth::id()` + `userId !== Auth::id()`. Otorisasi di server, bukan sekadar menyembunyikan tombol. |
+| **Kapan** | Hanya saat `status === 'waiting'` | Mengeluarkan pembalap **di tengah race** akan merusak akuntansi finish/placement. Diblokir setelah `racing` dimulai. |
+| **Sasaran** | Pemain **maupun** penonton (keduanya menahan slot) | Tombol X muncul di kartu pemain dan di daftar penonton (keduanya non-host). |
+| **UI** | Lingkaran "X" merah samar di sudut kartu | `wire:click="kickMember(id)"` + `wire:confirm` (dialog konfirmasi native), hanya dirender kalau `$this->isHost`. |
+| **Notif** | `RoomPresenceChanged` action `'kick'` → "… dikeluarkan dari ruang" di chat | Sama seperti join/leave, pesan sistem di tengah panel chat. |
+
+**Bagaimana pemain yang di-kick tahu:** baris `RoomMember`-nya dihapus, lalu `RoomUpdated`
+disiarkan **ke semua** (bukan `->toOthers()` — host juga perlu re-render agar kartu yang di-kick
+langsung hilang). Di `roomUpdated()` ada penjaga: **kalau room masih ada tapi aku bukan lagi
+anggotanya** (khusus fase `waiting`), kembali ke halaman choose dengan banner
+`you_were_kicked`. Penjaga ini di-*scope* ke `waiting` saja supaya pemain yang sudah selesai lalu
+keluar dan masih melihat **layar hasil** tak ikut terlempar dari hasilnya.
 
 ## 4. Batasan Saat Ini
 

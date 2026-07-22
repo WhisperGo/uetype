@@ -173,6 +173,18 @@
                                                 <span class="font-mono text-xs text-foreground/90 truncate">{{ $spectator->user->username }}</span>
                                                 @if ($spectator->user_id === $this->roomData->host_id)
                                                     <span class="text-[9px] font-mono font-bold uppercase tracking-wider text-gold shrink-0">{{ __('multiplayer.host') }}</span>
+                                                @elseif ($this->isHost)
+                                                    {{-- Host may also kick a spectator (they hold a slot too). --}}
+                                                    <button type="button"
+                                                        wire:click="kickMember({{ $spectator->user_id }})"
+                                                        wire:confirm="{{ __('multiplayer.kick_confirm', ['name' => $spectator->user->username]) }}"
+                                                        title="{{ __('multiplayer.kick_player', ['name' => $spectator->user->username]) }}"
+                                                        class="ml-auto w-5 h-5 rounded-full flex items-center justify-center border border-danger/40 text-danger/70 bg-danger/5 hover:bg-danger/20 hover:text-danger transition shrink-0"
+                                                        aria-label="{{ __('multiplayer.kick_player', ['name' => $spectator->user->username]) }}">
+                                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
                                                 @endif
                                             </div>
                                         @endforeach
@@ -190,8 +202,25 @@
                             $member = $this->orderedMembers->get($i);
                         @endphp
                         @if ($member)
+                            @php
+                                // The host may kick any OTHER member (not themselves) while waiting.
+                                $canKick = $this->isHost && $member->user_id !== $this->roomData->host_id;
+                            @endphp
                             <div
                                 class="p-5 border flex flex-col items-center justify-center text-center rounded-2xl relative transition duration-300 {{ $member->user_id === Auth::id() ? 'bg-elevated/60 border-brand-bright' : 'bg-surface/40 border-border/40' }}">
+                                @if ($canKick)
+                                    {{-- Host-only kick control: a small circled X in the card corner. --}}
+                                    <button type="button"
+                                        wire:click="kickMember({{ $member->user_id }})"
+                                        wire:confirm="{{ __('multiplayer.kick_confirm', ['name' => $member->user->username]) }}"
+                                        title="{{ __('multiplayer.kick_player', ['name' => $member->user->username]) }}"
+                                        class="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center border border-danger/40 text-danger/70 bg-danger/5 hover:bg-danger/20 hover:text-danger hover:border-danger/60 transition focus:outline-none focus-visible:ring-1 focus-visible:ring-danger/50"
+                                        aria-label="{{ __('multiplayer.kick_player', ['name' => $member->user->username]) }}">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                @endif
                                 <x-friend-avatar :user="$member->user" size="w-14 h-14" shape="rounded-xl"
                                     bg="bg-foreground/5" :bordered="false" fallback-size="w-4/5 h-4/5" class="mb-3" />
                                 <span

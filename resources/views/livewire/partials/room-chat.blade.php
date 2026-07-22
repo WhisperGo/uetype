@@ -17,6 +17,7 @@
         youLabel: @js(__('multiplayer.chat_you')),
         joinLabel: @js(__('multiplayer.chat_joined', ['name' => ':name'])),
         leaveLabel: @js(__('multiplayer.chat_left', ['name' => ':name'])),
+        kickLabel: @js(__('multiplayer.chat_kicked', ['name' => ':name'])),
     })"
     class="border bg-surface/40 border-border/40 rounded-2xl overflow-hidden flex flex-col"
     style="max-height: 22rem;">

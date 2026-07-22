@@ -9,16 +9,17 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Presence notification for a multiplayer room: someone joins ('join') or leaves
- * ('leave'). Rendered as a centered system message in the chat panel rather than a
- * normal bubble. Broadcast-only (not persisted), reusing the already-subscribed
- * 'room.{code}' channel — the frontend only needs one extra listener ('.room.presence').
+ * Presence notification for a multiplayer room: someone joins ('join'), leaves
+ * ('leave'), or is kicked by the host ('kick'). Rendered as a centered system message
+ * in the chat panel rather than a normal bubble. Broadcast-only (not persisted),
+ * reusing the already-subscribed 'room.{code}' channel — the frontend only needs one
+ * extra listener ('.room.presence').
  */
 class RoomPresenceChanged implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    /** @param  'join'|'leave'  $action */
+    /** @param  'join'|'leave'|'kick'  $action */
     public function __construct(
         public string $roomCode,
         public string $username,

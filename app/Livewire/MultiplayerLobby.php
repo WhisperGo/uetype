@@ -211,6 +211,26 @@ class MultiplayerLobby extends Component
             return;
         }
 
+        // Kicked by the host: my membership row is gone but the room still exists (it
+        // usually still has other members, so the "room gone" branch above wouldn't catch
+        // this). Scoped to the waiting lobby -- the only phase kick happens -- so a player
+        // who left AFTER finishing and is still viewing the result modal isn't dragged
+        // away from their results.
+        if ($room->status === 'waiting') {
+            $stillMember = RoomMember::where('room_id', $room->id)
+                ->where('user_id', Auth::id())
+                ->exists();
+
+            if (! $stillMember) {
+                $this->resetToChoose();
+                $this->dispatch('leave-room');
+                // Reuse the choose-step error banner to tell the kicked player why they're back.
+                session()->flash('error', __('multiplayer.you_were_kicked'));
+
+                return;
+            }
+        }
+
         if ($room->status === 'racing' && $this->step !== 'racing') {
             $this->step = 'racing';
             $this->resetRaceOutcome();
@@ -333,6 +353,50 @@ class MultiplayerLobby extends Component
         $this->resetToChoose();
 
         $this->dispatch('leave-room');
+    }
+
+    /**
+     * Host-only: remove another member from the room while waiting (e.g. a player who
+     * won't ready up so the race can't start). The host cannot kick themselves.
+     *
+     * Blocked once 'racing' has begun: pulling a competitor mid-race would corrupt the
+     * finish/placement accounting. The kicked player's own client returns to choose via
+     * the membership check in roomUpdated() (their row is gone, but the room isn't).
+     */
+    public function kickMember(int $userId): void
+    {
+        $room = Room::where('code', $this->roomCode)->first();
+
+        // Only the host may kick, only in the waiting lobby, and never themselves.
+        if (! $room || $room->status !== 'waiting'
+            || $room->host_id !== Auth::id()
+            || $userId === Auth::id()) {
+            return;
+        }
+
+        $member = RoomMember::where('room_id', $room->id)
+            ->where('user_id', $userId)
+            ->first();
+
+        if (! $member) {
+            return;
+        }
+
+        $kickedUsername = $member->user?->username ?? '';
+
+        $member->delete();
+
+        $this->forgetRoomCache();
+
+        // "<user> was kicked" system notice in the room chat (action 'kick').
+        if ($kickedUsername !== '') {
+            SafeBroadcast::run(fn () => broadcast(new RoomPresenceChanged($this->roomCode, $kickedUsername, 'kick')));
+        }
+
+        // Everyone re-renders: the kicked player leaves (roomUpdated membership check),
+        // remaining players see the freed slot. Not ->toOthers(): the host also needs
+        // the re-render to drop the kicked card immediately.
+        SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
     }
 
     /**
