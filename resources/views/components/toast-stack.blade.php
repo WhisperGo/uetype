@@ -1,7 +1,10 @@
-{{-- ===== GLOBAL TOAST STACK =====
+{{-- ===== GLOBAL TOAST =====
      ONE container for all notifications (friends, clan, chat). Previously three
      separate components rendered three containers at the exact same coordinates,
-     so toasts arriving at once overlapped instead of stacking.
+     so toasts arriving at once overlapped.
+
+     Shows only ONE toast at a time (bottom-right): a new notification replaces the
+     previous one instead of piling upward -- see push() in resources/js/toasts.js.
 
      Applies on ALL pages: a player may be typing or in multiplayer when a
      notification arrives. Kept outside {{ '{{ $slot }}' }} so it survives across

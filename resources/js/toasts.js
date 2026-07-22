@@ -1,14 +1,18 @@
 /**
- * Satu tumpukan toast global untuk SEMUA notifikasi (pertemanan, clan, chat).
+ * Satu toast global untuk SEMUA notifikasi (pertemanan, clan, chat).
  *
  * Dulu ada tiga komponen Alpine terpisah yang masing-masing merender container
  * sendiri -- dan ketiganya memakai posisi identik (`fixed bottom-5 right-5 z-[60]`).
- * Akibatnya toast teman dan toast chat yang datang bersamaan saling MENIMPA,
- * bukan menumpuk. Menyatukannya memperbaiki bug itu sekaligus membuang ~280
- * baris markup yang tersalin tiga kali.
+ * Akibatnya toast teman dan toast chat yang datang bersamaan saling MENIMPA.
+ * Menyatukannya memperbaiki bug itu sekaligus membuang ~280 baris markup yang
+ * tersalin tiga kali.
+ *
+ * Kebijakan tampilan: HANYA SATU toast di kanan bawah pada satu waktu. Notifikasi
+ * baru menggantikan yang lama (lihat push()) supaya request beruntun tak menumpuk
+ * memenuhi layar.
  *
  * Langganan Echo tetap per-kanal (payload & aturan tampilnya beda-beda), tapi
- * semuanya mendorong ke SATU antrean lewat push().
+ * semuanya mendorong ke satu slot lewat push().
  */
 
 const AUTO_DISMISS_MS = 6000;
@@ -22,6 +26,7 @@ export default function toastStack(config) {
     return {
         toasts: [],
         _seq: 0,
+        _dismissTimer: null,
 
         init() {
             if (!window.Echo) return; // Echo dimuat via app.js
@@ -173,14 +178,23 @@ export default function toastStack(config) {
             return !!(s && s.open && s.mode === 'clan');
         },
 
-        // ---- ANTREAN ----
+        // ---- ANTREAN (satu toast pada satu waktu) ----
+        // Hanya SATU notifikasi ditampilkan di kanan bawah. Notifikasi baru
+        // MENGGANTIKAN yang lama, bukan menumpuk ke atas -- request beruntun
+        // (mis. banyak "join request") tak lagi memenuhi layar. Karena `x-for`
+        // memakai :key=id, mengganti isi array memicu transisi leave (yang lama
+        // keluar) + enter (yang baru masuk) sekaligus.
 
         push(toast) {
             const id = ++this._seq;
 
-            this.toasts.push({ id, ...toast });
+            // Batalkan timer auto-dismiss toast sebelumnya: kalau tidak, timer lama
+            // bisa memanggil dismiss() setelah toast baru muncul dan menghapusnya.
+            if (this._dismissTimer) clearTimeout(this._dismissTimer);
 
-            setTimeout(() => this.dismiss(id), AUTO_DISMISS_MS);
+            this.toasts = [{ id, ...toast }];
+
+            this._dismissTimer = setTimeout(() => this.dismiss(id), AUTO_DISMISS_MS);
         },
 
         dismiss(id) {
