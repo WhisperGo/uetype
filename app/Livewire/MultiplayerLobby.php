@@ -13,6 +13,7 @@ use App\Livewire\Concerns\ReadsRoomState;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Services\AntiCheatService;
+use App\Services\RoomMembershipService;
 use App\Services\TextGeneratorService;
 use App\Support\SafeBroadcast;
 use App\Support\TypingLanguage;
@@ -62,6 +63,51 @@ class MultiplayerLobby extends Component
     public const MAX_PLAYERS = 5;
 
     public const MAX_SPECTATORS = 5;
+
+    /**
+     * Restore the caller straight into their room on load (no re-entering the code).
+     *
+     * The component has no persisted client state across a full page load (the nav is a
+     * plain anchor, not wire:navigate), but the room_members row survives in the DB. So on
+     * mount we look up the user's current membership and hydrate $roomCode/$step from it.
+     * A not-ready player who truly left elsewhere had their row removed by the leave beacon
+     * (see MultiplayerPresenceController), so no stale row is restored; a ready/host member
+     * (whom the beacon skips) is brought right back.
+     */
+    public function mount(): void
+    {
+        $member = RoomMember::where('user_id', Auth::id())->first();
+
+        if (! $member) {
+            return; // No membership -> stay on the create/join "choose" screen.
+        }
+
+        $room = Room::find($member->room_id);
+
+        if (! $room) {
+            return; // Orphan row (room already gone) -> choose screen; nothing to restore.
+        }
+
+        $this->roomCode = $room->code;
+
+        // 'finished' shows the result panel; 'waiting'/'racing' show lobby/arena.
+        $this->step = $room->status === 'finished' ? 'racing' : $room->status;
+
+        if ($room->status === 'finished') {
+            $this->showResultModal = true;
+            $this->captureResultSnapshot();
+        } elseif ($room->status === 'racing') {
+            // Derive finish state from the DB so a mid-race refresh doesn't hand a finished
+            // player their typing input back. (hasFinished/hasGivenUp default to false.)
+            $this->hasGivenUp = $member->isDnf();
+            $this->hasFinished = ! is_null($member->finished_time_seconds) && ! $member->isDnf();
+        }
+
+        $this->forgetRoomCache();
+
+        // Re-subscribe to the room/race Echo channels after the reload.
+        $this->dispatch('subscribe-room', room: $room->code);
+    }
 
     /** Create a fresh room, make the caller its host, and subscribe to its channel. */
     public function createRoom(): void
@@ -330,25 +376,10 @@ class MultiplayerLobby extends Component
     /** Leave the current room, settle what's left behind, and reset back to choose. */
     public function leaveRoom(): void
     {
-        $room = Room::where('code', $this->roomCode)->first();
-
-        if ($room) {
-            // Read the username before departing, while the membership row still exists.
-            $leavingUsername = Auth::user()->username;
-
-            // Same path as createRoom/joinRoom. This logic used to be written inline here,
-            // and only HERE tended the abandoned room -- which is why the other two paths
-            // leaked. One door, one behavior.
-            DB::transaction(fn () => $this->departCurrentRooms(Auth::id()));
-
-            // "<user> left" notice only if someone is still listening in the room
-            // (departCurrentRooms deletes the room once its last member leaves).
-            if (Room::where('id', $room->id)->exists()) {
-                SafeBroadcast::run(fn () => broadcast(new RoomPresenceChanged($this->roomCode, $leavingUsername, 'leave')));
-            }
-
-            SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode))->toOthers());
-        }
+        // Delegates to the shared service (same door as the leave-beacon / leave-confirm
+        // endpoints): delete membership, settle the room, and broadcast the leave notice
+        // + RoomUpdated so roommates re-render.
+        app(RoomMembershipService::class)->depart(Auth::id());
 
         $this->resetToChoose();
 
@@ -442,31 +473,6 @@ class MultiplayerLobby extends Component
             $user->username,
             $body,
         ))->toOthers());
-    }
-
-    /** If the leaver was the host, hand host to another member (racers preferred). */
-    private function reassignHostIfNeeded(Room $room, int $leavingUserId): void
-    {
-        if ($room->host_id !== $leavingUserId) {
-            return;
-        }
-
-        // The new host is preferably a racer (those actually competing); only if no
-        // racer remains does a spectator become a spectator-host.
-        $newHost = RoomMember::where('room_id', $room->id)
-            ->where('user_id', '!=', $leavingUserId)
-            ->orderByRaw("role = '".RoomMember::ROLE_PLAYER."' DESC")
-            ->orderBy('id', 'asc')
-            ->first();
-
-        if ($newHost) {
-            $room->update(['host_id' => $newHost->user_id]);
-
-            // is_ready only means something for racers; a spectator-host needn't be readied.
-            if ($newHost->isPlayer()) {
-                $newHost->update(['is_ready' => true]);
-            }
-        }
     }
 
     /** Clear all room state and return to the create/join page. */

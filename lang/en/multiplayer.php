@@ -101,4 +101,8 @@ return [
     'kick_player' => 'Kick :name',
     'kick_confirm' => 'Kick :name from the room?',
     'you_were_kicked' => 'You were kicked from the room by the host.',
+    'leave_confirm_title' => 'Leave the room?',
+    'leave_confirm_body' => 'Leaving this page removes you from the room. You will need the room code to join again.',
+    'leave_confirm_ok' => 'Leave room',
+    'leave_confirm_cancel' => 'Stay',
 ];

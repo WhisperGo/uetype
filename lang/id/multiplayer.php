@@ -101,4 +101,8 @@ return [
     'kick_player' => 'Keluarkan :name',
     'kick_confirm' => 'Keluarkan :name dari ruang?',
     'you_were_kicked' => 'Kamu dikeluarkan dari ruang oleh host.',
+    'leave_confirm_title' => 'Keluar dari room?',
+    'leave_confirm_body' => 'Meninggalkan halaman ini akan mengeluarkanmu dari room. Kamu perlu kode room untuk bergabung lagi.',
+    'leave_confirm_ok' => 'Keluar room',
+    'leave_confirm_cancel' => 'Tetap di sini',
 ];

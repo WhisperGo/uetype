@@ -7,8 +7,11 @@
 [`RoomMessageSent`](../../app/Events/RoomMessageSent.php),
 [`RoomPresenceChanged`](../../app/Events/RoomPresenceChanged.php)
 **View chat:** [`livewire/partials/room-chat.blade.php`](../../resources/views/livewire/partials/room-chat.blade.php)
-**JS:** [`resources/js/race-echo.js`](../../resources/js/race-echo.js) (langganan Echo + komponen Alpine `roomChat`)
-**Route:** `/multiplayer`
+**JS:** [`resources/js/race-echo.js`](../../resources/js/race-echo.js) (langganan Echo + komponen Alpine `roomChat`),
+[`resources/js/multiplayer-nav.js`](../../resources/js/multiplayer-nav.js) (leave beacon + ready-confirm nav)
+**Leave service:** [`App\Services\RoomMembershipService`](../../app/Services/RoomMembershipService.php),
+[`MultiplayerPresenceController`](../../app/Http/Controllers/MultiplayerPresenceController.php)
+**Route:** `/multiplayer` (+ `POST /multiplayer/leave-beacon`, `POST /multiplayer/leave-confirm`)
 
 ---
 
@@ -202,6 +205,38 @@ langsung hilang). Di `roomUpdated()` ada penjaga: **kalau room masih ada tapi ak
 anggotanya** (khusus fase `waiting`), kembali ke halaman choose dengan banner
 `you_were_kicked`. Penjaga ini di-*scope* ke `waiting` saja supaya pemain yang sudah selesai lalu
 keluar dan masih melihat **layar hasil** tak ikut terlempar dari hasilnya.
+
+### 3.12 Persistensi keanggotaan saat navigasi (restore / auto-leave / leave-confirm)
+
+Nav bar adalah **anchor biasa** (full page load, bukan `wire:navigate`) dan komponen tak punya
+state klien yang bertahan — tapi baris `room_members` **bertahan di DB**. Tiga perilaku menjaga
+agar keanggotaan konsisten dengan ekspektasi pemain:
+
+| # | Perilaku | Mekanisme |
+|---|----------|-----------|
+| **Restore** | Buka/refresh `/multiplayer` saat masih anggota → **langsung masuk room** (tanpa kode) | `mount()` mencari `RoomMember` milik user, meng-set `$roomCode`/`$step` dari `room.status` (waiting/racing/finished→result), menurunkan `hasFinished`/`hasGivenUp` dari DB untuk refresh mid-race, dan `dispatch('subscribe-room')`. |
+| **Auto-leave not-ready** | Member **not-ready non-host** yang meninggalkan halaman tanpa konfirmasi (tutup/refresh tab) → **keluar room** | Beacon `pagehide`/`beforeunload` ([`multiplayer-nav.js`](../../resources/js/multiplayer-nav.js)) → `POST /multiplayer/leave-beacon`. Server memutuskan: hanya not-ready non-host (& spectator) yang di-leave; **ready/host di-skip** agar row-nya bertahan untuk restore. Hanya saat `waiting`. |
+| **Leave-confirm (overlay)** | **Semua** member (ready maupun tidak) klik nav ke halaman lain → **overlay konfirmasi** | Interceptor klik fase-capture: kalau `data-mp-in-room="1"` dan tujuan bukan `/multiplayer`, cegah navigasi, simpan tujuan, dan buka overlay `<x-modal name="confirm-leave-room">` lewat event `open-modal`. Tombol **Keluar** → `window.__mpConfirmLeave()` → `POST /multiplayer/leave-confirm` (host: leave + reassign) lalu navigasi. **Tetap** → overlay tutup, tetap di room. |
+
+**Overlay, bukan `confirm()` browser:** konfirmasi memakai komponen [`x-modal`](../../resources/views/components/modal.blade.php)
+yang sama dengan sign-out — bukan dialog `confirm()` bawaan. Modal ada **di dalam** view lobby
+(single root Livewire), jadi hanya termuat di `/multiplayer`. Interceptor global menyimpan URL
+tujuan lalu memicu modal; tombol Keluar-nya memanggil fungsi yang di-*expose* interceptor.
+
+**Kenapa `data-*` di root view, bukan `window.*` global:** flag (`data-mp-in-room/waiting`,
+URL endpoint) dirender **server** sebagai atribut di elemen root lobby, jadi **ikut re-render tiap
+morph Livewire** (selalu segar saat klik/unload) dan **otomatis inert di halaman lain** (elemen
+`[data-mp-flags]` hanya ada di `/multiplayer`).
+
+**Satu pintu leave:** `leaveRoom()` (komponen), beacon, dan confirm semua memanggil
+[`RoomMembershipService::depart()`](../../app/Services/RoomMembershipService.php) — hapus row,
+settle room (hapus kalau kosong / reassign host), broadcast `RoomPresenceChanged('leave')` +
+`RoomUpdated`. Trait `ManagesRoomMembership` kini tipis, mendelegasikan ke service ini.
+
+**Keputusan disederhanakan:** refresh not-ready **juga** ikut leave (tanpa grace-window/kolom
+DB/cron — proyek tak punya scheduler). Konsekuensinya kecil (not-ready yang refresh join ulang);
+ready/host tak tersentuh beacon jadi restore mereka selalu jalan. Mid-race dilindungi (guard
+`status='waiting'`, sama seperti kick).
 
 ## 4. Batasan Saat Ini
 

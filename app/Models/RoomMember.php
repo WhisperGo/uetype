@@ -62,4 +62,10 @@ class RoomMember extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /** The room this membership belongs to. */
+    public function room()
+    {
+        return $this->belongsTo(Room::class);
+    }
 }

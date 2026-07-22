@@ -5,6 +5,7 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\FriendController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\MultiplayerPresenceController;
 use App\Http\Controllers\PresenceController;
 use App\Http\Controllers\ProfileController;
 use App\Livewire\About;
@@ -75,6 +76,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/clans/{clan}', ClanShow::class)->name('clans.show');
 
     Volt::route('/multiplayer', 'multiplayer-lobby')->name('multiplayer.lobby');
+
+    // Leave endpoints for the multiplayer room. The nav is a full page load, so leaving
+    // happens outside Livewire: leave-beacon fires on page unload (removes a not-ready
+    // non-host member), leave-confirm fires when a ready/host member confirms leaving.
+    Route::post('/multiplayer/leave-beacon', [MultiplayerPresenceController::class, 'leaveOnLeave'])
+        ->middleware('throttle:60,1')
+        ->name('multiplayer.leave-beacon');
+    Route::post('/multiplayer/leave-confirm', [MultiplayerPresenceController::class, 'leaveOrUnready'])
+        ->middleware('throttle:60,1')
+        ->name('multiplayer.leave-confirm');
 
     Volt::route('/leaderboard', 'leaderboard')->name('leaderboard');
 });

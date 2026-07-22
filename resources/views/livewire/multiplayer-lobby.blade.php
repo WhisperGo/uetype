@@ -1,4 +1,20 @@
-<div class="max-w-5xl px-4 mx-auto py-6 sm:px-6 lg:px-8 text-foreground">
+@php
+    // Flags for the leave beacon (#2) and leave-confirm nav interceptor (#3). Rendered as
+    // data-* on the root so they re-render on every Livewire morph (unlike a one-shot
+    // @script), and read by resources/js/multiplayer-nav.js at click / page-unload time.
+    $mpMember = ($this->step === 'waiting' || $this->step === 'racing')
+        ? $this->roomData?->members->firstWhere('user_id', Auth::id())
+        : null;
+    $mpInRoom = $mpMember !== null;
+    $mpWaiting = $this->step === 'waiting';
+@endphp
+<div class="max-w-5xl px-4 mx-auto py-6 sm:px-6 lg:px-8 text-foreground"
+    data-mp-flags
+    data-mp-in-room="{{ $mpInRoom ? '1' : '0' }}"
+    data-mp-waiting="{{ $mpWaiting ? '1' : '0' }}"
+    data-mp-leave-beacon="{{ route('multiplayer.leave-beacon') }}"
+    data-mp-leave-confirm="{{ route('multiplayer.leave-confirm') }}"
+    data-mp-page="{{ route('multiplayer.lobby') }}">
     <!-- ===== 1. CHOOSE PAGE: CREATE OR JOIN ROOM ===== -->
     @if ($this->step === 'choose')
         <div class="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24 items-stretch mt-10 relative w-full">
@@ -845,6 +861,38 @@
 
         </div>
     @endif
+
+    {{-- Leave-room confirmation overlay (#3). Shown when an in-room member clicks a nav
+         link away from /multiplayer. resources/js/multiplayer-nav.js intercepts the click,
+         stashes the destination, and opens this modal via the 'open-modal' event. The
+         Confirm button calls window.__mpConfirmLeave() (set by that module) which leaves
+         via the server then navigates; Cancel just closes and stays in the room. --}}
+    @auth
+        <x-modal name="confirm-leave-room" maxWidth="md" focusable>
+            <div class="p-5 sm:p-6">
+                <h2 class="font-mono text-xl font-semibold leading-tight text-foreground">
+                    {{ __('multiplayer.leave_confirm_title') }}
+                </h2>
+                <p class="mt-2 text-sm leading-6 text-muted">
+                    {{ __('multiplayer.leave_confirm_body') }}
+                </p>
+
+                <div class="mt-6 flex items-center justify-end gap-2">
+                    <button type="button"
+                        x-on:click="$dispatch('close-modal', 'confirm-leave-room')"
+                        class="rounded-lg px-3 py-1.5 font-mono text-sm text-muted transition-colors duration-150 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                        {{ __('multiplayer.leave_confirm_cancel') }}
+                    </button>
+
+                    <button type="button"
+                        x-on:click="window.__mpConfirmLeave && window.__mpConfirmLeave()"
+                        class="rounded-lg px-3 py-1.5 font-mono text-sm font-medium text-danger transition-colors duration-150 hover:bg-danger/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                        {{ __('multiplayer.leave_confirm_ok') }}
+                    </button>
+                </div>
+            </div>
+        </x-modal>
+    @endauth
 
     {{-- Race arena logic lives in resources/js/race-arena.js (Alpine 'race' store
          + 'raceArena' component) and resources/js/race-echo.js (Echo subscription),

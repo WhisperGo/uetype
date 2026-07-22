@@ -6,8 +6,12 @@ import navBadges from './nav-badges';
 import typingGame from './typing-game';
 import chatOverlayDock from './chat-dock';
 import createChatRuntime from './chat-runtime';
+import { registerMultiplayerNav } from './multiplayer-nav';
 import './race-arena';
 import './race-echo';
+
+// Multiplayer room nav guards (leave beacon + ready-confirm). Inert off /multiplayer.
+registerMultiplayerNav();
 
 window.Chart = Chart;
 
