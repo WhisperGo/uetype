@@ -101,6 +101,14 @@ if (is_null($member->xp_earned) && $member->user) { /* addExp lalu set xp_earned
 `giveUp`, `checkSuddenDeath`). Guard `xp_earned IS NULL` membuat pemberian EXP **idempoten** —
 aman dari double-award. EXP dihitung dengan rumus yang **sama persis** dengan solo (`User::addExp`).
 
+**Validasi hasil (sejajar solo):** sebelum EXP & baris riwayat ditulis, tiap hasil dilewatkan
+`isValidRaceResult()` → `AntiCheatService::rejectsRaceResult()`. Hasil yang **mustahil** (WPM di
+atas batas manusia, char inkonsisten) atau **kosong** (join tapi tak pernah mengetik, `no_input`)
+**ditolak**: tak masuk `multiplayer_match_history`, tak dapat EXP, dan ditandai
+`result_recorded = false` supaya rata-rata WPM pemain tak tercemar. Finisher **lambat** dan **DNF
+yang sempat mengetik** tetap dicatat (hasil sah, bukan curang). Pemain yang ditolak melihat badge
+**"Tidak dihitung"** di tabel hasil. Detail aturan: [`anti-cheat-wpm.md`](anti-cheat-wpm.md) §5.2.
+
 ### 3.7 Ketahanan terhadap host keluar / room hilang
 
 Beberapa lapis penjaga (`roomUpdated()`, `getRoomDataProperty()`, dan penjaga terakhir di

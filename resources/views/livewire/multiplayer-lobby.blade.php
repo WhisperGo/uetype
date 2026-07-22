@@ -738,6 +738,12 @@
                                                 <span
                                                     class="bg-brand-bright text-background text-[9px] font-black px-1 py-0.1 rounded uppercase tracking-wide">{{ __('multiplayer.you') }}</span>
                                             @endif
+                                            {{-- Anti-cheat: this player's result was rejected (impossible or empty) --}}
+                                            {{-- and not recorded to stats. Shown to everyone, not just the affected player. --}}
+                                            @if ($rank->result_recorded === false)
+                                                <span title="{{ __('multiplayer.result_invalid') }}"
+                                                    class="bg-danger/15 text-danger text-[9px] font-black px-1 py-0.1 rounded uppercase tracking-wide">{{ __('multiplayer.not_counted') }}</span>
+                                            @endif
                                         </div>
                                     </td>
                                     <td class="py-4 px-3 sm:px-5 text-gold font-bold">{{ $rank->wpm }} wpm</td>

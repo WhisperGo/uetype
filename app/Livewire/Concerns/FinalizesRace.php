@@ -80,9 +80,10 @@ trait FinalizesRace
                 $progress = max(0, min(100, (int) $member->progress_percent));
                 $correctChars = (int) round(($progress / 100) * $textLength);
 
-                // Same validity gate as solo mode: implausible results (impossible WPM,
-                // inconsistent chars, impossible duration) are REJECTED -- not written to
-                // history and no EXP, so the player's average WPM isn't corrupted.
+                // Anti-cheat gate: implausible results (impossible WPM, inconsistent
+                // chars, high-progress-with-impossibly-low-accuracy) and empty sessions
+                // are REJECTED -- not written to history and no EXP, so the player's
+                // average WPM isn't corrupted.
                 $isValid = $this->isValidRaceResult($member, $correctChars);
                 $updateData['result_recorded'] = $isValid;
 
@@ -149,21 +150,26 @@ trait FinalizesRace
 
     /**
      * Server-side validity gate for a finished race result, reusing AntiCheatService.
-     * Only genuine cheat signals reject (impossible WPM / inconsistent chars) --
-     * NOT low throughput/short duration, which are normal for a DNF or slow finish
-     * (those stay recorded, matching the "anti-cheat only" rule). totalChars ==
-     * correctChars because race progress only advances on correct characters.
+     * Rejects the impossible (WPM beyond human limits, inconsistent chars, AND a high
+     * progress paired with an impossibly low accuracy -- the "fast garbage" cheat) plus
+     * the truly-empty (no_input: joined but never typed). Does NOT reject a slow finish
+     * or a DNF that did type (real low WPM / 999s sentinel), which stay recorded.
      */
     private function isValidRaceResult(RoomMember $member, int $correctChars): bool
     {
         $duration = (float) ($member->finished_time_seconds ?? 0);
+        $progress = max(0, min(100, (int) $member->progress_percent));
 
         $antiCheat = app(AntiCheatService::class);
-        $reasons = $antiCheat->check($correctChars, $correctChars, $duration)['reasons'];
 
-        // The list of "impossible" signals lives in AntiCheatService, not copied here:
-        // one definition of cheating, used by both race and solo.
-        return ! $antiCheat->isCheating($reasons);
+        // raceResultReasons() adds the progress/accuracy cross-check the plain check()
+        // can't make: in a race the server derives WPM from progress, so it can only
+        // validate the client-reported accuracy against progress, not recompute it.
+        $reasons = $antiCheat->raceResultReasons($correctChars, $duration, $progress, (float) $member->accuracy);
+
+        // The rejection rule lives in AntiCheatService, not copied here: one definition
+        // of "invalid race result", used wherever a race is finalized.
+        return ! $antiCheat->rejectsRaceResult($reasons);
     }
 
     private function captureResultSnapshot(): void

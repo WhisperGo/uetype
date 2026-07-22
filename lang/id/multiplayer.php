@@ -54,6 +54,7 @@ return [
     'room' => 'Ruang :code',
     'you_placed' => 'Kamu peringkat ke-:rank',
     'result_invalid' => 'Hasil ini tidak lolos validasi dan tidak dicatat ke statistikmu.',
+    'not_counted' => 'Tidak dihitung',
     'you' => 'KAMU',
     'full_results' => 'Hasil Lengkap',
     'th_place' => 'Peringkat',

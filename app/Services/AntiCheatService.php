@@ -25,6 +25,7 @@ class AntiCheatService
         'wpm_too_high',
         'char_count_inconsistent',
         'accuracy_impossible',
+        'accuracy_progress_inconsistent',
     ];
 
     /** Empty session: not a real session, not worth saving (but not "cheating" either). */
@@ -32,6 +33,19 @@ class AntiCheatService
         'no_input',
         'duration_too_short',
     ];
+
+    /**
+     * Race-only: below this accuracy, a HIGH-progress result is internally impossible.
+     * Progress advances only on correct characters, so completing most of the text
+     * demands mostly-correct typing -- an accuracy this low alongside high progress
+     * means the client reported contradictory numbers (classic "fast garbage" cheat,
+     * e.g. 200 WPM at 3% accuracy). Not applied at low progress, where a low accuracy
+     * is a normal weak attempt.
+     */
+    private const RACE_MIN_ACCURACY_AT_PROGRESS = 50.0;
+
+    /** Race-only: the progress% above which the accuracy floor above is enforced. */
+    private const RACE_ACCURACY_CHECK_PROGRESS = 50;
 
     /**
      * Do these reasons indicate MANIPULATION (not just a weak session)?
@@ -44,6 +58,55 @@ class AntiCheatService
     public function isCheating(array $reasons): bool
     {
         return ! empty(array_intersect($reasons, self::IMPOSSIBLE_REASONS));
+    }
+
+    /**
+     * Should a RACE result be rejected (not written to history, no EXP)?
+     *
+     * Stricter than the old race gate (which rejected only isCheating()): it now also
+     * drops EMPTY sessions -- a player who joined and never typed a single character
+     * (no_input) would otherwise land in multiplayer_match_history as a real 0-WPM row
+     * and drag down their average. Aligns the race path with solo mode.
+     *
+     * Deliberately does NOT reject `duration_too_short` or `throughput_too_low`: a
+     * genuine DNF carries the 999s sentinel and a slow finisher has a real (low) WPM --
+     * both are legitimate race outcomes that must stay recorded. Only the impossible
+     * (isCheating) and the truly-empty (no_input) are dropped.
+     *
+     * @param  array<string>  $reasons
+     */
+    public function rejectsRaceResult(array $reasons): bool
+    {
+        return $this->isCheating($reasons)
+            || in_array('no_input', $reasons, true);
+    }
+
+    /**
+     * Full reason list for a RACE result: the standard check() signals PLUS the
+     * race-only progress/accuracy consistency signal.
+     *
+     * Why race-only and why here: in a race, WPM is derived server-side from progress%
+     * (correct chars = progress% x textLength), so the server never sees the raw
+     * correct/total split -- it can't recompute accuracy from characters. Accuracy is
+     * reported by the client. The one cross-check the server CAN make is against
+     * progress: finishing (or nearly finishing) the text requires mostly-correct
+     * typing, so a high progress alongside a very low accuracy is contradictory and
+     * flags manipulation. At low progress a low accuracy is a normal weak attempt, so
+     * the floor is only enforced above RACE_ACCURACY_CHECK_PROGRESS.
+     *
+     * @return array<string>
+     */
+    public function raceResultReasons(int $correctChars, float $durationSeconds, int $progressPercent, float $accuracy): array
+    {
+        // totalChars == correctChars: race progress only advances on correct characters.
+        $reasons = $this->check($correctChars, $correctChars, $durationSeconds)['reasons'];
+
+        if ($progressPercent >= self::RACE_ACCURACY_CHECK_PROGRESS
+            && $accuracy < self::RACE_MIN_ACCURACY_AT_PROGRESS) {
+            $reasons[] = 'accuracy_progress_inconsistent';
+        }
+
+        return $reasons;
     }
 
     /**
