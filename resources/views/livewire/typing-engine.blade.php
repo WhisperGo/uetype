@@ -251,15 +251,13 @@
                     </div>
                 </div>
 
+                {{-- Tinggi tetap 28px walau mode non-survival tak mengisinya. Blok ini
+                     dipakai bar stamina milik mode survival; tanpa ruang yang dicadangkan,
+                     berpindah mode di layar pemilihan akan menggeser area ketik. Dulu
+                     sparkline WPM live mengisi ruang ini di mode non-survival, tapi dihapus
+                     karena tak lagi diperlukan -- grafik WPM lengkap tetap ada di halaman
+                     hasil (typing-result), digambar Chart.js dari wpmHistory yang sama. --}}
                 <div class="h-[28px] mt-2">
-                    <template x-if="currentMain !== 'survival'">
-                        <svg x-show="wpmHistory.length > 1" x-cloak width="120" height="28"
-                            viewBox="0 0 120 28" preserveAspectRatio="none" fill="none" aria-hidden="true">
-                            <polyline :points="sparklinePoints()" stroke="rgb(var(--color-brand))"
-                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                    </template>
-
                     <template x-if="currentMain === 'survival'">
                         <div class="flex items-center gap-3">
                             <span class="font-display text-[0.55rem] uppercase tracking-[0.15em] text-muted shrink-0">{{ __('typing.stamina') }}</span>

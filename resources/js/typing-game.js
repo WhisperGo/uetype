@@ -10,7 +10,12 @@
  * mode-picker buttons in the markup.
  *
  * IMPORTANT: because this object is SPREAD, never use a getter here -- a spread evaluates
- * the getter once then freezes the result. Use a plain method (see sparklinePoints()).
+ * the getter once then freezes the result. Use a plain method instead.
+ *
+ * That is not hypothetical. The live WPM sparkline (since removed) silently never drew for
+ * exactly this reason: as a getter it was evaluated once at spread time, when wpmHistory was
+ * still empty, and stayed frozen at '' for the rest of the session. Nothing errored -- the
+ * SVG simply rendered blank forever.
  */
 // Survival stamina presets.
 //   sMax/sStart : capacity & starting stamina
@@ -801,27 +806,6 @@ export default function typingGame(initialText) {
             } else {
                 this.accuracy = 0;
             }
-        },
-
-        // wpmHistory[] -> a `points` string for the <polyline> sparkline, auto-scaled to min/max.
-        //
-        // A METHOD, not a getter. As a getter this chart would NEVER draw: this object is
-        // spread into x-data, and a spread evaluates the getter once then copies the result as
-        // a static value. At that moment wpmHistory is still empty, so the result is '' and
-        // locked forever -- the SVG box appears but is empty. A method isn't evaluated on
-        // spread, so it stays live.
-        sparklinePoints() {
-            const h = this.wpmHistory;
-            if (h.length < 2) return '';
-            const w = 120, ht = 28, pad = 2;
-            const max = Math.max(...h), min = Math.min(...h);
-            const range = max - min || 1;
-            const stepX = w / (h.length - 1);
-            return h.map((v, i) => {
-                const x = i * stepX;
-                const y = ht - pad - ((v - min) / range) * (ht - pad * 2);
-                return `${x.toFixed(1)},${y.toFixed(1)}`;
-            }).join(' ');
         },
 
         finish() {

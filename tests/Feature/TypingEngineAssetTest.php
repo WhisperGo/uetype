@@ -28,20 +28,15 @@ it('mendaftarkan typingGame lewat bundle', function () {
 
 /**
  * Objek ini di-SPREAD ke dalam x-data. Spread mengevaluasi getter satu kali lalu
- * membekukan hasilnya -- itulah sebabnya sparkline WPM tidak pernah tergambar:
- * saat spread, wpmHistory masih kosong sehingga nilainya terkunci di ''.
- * Getter apa pun di modul ini akan mengulang bug yang sama.
+ * membekukan hasilnya, dan kegagalannya SENYAP: tak ada error, nilainya sekadar
+ * terkunci di hasil evaluasi pertama saat state masih kosong. Sparkline WPM live
+ * (kini sudah dihapus) tidak pernah tergambar persis karena ini. Getter apa pun di
+ * modul ini akan mengulang bug yang sama, jadi larangannya dijaga di sini.
  */
 it('tidak memakai getter di komponen yang di-spread', function () {
     $module = file_get_contents(resource_path('js/typing-game.js'));
 
     expect($module)->not->toMatch('/^\s{8}get \w+\(\)/m');
-});
-
-it('memanggil sparklinePoints sebagai method di markup', function () {
-    $blade = file_get_contents(resource_path('views/livewire/typing-engine.blade.php'));
-
-    expect($blade)->toContain(':points="sparklinePoints()"');
 });
 
 /** Guard bfcache khas halaman /typing, tak boleh ikut pindah ke app.js. */
