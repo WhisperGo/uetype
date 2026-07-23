@@ -112,6 +112,18 @@ atas batas manusia, char inkonsisten) atau **kosong** (join tapi tak pernah meng
 yang sempat mengetik** tetap dicatat (hasil sah, bukan curang). Pemain yang ditolak melihat badge
 **"Tidak dihitung"** di tabel hasil. Detail aturan: [`anti-cheat-wpm.md`](anti-cheat-wpm.md) §5.2.
 
+**Peringkat dihitung SETELAH validasi.** Dulu nomor juara diambil dari urutan baris
+(`$index + 1`) sebelum validitas diketahui, jadi hasil yang ditolak tetap menempati podium —
+dan **pemain jujur yang benar-benar menang tercatat juara 2 secara permanen**. Sekarang
+validitas seluruh peserta dihitung lebih dulu; nomor peringkat hanya naik untuk hasil yang
+lolos, hasil yang ditolak mendapat `place = null`, dan `player_count` hanya menghitung peserta
+sah. Lihat [`anti-cheat-wpm.md`](anti-cheat-wpm.md) §8.2.
+
+**Jalur live juga dijaga** (`updateRaceProgress`): progress **wajib naik** (tak boleh mundur),
+**spectator tak boleh** mengirim progress sama sekali, dan laju yang mustahil (teleport ke 100%)
+**ditolak di sana** — bukan cuma saat finalisasi — karena waktu selesai yang menentukan juara
+tercatat pada saat progress masuk. Lihat [`anti-cheat-wpm.md`](anti-cheat-wpm.md) §8.
+
 ### 3.7 Ketahanan terhadap host keluar / room hilang
 
 Beberapa lapis penjaga (`roomUpdated()`, `getRoomDataProperty()`, dan penjaga terakhir di

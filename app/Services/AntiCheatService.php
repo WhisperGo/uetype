@@ -48,6 +48,17 @@ class AntiCheatService
     private const RACE_ACCURACY_CHECK_PROGRESS = 50;
 
     /**
+     * Race-only WPM ceiling, tighter than MAX_HUMAN_WPM.
+     *
+     * In a race, progress% is client-reported, so "finishing" is a single number a
+     * tampered client can simply assert. Against a ~240-character text that makes a
+     * 10-second teleport read as 290 WPM -- under the 300 ceiling, therefore accepted as
+     * a legitimate win. The world record is ~210-230 and sustaining it over a full race
+     * is rarer still, so 250 rejects teleports while leaving genuine elite runs intact.
+     */
+    private const MAX_RACE_WPM = 250;
+
+    /**
      * Do these reasons indicate MANIPULATION (not just a weak session)?
      *
      * Used by the multiplayer path: players who quit or are slow are still recorded
@@ -82,6 +93,19 @@ class AntiCheatService
     }
 
     /**
+     * Is this race pace beyond what a human can physically reach?
+     *
+     * Used on the LIVE path, where progress% is client-reported: a tampered client can
+     * assert "100%" at any moment. Rejecting the update outright stops it taking a finish
+     * time and a place, which is what actually decides the winner -- scoring it as 0 WPM
+     * would not, since placement is ranked by time, not speed.
+     */
+    public function exceedsRaceSpeed(int $correctChars, float $durationSeconds): bool
+    {
+        return $this->check($correctChars, $correctChars, $durationSeconds)['net_wpm'] > self::MAX_RACE_WPM;
+    }
+
+    /**
      * Full reason list for a RACE result: the standard check() signals PLUS the
      * race-only progress/accuracy consistency signal.
      *
@@ -99,11 +123,18 @@ class AntiCheatService
     public function raceResultReasons(int $correctChars, float $durationSeconds, int $progressPercent, float $accuracy): array
     {
         // totalChars == correctChars: race progress only advances on correct characters.
-        $reasons = $this->check($correctChars, $correctChars, $durationSeconds)['reasons'];
+        $check = $this->check($correctChars, $correctChars, $durationSeconds);
+        $reasons = $check['reasons'];
 
         if ($progressPercent >= self::RACE_ACCURACY_CHECK_PROGRESS
             && $accuracy < self::RACE_MIN_ACCURACY_AT_PROGRESS) {
             $reasons[] = 'accuracy_progress_inconsistent';
+        }
+
+        // Tighter race ceiling (see MAX_RACE_WPM): catches the "teleport to 100%" payload,
+        // which lands just under the general 300 limit once the race has run ~10 seconds.
+        if ($check['net_wpm'] > self::MAX_RACE_WPM && ! in_array('wpm_too_high', $reasons, true)) {
+            $reasons[] = 'wpm_too_high';
         }
 
         return $reasons;

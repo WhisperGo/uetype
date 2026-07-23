@@ -1,9 +1,11 @@
 # Fitur 2 — Anti-Cheat & Perhitungan WPM
 
 **Service utama:** [`App\Services\AntiCheatService`](../../app/Services/AntiCheatService.php)
+**Penjaga sesi solo:** [`App\Services\SoloSessionGuard`](../../app/Services/SoloSessionGuard.php)
 **Dipakai oleh:** [`TypingEngine::saveResult()`](../../app/Livewire/TypingEngine.php) (solo),
 [`MultiplayerLobby::updateRaceProgress()`](../../app/Livewire/MultiplayerLobby.php) (WPM live race),
 dan [`FinalizesRace::isValidRaceResult()`](../../app/Livewire/Concerns/FinalizesRace.php) (validasi hasil akhir race)
+**Audit data lama:** `php artisan typing:audit` (read-only)
 
 ---
 
@@ -12,6 +14,11 @@ dan [`FinalizesRace::isValidRaceResult()`](../../app/Livewire/Concerns/Finalizes
 Lapisan yang memastikan angka WPM/akurasi yang tersimpan **benar-benar dihitung server** dan
 **masuk akal secara manusiawi**. Ini fondasi integritas seluruh sistem skor: leaderboard, PB,
 EXP, dan poin Clan War semuanya bergantung padanya.
+
+> **Penting:** menghitung ulang di server **bukan** berarti memverifikasi. Selama input
+> mentahnya (durasi & jumlah karakter) berasal dari client, hasil hitung ulang hanya
+> mengulang angka palsu yang dikirim. Lihat §7 — celah ini pernah terbuka dan kini ditutup
+> oleh `SoloSessionGuard`.
 
 ## 2. Rumus Perhitungan
 
@@ -136,3 +143,108 @@ invalid"** untuk semua titik finalisasi. Lihat detail alur di
 
 Analisis mendalam soal "WPM tinggi + akurasi rendah apakah valid" dan penyelarasan solo vs
 multiplayer ada di [`../wpm-accuracy-integrity.md`](../wpm-accuracy-integrity.md).
+
+## 7. Penjaga Sesi Solo (`SoloSessionGuard`)
+
+### 7.1 Celah yang ditutup
+
+`saveResult()` menerima `durationMs`, `totalKeystrokes`, dan `correctKeystrokes` **dari
+client**. Server memang menghitung ulang WPM dari ketiganya — tapi menghitung ulang dari
+angka palsu tetap menghasilkan skor palsu. Payload berikut lolos **seluruh** sanity check
+di §3 dan langsung jadi `highest_wpm`:
+
+```
+saveResult(durationMs: 60000, total: 1495, correct: 1495)
+  -> netWpm = (1495/5) / 1 menit = 299 WPM   (di bawah ambang 300)
+  -> reasons = []  -> TERSIMPAN, jadi rekor pribadi & masuk leaderboard
+```
+
+Properti Livewire pun tak bisa jadi acuan: `textToType` bisa ditimpa client lewat payload,
+jadi panjang teks yang "diketahui server" ikut bisa dipalsukan.
+
+### 7.2 Cara kerja penjaga
+
+Acuan disimpan di **session server** (client tak bisa menulisinya), dicatat setiap kali
+server menyerahkan teks baru lewat `generateText()`: mode, sub-mode, dan panjang teks.
+
+Saat hasil dikirim, empat pemeriksaan berjalan:
+
+| Pemeriksaan | Aturan |
+|---|---|
+| **Kecocokan sesi** | mode+sub-mode saat submit harus sama dengan yang diterbitkan; kalau tidak → tolak |
+| **Durasi mode `time`** | diambil dari **sub-mode** (30 = 30 detik), payload diabaikan |
+| **Plafon karakter** | melebihi batas fisik (durasi × 15 cps) atau panjang teks × 3 → **tolak** |
+| **Anti-replay** | satu teks terbit = satu kiriman; sesi dihapus setelah dipakai |
+
+`textToType` juga diberi `#[Locked]` supaya client tak bisa menukarnya dengan teks panjang.
+`mainMode`/`subMode` **tak** bisa di-`Locked` (view memakai `@entangle`), jadi penukaran mode
+ditangkap oleh pemeriksaan kecocokan sesi.
+
+### 7.3 Kenapa menolak, bukan memotong diam-diam
+
+Versi awal memotong (`clamp`) angka berlebih ke batas wajar. Itu keliru: pengirim payload
+palsu tetap pulang membawa hasil yang sah. Sekarang kiriman yang melewati plafon fisik
+**ditolak** seperti halnya WPM mustahil di §3.
+
+### 7.4 Kenapa durasi mode `words`/`survival` tidak diambil dari jam server
+
+Sempat dicoba `min(klaim, waktu server berjalan)` — dan itu **salah arah**. Waktu server
+adalah batas **atas** sesi jujur, bukan batas bawah; memakainya justru memangkas durasi
+(mis. 30 detik → 3 detik) sehingga WPM **melonjak** ke 557 dan hasil jujur ikut tertolak.
+Karena arah yang menguntungkan pemalsu adalah **mengecilkan** durasi, dan itu sudah dijaga
+plafon karakter, durasi kedua mode ini cukup diterima apa adanya (durasi lebih panjang
+hanya menurunkan WPM sendiri).
+
+### 7.5 Toleransi untuk pemain jujur
+
+Mengetik bukan satu tombol satu karakter: salah ketik, backspace, dan mengulang kata
+menambah keystroke nyata. Teks 25 kata (~130 karakter) wajar menghasilkan 150+ keystroke,
+jadi plafon tekstual memakai **faktor 3× + 50** — longgar terhadap pengetik berantakan,
+tetap rapat terhadap angka fabrikasi (ribuan karakter atas teks 130 karakter).
+
+### 7.6 Data lama
+
+`php artisan typing:audit` mendaftar hasil dengan WPM mencurigakan beserta pemilik dan
+`highest_wpm`-nya. **Read-only** — tak mengubah apa pun; keputusan ada di tangan admin.
+
+```bash
+php artisan typing:audit                 # ambang default 150 WPM
+php artisan typing:audit --wpm=120       # ambang lebih ketat
+```
+
+## 8. Integritas Balapan Multiplayer
+
+Berbeda dari solo, server **sudah** memegang durasi (`race_starts_at`) dan panjang teks
+(`rooms.text_to_type`), jadi WPM race memang tak pernah dipercaya dari client. Yang **tidak**
+terjaga adalah `progress_percent` — dan itulah yang menentukan **waktu selesai & juara**.
+
+### 8.1 Empat celah yang ditutup
+
+| # | Celah | Dampak | Perbaikan |
+|---|---|---|---|
+| 1 | **Teleport ke 100%** | dapat `place=1` walau WPM dinolkan | ditolak lewat `exceedsRaceSpeed()` |
+| 2 | **Progress mundur** | 80% → kirim 10 → tersimpan 10 | progress dipaksa **monoton naik** |
+| 3 | **Spectator ikut balapan** | non-pemain dapat waktu & peringkat | hanya `ROLE_PLAYER` boleh kirim progress |
+| 4 | **Hasil ditolak tetap makan podium** | juara asli tercatat runner-up **permanen** | peringkat dihitung **setelah** validasi |
+
+### 8.2 Celah #4 yang paling merusak
+
+Anti-cheat lama sebenarnya **sudah benar** menolak si penipu: `result_recorded=false`, XP 0,
+tak masuk riwayat. Tapi peringkat diberikan dari urutan baris (`$index + 1`) **sebelum**
+validitas dihitung — jadi penipu tetap menempati place 1, dan **pemain jujur yang benar-benar
+menang tercatat juara 2 di riwayat permanennya**. Kerusakannya menimpa korban, bukan pelaku.
+
+Sekarang validitas dihitung lebih dulu untuk semua peserta, lalu nomor peringkat hanya naik
+untuk hasil yang lolos. Hasil yang ditolak mendapat `place = null`, dan `player_count` hanya
+menghitung peserta yang sah (supaya "juara 1 dari 2" tak jadi kemenangan semu).
+
+### 8.3 Kenapa ada plafon WPM khusus race (250, bukan 300)
+
+Teks race ~240 karakter. Teleport ke 100% pada detik ke-10 menghasilkan **290 WPM** — masih
+di bawah plafon umum 300, jadi dulu **lolos sebagai kemenangan sah**. Ambang race dipisah ke
+`MAX_RACE_WPM = 250`: cukup untuk menolak teleport, masih longgar untuk pengetik elite
+(rekor dunia ~210–230).
+
+Penolakan terjadi di **jalur live** (`updateRaceProgress`), bukan hanya saat finalisasi —
+karena yang menentukan juara adalah **waktu selesai**, dan itu tercatat saat progress masuk.
+Menilainya 0 WPM saja tak cukup; peringkat diurutkan berdasarkan waktu, bukan kecepatan.

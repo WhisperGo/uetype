@@ -10,12 +10,14 @@ use App\Services\AchievementService;
 use App\Services\AntiCheatService;
 use App\Services\ClanWarScorer;
 use App\Services\GhostResolver;
+use App\Services\SoloSessionGuard;
 use App\Services\TextGeneratorService;
 use App\Services\TypingErrorInspector;
 use App\Support\TypingLanguage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -42,6 +44,11 @@ class TypingEngine extends Component
         'survival' => ['easy', 'medium', 'hard'],
     ];
 
+    // Locked: the client renders this text but must never set it. Without the lock a
+    // tampered payload could swap in a much longer text to justify a huge character count.
+    // mainMode/subMode can't be locked (the view @entangles them); a mode swapped after the
+    // text was issued is caught instead by SoloSessionGuard::matchesIssuedSession().
+    #[Locked]
     public $textToType;
 
     // "Retry" text (words mode) for this request only: pulled from session in mount(),
@@ -436,11 +443,28 @@ class TypingEngine extends Component
         );
     }
 
-    /** Produce the text for the current session (retry text, fixed war text, or random). */
+    /**
+     * Produce the text for the current session (retry text, fixed war text, or random),
+     * then record it server-side so the submitted result can be validated against what
+     * was actually issued.
+     */
     public function generateText()
     {
         $this->typingSessionKey++;
+        $this->assembleText();
 
+        // Every path above lands here: the guard always sees the text the player really
+        // got, along with the moment it was handed over (see SoloSessionGuard).
+        app(SoloSessionGuard::class)->start(
+            $this->mainMode,
+            (string) $this->subMode,
+            (string) $this->textToType
+        );
+    }
+
+    /** Pick the text itself; generateText() owns the session bookkeeping around it. */
+    private function assembleText(): void
+    {
         // Retry (words mode): use the identical previous-session text, not random assembly.
         // Only set in mount() for the solo path (war-lock wins), and only once --
         // restart()/setMode() call generateText() with $retryText already null again.
@@ -494,17 +518,60 @@ class TypingEngine extends Component
         [$this->mainMode, $this->subMode] = $this->normalizeMode($this->mainMode, $this->subMode);
 
         // Client WPM/accuracy is NOT accepted -- the server always recomputes it (anti-cheat).
-        $totalKeystrokes = (int) $totalKeystrokes;
-        $correctKeystrokes = (int) $correctKeystrokes;
+        $totalKeystrokes = max(0, (int) $totalKeystrokes);
+        $correctKeystrokes = max(0, (int) $correctKeystrokes);
+
+        // Recomputing from client-supplied counts is not the same as verifying them: a
+        // forged payload (1495 correct chars "in" 60s = 299 WPM) recomputes to exactly the
+        // fake number it claims. The guard holds what the SERVER issued for this session,
+        // in the session store rather than a Livewire property -- the client can set those.
+        $guard = app(SoloSessionGuard::class);
+
+        // A submission whose mode no longer matches the issued text (e.g. take a 15s test,
+        // report it as 120s) has no honest reading; there is also nothing to submit when no
+        // text was ever issued. Both are refused outright.
+        if (! $guard->matchesIssuedSession($this->mainMode, (string) $this->subMode)) {
+            $guard->clear();
+            session()->flash('result_rejected', __('typing.result_rejected'));
+
+            return $this->redirect(route('typing'));
+        }
+
+        // Duration comes from the SERVER, not the payload. In `time` mode the sub-mode
+        // fixes it outright; elsewhere the client's claim is capped by the elapsed server
+        // clock, since under-reporting time is the direction that inflates WPM.
+        $duration = $guard->resolveDuration(
+            max(0.0, (float) $durationMs / 1000),
+            $this->mainMode,
+            (string) $this->subMode
+        );
+
+        // Character counts are bounded by what the issued text could physically produce in
+        // that time, so an inflated count can no longer buy WPM, XP or a leaderboard slot.
+        $maxChars = $guard->maxPlausibleChars($this->mainMode, $duration);
+
+        if ($maxChars !== null && $totalKeystrokes > $maxChars) {
+            // A payload this far past the physical ceiling is fabricated, not merely noisy.
+            // Silently clamping it would still hand the sender a valid result; refuse it
+            // instead, the same way an impossible WPM is refused below.
+            $guard->clear();
+            session()->flash('result_rejected', __('typing.result_rejected'));
+
+            return $this->redirect(route('typing'));
+        }
+
+        // Correct can never exceed total; clamp so the pair stays coherent.
+        $correctKeystrokes = min($correctKeystrokes, $totalKeystrokes);
         $incorrectKeystrokes = max(0, $totalKeystrokes - $correctKeystrokes);
+
+        // One issued text = one submission. Without this, the same finished session could
+        // be replayed to farm XP and records.
+        $guard->clear();
 
         // Survival: the leaderboard metric is duration_seconds, not score. The score column
         // becomes a side stat (correct chars while surviving); other modes don't use it.
+        // Read AFTER the cap so a survival score can't carry an inflated count either.
         $score = $this->mainMode === 'survival' ? $correctKeystrokes : null;
-
-        // Client duration is in milliseconds; store in seconds (fractional allowed) so the
-        // server WPM == the WPM the user saw while typing.
-        $duration = max(0.0, (float) $durationMs / 1000);
 
         // Server recomputes WPM/accuracy from chars & duration (not trusting the client);
         // implausible sessions are rejected, not saved.
