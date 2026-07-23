@@ -310,8 +310,11 @@ Dokumen terkait lain:
 - **Broadcasting:** `config/broadcasting.php` (default `reverb`),
   `config/reverb.php` (host/port dari env, rate limiting tersedia tapi nonaktif
   default).
-- **Env kunci** (`.env.example`): `DB_CONNECTION=sqlite`,
-  `BROADCAST_CONNECTION=reverb`, `REVERB_APP_ID/KEY/SECRET`,
+- **Database:** proyek ini berjalan di **MySQL**. Perlu dicatat `.env.example` masih
+  memuat `DB_CONNECTION=sqlite` bawaan Laravel, jadi sesuaikan di `.env` sendiri —
+  migrasi akan gagal di driver lain (CHECK constraint).
+- **Env kunci** (`.env.example`): `BROADCAST_CONNECTION=reverb`,
+  `REVERB_APP_ID/KEY/SECRET`,
   `REVERB_HOST=127.0.0.1`, `REVERB_PORT=8080`, dicerminkan ke `VITE_REVERB_*`
   untuk frontend build (di-*bake* saat `npm run build` — lihat catatan penting di
   §12).

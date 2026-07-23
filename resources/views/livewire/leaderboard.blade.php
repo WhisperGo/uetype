@@ -146,14 +146,13 @@ $userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
     // Computed IN THE DATABASE via COUNT: only a single number comes back to PHP.
     // (Previously: pluck() pulled ONE ROW PER USER into PHP memory, then array_search
     //  -- 10,000 users = 10,000 rows pulled, every time the user switches tabs.)
-    // The CAST is required, not decorative. A MAX() result column inside the subquery
-    // has no type affinity in sqlite, while Laravel binds fractional numbers as
-    // TEXT -- and sqlite sorts ALL text above ALL numbers. Without the cast,
-    // `103 > '102.5'` evaluates to FALSE and the rank of anyone with a fractional
-    // record comes out too high. MySQL coerces silently, so this bug is invisible there.
+    // Records are fractional (e.g. 102.5), so the comparison MUST be numeric -- it is
+    // guarded by a test that ranks 102.5 against 103. A plain where() is enough here:
+    // best_score is a numeric column, so MySQL compares it numerically even though PDO
+    // binds the parameter as a string.
     $better = DB::query()
         ->fromSub($bestPerUser($metric, $this->currentTab, $this->currentConfig, $this->timeframe, $this->currentLang), 'pb')
-        ->whereRaw('CAST(pb.best_score AS DECIMAL(12,2)) > CAST(? AS DECIMAL(12,2))', [$myBest])
+        ->where('pb.best_score', '>', $myBest)
         ->count();
 
     return $better + 1;

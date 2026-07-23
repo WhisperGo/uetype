@@ -12,9 +12,8 @@ return new class extends Migration
      *   - Clan chat: clan_id set, recipient_id null.
      *
      * The DB-level guard is NOT installed here but in the migration
-     * 2026_07_20_100000_enforce_message_target_invariants: this table is still altered by
-     * the next three migrations, and on sqlite adding a FOREIGN KEY rebuilds the table,
-     * which would drop any trigger along with it.
+     * 2026_07_20_100000_enforce_message_target_invariants, together with the matching
+     * guard for `message_clears` -- same invariant, one place.
      */
     public function up(): void
     {

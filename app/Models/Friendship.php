@@ -48,9 +48,12 @@ class Friendship extends Model
      * is only `(requester_id, addressee_id)`, i.e. one-directional: A->B and B->A can
      * coexist. The transaction here serializes the check against other writers on the
      * same connection, but two truly parallel requests can still both get through.
-     * Closing that would need a unique index over the normalized pair (LEAST/GREATEST
-     * as a generated column), whose syntax differs between MySQL and sqlite -- not yet
-     * worth it for the impact: two redundant pending rows, not data corruption.
+     *
+     * Closing it properly means a unique index over the NORMALIZED pair -- a stored
+     * generated column `LEAST(requester_id, addressee_id), GREATEST(...)`. MySQL
+     * supports that, so this is doable rather than blocked; it is left undone only
+     * because the payoff is small: the worst case is two redundant pending rows, not
+     * corrupted data, and both resolve the moment either side is accepted.
      */
     public static function requestBetween(int $requesterId, int $addresseeId): ?self
     {

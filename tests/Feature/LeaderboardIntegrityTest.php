@@ -109,12 +109,11 @@ test('userRank menghitung peringkat dengan benar', function () {
 /**
  * Rekor berkoma harus dibandingkan sebagai ANGKA, bukan teks.
  *
- * Ini pernah salah dan hanya kelihatan di sqlite: kolom hasil MAX() di dalam
- * subquery tak punya type affinity di sana, sementara Laravel mem-bind angka
- * pecahan sebagai TEXT -- dan sqlite mengurutkan SEMUA text di atas SEMUA angka.
- * Akibatnya `103 > '102.5'` bernilai FALSE, tak ada lawan yang terhitung lebih
- * baik, dan pemain berekor koma selalu dilaporkan rank 1. MySQL memaksa konversi
- * diam-diam sehingga bug ini tak pernah muncul di CI.
+ * WPM disimpan pecahan, sedangkan nilai pembanding di-bind PDO sebagai string.
+ * Kalau perbandingannya sampai jatuh ke teks, `103 > '102.5'` bernilai FALSE:
+ * tak ada lawan yang terhitung lebih baik dan setiap pemain berekor koma
+ * dilaporkan rank 1 -- salah tanpa error, jadi hanya test seperti ini yang
+ * menangkapnya. Sengaja memakai satu rekor bulat lawan satu rekor pecahan.
  */
 test('userRank membandingkan rekor berkoma sebagai angka, bukan teks', function () {
     $atas = User::factory()->create();

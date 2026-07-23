@@ -23,9 +23,9 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <!-- DB sengaja TIDAK dipatok di sini: suite harus lulus di sqlite maupun
-             MySQL, jadi driver-nya diambil dari .env masing-masing developer/CI.
-             Mematoknya ke sqlite akan menyembunyikan regresi khusus-MySQL. -->
+        <!-- DB sengaja TIDAK dipatok di sini: koneksinya diambil dari .env masing-masing
+             developer/CI. Proyek ini berjalan di MySQL; driver lain akan gagal saat
+             migrasi (CHECK constraint), dan itu memang sinyal yang diinginkan. -->
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>

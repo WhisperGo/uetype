@@ -10,16 +10,13 @@ use Illuminate\Support\Str;
  * `messages` memakai satu tabel untuk dua jenis chat, dibedakan kolom nullable:
  * DM mengisi recipient_id, clan chat mengisi clan_id. Tepat satu harus terisi.
  *
- * Invarian itu ditegakkan DI LEVEL DB, bukan sekadar disiplin aplikasi -- dan
- * harus tetap begitu di KEDUA driver. Dulu penjagaannya berupa satu
- * `ALTER TABLE ... ADD CONSTRAINT ... CHECK`, sintaks yang hanya dipahami MySQL:
- * di sqlite migrasinya meledak dan MEMATIKAN SELURUH SUITE (36/36 gagal di
- * ChatTest saja). Karena .env.example men-default sqlite, setiap developer baru
- * menabraknya.
+ * Invarian itu ditegakkan DI LEVEL DB (CHECK constraint), bukan sekadar disiplin
+ * aplikasi. Alasannya: `messages` ditulis dari beberapa jalur -- Chat, ChatOverlay,
+ * ChatController, dan seeder -- sehingga satu pemanggil yang lupa mengisi target
+ * sudah cukup membuat baris tak bermakna yang tak akan pernah tampil di UI mana pun.
  *
- * Sekarang mekanismenya bercabang per driver (CHECK di MySQL, trigger di sqlite)
- * tapi invariannya satu. Test ini yang membuktikannya -- ia harus hijau di mana
- * pun suite dijalankan, dan itulah gunanya.
+ * Test ini menguji penjagaan itu lewat query builder mentah, jadi ia tetap jujur
+ * meski validasi aplikasi berubah.
  */
 function makeTargetClan(): Clan
 {
@@ -70,9 +67,9 @@ it('rejects an update that breaks the invariant on an existing row', function ()
 
     insertRawMessage($recipient->id, null);
 
-    // Baris sah diubah jadi melanggar. Di sqlite ini butuh trigger UPDATE
-    // TERSENDIRI -- trigger INSERT saja tak menutupnya, dan tanpa test ini
-    // celahnya tak akan kelihatan.
+    // Baris yang sah saat disisipkan diubah jadi melanggar. Penjagaan yang hanya
+    // berlaku saat INSERT akan meloloskan ini, dan tanpa test tersendiri celah
+    // itu tak akan kelihatan.
     DB::table('messages')->update(['clan_id' => $clan->id]);
 })->throws(QueryException::class);
 
