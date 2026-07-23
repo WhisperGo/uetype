@@ -137,9 +137,15 @@ bug-nya masih ada — test regresinya sengaja memasukkan **dua baris** per tabel
 
 ## 4. Tabel Database
 
+> **Catatan privasi:** kolom `ip` menyimpan alamat yang **sudah dianonimkan** (oktet terakhir
+> IPv4 dinolkan, IPv6 disisakan prefix /48) lewat
+> [`AnonymizeClientIp`](../../app/Http/Middleware/AnonymizeClientIp.php). IP penuh adalah data
+> pribadi menurut UU PDP & GDPR; log tetap berguna mengenali pola per jaringan tanpa menunjuk
+> satu perangkat. Detail: [`anti-cheat-wpm.md`](anti-cheat-wpm.md) §10.4.
+
 | Tabel | Isi |
 |---|---|
-| `visits_monitoring` | user_id, browser, platform, device, ip, page |
+| `visits_monitoring` | user_id, browser, platform, device, ip (dianonimkan), page |
 | `actions_monitoring` | user_id, aksi (store/update/destroy), model terkait |
 | `authentications_monitoring` | user_id, tipe (login/logout) |
 

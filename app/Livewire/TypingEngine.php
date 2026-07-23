@@ -16,6 +16,7 @@ use App\Services\TypingErrorInspector;
 use App\Support\TypingLanguage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -43,6 +44,13 @@ class TypingEngine extends Component
         'words' => ['10', '25', '50', '100'],
         'survival' => ['easy', 'medium', 'hard'],
     ];
+
+    /**
+     * Result submissions allowed per minute. The shortest test is 15 seconds, so even
+     * back-to-back honest play stays well under this; the limit exists to stop a script
+     * from sweeping payloads until one clears the anti-cheat checks.
+     */
+    private const MAX_RESULTS_PER_MINUTE = 10;
 
     // Locked: the client renders this text but must never set it. Without the lock a
     // tampered payload could swap in a much longer text to justify a huge character count.
@@ -520,6 +528,19 @@ class TypingEngine extends Component
         // Client WPM/accuracy is NOT accepted -- the server always recomputes it (anti-cheat).
         $totalKeystrokes = max(0, (int) $totalKeystrokes);
         $correctKeystrokes = max(0, (int) $correctKeystrokes);
+
+        // Rate limit before any work: results are submitted once every 15+ seconds by a
+        // real player, so a burst is either a bug or someone scripting attempts to find a
+        // payload that slips through. Keyed per user (guests share the IP bucket).
+        $rateKey = 'save-result:'.(Auth::id() ?? request()->ip());
+
+        if (RateLimiter::tooManyAttempts($rateKey, self::MAX_RESULTS_PER_MINUTE)) {
+            session()->flash('result_rejected', __('typing.result_rejected'));
+
+            return $this->redirect(route('typing'));
+        }
+
+        RateLimiter::hit($rateKey, 60);
 
         // Recomputing from client-supplied counts is not the same as verifying them: a
         // forged payload (1495 correct chars "in" 60s = 299 WPM) recomputes to exactly the

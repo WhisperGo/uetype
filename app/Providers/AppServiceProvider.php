@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\User;
 use App\Support\PageTitle;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
@@ -32,6 +34,11 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->guardAgainstNPlusOne();
+
+        // Single definition of "may open the monitoring dashboard". EnsureUserIsAdmin is
+        // what actually gates the routes; this Gate expresses the same rule so views and
+        // any future callers can ask authorization rather than re-reading is_admin.
+        Gate::define('access-monitoring', fn (User $user) => (bool) $user->is_admin);
 
         // Behind a reverse proxy a request can arrive as http; force https so
         // generated URLs don't become mixed content.

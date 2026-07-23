@@ -30,6 +30,15 @@ class ClanWar extends Component
     // How long a challenge has to be accepted before it auto-expires.
     public const ACCEPT_WINDOW_HOURS = 1;
 
+    /**
+     * Slots one member may claim in a single war, out of the 9 available.
+     *
+     * A war is meant to be a clan effort. Without a cap, one account can claim every slot
+     * and decide the outcome alone -- which also means a single cheating or compromised
+     * member is enough to win, and the damage lands on the opposing clan.
+     */
+    public const MAX_CLAIMS_PER_MEMBER = 4;
+
     /** Close overdue wars (expire Pending, resolve Ongoing) before computed properties read data. */
     public function mount(ClanWarResolver $resolver): void
     {
@@ -198,6 +207,18 @@ class ClanWar extends Component
                     ->first();
 
                 if ($existing) {
+                    return null;
+                }
+
+                // One member may not hold every slot. A war is meant to be a clan effort,
+                // and concentrating all 9 slots in one account makes a single compromised
+                // or cheating player able to decide the whole war by themselves.
+                $mine = ClanWarModeClaim::where('clan_war_id', $war->id)
+                    ->where('clan_id', $this->myClan->id)
+                    ->where('user_id', Auth::id())
+                    ->count();
+
+                if ($mine >= self::MAX_CLAIMS_PER_MEMBER) {
                     return null;
                 }
 

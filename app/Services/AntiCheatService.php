@@ -5,9 +5,8 @@ namespace App\Services;
 /** Server-side sanity check: recomputes wpm/accuracy and rejects impossible sessions. */
 class AntiCheatService
 {
-    /** Human WPM ceiling; above this is almost certainly fake (world record ~210-230). */
-    private const MAX_HUMAN_WPM = 300;
 
+    private const MAX_HUMAN_WPM = 300;
     /** Minimum session duration (seconds) to be considered meaningful. */
     private const MIN_DURATION_SECONDS = 1.0;
 

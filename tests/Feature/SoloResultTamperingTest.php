@@ -3,6 +3,7 @@
 use App\Livewire\TypingEngine;
 use App\Models\TypingResult;
 use App\Models\User;
+use App\Services\SoloSessionGuard;
 use Livewire\Livewire;
 
 /**
@@ -34,8 +35,10 @@ it('ignores a shortened duration in time mode', function () {
     $user = User::factory()->create();
 
     // Claiming 5s for a 30s test would multiply WPM sixfold.
-    playSolo($user, 'time', '30')
-        ->call('saveResult', 5000, 400, 400, [], [], [], 0, 0, '', 0);
+    $component = playSolo($user, 'time', '30');
+    app(SoloSessionGuard::class)->backdate(30);
+
+    $component->call('saveResult', 5000, 400, 400, [], [], [], 0, 0, '', 0);
 
     $result = TypingResult::where('user_id', $user->id)->first();
 
@@ -77,6 +80,7 @@ it('rejects a submission once the issued session has been consumed', function ()
     $user = User::factory()->create();
 
     $component = playSolo($user, 'time', '30');
+    app(SoloSessionGuard::class)->backdate(30);
     $component->call('saveResult', 30000, 300, 290, [], [], [], 0, 0, '', 0);
 
     $component->call('saveResult', 30000, 300, 290, [], [], [], 0, 0, '', 0)
@@ -105,8 +109,13 @@ it('still accepts an honest session', function () {
     $user = User::factory()->create();
 
     // ~300 chars over a 30-second test is a realistic ~60 WPM.
-    playSolo($user, 'time', '30')
-        ->call('saveResult', 30000, 300, 290, [], [], [], 0, 0, '', 0)
+    $component = playSolo($user, 'time', '30');
+
+    // A real player spends the 30 seconds typing; a test calls saveResult() instantly,
+    // which would otherwise look like an automated forgery to the elapsed-time guard.
+    app(SoloSessionGuard::class)->backdate(30);
+
+    $component->call('saveResult', 30000, 300, 290, [], [], [], 0, 0, '', 0)
         ->assertRedirect(route('typing.result'));
 
     $result = TypingResult::where('user_id', $user->id)->first();

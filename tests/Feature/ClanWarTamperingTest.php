@@ -10,6 +10,7 @@ use App\Models\ClanWar as ClanWarModel;
 use App\Models\ClanWarModeClaim;
 use App\Models\TypingResult;
 use App\Models\User;
+use App\Services\SoloSessionGuard;
 use Livewire\Livewire;
 
 /**
@@ -99,8 +100,13 @@ it('still scores an honest war attempt', function () {
     [$user, $claim] = tamperWarClaim('time', '30');
 
     // ~300 characters over a 30-second slot is an ordinary ~60 WPM run.
-    Livewire::actingAs($user)->test(TypingEngine::class, ['warClaimId' => $claim->id])
-        ->call('saveResult', 30000, 300, 290, [], [], [], 0, 0, '', 0)
+    $component = Livewire::actingAs($user)->test(TypingEngine::class, ['warClaimId' => $claim->id]);
+
+    // A real player spends the slot typing; the test submits instantly, which the
+    // elapsed-time guard would otherwise read as an automated forgery.
+    app(SoloSessionGuard::class)->backdate(30);
+
+    $component->call('saveResult', 30000, 300, 290, [], [], [], 0, 0, '', 0)
         ->assertRedirect(route('typing.result'));
 
     $claim->refresh();

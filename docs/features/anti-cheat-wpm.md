@@ -295,7 +295,69 @@ tak pernah benar-benar berjalan tidak.
 Ditambah `claimsMoreTimeThanElapsed()` untuk `words`/`survival`: durasi yang melebihi umur
 sesi adalah waktu yang tak pernah berlalu, dan itulah yang menutup celah survival.
 
-> **Catatan kalibrasi:** slack 30 detik dipilih dari pengukuran, bukan tebakan. Slack 15 detik
-> memberi plafon 275 karakter dan **ikut menolak sesi jujur** (~300 karakter). Slack 30 detik
-> memberi 500 — cukup longgar untuk pemain nyata, tetap rapat terhadap ~1500 karakter yang
-> dibutuhkan untuk mencapai 150 WPM.
+> **Catatan kalibrasi:** slack bersifat **proporsional** (`SLACK_FRACTION = 0.35`), dibatasi
+> maksimal 30 detik. Slack datar tak cukup: 30 detik adalah hampir seluruh sesi `time 30`,
+> sehingga masih menyisakan ~500 karakter (≈200 WPM palsu). Dengan 0.35, pemain nyata tetap
+> lolos lega — saat mereka mengirim, jam server memang sudah berjalan — sementara kiriman
+> instan mentok di ~83 WPM, di bawah 150 WPM yang memberi poin war penuh.
+
+## 10. Tindak Lanjut Penetration Test Eksternal
+
+Empat temuan (F-01…F-04) dari pentest pihak ketiga. Ringkasan status & apa yang berubah:
+
+| ID | Temuan | Status |
+|---|---|---|
+| F-01 | Dashboard monitoring tanpa autentikasi | **Ditutup** — §3.6 + Gate `access-monitoring` |
+| F-02 | Manipulasi skor/WPM/leaderboard | **Ditutup** — §7, diperketat lagi di §10.1 |
+| F-03 | Manipulasi poin Clan War | **Ditutup** — §9 + batas klaim per anggota |
+| F-04 | Paket monitoring insecure-by-default | **Ditutup** — §3.6 + audit dependensi di CI |
+
+### 10.1 PoC pentester lolos separuh — apa yang kurang
+
+PoC mereka (`740 char / 30 detik = 296 WPM`) memang sudah ditolak oleh §7. Tapi saat diuji
+ulang **menyapu berbagai nilai**, ternyata masih ada yang lolos:
+
+```
+500 char -> 200 WPM   LOLOS
+450 char -> 180 WPM   LOLOS
+400 char -> 160 WPM   LOLOS
+```
+
+Ini **bukan** temuan sepele. `WPM_SCALE = 150`, jadi **160 WPM saja sudah memberi poin Clan
+War penuh** — F-03 belum benar-benar tertutup meski F-02 tampak beres. Dua perbaikan:
+
+1. **`MAX_HUMAN_WPM` 300 → 240.** Batas 300 hanya menyaring yang mustahil dan menyisakan
+   pita lebar "tak masuk akal tapi diterima". Rekor dunia berkelanjutan ~210–230.
+2. **Slack proporsional** (lihat catatan kalibrasi di atas) — inilah yang benar-benar
+   mengikat; menurunkan ceiling saja tak cukup.
+
+Setelah keduanya: **tak ada nilai yang bisa dipalsukan**, dan kiriman instan mentok ~83 WPM.
+
+### 10.2 Rate limit pengiriman hasil
+
+`saveResult` dibatasi **10 kiriman/menit** per user (`MAX_RESULTS_PER_MINUTE`). Tes terpendek
+15 detik, jadi permainan jujur tak pernah mendekati batas; ini menutup pola "sapu payload
+sampai ada yang lolos" seperti yang saya lakukan sendiri saat menguji.
+
+### 10.3 Batas klaim slot war per anggota
+
+Satu akun sebelumnya bisa mengklaim **ke-9 slot** dan menentukan hasil war sendirian.
+Sekarang dibatasi **4 slot** (`ClanWar::MAX_CLAIMS_PER_MEMBER`), jadi butuh minimal 3 anggota
+berbeda. Ini menutup rekomendasi pentester "batasi kontribusi per anggota" dan sekaligus
+memperkecil dampak satu akun yang diretas.
+
+### 10.4 Privasi IP (UU PDP / GDPR)
+
+Pentester menandai penyimpanan IP penuh sebagai risiko PII. IP kini **dianonimkan sebelum
+ditulis**: oktet terakhir IPv4 dinolkan (`192.168.1.77` → `192.168.1.0`), IPv6 disisakan
+prefix /48. Log tetap berguna untuk mengenali pola per jaringan, tapi tak lagi menunjuk satu
+perangkat.
+
+Implementasinya di [`AnonymizeClientIp`](../../app/Http/Middleware/AnonymizeClientIp.php),
+**bukan** di tiap titik tulis. Alasannya: paket menulis IP dari **tiga** tempat di `vendor/`
+(middleware, listener login/logout, dan trait `Actionable`), dan dua di antaranya memakai
+`DB::table()` sehingga event Eloquent tak menangkapnya. Ketiganya membaca `request()->ip()`,
+jadi menyamarkan di lapisan request menutup semua jalur tanpa menyentuh `vendor/`.
+
+> **Urutan middleware penting:** `AnonymizeClientIp` harus terdaftar **sebelum**
+> `VisitMonitoringMiddleware` di [`bootstrap/app.php`](../../bootstrap/app.php).

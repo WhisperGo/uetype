@@ -50,12 +50,20 @@ class SoloSessionGuard
      * client claims, covering latency and the gap between the last keystroke and the
      * request landing. Beyond this the claim describes time that never passed.
      *
-     * At 30 seconds the character window opens to ~500 even for a session submitted
-     * instantly, which comfortably clears an honest run while still refusing the payloads
-     * that matter: ~1500 characters is what buys 150 WPM, the ratio that maxes out a Clan
-     * War point ceiling.
+     * Capped further by SLACK_FRACTION so it stays proportional to the session.
      */
     private const DURATION_SLACK_SECONDS = 30.0;
+
+    /**
+     * Slack may never exceed this share of the session's nominal length.
+     *
+     * A flat allowance is fine for a two-minute test but is most of a 30-second one, which
+     * is what left ~500 characters (a forged 200 WPM) claimable on short sessions. At 0.35
+     * a genuine player still clears easily -- by the time they submit, the clock really has
+     * run -- while a result posted the instant the text is issued tops out near 83 WPM,
+     * below the 150 WPM that maxes out Clan War scoring.
+     */
+    private const SLACK_FRACTION = 0.35;
 
     /** Remember that a session just started, with the text the server actually issued. */
     public function start(string $mode, string $subMode, string $text): void
@@ -74,6 +82,26 @@ class SoloSessionGuard
         $data = session()->get(self::SESSION_KEY);
 
         return is_array($data) && isset($data['started_at']) ? $data : null;
+    }
+
+    /**
+     * Backdate the active session's start time by N seconds.
+     *
+     * For tests only. A real player spends the session actually typing, so by the time the
+     * result arrives the server clock has genuinely advanced; a test calls saveResult()
+     * immediately, which otherwise looks exactly like an automated forgery. This lets a
+     * test simulate the time a human would really have spent.
+     */
+    public function backdate(float $seconds): void
+    {
+        $session = $this->current();
+
+        if ($session === null) {
+            return;
+        }
+
+        $session['started_at'] -= $seconds;
+        session()->put(self::SESSION_KEY, $session);
     }
 
     /** Drop the session so one issued text can only be submitted once (no replay). */
@@ -130,11 +158,16 @@ class SoloSessionGuard
 
         // The window is bounded by real elapsed time PLUS slack, so an automated client
         // cannot claim a full-length session that never actually ran. The slack keeps
-        // honest submissions safe when the request lands right after the last keystroke.
+        // honest submissions safe when the request lands right after the last keystroke,
+        // but it is capped at a FRACTION of the session: a flat 30 seconds is most of a
+        // 30-second test, which left ~500 characters claimable and a forged 200 WPM
+        // reachable. Proportional slack keeps short sessions tight and long ones forgiving.
         $elapsed = $this->elapsedSeconds();
+        $slack = min(self::DURATION_SLACK_SECONDS, $durationSeconds * self::SLACK_FRACTION);
+
         $realSeconds = $elapsed === null
             ? $durationSeconds
-            : min($durationSeconds, $elapsed + self::DURATION_SLACK_SECONDS);
+            : min($durationSeconds, $elapsed + $slack);
 
         $physical = (int) ceil($realSeconds * self::MAX_CHARS_PER_SECOND) + self::CHAR_TOLERANCE;
 

@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -18,7 +19,9 @@ class EnsureUserIsAdmin
 {
     public function handle(Request $request, Closure $next): Response
     {
-        abort_unless($request->user()?->is_admin, 404);
+        // Defers to the `access-monitoring` Gate (AppServiceProvider) so the rule lives in
+        // one place; Gate::allows() is false for guests, giving them the same 404.
+        abort_unless(Gate::allows('access-monitoring'), 404);
 
         return $next($request);
     }

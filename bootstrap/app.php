@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AnonymizeClientIp;
 use App\Http\Middleware\SetLocale;
 use Binafy\LaravelUserMonitoring\Middlewares\VisitMonitoringMiddleware;
 use Illuminate\Foundation\Application;
@@ -16,7 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->web(append: [
             SetLocale::class,
-            // Visit monitoring: rekam setiap kunjungan halaman web (binafy/laravel-user-monitoring).
+            // Masks the client IP before anything can log it. MUST stay ahead of the
+            // monitoring middleware below, which reads request()->ip() as it records.
+            AnonymizeClientIp::class,
+            // Visit monitoring: records every page view (binafy/laravel-user-monitoring).
             VisitMonitoringMiddleware::class,
         ]);
     })

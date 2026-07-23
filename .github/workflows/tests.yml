@@ -63,8 +63,17 @@ jobs:
       - name: Check code style (Pint)
         run: vendor/bin/pint --test
 
+      # Catches known CVEs and insecure-by-default packages before they ship. Reported
+      # rather than blocking: a fresh advisory on a transitive dependency should not stop
+      # an unrelated pull request, but it must be visible in the run.
+      - name: Audit PHP dependencies
+        run: composer audit --no-interaction || true
+
       - name: Install Node dependencies
         run: npm ci
+
+      - name: Audit JS dependencies
+        run: npm audit --audit-level=high || true
 
       - name: Build frontend assets
         run: npm run build
