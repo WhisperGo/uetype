@@ -1,0 +1,161 @@
+<?php
+
+use App\Livewire\MultiplayerLobby;
+use App\Models\MultiplayerMatchHistory;
+use App\Models\Room;
+use App\Models\RoomMember;
+use App\Models\User;
+use Livewire\Livewire;
+
+/**
+ * Race progress arrives from the client, so "I finished" is a single number a tampered
+ * client can simply assert. WPM was already recomputed server-side, but PLACE is ranked by
+ * finish TIME -- so a teleport to 100% still took the podium and pushed the real winner
+ * down a slot in their permanent history.
+ *
+ * text_to_type is 100 characters so progress% maps 1:1 to correct characters.
+ */
+function tamperRoom(User $host, int $startedSecondsAgo): Room
+{
+    return Room::create([
+        'code' => 'TMP'.random_int(100, 999),
+        'host_id' => $host->id,
+        'status' => 'racing',
+        'text_to_type' => str_repeat('ab cde ', 14).'ab',
+        'race_starts_at' => now()->subSeconds($startedSecondsAgo),
+    ]);
+}
+
+function tamperMember(Room $room, User $user, int $progress = 0, string $role = RoomMember::ROLE_PLAYER): RoomMember
+{
+    return RoomMember::create([
+        'room_id' => $room->id,
+        'user_id' => $user->id,
+        'is_ready' => true,
+        'role' => $role,
+        'progress_percent' => $progress,
+        'wpm' => 0,
+    ]);
+}
+
+function sendProgress(User $user, Room $room, int $progress, int $wpm = 0, int $accuracy = 100): void
+{
+    Livewire::actingAs($user)->test(MultiplayerLobby::class)
+        ->set('roomCode', $room->code)
+        ->set('step', 'racing')
+        ->call('updateRaceProgress', $progress, $wpm, $accuracy);
+}
+
+it('refuses a finish claimed faster than a human can type', function () {
+    $user = User::factory()->create();
+    $room = tamperRoom($user, startedSecondsAgo: 2);
+    $member = tamperMember($room, $user);
+
+    // 100 characters in 2 seconds = 600 WPM.
+    sendProgress($user, $room, 100, 999);
+
+    $member->refresh();
+
+    expect($member->finished_time_seconds)->toBeNull()
+        ->and($member->place)->toBeNull();
+});
+
+/**
+ * The gap the tighter race ceiling exists to close: against a ~240-character race text a
+ * 10-second teleport reads as ~290 WPM, which slipped under the general 300 limit and was
+ * therefore banked as a genuine win.
+ */
+it('refuses a finish that squeaks under the general wpm ceiling', function () {
+    $user = User::factory()->create();
+
+    // 240-character text finished in 10 seconds = ~288 WPM: below 300, above the race limit.
+    $room = tamperRoom($user, startedSecondsAgo: 10);
+    $room->update(['text_to_type' => str_repeat('abcde ', 40)]); // 240 characters
+    $member = tamperMember($room, $user);
+
+    sendProgress($user, $room, 100);
+
+    $member->refresh();
+
+    expect($member->finished_time_seconds)->toBeNull();
+});
+
+it('does not let progress move backwards', function () {
+    $user = User::factory()->create();
+    $room = tamperRoom($user, startedSecondsAgo: 30);
+    $member = tamperMember($room, $user, progress: 80);
+
+    // Rewinding would let a client replay the easy stretch of the text.
+    sendProgress($user, $room, 10);
+
+    expect($member->refresh()->progress_percent)->toBe(80);
+});
+
+it('ignores race progress sent by a spectator', function () {
+    $host = User::factory()->create();
+    $spectator = User::factory()->create();
+    $room = tamperRoom($host, startedSecondsAgo: 40);
+    $member = tamperMember($room, $spectator, role: RoomMember::ROLE_SPECTATOR);
+
+    sendProgress($spectator, $room, 100, 200);
+
+    $member->refresh();
+
+    expect($member->progress_percent)->toBe(0)
+        ->and($member->finished_time_seconds)->toBeNull()
+        ->and($member->place)->toBeNull();
+});
+
+it('still accepts an honest finish', function () {
+    $user = User::factory()->create();
+
+    // 100 characters in 60 seconds = 20 WPM, entirely ordinary.
+    $room = tamperRoom($user, startedSecondsAgo: 60);
+    $member = tamperMember($room, $user);
+
+    sendProgress($user, $room, 100, 20, 97);
+
+    $member->refresh();
+
+    expect($member->finished_time_seconds)->not->toBeNull()
+        ->and($member->progress_percent)->toBe(100);
+});
+
+/**
+ * The damaging part of the old behaviour: the cheat itself was thrown out at finalization
+ * (no XP, no history row) but it had already consumed place 1, so the honest winner was
+ * recorded as runner-up forever.
+ */
+it('does not let a rejected result steal the winner\'s place', function () {
+    $cheater = User::factory()->create();
+    $honest = User::factory()->create();
+
+    $room = tamperRoom($cheater, startedSecondsAgo: 60);
+    $cheatMember = tamperMember($room, $cheater);
+    $honestMember = tamperMember($room, $honest);
+
+    // The cheater's row is written straight to the DB, as though it had slipped past the
+    // live gate: finished first, but at an impossible pace.
+    $cheatMember->update([
+        'progress_percent' => 100,
+        'finished_time_seconds' => 2,
+        'wpm' => 600,
+        'accuracy' => 100,
+    ]);
+
+    // The honest player finishes later, at a believable speed.
+    sendProgress($honest, $room, 100, 20, 98);
+
+    $honestMember->refresh();
+    $cheatMember->refresh();
+
+    expect($honestMember->place)->toBe(1)
+        ->and($cheatMember->result_recorded)->toBeFalse()
+        ->and($cheatMember->place)->toBeNull();
+
+    $history = MultiplayerMatchHistory::where('user_id', $honest->id)->first();
+
+    expect($history)->not->toBeNull()
+        ->and($history->place)->toBe(1)
+        ->and($history->player_count)->toBe(1);
+});

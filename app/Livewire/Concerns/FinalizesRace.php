@@ -65,9 +65,35 @@ trait FinalizesRace
             ->orderBy('progress_percent', 'desc')
             ->get();
 
-        foreach ($members as $index => $member) {
-            $place = $index + 1;
-            $updateData = ['place' => $place];
+        // Validity is decided BEFORE places are handed out. Ranking by raw position would
+        // let a rejected result occupy the podium: a cheater teleporting to 100% in two
+        // seconds earned no XP and no history row, yet still took place 1 and pushed the
+        // real winner down to 2 -- in that honest player's PERMANENT history. Places are
+        // therefore only counted for players whose result survives the anti-cheat gate.
+        $validity = [];
+
+        foreach ($members as $member) {
+            $progress = max(0, min(100, (int) $member->progress_percent));
+            $correctChars = (int) round(($progress / 100) * $textLength);
+
+            $validity[$member->id] = $member->user
+                ? $this->isValidRaceResult($member, $correctChars)
+                : false;
+        }
+
+        $validCount = count(array_filter($validity));
+        $place = 0;
+
+        foreach ($members as $member) {
+            $isValid = $validity[$member->id];
+
+            // Rejected results keep their existing place value rather than claiming a new
+            // one; only genuine finishers advance the counter.
+            if ($isValid) {
+                $place++;
+            }
+
+            $updateData = ['place' => $isValid ? $place : null];
 
             // EXP once per player: xp_earned null = not yet awarded (safe from double-award
             // via the "all finished" fast-path or checkSuddenDeath). rooms/room_members are
@@ -80,11 +106,6 @@ trait FinalizesRace
                 $progress = max(0, min(100, (int) $member->progress_percent));
                 $correctChars = (int) round(($progress / 100) * $textLength);
 
-                // Anti-cheat gate: implausible results (impossible WPM, inconsistent
-                // chars, high-progress-with-impossibly-low-accuracy) and empty sessions
-                // are REJECTED -- not written to history and no EXP, so the player's
-                // average WPM isn't corrupted.
-                $isValid = $this->isValidRaceResult($member, $correctChars);
                 $updateData['result_recorded'] = $isValid;
 
                 if ($isValid) {
@@ -95,7 +116,9 @@ trait FinalizesRace
                         'user_id' => $member->user_id,
                         'room_code' => $room?->code ?? '',
                         'place' => $place,
-                        'player_count' => $members->count(),
+                        // Counts only players whose result stood: "1st of 2" would read as
+                        // a hollow win if the other entry was a rejected cheat attempt.
+                        'player_count' => $validCount,
                         'wpm' => (int) $member->wpm,
                         'accuracy' => (float) $member->accuracy,
                         // The DNF sentinel (999) MUST NOT reach permanent history: here the

@@ -525,8 +525,19 @@ class MultiplayerLobby extends Component
             return;
         }
 
+        // Spectators are not racing. Without this they could post progress, take a
+        // finish time and a place, and shift every real racer's standing.
+        if ($member->role !== RoomMember::ROLE_PLAYER) {
+            return;
+        }
+
         $progressPercent = min(100, max(0, $progressPercent));
         $accuracy = min(100, max(0, $accuracy));
+
+        // Progress only ever moves forward: it is the count of correct characters typed so
+        // far, which cannot decrease. Accepting a lower value would let a client rewind to
+        // replay the fast part of the text, or drop to 0 to reset its own pace.
+        $progressPercent = max($progressPercent, (int) $member->progress_percent);
 
         // Authoritative Net WPM: derived from progress (progress% x text length = correct
         // chars, same pattern as finalizeRace) and the server-side race duration, NOT the
@@ -542,6 +553,14 @@ class MultiplayerLobby extends Component
         // WPM can't be pumped by typing garbage.
         $antiCheat = app(AntiCheatService::class);
         $wpmCheck = $antiCheat->check($correctChars, $correctChars, $durationSeconds);
+
+        // Reaching this progress this fast is physically impossible, so the claim itself is
+        // refused rather than merely scored as 0 WPM. Letting it through would still stamp a
+        // finish time and a place -- the part that decides who "won" -- even though the
+        // result is later thrown out at finalization.
+        if ($antiCheat->exceedsRaceSpeed($correctChars, $durationSeconds)) {
+            return;
+        }
 
         // Only impossible signals are REJECTED (WPM beyond human limits / inconsistent
         // chars). Low throughput / short duration are normal early on and for slow players
