@@ -251,35 +251,36 @@
                     </div>
                 </div>
 
-                {{-- Tinggi tetap 28px walau mode non-survival tak mengisinya. Blok ini
-                     dipakai bar stamina milik mode survival; tanpa ruang yang dicadangkan,
-                     berpindah mode di layar pemilihan akan menggeser area ketik. Dulu
-                     sparkline WPM live mengisi ruang ini di mode non-survival, tapi dihapus
-                     karena tak lagi diperlukan -- grafik WPM lengkap tetap ada di halaman
-                     hasil (typing-result), digambar Chart.js dari wpmHistory yang sama. --}}
-                <div class="h-[28px] mt-2">
-                    <template x-if="currentMain === 'survival'">
-                        <div class="flex items-center gap-3">
-                            <span class="font-display text-[0.55rem] uppercase tracking-[0.15em] text-muted shrink-0">{{ __('typing.stamina') }}</span>
-                            <div class="relative flex-1 flex gap-[3px] p-[3px] bg-surface/80 border border-border/60"
-                                :class="(staminaPct < 25 && isStarted && !isFinished) ? 'animate-[pulse_0.7s_ease-in-out_infinite]' : ''">
-                                <template x-for="cell in staminaCells" :key="cell">
-                                    <div class="h-[14px] flex-1 transition-colors duration-150"
-                                        :style="`background-color: ${
-                                            cell <= Math.ceil(staminaPct / 100 * staminaCells.length)
-                                                ? (staminaPct > 50 ? 'rgb(var(--color-brand))' : (staminaPct > 25 ? 'rgb(var(--color-gold))' : 'rgb(var(--color-danger))'))
-                                                : 'rgb(var(--color-border) / 0.35)'
-                                        };`">
-                                    </div>
-                                </template>
-                                <div class="absolute inset-0 pointer-events-none transition-opacity duration-150 bg-danger/70"
-                                    :class="drainFlash ? 'opacity-100' : 'opacity-0'"></div>
-                            </div>
-                            <span class="font-display text-[0.55rem] uppercase tracking-[0.15em] text-muted shrink-0"
-                                x-text="currentSub"></span>
+                {{-- Bar stamina, HANYA untuk mode survival -- tidak ada elemen pengganti di
+                     mode lain, sehingga statistik menempel dekat ke area ketik. Ruang ini dulu
+                     dicadangkan setinggi 28px untuk semua mode karena sparkline WPM live
+                     mengisinya; setelah sparkline dihapus yang tersisa hanya celah kosong.
+
+                     Berpindah mode kini menggeser area ketik setinggi blok ini. Itu disengaja:
+                     yang harus bebas-geser adalah alur MULAI mengetik (lihat pemilih mode yang
+                     mencadangkan ruangnya sendiri), bukan perpindahan mode -- aksi sadar user,
+                     dan survival memang punya elemen yang mode lain tak punya. --}}
+                <template x-if="currentMain === 'survival'">
+                    <div class="h-[28px] mt-2 flex items-center gap-3">
+                        <span class="font-display text-[0.55rem] uppercase tracking-[0.15em] text-muted shrink-0">{{ __('typing.stamina') }}</span>
+                        <div class="relative flex-1 flex gap-[3px] p-[3px] bg-surface/80 border border-border/60"
+                            :class="(staminaPct < 25 && isStarted && !isFinished) ? 'animate-[pulse_0.7s_ease-in-out_infinite]' : ''">
+                            <template x-for="cell in staminaCells" :key="cell">
+                                <div class="h-[14px] flex-1 transition-colors duration-150"
+                                    :style="`background-color: ${
+                                        cell <= Math.ceil(staminaPct / 100 * staminaCells.length)
+                                            ? (staminaPct > 50 ? 'rgb(var(--color-brand))' : (staminaPct > 25 ? 'rgb(var(--color-gold))' : 'rgb(var(--color-danger))'))
+                                            : 'rgb(var(--color-border) / 0.35)'
+                                    };`">
+                                </div>
+                            </template>
+                            <div class="absolute inset-0 pointer-events-none transition-opacity duration-150 bg-danger/70"
+                                :class="drainFlash ? 'opacity-100' : 'opacity-0'"></div>
                         </div>
-                    </template>
-                </div>
+                        <span class="font-display text-[0.55rem] uppercase tracking-[0.15em] text-muted shrink-0"
+                            x-text="currentSub"></span>
+                    </div>
+                </template>
             </div>
 
             <div class="relative">
