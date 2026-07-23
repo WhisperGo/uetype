@@ -12,6 +12,7 @@ return [
     'friend_requests_pending' => 'pending friend request(s)',
     'chat' => 'Chat',
     'settings' => 'Settings',
+    'monitoring' => 'Monitoring',
     'soon' => 'soon',
     'login' => 'Sign In',
     'register' => 'Sign Up',

@@ -193,5 +193,6 @@ it('clears the countdown deadline when a different race starts', function () {
     $blade = arenaBlade();
 
     // Rematch: raceKey berubah -> tenggat lama harus dibuang, bukan dipakai ulang.
-    expect($blade)->toContain('this.deadline = null; // race lain -> tenggat lama tak berlaku');
+    // Assert kode-nya, bukan teks komentar di belakangnya (komentar bisa diterjemahkan).
+    expect($blade)->toContain('this.deadline = null;');
 });

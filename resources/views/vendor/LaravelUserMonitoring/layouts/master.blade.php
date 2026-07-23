@@ -57,7 +57,7 @@
                         ← UeType
                     </a>
                     <span class="text-muted/40">/</span>
-                    <h1 class="font-display text-sm text-gold">MONITORING</h1>
+                    <h1 class="font-display text-sm text-gold">{{ Str::upper(__('monitoring.title')) }}</h1>
                 </div>
                 <a href="https://github.com/binafy/laravel-user-monitoring"
                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface border border-border text-muted hover:text-foreground hover:border-elevated transition text-x-small font-mono">
@@ -70,9 +70,9 @@
             <div class="flex flex-wrap items-center gap-1 p-1 rounded-xl bg-surface border border-border mb-4">
                 @php
                     $tabs = [
-                        'user-monitoring.visits-monitoring' => 'Kunjungan',
-                        'user-monitoring.actions-monitoring' => 'Aksi',
-                        'user-monitoring.authentications-monitoring' => 'Autentikasi',
+                        'user-monitoring.visits-monitoring' => __('monitoring.tab.visits'),
+                        'user-monitoring.actions-monitoring' => __('monitoring.tab.actions'),
+                        'user-monitoring.authentications-monitoring' => __('monitoring.tab.authentications'),
                     ];
                 @endphp
                 @foreach ($tabs as $route => $label)
@@ -101,7 +101,7 @@
                         <input id="um-autorefresh-toggle" type="checkbox"
                                onchange="window.umToggleAutoRefresh(this.checked)"
                                class="w-4 h-4 accent-brand">
-                        <span>Auto-refresh (10 dtk)</span>
+                        <span>{{ __('monitoring.auto_refresh') }}</span>
                     </label>
                 </div>
 

@@ -78,7 +78,8 @@ Dibangun dengan **Laravel 12 + Livewire 4 + Alpine.js + Tailwind CSS**, dengan
 ### Monitoring (Admin)
 - **Visit monitoring** (kunjungan halaman), **action monitoring** (create/update/delete
   model penting), **authentication monitoring** (login/logout). Dashboard tersedia di
-  `/user-monitoring/*` dengan auto-refresh 10 detik.
+  `/user-monitoring/*` dengan auto-refresh 10 detik, **hanya untuk akun admin**
+  (`is_admin = true`); selain itu 404.
 
 ---
 
@@ -247,12 +248,20 @@ Akun dummy: `dummy@uetype.test`.
 
 ## Panel Monitoring
 
-Dashboard monitoring aktivitas (perlu login):
+Dashboard monitoring aktivitas, **khusus admin** (`is_admin = true`):
 
 - `/user-monitoring/visits-monitoring` — kunjungan halaman.
 - `/user-monitoring/actions-monitoring` — aksi create/update/delete pada model penting
   (Clan, Room, Message, Friendship).
 - `/user-monitoring/authentications-monitoring` — riwayat login/logout.
+
+Guest maupun user biasa mendapat **404** di ketiga URL itu, jadi keberadaan panelnya tak
+bocor. Semua akun default-nya bukan admin — angkat satu lebih dulu:
+
+```bash
+php artisan user:admin email@kamu.com            # jadikan admin
+php artisan user:admin email@kamu.com --revoke   # cabut hak admin
+```
 
 Data dicatat **real-time** ke database; tampilan dashboard **auto-refresh tiap 10 detik**
 (bisa dimatikan lewat toggle di pojok kanan atas).

@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\Auth;
+
 /**
  * The single source of truth for navigation destinations.
  *
@@ -72,7 +74,7 @@ class NavItems
             'settings' => ['nav.settings', 'settings'],
         ];
 
-        return collect($routes)
+        $items = collect($routes)
             ->map(fn (array $item, string $key) => [
                 'key' => $key,
                 'label' => $item[0],
@@ -81,5 +83,20 @@ class NavItems
             ])
             ->values()
             ->all();
+
+        // Admin-only entry point to the monitoring dashboard. Non-admins never see it,
+        // and the routes themselves are guarded by EnsureUserIsAdmin -- hiding the link
+        // is convenience for admins, not the access control.
+        if (Auth::user()?->is_admin) {
+            $items[] = [
+                'key' => 'monitoring',
+                'label' => 'nav.monitoring',
+                'href' => route('user-monitoring.visits-monitoring'),
+                // Any of the three dashboard tabs lights up this one item.
+                'active' => request()->routeIs('user-monitoring.*'),
+            ];
+        }
+
+        return $items;
     }
 }

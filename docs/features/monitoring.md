@@ -3,8 +3,10 @@
 **Paket:** [`binafy/laravel-user-monitoring`](https://github.com/binafy/laravel-user-monitoring)
 **Provider kustom:** [`App\Providers\UserMonitoringServiceProvider`](../../app/Providers/UserMonitoringServiceProvider.php)
 **Config:** [`config/user-monitoring.php`](../../config/user-monitoring.php)
-**Middleware:** `VisitMonitoringMiddleware` (didaftarkan di [`bootstrap/app.php`](../../bootstrap/app.php))
+**Middleware:** `VisitMonitoringMiddleware` (didaftarkan di [`bootstrap/app.php`](../../bootstrap/app.php)),
+`EnsureUserIsAdmin` ([`app/Http/Middleware/EnsureUserIsAdmin.php`](../../app/Http/Middleware/EnsureUserIsAdmin.php))
 **Dashboard:** `/user-monitoring/visits-monitoring`, `/actions-monitoring`, `/authentications-monitoring`
+**Akses:** **admin saja** (`is_admin = true`) — lihat §3.6
 
 ---
 
@@ -83,6 +85,56 @@ layout dashboard yang di-publish
 presisi milidetik; reload sederhana sudah cukup dan minim kode. (Kalau kelak butuh update
 tanpa reload, bisa naik ke polling AJAX atau broadcast via Reverb.)
 
+### 3.6 Akses dibatasi admin (404, bukan 403)
+
+Dashboard ini sempat **terbuka untuk siapa pun**, termasuk pengunjung yang belum login:
+route-nya didaftarkan oleh provider bawaan paket
+(`LaravelUserMonitoringRouteServiceProvider`) yang **menghardcode** middleware-nya menjadi
+`web` + `VisitMonitoringMiddleware` saja. Artinya IP, browser, dan riwayat halaman seluruh
+pengguna bisa dibaca publik — dan route `DELETE`-nya bisa dipakai menghapus jejak audit.
+
+**Solusi:** provider paket itu **tidak lagi didaftarkan**. Sebagai gantinya
+[`UserMonitoringServiceProvider::registerRoutes()`](../../app/Providers/UserMonitoringServiceProvider.php)
+mengikat file route yang sama di belakang `EnsureUserIsAdmin`.
+
+**Kenapa 404 dan bukan 403:** 403 (atau redirect ke login) sama saja mengonfirmasi bahwa
+halaman itu **ada**. Guest dan user login non-admin sengaja diberi respons **identik** (404)
+supaya keberadaan panel admin tak bisa disimpulkan dari perbedaan respons. Itu juga alasan
+middleware `auth` **tidak** dipakai berbarengan — `auth` akan me-redirect guest ke login dan
+justru membocorkan URL-nya.
+
+**Kenapa `VisitMonitoringMiddleware` dilepas dari grup route ini:** ketiga halaman dashboard
+sudah terdaftar di `visit_monitoring.except_pages`, jadi middleware itu memang tak pernah
+mencatat apa pun di sini. Pencatatan kunjungan halaman biasa tetap jalan karena middleware-nya
+terpasang global di [`bootstrap/app.php`](../../bootstrap/app.php).
+
+**Cara mengangkat admin:** kolom `is_admin` default-nya `false` untuk semua akun, jadi tanpa
+langkah ini tak seorang pun bisa membuka dashboard. Pakai artisan command
+[`user:admin`](../../app/Console/Commands/MakeUserAdmin.php):
+
+```bash
+php artisan user:admin email@kamu.com            # jadikan admin
+php artisan user:admin email@kamu.com --revoke   # cabut hak admin
+```
+
+Bagi admin, item **Monitoring** juga muncul di dropdown akun
+([`NavItems::account()`](../../app/Support/NavItems.php)). Menyembunyikan link itu hanya
+kemudahan navigasi — pengamanan sebenarnya ada di middleware, bukan di menu.
+
+### 3.7 `loadMissing('user')` di view (bukan patch ke vendor)
+
+Controller bawaan paket mem-paginate **tanpa** `with('user')`, padahal
+[`AppServiceProvider`](../../app/Providers/AppServiceProvider.php) mengaktifkan
+`Model::preventLazyLoading()` di luar produksi. Begitu tabelnya berisi data, kolom nama
+pengguna di view memicu **`LazyLoadingViolationException`** — halaman gagal dibuka total.
+
+**Solusi:** ketiga view memanggil `loadMissing('user')` pada paginator sebelum loop. View-nya
+memang sudah di-publish ke repo ini, jadi perbaikannya di sisi kita dan `vendor/` tetap bersih.
+
+**Catatan untuk penulis test:** Laravel **mengecualikan** hasil query berisi **satu model**
+dari guard ini (satu query tambahan bukan N+1). Jadi fixture satu baris akan lolos walau
+bug-nya masih ada — test regresinya sengaja memasukkan **dua baris** per tabel.
+
 ## 4. Tabel Database
 
 | Tabel | Isi |
@@ -112,7 +164,9 @@ Di [`config/user-monitoring.php`](../../config/user-monitoring.php):
 
 ## 7. Catatan Operasional
 
-- Dashboard butuh **login**. Untuk uji lokal cepat, pakai `/dev-login`.
+- Dashboard butuh akun **admin** (`is_admin = true`), bukan sekadar login — non-admin dan guest
+  sama-sama dapat **404** (lihat §3.6). Untuk uji lokal: `/dev-login`, lalu
+  `php artisan user:admin <email>`.
 - Kalau paket ini di-*reinstall*/update via composer, cukup pastikan
   `dont-discover` di `composer.json` tetap ada dan provider kustom tetap terdaftar di
   [`bootstrap/providers.php`](../../bootstrap/providers.php) — migrasi tak perlu diulang.

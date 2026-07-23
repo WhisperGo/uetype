@@ -12,6 +12,7 @@ return [
     'friend_requests_pending' => 'permintaan pertemanan tertunda',
     'chat' => 'Chat',
     'settings' => 'Pengaturan',
+    'monitoring' => 'Monitoring',
     'soon' => 'segera',
     'login' => 'Masuk',
     'register' => 'Daftar',
