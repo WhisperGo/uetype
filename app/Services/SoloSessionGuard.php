@@ -45,6 +45,18 @@ class SoloSessionGuard
      */
     private const MAX_CHARS_PER_SECOND = 15.0;
 
+    /**
+     * Slack (seconds) allowed between the server's own elapsed clock and the duration a
+     * client claims, covering latency and the gap between the last keystroke and the
+     * request landing. Beyond this the claim describes time that never passed.
+     *
+     * At 30 seconds the character window opens to ~500 even for a session submitted
+     * instantly, which comfortably clears an honest run while still refusing the payloads
+     * that matter: ~1500 characters is what buys 150 WPM, the ratio that maxes out a Clan
+     * War point ceiling.
+     */
+    private const DURATION_SLACK_SECONDS = 30.0;
+
     /** Remember that a session just started, with the text the server actually issued. */
     public function start(string $mode, string $subMode, string $text): void
     {
@@ -97,11 +109,16 @@ class SoloSessionGuard
      * The highest character count this session could plausibly have produced.
      *
      * Two independent ceilings, whichever is lower:
-     *  - physical: elapsed seconds x peak human cps;
+     *  - physical: seconds x peak human cps;
      *  - textual: the issued text length (+ tolerance) for the fixed-length modes, since
      *    `words` and `survival` end when the text does and cannot exceed it.
      *
      * `time` mode loops its text, so only the physical ceiling applies there.
+     *
+     * The physical ceiling is measured against however long the server has ACTUALLY held
+     * the session open, not the nominal duration. Otherwise a 120-second war slot submitted
+     * the instant it opened would allow 1800 characters "typed" in no real time at all --
+     * exactly 150 WPM, which is the ratio that maxes out a Clan War point ceiling.
      */
     public function maxPlausibleChars(string $mode, float $durationSeconds): ?int
     {
@@ -111,7 +128,15 @@ class SoloSessionGuard
             return null;
         }
 
-        $physical = (int) ceil($durationSeconds * self::MAX_CHARS_PER_SECOND) + self::CHAR_TOLERANCE;
+        // The window is bounded by real elapsed time PLUS slack, so an automated client
+        // cannot claim a full-length session that never actually ran. The slack keeps
+        // honest submissions safe when the request lands right after the last keystroke.
+        $elapsed = $this->elapsedSeconds();
+        $realSeconds = $elapsed === null
+            ? $durationSeconds
+            : min($durationSeconds, $elapsed + self::DURATION_SLACK_SECONDS);
+
+        $physical = (int) ceil($realSeconds * self::MAX_CHARS_PER_SECOND) + self::CHAR_TOLERANCE;
 
         if ($mode === 'time') {
             return $physical;
@@ -121,6 +146,38 @@ class SoloSessionGuard
             + self::CHAR_TOLERANCE;
 
         return min($physical, $textual);
+    }
+
+    /**
+     * Does the client claim more time than has actually passed since the text was issued?
+     *
+     * An over-claimed duration normally hurts the sender (it lowers WPM), which is why the
+     * claim is otherwise taken at face value. Clan War survival inverts that: points there
+     * scale with `duration_seconds`, so "I survived 9999 seconds" buys the full 150-point
+     * ceiling. Bounding the claim by the server's own clock removes that payoff without
+     * touching honest sessions, which can only ever claim LESS time than has elapsed.
+     */
+    public function claimsMoreTimeThanElapsed(float $claimedSeconds): bool
+    {
+        $elapsed = $this->elapsedSeconds();
+
+        if ($elapsed === null) {
+            return false;
+        }
+
+        return $claimedSeconds > $elapsed + self::DURATION_SLACK_SECONDS;
+    }
+
+    /** Seconds the server has actually held this session open, or null if none is active. */
+    public function elapsedSeconds(): ?float
+    {
+        $session = $this->current();
+
+        if ($session === null) {
+            return null;
+        }
+
+        return max(0.0, microtime(true) - (float) $session['started_at']);
     }
 
     /**

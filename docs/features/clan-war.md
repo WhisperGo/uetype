@@ -99,3 +99,17 @@ dan resolver).
 Poin war hanya dihitung dari `ClanWarModeClaim` yang **sudah disubmit** (`typing_result_id` terisi).
 Klaim yang terkunci tapi belum dikerjakan bernilai 0 — mencegah "kunci semua mode lalu diam" memberi
 keuntungan. Hasil ketik war tetap melewati anti-cheat & Net WPM yang sama dengan mode solo.
+
+**Poin war tak punya jalur input sendiri.** Semuanya diturunkan dari `TypingResult`, jadi apa pun
+yang memalsukan hasil solo otomatis memalsukan poin war — bedanya, poin war menggerakkan **clan
+power yang permanen**. Dua sifat scorer membuat serangan biasa jadi maksimal di sini:
+
+- **survival hard** (ceiling tertinggi, 150) menilai dari `duration_seconds`, sehingga durasi
+  panjang adalah **hadiah**. Di solo justru sebaliknya (durasi panjang menurunkan WPM), jadi
+  asumsi "over-claim durasi merugikan diri sendiri" **tidak berlaku** di war.
+- **time/words** mencapai rasio penuh **persis** di 150 WPM.
+
+Penjaganya ada di [`SoloSessionGuard`](../../app/Services/SoloSessionGuard.php): plafon karakter
+diukur dari waktu yang **benar-benar berlalu di server**, bukan durasi nominal, dan klaim durasi
+yang melebihi umur sesi ditolak. Detail & angka kalibrasi:
+[`anti-cheat-wpm.md`](anti-cheat-wpm.md) §9.

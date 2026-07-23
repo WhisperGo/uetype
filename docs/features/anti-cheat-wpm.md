@@ -248,3 +248,54 @@ di bawah plafon umum 300, jadi dulu **lolos sebagai kemenangan sah**. Ambang rac
 Penolakan terjadi di **jalur live** (`updateRaceProgress`), bukan hanya saat finalisasi —
 karena yang menentukan juara adalah **waktu selesai**, dan itu tercatat saat progress masuk.
 Menilainya 0 WPM saja tak cukup; peringkat diurutkan berdasarkan waktu, bukan kecepatan.
+
+## 9. Integritas Poin Clan War
+
+Poin war **tidak punya jalur input sendiri** — semuanya diturunkan dari sebuah `TypingResult`
+lewat [`ClanWarScorer`](../../app/Services/ClanWarScorer.php). Jadi apa pun yang bisa
+memalsukan hasil solo, otomatis memalsukan poin war. Bedanya: poin war menggerakkan **clan
+power yang permanen**, bukan sekadar satu baris leaderboard.
+
+### 9.1 Kenapa war lebih berbahaya dari solo
+
+Dua sifat scorer membuat serangan yang "biasa saja" di solo jadi maksimal di war:
+
+| Mode war | Rumus poin | Kenapa jadi target |
+|---|---|---|
+| **survival hard** | `duration_seconds / 90` | ceiling tertinggi (**150**), dan **durasi panjang = hadiah** |
+| **time / words** | `net_wpm / 150` | 150 WPM **persis** memberi rasio penuh |
+
+Di solo, durasi panjang justru **menurunkan** WPM — jadi tak ada untungnya berbohong ke arah
+itu. Di survival war, kebalikannya: klaim "bertahan 9999 detik" langsung membeli poin penuh.
+Asumsi "over-claim durasi itu merugikan diri sendiri" **tidak berlaku** di sini.
+
+### 9.2 Tiga celah yang ditutup
+
+| Serangan | Poin sebelum | Sesudah |
+|---|---|---|
+| survival hard, klaim durasi 9999 detik | **150 / 150** (penuh) | ditolak, klaim kosong |
+| time 120, klaim 1500 char (=150 WPM) | **120 / 120** (penuh) | ditolak, klaim kosong |
+| words 10, klaim 4000 char | penuh | ditolak, klaim kosong |
+| *(kontrol)* sesi jujur time 30 | — | **60.84 / 80** — tetap dinilai wajar |
+
+Penjaga kepemilikan klaim (`resolveWarClaim`) sebenarnya **sudah benar**: klaim divalidasi
+ulang di server, harus milik klan si pemain, war harus `Ongoing`, dan `whereNull` mencegah
+klaim ganda. Yang bocor bukan kepemilikannya, melainkan **angka hasilnya**.
+
+### 9.3 Perbaikan: plafon karakter diukur dari waktu NYATA
+
+Sebelumnya plafon karakter dihitung dari durasi **nominal**. Slot war `time 120` karenanya
+mengizinkan ~1800 karakter — walau kiriman datang **0 detik** setelah teks terbit. Artinya
+1500 karakter "diketik" dalam waktu nyata nol, tersimpan sebagai 150 WPM, poin penuh.
+
+Sekarang jendelanya diukur dari **berapa lama server benar-benar memegang sesi itu**
+(`elapsedSeconds()`), ditambah slack 30 detik untuk latensi. Sesi jujur tetap lolos; sesi yang
+tak pernah benar-benar berjalan tidak.
+
+Ditambah `claimsMoreTimeThanElapsed()` untuk `words`/`survival`: durasi yang melebihi umur
+sesi adalah waktu yang tak pernah berlalu, dan itulah yang menutup celah survival.
+
+> **Catatan kalibrasi:** slack 30 detik dipilih dari pengukuran, bukan tebakan. Slack 15 detik
+> memberi plafon 275 karakter dan **ikut menolak sesi jujur** (~300 karakter). Slack 30 detik
+> memberi 500 — cukup longgar untuk pemain nyata, tetap rapat terhadap ~1500 karakter yang
+> dibutuhkan untuk mencapai 150 WPM.

@@ -537,11 +537,27 @@ class TypingEngine extends Component
             return $this->redirect(route('typing'));
         }
 
+        $claimedDuration = max(0.0, (float) $durationMs / 1000);
+
+        // A duration longer than the session has been open is time that never passed. Only
+        // the variable-length modes need this: `time` takes its duration from the sub-mode
+        // regardless, so the claim there is already ignored.
+        //
+        // It matters most for Clan War survival, where points scale with duration_seconds --
+        // "I survived 9999 seconds" would otherwise buy the full 150-point ceiling outright.
+        // Elsewhere a long duration only lowers WPM, which is why the claim is not policed
+        // in the other direction.
+        if ($this->mainMode !== 'time' && $guard->claimsMoreTimeThanElapsed($claimedDuration)) {
+            $guard->clear();
+            session()->flash('result_rejected', __('typing.result_rejected'));
+
+            return $this->redirect(route('typing'));
+        }
+
         // Duration comes from the SERVER, not the payload. In `time` mode the sub-mode
-        // fixes it outright; elsewhere the client's claim is capped by the elapsed server
-        // clock, since under-reporting time is the direction that inflates WPM.
+        // fixes it outright; the variable-length modes keep their (now bounded) claim.
         $duration = $guard->resolveDuration(
-            max(0.0, (float) $durationMs / 1000),
+            $claimedDuration,
             $this->mainMode,
             (string) $this->subMode
         );
