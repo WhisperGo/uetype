@@ -587,11 +587,14 @@ class MultiplayerLobby extends Component
             // two players finishing in the same millisecond can read the same count and
             // get identical numbers.
             //
-            // Deliberately NOT locked. This value lives only a few seconds as on-screen
-            // feedback, then is fully overwritten by finalizeRace(), which re-ranks every
-            // player in one query inside a transaction -- that is the source of truth for
-            // placement. Adding a lock here would pay contention cost on the hottest path
-            // of the race for a number that gets discarded anyway.
+            // Deliberately NOT locked, and the duplicate is never seen by anyone: this
+            // column is NOT rendered while racing. The live "who's ahead" number comes
+            // from rankOf() in resources/js/race-arena.js, computed client-side from
+            // progress. By the time placement IS displayed (the result screen) this value
+            // has been fully overwritten by finalizeRace(), which re-ranks every player in
+            // one query inside a transaction -- the single source of truth for placement.
+            // Locking here would pay contention cost on the hottest path of the race to
+            // deduplicate a number nobody reads and that is discarded anyway.
             $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
                 ->where('role', RoomMember::ROLE_PLAYER)
                 ->whereNotNull('finished_time_seconds')
@@ -658,6 +661,9 @@ class MultiplayerLobby extends Component
             return;
         }
 
+        // Same provisional, unlocked count-then-plus-one as in updateRaceProgress() --
+        // see the comment there for why that is deliberate and harmless. Do not "fix"
+        // this one in isolation.
         $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
             ->where('role', RoomMember::ROLE_PLAYER)
             ->whereNotNull('finished_time_seconds')

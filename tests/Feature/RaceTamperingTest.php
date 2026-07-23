@@ -159,3 +159,59 @@ it('does not let a rejected result steal the winner\'s place', function () {
         ->and($history->place)->toBe(1)
         ->and($history->player_count)->toBe(1);
 });
+
+/**
+ * Sisi LAYAR dari kasus di atas -- yang selama ini luput.
+ *
+ * Test sebelumnya membuktikan kolom `place` dan riwayat permanen sudah benar, tapi
+ * modal hasil tidak pernah membaca kolom itu: ia merender posisi dalam koleksi
+ * ($index + 1), diurutkan wpm DESC. Baris yang ditolak anti-cheat punya WPM
+ * tertinggi justru karena dicurangi, jadi ia tetap berdiri di puncak podium dan
+ * mendorong pemenang jujur ke posisi 2 -- persis kerusakan yang komentar di
+ * FinalizesRace klaim sudah ditutup, tapi hanya ditutup di database.
+ */
+it('does not let a rejected result take the podium on screen', function () {
+    $cheater = User::factory()->create(['username' => 'Cheater']);
+    $honest = User::factory()->create(['username' => 'Honest']);
+
+    $room = tamperRoom($cheater, startedSecondsAgo: 60);
+    $cheatMember = tamperMember($room, $cheater);
+    tamperMember($room, $honest);
+
+    $cheatMember->update([
+        'progress_percent' => 100,
+        'finished_time_seconds' => 2,
+        'wpm' => 600,
+        'accuracy' => 100,
+    ]);
+
+    // Pemain jujur finis -> semua peserta selesai -> fast-path finalize + snapshot.
+    // roomUpdated() menyusul karena fast-path menyiarkan RoomUpdated ke SEMUA klien
+    // (bukan toOthers); itulah yang menyalakan modal hasil -- fast-path sendiri hanya
+    // menyimpan snapshot.
+    $comp = Livewire::actingAs($honest)->test(MultiplayerLobby::class)
+        ->set('roomCode', $room->code)
+        ->set('step', 'racing')
+        ->call('updateRaceProgress', 100, 20, 98)
+        ->call('roomUpdated');
+
+    $snapshot = collect($comp->get('resultSnapshot'));
+
+    // Yang dirender paling atas harus pemenang sah, bukan yang WPM-nya tertinggi.
+    expect($snapshot->first()['user_id'])->toBe($honest->id)
+        ->and($snapshot->first()['place'])->toBe(1);
+
+    // Hasil ditolak tidak membawa angka peringkat sama sekali -> view menampilkan tanda pisah.
+    expect($snapshot->firstWhere('user_id', $cheater->id)['place'])->toBeNull();
+
+    // Podium juara (blok tengah) menampilkan pemain jujur.
+    $html = $comp->html();
+    $marker = '<!-- PODIUM 1 (CENTER) -->';
+
+    expect($html)->toContain($marker);
+
+    $podium = substr($html, strpos($html, $marker), 600);
+
+    expect($podium)->toContain('Honest')
+        ->and($podium)->not->toContain('Cheater');
+});

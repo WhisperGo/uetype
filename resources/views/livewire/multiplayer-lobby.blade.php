@@ -646,6 +646,30 @@
         @php
             $results = collect($this->resultSnapshot)->map(fn ($row) => (object) $row);
             $stillIn = $this->stillInRoomUserIds;
+
+            // Peringkat SELALU dibaca dari kolom `place` yang sudah ditetapkan
+            // finalizeRace() -- tidak pernah dari posisi baris. Keduanya dulu dihitung
+            // terpisah, jadi layar bisa bilang "peringkat 2" untuk pemain yang riwayat
+            // permanennya mencatat juara 1.
+            //
+            // place null = hasil ditolak anti-cheat. Ia tidak pernah mendapat angka:
+            // memberinya nomor urut persis mengembalikan kerusakan yang penolakan itu
+            // ada untuk mencegah. Alasannya sudah disampaikan banner myRejectReason
+            // (untuk yang bersangkutan) dan badge "tidak dihitung" (untuk semua).
+            $rankLabel = function ($place) {
+                if (is_null($place)) {
+                    return '—';
+                }
+
+                $suffix = match ((int) $place) {
+                    1 => 'st',
+                    2 => 'nd',
+                    3 => 'rd',
+                    default => 'th',
+                };
+
+                return $place . (app()->getLocale() === 'en' ? $suffix : '');
+            };
         @endphp
         <div class="space-y-12 animate-fade-in py-4 select-none">
 
@@ -653,13 +677,7 @@
             <div class="flex flex-col space-y-1">
                 <h1 class="text-fluid-title font-mono font-black text-gold tracking-wider uppercase">{{ __('multiplayer.match_result') }}</h1>
                 @php
-                    $myRank = $results->search(fn($m) => $m->user_id === Auth::id()) + 1;
-                    $suffix = match ($myRank) {
-                        1 => 'st',
-                        2 => 'nd',
-                        3 => 'rd',
-                        default => 'th',
-                    };
+                    $myRank = $rankLabel($results->firstWhere('user_id', Auth::id())?->place);
                 @endphp
                 <div class="flex items-center gap-2 text-xs font-mono text-muted uppercase tracking-widest">
                     <span>{{ __('multiplayer.room', ['code' => $this->roomCode]) }}</span>
@@ -669,7 +687,7 @@
                             <span class="text-sm leading-none">&#128065;</span>{{ __('multiplayer.you_spectated') }}
                         </span>
                     @else
-                        <span>{!! __('multiplayer.you_placed', ['rank' => '<strong class="text-foreground font-bold">'.$myRank.(app()->getLocale() === 'en' ? $suffix : '').'</strong>']) !!}</span>
+                        <span>{!! __('multiplayer.you_placed', ['rank' => '<strong class="text-foreground font-bold">'.e($myRank).'</strong>']) !!}</span>
                     @endif
                 </div>
 
@@ -688,10 +706,13 @@
             </div>
 
             <!-- TOP-3 PODIUM VISUAL -->
+            {{-- Dipilih lewat kolom `place`, bukan posisi baris: hasil yang ditolak
+                 anti-cheat membawa place null, jadi ia tidak bisa lagi berdiri di podium
+                 hanya karena WPM curangnya membuatnya terurut paling atas. --}}
             @php
-                $rank1 = $results->get(0);
-                $rank2 = $results->get(1);
-                $rank3 = $results->get(2);
+                $rank1 = $results->firstWhere('place', 1);
+                $rank2 = $results->firstWhere('place', 2);
+                $rank3 = $results->firstWhere('place', 3);
             @endphp
             <div class="grid grid-cols-3 gap-4 items-end max-w-2xl mx-auto pt-16 pb-6 relative">
 
@@ -774,21 +795,14 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border/20">
-                            @foreach ($results as $index => $rank)
+                            @foreach ($results as $rank)
                                 @php
-                                    $pos = $index + 1;
-                                    $suffix = match ($pos) {
-                                        1 => 'st',
-                                        2 => 'nd',
-                                        3 => 'rd',
-                                        default => 'th',
-                                    };
                                     $isMe = $rank->user_id === Auth::id();
                                     $hasLeft = ! in_array($rank->user_id, $stillIn);
                                 @endphp
                                 <tr
                                     class="transition duration-150 {{ $isMe ? 'bg-brand/25 text-foreground font-bold' : 'text-muted hover:bg-foreground/[0.02]' }} {{ $hasLeft ? 'opacity-50' : '' }}">
-                                    <td class="py-4 px-3 sm:px-5 font-bold text-foreground">{{ $pos }}{{ $suffix }}
+                                    <td class="py-4 px-3 sm:px-5 font-bold text-foreground">{{ $rankLabel($rank->place) }}
                                     </td>
                                     <td class="py-4 px-5">
                                         <div class="flex items-center gap-2">

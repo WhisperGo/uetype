@@ -112,6 +112,24 @@ trait ReadsRoomState
     /**
      * The ordered race result board.
      *
+     * ORDERED BY `place`, the column writeFinalStandings() already settled -- NOT by a
+     * ranking of its own. It used to sort by wpm DESC, which made the result screen and
+     * the permanent history disagree: they were two independent rankings that happened
+     * to match only while every player finished (same text -> time and WPM move together).
+     * A DNF breaks that, because the 999s sentinel replaces the finish time while the
+     * accumulated wpm survives -- so someone who quit outranked a slower genuine finisher
+     * on screen while their history said otherwise. Reading the settled column instead of
+     * re-deriving one makes the two impossible to diverge.
+     *
+     * Rejected results carry place = null and sort last; the view renders a dash for them
+     * rather than a number they never earned.
+     *
+     * DEPENDS ON finalization having run. Every caller satisfies that today: the sole
+     * consumer is captureResultSnapshot(), reached only after finalizeRace() (fast-path
+     * in updateRaceProgress, checkSuddenDeath, or roomUpdated reacting to the broadcast
+     * those two send). Read this before finalization and place is null for everyone, so
+     * the order collapses to the wpm tie-break.
+     *
      * with('user') is required: this query RE-loads members (rather than reusing those
      * already eager-loaded in roomData), and captureResultSnapshot() reads $member->user
      * for each row -- without the eager load that's one query per player. Caught by
@@ -128,9 +146,9 @@ trait ReadsRoomState
         return $this->roomData->members()
             ->where('role', RoomMember::ROLE_PLAYER)
             ->with('user')
+            ->orderByRaw('place IS NULL')
+            ->orderBy('place', 'asc')
             ->orderBy('wpm', 'desc')
-            ->orderBy('progress_percent', 'desc')
-            ->orderByRaw('finished_time_seconds IS NULL, finished_time_seconds ASC')
             ->get();
     }
 
