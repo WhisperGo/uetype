@@ -21,7 +21,7 @@
     'py-24' => $spacing !== '16',
     'border border-white/5 rounded-2xl bg-surface/20' => $card,
 ])>
-    <img src="/icon/uetype_mascot.png" alt="" class="w-16 h-16 opacity-30 mb-4">
+    <img src="/icon/uetype_mascot.png" alt="" class="w-16 opacity-30 mb-4">
 
     @if ($title)
         <p class="font-mono text-sm font-bold text-foreground">{{ $title }}</p>
