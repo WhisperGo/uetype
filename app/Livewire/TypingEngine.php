@@ -630,6 +630,17 @@ class TypingEngine extends Component
         $finalRawWpm = $check['raw_wpm'];
         $finalAccuracy = $check['accuracy'];
 
+        // Consistency as an anti-cheat signal (not just a display stat): a near-flat
+        // per-second WPM curve at high speed is a bot posting a fixed WPM each tick -- no
+        // human is that even. Computed server-side from the reported wpmHistory, then folded
+        // into the reason list so the shared gate below rejects it. Low-WPM runs are exempt
+        // inside isImpossiblyConsistent() (a slow, careful beginner is legitimately steady).
+        $consistency = $this->computeConsistency($session->wpmHistory);
+
+        if ($antiCheat->isImpossiblyConsistent($consistency, $finalNetWpm)) {
+            $check['reasons'][] = 'consistency_impossible';
+        }
+
         // Reject only what genuinely deserves it (cheating / empty session / stalling in
         // survival). The gate used to be `! $check['valid']`, which also threw away real
         // SLOW-TYPER results -- low throughput is slow, not cheating, and in time/words the
@@ -647,8 +658,6 @@ class TypingEngine extends Component
         // tell those apart -- 25 characters in 60 seconds is both a 5-WPM beginner and an
         // idle tab -- which is why it stays reserved for survival (see AntiCheatService).
         $isAfk = $this->isAfkSession($session->maxIdleMs / 1000, $duration);
-
-        $consistency = $this->computeConsistency($session->wpmHistory);
 
         $isPersonalBest = false;
         $previousBest = null;
@@ -896,7 +905,8 @@ class TypingEngine extends Component
     }
 
     // Consistency: how steady WPM was across the session (from per-second wpmHistory).
-    // 100% = perfectly even speed. Presentation only, not anti-cheat. Needs >= 2 samples & mean > 0.
+    // 100% = perfectly even speed. Shown to the player AND used as an anti-cheat signal
+    // (see AntiCheatService::isImpossiblyConsistent). Needs >= 2 samples & mean > 0.
     private function computeConsistency(array $history): ?int
     {
         $values = array_values(array_filter($history, fn ($v) => is_numeric($v)));
