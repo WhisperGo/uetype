@@ -84,6 +84,13 @@ class MultiplayerLobby extends Component
      */
     public function mount(): void
     {
+        // Reap members who left without pressing Leave (tab closed / lost connection):
+        // their presence heartbeat has gone stale, so they no longer hold a slot and a
+        // room they abandoned as host gets a new host (or is deleted if now empty). Lazy,
+        // on every lobby load -- no scheduler, mirroring ClanWarResolver. Skip the caller:
+        // they are provably here, and their own heartbeat may not have landed yet.
+        app(RoomMembershipService::class)->sweepOfflineMembers(exceptUserId: Auth::id());
+
         $member = RoomMember::where('user_id', Auth::id())->first();
 
         if (! $member) {

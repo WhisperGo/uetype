@@ -6,6 +6,7 @@ use App\Events\RoomPresenceChanged;
 use App\Events\RoomUpdated;
 use App\Models\Room;
 use App\Models\RoomMember;
+use App\Models\User;
 use App\Support\SafeBroadcast;
 use Illuminate\Support\Facades\DB;
 
@@ -86,6 +87,79 @@ class RoomMembershipService
         SafeBroadcast::run(fn () => broadcast(new RoomUpdated($roomCode)));
 
         return true;
+    }
+
+    /**
+     * Reap "stuck" memberships: a player who closed the tab / lost connection / walked
+     * away WITHOUT pressing Leave. The leave-beacon only removes not-ready, non-host
+     * members on a clean page unload; a ready player or host is deliberately kept so
+     * mount() can restore them -- but if they never come back, their row lingers forever,
+     * holding a slot and (as host) leaving a room no one can start or clean up.
+     *
+     * The signal is the site-wide presence heartbeat: while genuinely on any page the
+     * client pings every ~30s, refreshing users.last_seen_at. So a member whose USER is
+     * offline (User::isOnline() false -> last_seen_at stale past the 60s threshold, or
+     * null after logout) is the one who is actually gone. This reads a maintained signal
+     * rather than inventing a new heartbeat -- an idle-but-present waiter still pings, so
+     * they are never wrongly swept.
+     *
+     * Scoped to 'waiting' rooms only, matching the leave endpoints: a 'racing' room is
+     * settled by the race itself (finish / sudden death), and pulling a competitor
+     * mid-race would corrupt placement. Called lazily on lobby load (no scheduler), the
+     * same pattern ClanWarResolver uses.
+     *
+     * $exceptUserId is never swept even if momentarily stale -- the caller (the person
+     * whose page just loaded) is provably present, and their own heartbeat may not have
+     * landed yet on a fresh load.
+     */
+    public function sweepOfflineMembers(?int $exceptUserId = null): void
+    {
+        $cutoff = now()->subSeconds(User::ONLINE_THRESHOLD_SECONDS);
+
+        // Candidate stale rows: members of waiting rooms whose user hasn't pinged since the
+        // cutoff (or never -> null last_seen_at). Join to users so one query finds them all.
+        $stale = RoomMember::query()
+            ->join('rooms', 'rooms.id', '=', 'room_members.room_id')
+            ->join('users', 'users.id', '=', 'room_members.user_id')
+            ->where('rooms.status', 'waiting')
+            ->when($exceptUserId, fn ($q) => $q->where('room_members.user_id', '!=', $exceptUserId))
+            ->where(fn ($q) => $q->whereNull('users.last_seen_at')->orWhere('users.last_seen_at', '<', $cutoff))
+            ->select('room_members.id', 'room_members.room_id', 'room_members.user_id')
+            ->get();
+
+        if ($stale->isEmpty()) {
+            return;
+        }
+
+        // Group by room so each affected room is settled once, after all its stale members
+        // are gone -- host handoff / delete-if-empty then reflects the final membership.
+        $affectedRoomIds = [];
+
+        DB::transaction(function () use ($stale, &$affectedRoomIds) {
+            RoomMember::whereIn('id', $stale->pluck('id'))->delete();
+
+            foreach ($stale->groupBy('room_id') as $roomId => $members) {
+                $room = Room::find($roomId);
+
+                if (! $room) {
+                    continue;
+                }
+
+                // Pass one of the departed users so host handoff triggers if the host was
+                // among the swept; settleAbandonedRoom re-checks host_id against it.
+                $this->settleAbandonedRoom($room, (int) $members->first()->user_id);
+
+                if (Room::whereKey($roomId)->exists()) {
+                    $affectedRoomIds[$roomId] = $room->code;
+                }
+            }
+        });
+
+        // Tell the surviving members to re-render (freed slots, possible new host). Outside
+        // the transaction: broadcasting is a side effect that shouldn't hold the DB lock.
+        foreach ($affectedRoomIds as $code) {
+            SafeBroadcast::run(fn () => broadcast(new RoomUpdated($code)));
+        }
     }
 
     /**

@@ -28,7 +28,20 @@ class UserFactory extends Factory
             'is_admin' => false,
             'preferences' => null,
             'remember_token' => Str::random(10),
+            // A factory user represents an active account: present, so isOnline() is true
+            // and the multiplayer stale-member sweep won't reap them from a room. Tests that
+            // need an offline/absent user set last_seen_at explicitly (null or a past time)
+            // -- see PresenceTest and the offline() helper in MultiplayerStaleSweepTest.
+            'last_seen_at' => now(),
         ];
+    }
+
+    /** An absent/offline user: last_seen_at is null, so isOnline() is false. */
+    public function offline(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'last_seen_at' => null,
+        ]);
     }
 
     /**
