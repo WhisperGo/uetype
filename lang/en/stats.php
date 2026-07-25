@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'header' => 'Stats',
+    'header' => 'STATS',
 
     'tab' => [
         'solo' => 'Solo',

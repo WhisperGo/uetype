@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Monitoring',
+    'title' => 'MONITORING',
     'auto_refresh' => 'Auto-refresh (10s)',
 
     'tab' => [

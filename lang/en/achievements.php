@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'header' => 'Achievements',
+    'header' => 'ACHIEVEMENTS',
     'back_to_profile' => 'Profile',
     'unlocked_count' => ':count / :total unlocked',
     'earned' => 'Earned',

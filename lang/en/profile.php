@@ -1,8 +1,8 @@
 <?php
 
 return [
-    'header' => 'Profile',
-    'header_public' => 'Player Profile',
+    'header' => 'PROFILE',
+    'header_public' => 'PLAYER PROFILE',
     'back' => 'Back',
     'joined' => 'Joined :date',
     'level' => 'Level :level',

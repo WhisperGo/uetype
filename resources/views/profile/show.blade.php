@@ -1,19 +1,5 @@
 {{-- User profile page: identity header, level progress, stat cards, and (own profile) a link to full stats. --}}
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex items-center gap-3">
-            @if($isPublic)
-                <a href="{{ route('friends.index') }}" wire:navigate class="text-muted hover:text-foreground transition" aria-label="{{ __('profile.back') }}">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-                    </svg>
-                </a>
-            @endif
-            <h2 class="font-mono text-xl font-semibold tracking-tight text-foreground">
-                {{ $isPublic ? __('profile.header_public') : __('profile.header') }}
-            </h2>
-        </div>
-    </x-slot>
 
     @php
         // Total practice time as HH:MM:SS (zero-padded, precise to the second). Hours are
@@ -30,6 +16,21 @@
 
     <div class="py-10">
         <div class="max-w-5xl px-4 mx-auto space-y-8 sm:px-6 lg:px-8">
+
+            {{-- Page title: same treatment as the CLAN / CHAT headers (font-display,
+                 fluid-title). The back arrow stays for another player's public profile. --}}
+            <div class="flex items-center gap-3">
+                @if($isPublic)
+                    <a href="{{ route('friends.index') }}" wire:navigate class="text-muted hover:text-foreground transition" aria-label="{{ __('profile.back') }}">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </a>
+                @endif
+                <h1 class="font-display text-fluid-title tracking-wide text-foreground">
+                    {{ $isPublic ? __('profile.header_public') : __('profile.header') }}
+                </h1>
+            </div>
 
             <!-- ===== IDENTITY HEADER ===== -->
             <div class="relative p-6 overflow-hidden border bg-surface/70 border-white/10 rounded-3xl sm:p-8">

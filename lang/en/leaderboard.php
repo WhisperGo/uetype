@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Leaderboard',
+    'title' => 'LEADERBOARD',
     'all_time' => 'All Time',
     'daily' => 'Daily',
     'language' => 'Language',

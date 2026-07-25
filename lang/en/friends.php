@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Friends',
+    'title' => 'FRIENDS',
 
     'tab' => [
         'friends' => 'Friends (:count)',

@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Chat',
+    'title' => 'CHAT',
 
     'tab_friends' => 'Friends',
     'tab_clan' => 'Clan',
