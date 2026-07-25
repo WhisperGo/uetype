@@ -7,10 +7,10 @@ return [
 
     'my_best' => 'Rekor Terbaikku',
     'your_best' => 'Rekor Terbaikmu',
-    'my_best_empty' => 'Selesaikan tes Time/Words dulu untuk melawan rekor terbaikmu sendiri.',
+    'my_best_empty' => 'Catat rekor di mode ini dulu untuk melawan rekor terbaikmu sendiri.',
 
     'friends' => 'Teman',
-    'friends_empty' => 'Belum ada teman dengan catatan waktu.',
+    'friends_empty' => 'Belum ada teman dengan rekor di mode ini.',
 
     'leaderboard' => 'Papan Peringkat',
     'leaderboard_empty' => 'Papan peringkat kosong untuk mode ini.',

@@ -14,7 +14,6 @@ return [
     'new_personal_best' => 'new personal best',
     'pb' => 'PB :time',
     'pb_short_by' => ':seconds s short',
-    'vs_record' => 'vs record :best',
     'beat_ghost' => 'beat the ghost',
     'lost_ghost' => 'lost to the ghost',
     'vs_ghost' => 'vs :label (:wpm wpm)',

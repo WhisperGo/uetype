@@ -13,21 +13,38 @@ it('renders the typing page with ghost picker mounted', function () {
     actingAs($user)->get('/typing')->assertOk()->assertSeeLivewire(GhostPicker::class);
 });
 
-it('hides My Best when highest_wpm is 0', function () {
-    $user = User::factory()->create(['highest_wpm' => 0]);
+/** Satu baris rekor untuk mode+config tertentu. */
+function pickerResult(User $user, string $mode, string $config, float $wpm): void
+{
+    TypingResult::create([
+        'user_id' => $user->id, 'mode' => $mode, 'mode_config' => $config,
+        'net_wpm' => $wpm, 'raw_wpm' => $wpm + 5, 'accuracy' => 96,
+        'correct_chars' => 300, 'incorrect_chars' => 10, 'duration_seconds' => 30,
+    ]);
+}
+
+it('hides My Best when there is no record for this mode', function () {
+    // Punya rekor karier, tapi belum pernah main config ini -> tak ada pace yang jujur.
+    $user = User::factory()->create(['highest_wpm' => 90]);
     Livewire::actingAs($user)->test(GhostPicker::class, ['mainMode' => 'time', 'subMode' => '30'])
-        ->assertSee('Complete a Time/Words test first');
+        ->assertSee('Set a record in this mode first');
 });
 
-it('exposes My Best when highest_wpm > 0', function () {
-    $user = User::factory()->create(['highest_wpm' => 85.5]);
+it('exposes My Best from the record for this mode', function () {
+    $user = User::factory()->create(['highest_wpm' => 120]);
+    pickerResult($user, 'time', '30', 85.5);
+    pickerResult($user, 'time', '15', 120); // sprint: tak boleh muncul untuk time/30
+
     Livewire::actingAs($user)->test(GhostPicker::class, ['mainMode' => 'time', 'subMode' => '30'])
         ->assertSee('Your Best')
-        ->assertSee('85.5');
+        ->assertSee('85.5')
+        ->assertDontSee('120');
 });
 
 it('selectOpponent own dispatches ghost-selected with server-derived wpm', function () {
-    $user = User::factory()->create(['highest_wpm' => 77.3]);
+    $user = User::factory()->create();
+    pickerResult($user, 'time', '30', 77.3);
+
     Livewire::actingAs($user)->test(GhostPicker::class, ['mainMode' => 'time', 'subMode' => '30'])
         ->call('selectOpponent', 'own')
         ->assertDispatched('ghost-selected', wpm: 77.3, label: 'Your Best');

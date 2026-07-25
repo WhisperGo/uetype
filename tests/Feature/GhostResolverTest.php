@@ -26,8 +26,16 @@ function ghostResult(User $user, string $mode, string $config, float $wpm): Typi
     ]);
 }
 
-it('resolve own memakai highest_wpm viewer', function () {
-    $me = User::factory()->create(['highest_wpm' => 88.5]);
+/**
+ * Ghost adalah PACE yang dikejar, dan sebuah pace cuma bermakna melawan tes yang sama.
+ * Dulu 'own' & 'friend' membaca users.highest_wpm -- satu angka lintas mode -- sehingga
+ * balapan di time 120 dipacu oleh sprint time 15 yang tak mungkin dipertahankan dua menit.
+ */
+it('resolve own memakai rekor viewer untuk mode+config aktif', function () {
+    // Rekor karier 150 (dari sprint time/15) tak boleh bocor ke pace time/30.
+    $me = User::factory()->create(['highest_wpm' => 150]);
+    ghostResult($me, 'time', '15', 150);
+    ghostResult($me, 'time', '30', 88.5);
 
     $ghost = $this->resolver->resolve('own', null, 'time', '30', $me->id);
 
@@ -37,15 +45,19 @@ it('resolve own memakai highest_wpm viewer', function () {
         ->and($ghost['label'])->toBe('Your Best');
 });
 
-it('resolve own mengembalikan null kalau belum punya rekor (highest_wpm 0)', function () {
-    $me = User::factory()->create(['highest_wpm' => 0]);
+it('resolve own mengembalikan null kalau belum punya rekor di config itu', function () {
+    // Punya rekor karier & rekor di time/30, tapi belum pernah main time/60.
+    $me = User::factory()->create(['highest_wpm' => 120]);
+    ghostResult($me, 'time', '30', 120);
 
-    expect($this->resolver->resolve('own', null, 'time', '30', $me->id))->toBeNull();
+    expect($this->resolver->resolve('own', null, 'time', '60', $me->id))->toBeNull();
 });
 
-it('resolve friend butuh accepted-friendship milik viewer', function () {
+it('resolve friend memakai rekor teman untuk mode+config aktif', function () {
     $me = User::factory()->create();
-    $friend = User::factory()->create(['username' => 'kawan', 'highest_wpm' => 70]);
+    $friend = User::factory()->create(['username' => 'kawan', 'highest_wpm' => 200]);
+    ghostResult($friend, 'time', '30', 70);
+    ghostResult($friend, 'time', '15', 200);
 
     $f = Friendship::create([
         'requester_id' => $me->id,

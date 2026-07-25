@@ -17,11 +17,6 @@
                 default => ucfirst($mode) . ' · ' . $subMode,
             };
 
-            $recordDelta = null;
-            if (!$isSurvival && !$isPersonalBest && $previousBest > 0) {
-                $recordDelta = round($wpm - $previousBest, 1);
-            }
-
             $wordsTyped = (int) floor(($correctKeystrokes ?? 0) / 5);
 
             $pbSeconds = $survivalPreviousBest !== null ? (int) round($survivalPreviousBest) : null;
@@ -181,16 +176,18 @@
 
                 {{-- Achievement moment = gold pill (matching the PB treatment in the survival
                      branch around line 82), NOT small text. Solo can show a PB AND a ghost at once,
-                     so this stays a column. Loss / below-record states stay muted text -- not a celebration. --}}
+                     so this stays a column.
+
+                     The record is mentioned ONLY when it is broken. There used to be an
+                     "-39 vs record 70.2" line on every other session, which compared the run
+                     against a global cross-mode record it could not fairly be measured
+                     against -- so it was near-permanently negative and read as a reminder of
+                     failure rather than information. --}}
                 <div class="mt-6 flex flex-col items-center gap-2">
                     @if ($isPersonalBest)
                         <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gold/10 border border-gold/40 text-gold font-mono text-sm">
                             <span>✦</span> {{ __('result.new_personal_best') }}
                         </span>
-                    @elseif (!is_null($recordDelta))
-                        <p class="font-mono text-sm text-muted tabular-nums">
-                            {{ $recordDelta >= 0 ? '+' : '' }}{{ $recordDelta }} <span class="text-muted/70">{{ __('result.vs_record', ['best' => rtrim(rtrim(number_format($previousBest, 1), '0'), '.')]) }}</span>
-                        </p>
                     @endif
 
                     @if ($ghostResult)

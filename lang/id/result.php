@@ -14,7 +14,6 @@ return [
     'new_personal_best' => 'rekor pribadi baru',
     'pb' => 'PB :time',
     'pb_short_by' => 'kurang :seconds d lagi',
-    'vs_record' => 'vs rekor :best',
     'beat_ghost' => 'mengalahkan ghost',
     'lost_ghost' => 'kalah dari ghost',
     'vs_ghost' => 'vs :label (:wpm wpm)',

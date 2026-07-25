@@ -40,7 +40,7 @@
                                     wire:key="ghost-friend-{{ $row['friendship_id'] }}"
                                     class="w-full flex items-center justify-between p-3 border bg-surface/40 border-white/5 rounded-xl hover:border-brand/40 transition text-left">
                                     <span class="font-mono text-sm text-foreground truncate">{{ $row['username'] }}</span>
-                                    <span class="font-mono text-sm font-bold text-brand-bright shrink-0 ml-2">{{ rtrim(rtrim(number_format($row['highest_wpm'], 1), '0'), '.') }} wpm</span>
+                                    <span class="font-mono text-sm font-bold text-brand-bright shrink-0 ml-2">{{ rtrim(rtrim(number_format($row['wpm'], 1), '0'), '.') }} wpm</span>
                                 </button>
                             @endforeach
                         </div>

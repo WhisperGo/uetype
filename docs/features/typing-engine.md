@@ -88,6 +88,33 @@ if ($this->mainMode !== 'survival' && $finalNetWpm > (float) $user->highest_wpm)
 jadi WPM-nya bukan perbandingan *apple-to-apple* dengan Time/Words. Rekor Survival diukur dari
 **lama bertahan** (`duration_seconds`), bukan WPM. Ini menjaga arti "rekor WPM" tetap konsisten.
 
+### 3.4.a Dua angka "terbaik" yang berbeda: rekor karier vs rekor per mode
+
+| Angka | Sumber | Cakupan | Dipakai di |
+|---|---|---|---|
+| **Rekor karier** | kolom `users.highest_wpm` | lintas mode (time **dan** words, semua config) | kartu profil, daftar teman, achievement 100/150/200 WPM |
+| **Rekor mode** | `MAX(net_wpm)` dari `typing_results` per `mode`+`mode_config` | satu konfigurasi saja | penentu **PB di layar hasil**, dan pace **Ghost Mode** |
+
+**Justifikasi (masalah yang diperbaiki):** dulu layar hasil membandingkan sesi dengan
+`highest_wpm` — satu angka global. Tes pendek selalu menghasilkan WPM lebih tinggi, jadi hasil
+`time 120` diukur terhadap rekor yang mungkin dibuat di `time 15`, dan selisihnya **nyaris selalu
+negatif** (layar menampilkan hal seperti `-39 vs record 70.2` hampir tiap sesi). Survival sejak
+awal sudah benar — rekornya diturunkan per `mode`+`mode_config` — jadi mode standard kini
+mengikuti pola yang sama, sekaligus selaras dengan cara **leaderboard** mengelompokkan hasil
+(`mode_config` memang kunci filternya).
+
+Konsekuensi yang disengaja: ada **8 kantong rekor** (time 15/30/60/120 + words 10/25/50/100),
+dan karena `MAX()` atas kantong kosong bernilai `null`, **hasil pertama di tiap kantong otomatis
+jadi PB** — aturan yang sama persis dengan survival.
+
+`highest_wpm` **tidak dibuang**: ia menjawab pertanyaan berbeda ("secepat apa pemain ini pernah
+mengetik") dan tetap jadi angka headline sosial. Dua pertanyaan, dua angka.
+
+**Rekor hanya disebut saat dipecahkan.** Baris "selisih vs rekor" untuk sesi yang *tidak*
+memecahkan rekor sudah dihapus: karena dasar perbandingannya timpang, baris itu berfungsi sebagai
+pengingat kekalahan tiap sesi, bukan informasi. Sekarang hanya pil emas
+`result.new_personal_best` yang muncul, dan hanya ketika rekornya benar-benar pecah.
+
 ### 3.4.b Sesi yang ditinggalkan (AFK) tidak dicatat
 
 ```php

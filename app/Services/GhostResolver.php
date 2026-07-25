@@ -32,8 +32,8 @@ class GhostResolver
     public function resolve(string $type, ?int $refId, string $mainMode, string $subMode, ?int $viewerId): ?array
     {
         $resolved = match ($type) {
-            'own' => $this->resolveOwn($viewerId),
-            'friend' => $this->resolveFriend($refId, $viewerId),
+            'own' => $this->resolveOwn($viewerId, $mainMode, $subMode),
+            'friend' => $this->resolveFriend($refId, $viewerId, $mainMode, $subMode),
             'leaderboard' => $this->resolveLeaderboard($refId, $mainMode, $subMode),
             default => null,
         };
@@ -46,23 +46,43 @@ class GhostResolver
         return ['type' => $type] + $resolved;
     }
 
-    /** The player's own best record (mode-independent: highest_wpm). */
-    private function resolveOwn(?int $viewerId): ?array
+    /**
+     * The best Net WPM a user ever reached in THIS mode+config, or null if they have no
+     * record there. Every opponent type funnels through here.
+     *
+     * A ghost is a pace to chase, and a pace only means anything against the same test.
+     * 'own' and 'friend' used to read users.highest_wpm -- ONE cross-mode figure -- so
+     * racing in time 120 paced you against a time 15 sprint nobody sustains for two
+     * minutes, and a friend's ghost claimed a speed they may never have reached in that
+     * mode at all. 'leaderboard' was already scoped this way; now all three agree.
+     */
+    private function bestWpmIn(?int $userId, string $mainMode, string $subMode): ?float
     {
-        if ($viewerId === null) {
+        if ($userId === null) {
             return null;
         }
 
-        $wpm = (float) (User::find($viewerId)?->highest_wpm ?? 0);
+        $best = TypingResult::where('user_id', $userId)
+            ->where('mode', $mainMode)
+            ->where('mode_config', $subMode)
+            ->max('net_wpm');
 
-        return ['wpm' => $wpm, 'label' => 'Your Best'];
+        return $best === null ? null : (float) $best;
+    }
+
+    /** The player's own record for the active mode+config. */
+    private function resolveOwn(?int $viewerId, string $mainMode, string $subMode): ?array
+    {
+        $wpm = $this->bestWpmIn($viewerId, $mainMode, $subMode);
+
+        return $wpm === null ? null : ['wpm' => $wpm, 'label' => 'Your Best'];
     }
 
     /**
-     * A friend's best record (highest_wpm). refId = friendship_id, which MUST be an
+     * A friend's record for the active mode+config. refId = friendship_id, which MUST be an
      * accepted friendship involving the viewer -- prevents guessing other people's IDs.
      */
-    private function resolveFriend(?int $refId, ?int $viewerId): ?array
+    private function resolveFriend(?int $refId, ?int $viewerId, string $mainMode, string $subMode): ?array
     {
         if ($refId === null || $viewerId === null) {
             return null;
@@ -86,30 +106,25 @@ class GhostResolver
             return null;
         }
 
-        return ['wpm' => (float) $friend->highest_wpm, 'label' => $friend->username];
+        $wpm = $this->bestWpmIn($friend->id, $mainMode, $subMode);
+
+        return $wpm === null ? null : ['wpm' => $wpm, 'label' => $friend->username];
     }
 
     /**
-     * A user's best record in the ACTIVE mode+config (MAX net_wpm). refId = user_id.
+     * A user's record in the ACTIVE mode+config. refId = user_id.
      * If the user has no record for that config -> null (fail-safe; ghost hidden).
      */
     private function resolveLeaderboard(?int $refId, string $mainMode, string $subMode): ?array
     {
-        if ($refId === null) {
-            return null;
-        }
+        $wpm = $this->bestWpmIn($refId, $mainMode, $subMode);
 
-        $best = TypingResult::where('user_id', $refId)
-            ->where('mode', $mainMode)
-            ->where('mode_config', $subMode)
-            ->max('net_wpm');
-
-        if ($best === null) {
+        if ($wpm === null) {
             return null;
         }
 
         $label = User::find($refId)?->username ?? 'Leaderboard';
 
-        return ['wpm' => (float) $best, 'label' => $label];
+        return ['wpm' => $wpm, 'label' => $label];
     }
 }

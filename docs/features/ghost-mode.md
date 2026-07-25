@@ -40,6 +40,22 @@ target, dan di akhir sesi pemain diberi tahu menang/kalah beserta selisih karakt
 menurunkan WPM dari DB berdasarkan identifier yang divalidasi kepemilikannya, ghost selalu
 merepresentasikan rekor nyata.
 
+### 3.1.a Ketiga tipe memakai rekor **mode+config yang sedang aktif**
+
+Semua tipe lawan (`own`, `friend`, `leaderboard`) melewati satu helper `bestWpmIn()` =
+`MAX(net_wpm)` untuk `mode`+`mode_config` aktif; tak ada rekor di konfigurasi itu → `null` →
+ghost disembunyikan (fail-safe).
+
+**Justifikasi:** ghost adalah **pace yang dikejar**, dan sebuah pace hanya bermakna melawan tes
+yang sama. Dulu hanya `leaderboard` yang di-scope begini; `own` dan `friend` membaca
+`users.highest_wpm` — satu angka lintas mode. Akibatnya balapan di `time 120` dipacu oleh sprint
+`time 15` yang tak mungkin dipertahankan dua menit, dan ghost seorang teman mengklaim kecepatan
+yang mungkin **tak pernah ia capai** di mode itu. Sekarang ketiganya sepakat pada satu definisi.
+
+**Konsekuensi UI yang disengaja:** teman kini hanya muncul di picker untuk mode yang benar-benar
+pernah mereka mainkan — perilaku yang memang sudah berlaku untuk daftar leaderboard di picker
+yang sama. Lihat juga [typing-engine.md](typing-engine.md) §3.4.a.
+
 ### 3.2 Validasi kepemilikan untuk tipe `friend`
 
 `selectOpponent('friend', $refId)` memverifikasi bahwa `friendship_id` benar-benar milik user

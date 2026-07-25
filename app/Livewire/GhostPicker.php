@@ -33,22 +33,36 @@ class GhostPicker extends Component
         return in_array($this->mainMode, ['time', 'words'], true);
     }
 
-    /** The current user's own best WPM (for the "race yourself" option). */
+    /**
+     * The player's own record for the ACTIVE mode+config (for the "race yourself" option).
+     *
+     * Scoped like every other opponent in this picker: users.highest_wpm is a cross-mode
+     * career figure, so offering it here paced a 120-second race against a 15-second sprint.
+     */
     public function getMyBestProperty(): float
     {
-        return (float) (Auth::user()->highest_wpm ?? 0);
+        if (! Auth::check() || ! $this->isEligibleMode()) {
+            return 0.0;
+        }
+
+        return (float) (TypingResult::where('user_id', Auth::id())
+            ->where('mode', $this->mainMode)
+            ->where('mode_config', $this->subMode)
+            ->max('net_wpm') ?? 0);
     }
 
     /**
-     * Accepted friends with highest_wpm > 0 only; those who've never played are hidden.
+     * Accepted friends who hold a record in the ACTIVE mode+config; the rest are hidden,
+     * exactly as the leaderboard list already behaves. A friend therefore appears only in
+     * the modes they have actually played -- their number is a pace you can really chase.
      *
-     * @return Collection<int, array{friendship_id:int, user_id:int, username:string, highest_wpm:float}>
+     * @return Collection<int, array{friendship_id:int, user_id:int, username:string, wpm:float}>
      */
     public function getEligibleFriendsProperty()
     {
         $me = Auth::id();
 
-        return Friendship::with(['requester', 'addressee'])
+        $friends = Friendship::with(['requester', 'addressee'])
             ->where('status', FriendshipStatus::Accepted)
             ->where(fn ($q) => $q->where('requester_id', $me)->orWhere('addressee_id', $me))
             ->get()
@@ -59,11 +73,28 @@ class GhostPicker extends Component
                     'friendship_id' => $f->id,
                     'user_id' => $friend->id,
                     'username' => $friend->username,
-                    'highest_wpm' => (float) $friend->highest_wpm,
                 ] : null;
             })
-            ->filter(fn ($row) => $row !== null && $row['highest_wpm'] > 0)
-            ->sortByDesc('highest_wpm')
+            ->filter()
+            ->values();
+
+        if ($friends->isEmpty()) {
+            return collect();
+        }
+
+        // ONE grouped query for every friend's record: looking each friend up individually
+        // would be a query per row rendered in the picker.
+        $bests = TypingResult::whereIn('user_id', $friends->pluck('user_id'))
+            ->where('mode', $this->mainMode)
+            ->where('mode_config', $this->subMode)
+            ->groupBy('user_id')
+            ->selectRaw('user_id, MAX(net_wpm) as best')
+            ->pluck('best', 'user_id');
+
+        return $friends
+            ->map(fn (array $row) => $row + ['wpm' => (float) ($bests[$row['user_id']] ?? 0)])
+            ->filter(fn (array $row) => $row['wpm'] > 0)
+            ->sortByDesc('wpm')
             ->values();
     }
 

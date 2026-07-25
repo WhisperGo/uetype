@@ -7,10 +7,10 @@ return [
 
     'my_best' => 'My Best',
     'your_best' => 'Your Best',
-    'my_best_empty' => 'Complete a Time/Words test first to race your own best.',
+    'my_best_empty' => 'Set a record in this mode first to race your own best.',
 
     'friends' => 'Friends',
-    'friends_empty' => 'No friends with a recorded time yet.',
+    'friends_empty' => 'No friends with a record in this mode yet.',
 
     'leaderboard' => 'Leaderboard',
     'leaderboard_empty' => 'Leaderboard is empty for this mode.',

@@ -19,7 +19,8 @@ function lbResult(User $user, string $mode, string $config, float $wpm): void
 }
 
 it('menyimpan identitas ghost ke session saat memilih (own)', function () {
-    $user = User::factory()->create(['highest_wpm' => 88]);
+    $user = User::factory()->create();
+    lbResult($user, 'time', '30', 88);
 
     Livewire::actingAs($user)->test(GhostPicker::class, ['mainMode' => 'time', 'subMode' => '30'])
         ->call('selectOpponent', 'own');
@@ -43,7 +44,8 @@ it('menyimpan user_id untuk pilihan leaderboard', function () {
  * the ghost that was set must APPEAR AGAIN, not vanish.
  */
 it('memulihkan ghost dari session saat mount berikutnya (skenario Next Test)', function () {
-    $user = User::factory()->create(['highest_wpm' => 77]);
+    $user = User::factory()->create();
+    lbResult($user, 'time', '30', 77);
     session(['ghost_selection' => ['type' => 'own', 'ref_id' => null]]);
 
     Livewire::actingAs($user)->test(TypingEngine::class)
@@ -52,7 +54,8 @@ it('memulihkan ghost dari session saat mount berikutnya (skenario Next Test)', f
 });
 
 it('tidak memulihkan ghost kalau session kosong', function () {
-    $user = User::factory()->create(['highest_wpm' => 77]);
+    $user = User::factory()->create();
+    lbResult($user, 'time', '30', 77);
 
     Livewire::actingAs($user)->test(TypingEngine::class)
         ->assertSet('ghostActive', false)
@@ -73,7 +76,8 @@ it('menurunkan ULANG wpm dari DB saat restore, bukan angka beku', function () {
 });
 
 it('suspend saat pindah ke survival TANPA menghapus pilihan session', function () {
-    $user = User::factory()->create(['highest_wpm' => 90]);
+    $user = User::factory()->create();
+    lbResult($user, 'time', '30', 90);
     session(['ghost_selection' => ['type' => 'own', 'ref_id' => null]]);
 
     Livewire::actingAs($user)->test(TypingEngine::class)
@@ -86,7 +90,8 @@ it('suspend saat pindah ke survival TANPA menghapus pilihan session', function (
 });
 
 it('memulihkan ghost lagi saat balik dari survival ke time/words', function () {
-    $user = User::factory()->create(['highest_wpm' => 90]);
+    $user = User::factory()->create();
+    lbResult($user, 'time', '30', 90);
     session(['ghost_selection' => ['type' => 'own', 'ref_id' => null]]);
 
     Livewire::actingAs($user)->test(TypingEngine::class)
@@ -98,7 +103,8 @@ it('memulihkan ghost lagi saat balik dari survival ke time/words', function () {
 });
 
 it('clearGhost menghapus pilihan dari session dan menyembunyikan', function () {
-    $user = User::factory()->create(['highest_wpm' => 90]);
+    $user = User::factory()->create();
+    lbResult($user, 'time', '30', 90);
     session(['ghost_selection' => ['type' => 'own', 'ref_id' => null]]);
 
     Livewire::actingAs($user)->test(TypingEngine::class)
@@ -164,7 +170,8 @@ it('deep-link tak valid (lawan tanpa rekor) tidak menulis session', function () 
 
 it('ghost teman ikut sticky lintas mount', function () {
     $me = User::factory()->create();
-    $friend = User::factory()->create(['username' => 'kawan', 'highest_wpm' => 82]);
+    $friend = User::factory()->create(['username' => 'kawan']);
+    lbResult($friend, 'time', '30', 82);
     $f = Friendship::create([
         'requester_id' => $me->id, 'addressee_id' => $friend->id,
         'status' => FriendshipStatus::Accepted,

@@ -679,10 +679,19 @@ class TypingEngine extends Component
         if (Auth::check() && ! $isAfk) {
             $user = Auth::user();
 
-            // Captured before the transaction overwrites highest_wpm. Survival is excluded from the WPM record.
-            $previousBest = (float) $user->highest_wpm;
-            $isPersonalBest = $this->mainMode !== 'survival' && $finalNetWpm > $previousBest;
-
+            // The record to beat is the best in THIS mode+config, read before the
+            // transaction inserts this session's own row.
+            //
+            // It used to be users.highest_wpm -- one global figure covering time AND words
+            // and every sub-mode at once. Short tests always score higher, so a `time 120`
+            // result was measured against a `time 15` record and the screen showed a
+            // negative delta almost every session. Survival already scoped its record this
+            // way; standard mode now matches it (and matches how the leaderboard buckets
+            // results, since mode_config is its filter key).
+            //
+            // highest_wpm is deliberately NOT replaced: it stays the cross-mode CAREER best
+            // behind the profile card, the friends list, the ghost picker and the WPM
+            // achievements. Two different questions, two different numbers.
             if ($this->mainMode === 'survival') {
                 $survivalPreviousBest = TypingResult::where('user_id', $user->id)
                     ->where('mode', 'survival')
@@ -691,6 +700,16 @@ class TypingEngine extends Component
 
                 $isSurvivalPersonalBest = $survivalPreviousBest === null
                     || $duration > (float) $survivalPreviousBest;
+            } else {
+                $modeBest = TypingResult::where('user_id', $user->id)
+                    ->where('mode', $this->mainMode)
+                    ->where('mode_config', (string) $this->subMode)
+                    ->max('net_wpm');
+
+                // No record in this bucket yet -> the first run sets it, the same rule
+                // survival applies above.
+                $previousBest = $modeBest === null ? null : (float) $modeBest;
+                $isPersonalBest = $modeBest === null || $finalNetWpm > (float) $modeBest;
             }
 
             DB::transaction(function () use (
