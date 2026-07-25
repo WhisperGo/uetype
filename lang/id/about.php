@@ -15,11 +15,11 @@ return [
     'close' => 'Tutup',
 
     'bio' => [
-        'jessie' => 'Merancang rasa UeType — dari wireframe pertama sampai piksel terakhir, menjaga tiap layar tetap jelas dan bertujuan.',
-        'jason' => 'Membangun antarmuka tempatmu mengetik, memastikan tiap ketukan terasa seketika dan tiap animasi mulus.',
-        'nando' => 'Menggarap sisi server: mesin pengetikan, penilaian, dan data yang menggerakkan papan peringkat.',
-        'yusuf' => 'Membangun backend di balik balapan multiplayer, clan, dan chat real-time.',
-        'kevin' => 'Sengaja merusak agar kamu tak perlu mengalaminya — menguji tiap mode, kasus tepi, dan race condition.',
+        'jessie' => 'Memimpin produk dan desain: merancang alur tiap mode permainan, lalu menata tampilan, layout, dan gaya visualnya agar seluruh aplikasi terasa menyatu.',
+        'jason' => 'Membangun sisi depan tempatmu mengetik — tampilan ketik langsung, arena balapan, dan animasinya — serta menghubungkannya ke server agar progres, WPM, dan hasil ter-update secara real-time.',
+        'nando' => 'Membangun inti back-end pengetikan: generator teks, penghitungan WPM dan akurasi, pemeriksaan anti-cheat, hingga statistik dan papan peringkat di balik tiap hasil.',
+        'yusuf' => 'Membangun back-end multiplayer dan sosial: room balapan real-time, sistem clan dan Clan War, pertemanan, serta chat langsung — lengkap dengan presence dan anti-cheat yang menjaga pertandingan tetap adil.',
+        'kevin' => 'Menjaga kualitas: menulis pengujian otomatis dan memburu kasus tepi di tiap mode, mulai dari penanganan give-up dan AFK sampai race condition di multiplayer.',
     ],
 
     'disclaimer' => 'UeType adalah proyek mahasiswa yang dibuat untuk tujuan pembelajaran.',

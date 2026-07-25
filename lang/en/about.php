@@ -15,11 +15,11 @@ return [
     'close' => 'Close',
 
     'bio' => [
-        'jessie' => 'Shapes how UeType feels — from the first wireframe to the final pixel, keeping every screen clear and purposeful.',
-        'jason' => 'Builds the interface you type on, making sure every keystroke lands instantly and every animation stays smooth.',
-        'nando' => 'Works on the server side: the typing engine, scoring, and the data that powers the leaderboards.',
-        'yusuf' => 'Builds the backend behind multiplayer races, clans, and real-time chat.',
-        'kevin' => 'Breaks things on purpose so you never have to — testing every mode, edge case, and race condition.',
+        'jessie' => 'Leads product and design: maps out the game modes, then designs the screens, layout, and visual style so the whole app looks and feels like one piece.',
+        'jason' => 'Builds the front-end you actually type on — the live typing view, the race arena, and the animations — wiring it to the server so progress, WPM, and results update in real time.',
+        'nando' => 'Builds the core typing back-end: the text generator, the WPM and accuracy scoring, the anti-cheat checks, and the stats and leaderboards behind every result.',
+        'yusuf' => 'Builds the multiplayer and social back-end: real-time race rooms, the clan and Clan War system, friends, and live chat — plus the presence and anti-cheat that keep matches fair.',
+        'kevin' => 'Owns quality: writes the automated tests and hunts edge cases across every mode, from give-up and AFK handling to race conditions in multiplayer.',
     ],
 
     'disclaimer' => 'UeType is a student project built for learning purposes.',
