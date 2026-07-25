@@ -23,6 +23,24 @@ return [
     'not_ready' => 'NOT READY',
     'empty_slot' => 'Empty Slot',
 
+    // Invite-a-friend picker (opened from an empty player slot).
+    'invite_friend' => 'Invite',
+    'invite_title' => 'Invite a friend',
+    'invite_subtitle' => 'Online friends can join this room straight from a notification.',
+    'invite_action' => 'Invite',
+    'invite_in_room' => 'In room',
+    'invite_online' => 'Online',
+    'invite_offline' => 'Offline',
+    'invite_offline_hint' => 'This friend is offline and cannot be invited right now.',
+    'invite_no_friends' => "You don't have any friends to invite yet.",
+    'invite_find_friends' => 'Find friends',
+    // Full-screen invite overlay (profile card with Accept/Decline).
+    'invite_overlay_body' => ' invited you to the game',
+    'invite_overlay_subtitle' => 'Multiplayer race',
+    'invite_accept' => 'Accept',
+    'invite_decline' => 'Decline',
+    'close' => 'Close',
+
     'start_race' => 'Start Race',
     'waiting_ready' => 'Waiting for all participants to be ready...',
     'im_ready' => "I'm Ready",

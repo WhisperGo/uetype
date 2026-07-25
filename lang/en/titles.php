@@ -19,7 +19,7 @@ return [
         'multiplayer.lobby' => 'Multiplayer',
         'leaderboard' => 'Leaderboard',
         'about' => 'About',
-        'terms' => 'Privacy Policy',
+        'terms' => 'Terms and Conditions',
         'login' => 'Sign In',
         'register' => 'Sign Up',
         'style-guide' => 'Design System',

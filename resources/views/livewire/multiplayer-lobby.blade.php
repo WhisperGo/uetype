@@ -21,6 +21,31 @@
             if (this.kickId !== null) { $wire.kickMember(this.kickId); }
             $dispatch('close-modal', 'confirm-kick-member');
         },
+        {{-- Per-friend invite cooldown: after inviting, that friend's button shows a live
+             5-second countdown, then becomes available again -- no page refresh needed.
+             cooldowns maps friendId => seconds remaining (0/absent = invitable). --}}
+        inviteCooldown: 5,
+        cooldowns: {},
+        openInvite() {
+            $dispatch('open-modal', 'invite-friends');
+        },
+        inviteRemaining(id) {
+            return this.cooldowns[id] || 0;
+        },
+        invite(id) {
+            if (this.inviteRemaining(id) > 0) return;
+            $wire.invitePlayer(id);
+
+            // Start the countdown for this friend and tick it down once per second.
+            this.cooldowns[id] = this.inviteCooldown;
+            const timer = setInterval(() => {
+                this.cooldowns[id] = (this.cooldowns[id] || 0) - 1;
+                if (this.cooldowns[id] <= 0) {
+                    delete this.cooldowns[id];
+                    clearInterval(timer);
+                }
+            }, 1000);
+        },
     }"
     data-mp-flags
     data-mp-in-room="{{ $mpInRoom ? '1' : '0' }}"
@@ -285,13 +310,22 @@
                                 </div>
                             </div>
                         @else
-                            <div
-                                class="p-5 border border-dashed border-border/50 flex flex-col items-center justify-center text-center rounded-2xl opacity-40">
+                            {{-- Empty slot: click to invite a friend. Any member may invite.
+                                 The dashed card turns into a "+ Invite" affordance on hover. --}}
+                            <button type="button" x-on:click="openInvite()"
+                                class="group p-5 border border-dashed border-border/50 flex flex-col items-center justify-center text-center rounded-2xl transition duration-200 opacity-40 hover:opacity-100 hover:border-brand-bright/60 hover:bg-brand-bright/5 focus:outline-none focus-visible:ring-1 focus-visible:ring-brand-bright/50"
+                                title="{{ __('multiplayer.invite_friend') }}"
+                                aria-label="{{ __('multiplayer.invite_friend') }}">
                                 <div
-                                    class="w-12 h-12 rounded-full border border-dashed border-border/60 mb-2 flex items-center justify-center font-mono text-sm text-muted">
-                                    ?</div>
-                                <span class="text-xs font-mono text-muted">{{ __('multiplayer.empty_slot') }}</span>
-                            </div>
+                                    class="w-12 h-12 rounded-full border border-dashed border-border/60 mb-2 flex items-center justify-center font-mono text-lg text-muted transition group-hover:border-brand-bright/60 group-hover:text-brand-bright">
+                                    <span class="group-hover:hidden">?</span>
+                                    <span class="hidden group-hover:inline leading-none">+</span>
+                                </div>
+                                <span class="text-xs font-mono text-muted group-hover:text-brand-bright transition">
+                                    <span class="group-hover:hidden">{{ __('multiplayer.empty_slot') }}</span>
+                                    <span class="hidden group-hover:inline">{{ __('multiplayer.invite_friend') }}</span>
+                                </span>
+                            </button>
                         @endif
                     @endforeach
                 </div>
@@ -988,6 +1022,85 @@
                 </div>
             </div>
         </x-modal>
+    @endauth
+
+    {{-- Invite-a-friend overlay. Opened by clicking an empty player slot (openInvite()).
+         Lists the caller's accepted friends: online ones get an Invite button (which fires
+         $wire.invitePlayer and flips to "Invited"), offline ones are shown but disabled.
+         The invited friend receives a real-time toast with a join link (see toasts.js). --}}
+    @auth
+        @if ($this->step === 'waiting')
+            <x-modal name="invite-friends" maxWidth="md" focusable>
+                <div class="p-5 sm:p-6">
+                    <h2 class="font-mono text-xl font-semibold leading-tight text-foreground">
+                        {{ __('multiplayer.invite_title') }}
+                    </h2>
+                    <p class="mt-1 text-sm leading-6 text-muted">{{ __('multiplayer.invite_subtitle') }}</p>
+
+                    <div class="mt-5 max-h-80 overflow-y-auto -mx-1 px-1 space-y-2">
+                        @forelse ($this->invitableFriends as $row)
+                            @php $friend = $row['user']; @endphp
+                            <div class="flex items-center gap-3 p-2.5 rounded-xl border border-border/40 bg-surface/40">
+                                <div class="relative shrink-0">
+                                    <x-friend-avatar :user="$friend" size="w-10 h-10" shape="rounded-lg"
+                                        bg="bg-foreground/5" :bordered="false" fallback-size="w-3/5 h-3/5" />
+                                    {{-- Presence dot. --}}
+                                    <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background {{ $row['online'] ? 'bg-active' : 'bg-muted' }}"></span>
+                                </div>
+
+                                <div class="min-w-0 flex-1">
+                                    <p class="font-mono text-sm font-bold text-foreground truncate">{{ $friend->username }}</p>
+                                    <p class="font-mono text-[11px] uppercase tracking-wider {{ $row['online'] ? 'text-active' : 'text-muted' }}">
+                                        {{ $row['online'] ? __('multiplayer.invite_online') : __('multiplayer.invite_offline') }}
+                                    </p>
+                                </div>
+
+                                @if ($row['in_room'])
+                                    <span class="shrink-0 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-muted">
+                                        {{ __('multiplayer.invite_in_room') }}
+                                    </span>
+                                @elseif ($row['online'])
+                                    {{-- During the post-invite cooldown the button is disabled and
+                                         counts down (e.g. "5s"); at 0 it becomes invitable again. --}}
+                                    <button type="button"
+                                        x-on:click="invite({{ $friend->id }})"
+                                        x-bind:disabled="inviteRemaining({{ $friend->id }}) > 0"
+                                        class="shrink-0 min-w-[5.5rem] text-center px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider rounded-lg border transition disabled:cursor-default"
+                                        x-bind:class="inviteRemaining({{ $friend->id }}) > 0
+                                            ? 'border-active/40 text-active bg-active/10'
+                                            : 'border-brand-bright/50 text-brand-bright hover:bg-brand-bright/10'">
+                                        <span x-show="inviteRemaining({{ $friend->id }}) === 0">{{ __('multiplayer.invite_action') }}</span>
+                                        <span x-show="inviteRemaining({{ $friend->id }}) > 0" x-cloak>
+                                            <span x-text="inviteRemaining({{ $friend->id }})"></span>s
+                                        </span>
+                                    </button>
+                                @else
+                                    <span class="shrink-0 px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-muted/60 border border-border/30 rounded-lg cursor-not-allowed"
+                                        title="{{ __('multiplayer.invite_offline_hint') }}">
+                                        {{ __('multiplayer.invite_action') }}
+                                    </span>
+                                @endif
+                            </div>
+                        @empty
+                            <div class="py-8 text-center">
+                                <p class="font-mono text-sm text-muted">{{ __('multiplayer.invite_no_friends') }}</p>
+                                <a href="{{ route('friends.index') }}" class="mt-2 inline-block font-mono text-xs text-brand-bright hover:underline">
+                                    {{ __('multiplayer.invite_find_friends') }}
+                                </a>
+                            </div>
+                        @endforelse
+                    </div>
+
+                    <div class="mt-6 flex items-center justify-end">
+                        <button type="button"
+                            x-on:click="$dispatch('close-modal', 'invite-friends')"
+                            class="rounded-lg px-3 py-1.5 font-mono text-sm text-muted transition-colors duration-150 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                            {{ __('multiplayer.close') }}
+                        </button>
+                    </div>
+                </div>
+            </x-modal>
+        @endif
     @endauth
 
     {{-- Race arena logic lives in resources/js/race-arena.js (Alpine 'race' store

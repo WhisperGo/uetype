@@ -8,7 +8,7 @@ return [
     'tagline' => 'Sign in to save your progress and play with friends.',
     'continue_google' => 'Continue with Google',
     'privacy_prefix' => 'By continuing, you agree to',
-    'privacy_link' => 'the privacy policy',
+    'privacy_link' => 'the terms and conditions',
     'privacy_suffix' => 'of UeType.',
 
     'username' => [

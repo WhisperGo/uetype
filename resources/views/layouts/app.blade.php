@@ -52,6 +52,13 @@
         @auth
             <x-toast-stack />
 
+            {{-- ===== ROOM INVITE NOTIFICATION =====
+                 A friend's race-room invitation, shown as a non-blocking bottom-right card
+                 with Accept/Decline on any page (so it never covers the typing area). Driven
+                 by the `room-invite-received` window event that <x-toast-stack /> raises from
+                 the friends.{id} channel. --}}
+            <x-room-invite-overlay />
+
             {{-- ===== GLOBAL CHAT OVERLAY =====
                  A chat drawer openable from any page, mounted once here (outside
                  {{ '{{ $slot }}' }}) so it survives across wire:navigate like the

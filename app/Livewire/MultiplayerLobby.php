@@ -2,7 +2,9 @@
 
 namespace App\Livewire;
 
+use App\Enums\FriendshipStatus;
 use App\Events\RaceProgressUpdated;
+use App\Events\RoomInvitationSent;
 use App\Events\RoomMessageSent;
 use App\Events\RoomPresenceChanged;
 use App\Events\RoomUpdated;
@@ -10,13 +12,16 @@ use App\Events\SuddenDeathTriggered;
 use App\Livewire\Concerns\FinalizesRace;
 use App\Livewire\Concerns\ManagesRoomMembership;
 use App\Livewire\Concerns\ReadsRoomState;
+use App\Models\Friendship;
 use App\Models\Room;
 use App\Models\RoomMember;
+use App\Models\User;
 use App\Services\AntiCheatService;
 use App\Services\RoomMembershipService;
 use App\Services\TextGeneratorService;
 use App\Support\SafeBroadcast;
 use App\Support\TypingLanguage;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
@@ -82,7 +87,7 @@ class MultiplayerLobby extends Component
      * (see MultiplayerPresenceController), so no stale row is restored; a ready/host member
      * (whom the beacon skips) is brought right back.
      */
-    public function mount(): void
+    public function mount(?string $invite = null): void
     {
         // Reap members who left without pressing Leave (tab closed / lost connection):
         // their presence heartbeat has gone stale, so they no longer hold a slot and a
@@ -90,6 +95,18 @@ class MultiplayerLobby extends Component
         // on every lobby load -- no scheduler, mirroring ClanWarResolver. Skip the caller:
         // they are provably here, and their own heartbeat may not have landed yet.
         app(RoomMembershipService::class)->sweepOfflineMembers(exceptUserId: Auth::id());
+
+        // Arrived from a room-invite link (/multiplayer?invite=CODE): auto-join that room.
+        // Read from the request query string as the source of truth (with the injected arg
+        // as a fallback for the test harness) since Livewire injects route params, not query
+        // params, into mount() by name. On success joinRoomByCode already set step/roomCode
+        // and subscribed, so we return -- avoiding a redundant second restore + subscribe. A
+        // bad/expired code just flashes an error and falls through to the choose screen.
+        $inviteCode = request()->query('invite', $invite);
+
+        if (is_string($inviteCode) && strlen($inviteCode) === 6 && $this->joinRoomByCode(strtoupper($inviteCode))) {
+            return;
+        }
 
         $member = RoomMember::where('user_id', Auth::id())->first();
 
@@ -223,12 +240,22 @@ class MultiplayerLobby extends Component
             return;
         }
 
+        $this->joinRoomByCode($code);
+    }
+
+    /**
+     * Join an existing waiting room by an already-validated code. Shared by the manual
+     * join-code form (joinRoom) and the invite deep link (mount's ?invite handler).
+     * Returns true on success; on failure it flashes an error and returns false.
+     */
+    private function joinRoomByCode(string $code): bool
+    {
         $room = Room::where('code', $code)->where('status', 'waiting')->first();
 
         if (! $room) {
             session()->flash('error', __('multiplayer.error_room_not_found'));
 
-            return;
+            return false;
         }
 
         // One transaction covers two things at once:
@@ -272,7 +299,7 @@ class MultiplayerLobby extends Component
         if ($full) {
             session()->flash('error', __('multiplayer.error_room_full'));
 
-            return;
+            return false;
         }
 
         $this->roomCode = $code;
@@ -286,6 +313,8 @@ class MultiplayerLobby extends Component
         // Presence notice to other members: "<user> joined". ->toOthers() so the
         // joiner doesn't see a notice about themselves.
         SafeBroadcast::run(fn () => broadcast(new RoomPresenceChanged($code, Auth::user()->username, 'join'))->toOthers());
+
+        return true;
     }
 
     /** React to a room change broadcast by another player and re-sync local step/state. */
@@ -480,6 +509,94 @@ class MultiplayerLobby extends Component
         // remaining players see the freed slot. Not ->toOthers(): the host also needs
         // the re-render to drop the kicked card immediately.
         SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
+    }
+
+    /**
+     * The caller's accepted friends, for the "invite to room" picker shown when an empty
+     * slot is clicked. Each row: the friend, whether they're online, and whether they're
+     * already in THIS room (so the UI can show "In room" instead of an invite button).
+     *
+     * Any member (not just the host) may open this -- inviting is collaborative. Offline
+     * friends are still listed but not invitable (the toast + join link would go unseen).
+     *
+     * @return Collection<int, array{user: User, online: bool, in_room: bool}>
+     */
+    public function getInvitableFriendsProperty()
+    {
+        $me = Auth::id();
+
+        $friendships = Friendship::query()
+            ->where('status', FriendshipStatus::Accepted)
+            ->where(fn ($q) => $q->where('requester_id', $me)->orWhere('addressee_id', $me))
+            ->with(['requester', 'addressee'])
+            ->get();
+
+        // The users already in this room, so they're marked "in room" rather than invitable.
+        $memberIds = $this->roomData
+            ? $this->roomData->members->pluck('user_id')->all()
+            : [];
+
+        return $friendships
+            ->map(fn (Friendship $f) => $f->requester_id === $me ? $f->addressee : $f->requester)
+            ->filter() // guard against a soft-missing side
+            ->map(fn ($user) => [
+                'user' => $user,
+                'online' => $user->isOnline(),
+                'in_room' => in_array($user->id, $memberIds, true),
+            ])
+            // Online-and-invitable first, then online in-room, then offline; alphabetical within.
+            ->sortBy(fn ($row) => [$row['in_room'] ? 1 : 0, $row['online'] ? 0 : 1, mb_strtolower($row['user']->username)])
+            ->values();
+    }
+
+    /**
+     * Invite an accepted friend to this room. Delivered as a real-time toast on the
+     * friend's 'friends.{id}' channel (already subscribed for friend/presence events),
+     * carrying a deep link to /multiplayer?invite=CODE where mount() auto-joins.
+     *
+     * Guards: must be in a waiting room, the target must be a real accepted friend (so the
+     * feature can't be used to spam arbitrary users), and they must not already be a member.
+     * Rate-limited per inviter to blunt invite-spam.
+     */
+    public function invitePlayer(int $friendId): void
+    {
+        $room = Room::where('code', $this->roomCode)->first();
+
+        // Only from inside a waiting room, and never invite yourself.
+        if (! $room || $room->status !== 'waiting' || $friendId === Auth::id()) {
+            return;
+        }
+
+        // Must be an accepted friendship in either direction -- not an arbitrary user id.
+        $isFriend = Auth::user()->friendshipWith($friendId)?->status === FriendshipStatus::Accepted;
+
+        if (! $isFriend) {
+            return;
+        }
+
+        // Already in the room? Nothing to invite.
+        if (RoomMember::where('room_id', $room->id)->where('user_id', $friendId)->exists()) {
+            return;
+        }
+
+        // Cap invites so a member can't flood a friend with toasts (10/min per inviter).
+        $key = 'room-invite:'.Auth::id();
+
+        if (RateLimiter::tooManyAttempts($key, 10)) {
+            return;
+        }
+
+        RateLimiter::hit($key, 60);
+
+        SafeBroadcast::run(fn () => broadcast(new RoomInvitationSent(
+            $friendId,
+            $room->code,
+            Auth::user()->username,
+            Auth::user()->avatar,
+        )));
+
+        // Confirm to the inviter so the UI can show a one-off "invite sent" acknowledgement.
+        $this->dispatch('invite-sent', friendId: $friendId);
     }
 
     /**

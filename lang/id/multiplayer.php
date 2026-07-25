@@ -23,6 +23,24 @@ return [
     'not_ready' => 'BELUM SIAP',
     'empty_slot' => 'Slot Kosong',
 
+    // Pemilih undang teman (dibuka dari slot pemain yang kosong).
+    'invite_friend' => 'Undang',
+    'invite_title' => 'Undang teman',
+    'invite_subtitle' => 'Teman yang online bisa langsung bergabung ke ruang ini dari notifikasi.',
+    'invite_action' => 'Undang',
+    'invite_in_room' => 'Di ruang',
+    'invite_online' => 'Online',
+    'invite_offline' => 'Offline',
+    'invite_offline_hint' => 'Teman ini sedang offline dan tidak bisa diundang sekarang.',
+    'invite_no_friends' => 'Kamu belum punya teman untuk diundang.',
+    'invite_find_friends' => 'Cari teman',
+    // Overlay undangan layar penuh (kartu profil dengan Terima/Tolak).
+    'invite_overlay_body' => ' mengundangmu ke permainan',
+    'invite_overlay_subtitle' => 'Balapan multiplayer',
+    'invite_accept' => 'Terima',
+    'invite_decline' => 'Tolak',
+    'close' => 'Tutup',
+
     'start_race' => 'Mulai Balapan',
     'waiting_ready' => 'Menunggu semua peserta siap...',
     'im_ready' => 'Aku Siap',

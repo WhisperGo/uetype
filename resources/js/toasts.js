@@ -65,6 +65,16 @@ export default function toastStack(config) {
             channel.listen('.presence.updated', () => {
                 window.dispatchEvent(new CustomEvent('friendship-updated-remote'));
             });
+
+            // Multiplayer room invite: a friend invited us to their race room. Instead of a
+            // toast, this raises a full profile overlay (Accept / Decline) -- rendered by the
+            // room-invite-overlay component. Forward the whole payload to it via a window event.
+            channel.stopListening('.room.invitation');
+            channel.listen('.room.invitation', (e) => {
+                if (!e?.roomCode) return;
+
+                window.dispatchEvent(new CustomEvent('room-invite-received', { detail: e }));
+            });
         },
 
         listenClan() {

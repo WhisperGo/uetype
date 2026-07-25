@@ -41,8 +41,8 @@ it('embeds each localized bio into the card payload', function () {
     $html = Livewire::test(About::class)->html();
 
     // Bio EN ikut ter-render di payload x-on:click tiap kartu.
-    expect($html)->toContain('final pixel');   // jessie
-    expect($html)->toContain('race condition'); // kevin
+    expect($html)->toContain('one piece');      // jessie
+    expect($html)->toContain('race conditions'); // kevin
 });
 
 it('uses the indonesian bio when the locale is id', function () {
@@ -50,9 +50,9 @@ it('uses the indonesian bio when the locale is id', function () {
 
     $html = Livewire::test(About::class)->html();
 
-    expect($html)->toContain('piksel terakhir');       // jessie
-    expect($html)->toContain('chat real-time');        // yusuf
-    expect($html)->not->toContain('final pixel');
+    expect($html)->toContain('terasa menyatu');        // jessie
+    expect($html)->toContain('chat langsung');         // yusuf
+    expect($html)->not->toContain('one piece');
 });
 
 it('never leaves a bio translation key unresolved', function () {

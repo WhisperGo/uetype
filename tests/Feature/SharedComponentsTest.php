@@ -74,10 +74,17 @@ it('tidak menyisakan kelas tombol emas yang ditulis tangan', function () {
 });
 
 it('menyediakan komponen bersama yang diharapkan', function () {
-    foreach (['empty-state', 'btn-gold', 'btn-ghost', 'friend-avatar', 'toast-stack'] as $name) {
+    foreach (['empty-state', 'btn-gold', 'btn-ghost', 'friend-avatar', 'toast-stack', 'room-invite-overlay'] as $name) {
         expect(file_exists(resource_path("views/components/{$name}.blade.php")))
             ->toBeTrue("Komponen {$name} hilang");
     }
+});
+
+it('memasang overlay undangan room di layout global agar muncul di semua halaman', function () {
+    // Overlay harus ada di app.blade.php (bukan di satu halaman) supaya undangan bisa
+    // muncul di mana pun user berada, sama seperti toast stack.
+    expect(file_get_contents(resource_path('views/layouts/app.blade.php')))
+        ->toContain('<x-room-invite-overlay');
 });
 
 it('membuang komponen tombol yang tak dipakai siapa pun', function () {
