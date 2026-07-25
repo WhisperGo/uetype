@@ -249,7 +249,9 @@ describe('multiplayer lobby', function () {
             'finished_time_seconds' => 999,
         ]);
         $this->assertDatabaseHas('rooms', ['code' => 'GIVEUP', 'status' => 'racing']);
-        expect($room->fresh()->countdown_started_at)->not->toBeNull();
+        // Giving up is a concession, not a valid finish: it must NOT start the sudden-death
+        // clock. That only runs once someone finishes with a valid result.
+        expect($room->fresh()->countdown_started_at)->toBeNull();
     });
 
     it('finishes the room when the last active player gives up', function () {

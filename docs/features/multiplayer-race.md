@@ -72,15 +72,28 @@ milidetik (galat hingga 1 detik). Dengan mengirim **durasi relatif** ("hitung mu
 sejak halaman ini diterima"), jam & zona waktu klien tak lagi relevan — semua klien countdown-nya
 sinkron tanpa peduli seberapa akurat jam mereka.
 
-### 3.4 Sudden Death (15 detik) setelah pemain pertama finish
+### 3.4 Sudden Death (15 detik) setelah pemain pertama finish **valid**
 
-Saat pemain pertama menyentuh 100%, `countdown_started_at` di-set dan `SuddenDeathTriggered`
-disiarkan dengan **timestamp akhir yang sama** ke semua klien.
+Saat pemain pertama menyentuh 100% **dengan hasil yang valid**, `countdown_started_at` di-set dan
+`SuddenDeathTriggered` disiarkan dengan **timestamp akhir yang sama** ke semua klien.
 
 **Justifikasi:** race tak boleh menggantung menunggu pemain lambat/AFK selamanya. Sudden death
 memberi jendela adil (15 detik) bagi yang tersisa untuk menyelesaikan, lalu race ditutup. Timestamp
 akhir yang seragam menjaga countdown mundur sinkron di semua layar; server tetap gerbang final
 lewat `checkSuddenDeath()` (idempoten meski dipicu beberapa klien).
+
+**Gerbang validitas (penting):** `updateRaceProgress()` memvalidasi finish **sebelum** ia boleh
+menyalakan sudden death atau mengambil `place`. Hasil yang akan ditolak finalisasi (fast-garbage:
+progress tinggi + akurasi mustahil rendah, atau sesi kosong) **tidak** menyalakan timer — kalau
+tidak, satu pemain yang men-spam bisa memotong race untuk pemain jujur yang masih mengetik, dan
+menempati podium. Finisher tak valid **tetap** ditandai selesai (tak bisa lanjut balapan) tapi
+`place = null`; timer baru menyala saat ada finisher **valid**. Aturan validitas yang dipakai sama
+persis dengan finalisasi (`isValidRaceResult()` → `AntiCheatService::rejectsRaceResult()`), satu
+definisi.
+
+**Give up bukan finish:** menekan GIVE UP adalah konsesi (DNF), jadi **tidak** menyalakan sudden
+death dan tak mengambil place — race tetap menunggu finisher valid. Placement hasil tak valid/DNF
+ditampilkan sebagai **`—`** di layar hasil (via `place = null`, lihat `$rankLabel`).
 
 ### 3.5 Urutan menang (`place`) berdasarkan waktu selesai, bukan WPM
 

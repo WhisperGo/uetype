@@ -620,26 +620,45 @@ class MultiplayerLobby extends Component
             // updated_at only if race_starts_at is empty. absolute: true -> no negatives.
             $updateData['finished_time_seconds'] = (int) round($durationSeconds);
 
-            // TEMPORARY place, not authoritative. This count-then-plus-one is not atomic:
-            // two players finishing in the same millisecond can read the same count and
-            // get identical numbers.
-            //
-            // Deliberately NOT locked, and the duplicate is never seen by anyone: this
-            // column is NOT rendered while racing. The live "who's ahead" number comes
-            // from rankOf() in resources/js/race-arena.js, computed client-side from
-            // progress. By the time placement IS displayed (the result screen) this value
-            // has been fully overwritten by finalizeRace(), which re-ranks every player in
-            // one query inside a transaction -- the single source of truth for placement.
-            // Locking here would pay contention cost on the hottest path of the race to
-            // deduplicate a number nobody reads and that is discarded anyway.
-            $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
-                ->where('role', RoomMember::ROLE_PLAYER)
-                ->whereNotNull('finished_time_seconds')
-                ->count();
+            // Validate the finish BEFORE it can start sudden death or take a place. A result
+            // that finalization would reject anyway (fast-garbage: high progress with an
+            // impossibly low accuracy, or an empty session) must not (a) start the sudden
+            // death clock -- that would cut the race short for the honest players still
+            // typing -- nor (b) claim a podium slot. So an invalid finisher is marked
+            // finished (they can't keep racing) but with place = null, and sudden death only
+            // ever starts off a VALID finish. isValidRaceResult reads the member's accuracy
+            // and progress, so apply this update to the in-memory model first.
+            $member->progress_percent = $progressPercent;
+            $member->accuracy = $accuracy;
+            $member->finished_time_seconds = $updateData['finished_time_seconds'];
+            $isValidFinish = $this->isValidRaceResult($member, $correctChars);
 
-            $updateData['place'] = $alreadyFinishedCount + 1;
+            if ($isValidFinish) {
+                // TEMPORARY place, not authoritative. This count-then-plus-one is not atomic:
+                // two players finishing in the same millisecond can read the same count and
+                // get identical numbers. Deliberately NOT locked, and the duplicate is never
+                // seen by anyone: this column is NOT rendered while racing (the live "who's
+                // ahead" number comes from rankOf() in race-arena.js). By the time placement
+                // IS displayed (the result screen) finalizeRace() has re-ranked everyone in
+                // one transaction -- the single source of truth for placement. Only VALID
+                // finishers are counted, so an invalid one never shifts the honest standings.
+                $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
+                    ->where('role', RoomMember::ROLE_PLAYER)
+                    ->whereNotNull('finished_time_seconds')
+                    ->whereNotNull('place')
+                    ->count();
 
-            $suddenDeathJustStarted = $this->startSuddenDeathIfNeeded($room);
+                $updateData['place'] = $alreadyFinishedCount + 1;
+
+                // Sudden death starts only off a valid finish: keep waiting for a real
+                // finisher otherwise.
+                $suddenDeathJustStarted = $this->startSuddenDeathIfNeeded($room);
+            } else {
+                // Rejected result: finished, but no place and no sudden death. finalizeRace
+                // will confirm place = null and mark result_recorded = false.
+                $updateData['place'] = null;
+            }
+
             $this->hasFinished = true;
         }
 
@@ -698,28 +717,19 @@ class MultiplayerLobby extends Component
             return;
         }
 
-        // Same provisional, unlocked count-then-plus-one as in updateRaceProgress() --
-        // see the comment there for why that is deliberate and harmless. Do not "fix"
-        // this one in isolation.
-        $alreadyFinishedCount = RoomMember::where('room_id', $room->id)
-            ->where('role', RoomMember::ROLE_PLAYER)
-            ->whereNotNull('finished_time_seconds')
-            ->count();
-
+        // A give-up is a concession (DNF), not a valid finish, so it takes no numbered
+        // place -- finalizeRace re-ranks only valid finishers and confirms this null.
         $member->update([
             'finished_time_seconds' => RoomMember::DNF_SENTINEL_SECONDS,
-            'place' => $alreadyFinishedCount + 1,
+            'place' => null,
         ]);
         $this->forgetRoomCache();
 
         $this->hasGivenUp = true;
 
-        if ($this->startSuddenDeathIfNeeded($room)) {
-            SafeBroadcast::run(fn () => broadcast(new SuddenDeathTriggered(
-                $this->roomCode,
-                $room->countdown_started_at->copy()->addSeconds(self::SUDDEN_DEATH_SECONDS)->toIso8601String(),
-            )));
-        }
+        // Deliberately does NOT start sudden death: the clock only runs once someone
+        // finishes with a VALID result (same rule as updateRaceProgress). Conceding must
+        // not cut the race short for the honest players still typing.
 
         $this->dispatch('force-finish');
 
