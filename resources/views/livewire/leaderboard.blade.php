@@ -68,7 +68,11 @@ $metricFor = fn (string $tab) => $tab === 'survival' ? 'duration_seconds' : 'net
 $scoped = function (string $tab, string $config, string $timeframe, string $language) {
     $q = TypingResult::where('mode', $tab)
         ->where('mode_config', $config)
-        ->where('language', $language);
+        ->where('language', $language)
+        // Only publicly-cleared results reach the board (anti-cheat §7.6): a run held for
+        // review (`pending`) or declined (`rejected`) never appears until a human clears it.
+        // Applied in the single scoped source so BOTH the board and the rank agree.
+        ->whereIn('review_status', [\App\Models\TypingResult::REVIEW_CLEAR, \App\Models\TypingResult::REVIEW_APPROVED]);
 
     if ($timeframe === 'daily') {
         $q->where('created_at', '>=', now()->startOfDay());

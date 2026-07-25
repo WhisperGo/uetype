@@ -10,6 +10,8 @@ use App\Services\AchievementService;
 use App\Services\AntiCheatService;
 use App\Services\ClanWarScorer;
 use App\Services\GhostResolver;
+use App\Services\KeystrokeAnalyzer;
+use App\Services\LongitudinalBaseline;
 use App\Services\SoloSessionGuard;
 use App\Services\TextGeneratorService;
 use App\Services\TypingErrorInspector;
@@ -17,6 +19,7 @@ use App\Support\SoloSessionPayload;
 use App\Support\TypingLanguage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
@@ -52,6 +55,13 @@ class TypingEngine extends Component
      * from sweeping payloads until one clears the anti-cheat checks.
      */
     private const MAX_RESULTS_PER_MINUTE = 10;
+
+    /**
+     * Whether keystroke-timing flags REJECT a run, or are only logged (§7.1). Kept false for
+     * the first rollout: collect logs, confirm no honest player is flagged, THEN flip to true.
+     * Rejecting on day one risks locking out players whose cached bundle sends no intervals.
+     */
+    private const KEYSTROKE_TIMING_ENFORCED = false;
 
     /**
      * Share of the session an idle gap may reach before the run counts as abandoned.
@@ -641,6 +651,27 @@ class TypingEngine extends Component
             $check['reasons'][] = 'consistency_impossible';
         }
 
+        // Keystroke-timing analysis (§7.1): the one check that looks at the SHAPE of the
+        // typing, not just its magnitude. Fail-safe rollout -- while KEYSTROKE_TIMING_ENFORCED
+        // is false, a flagged run is only LOGGED (so we can confirm no honest player trips it
+        // before it can reject anything); an empty sample (old bundle / short run) never
+        // flags. Flip the flag to true once the logs show it's safe.
+        $timing = app(KeystrokeAnalyzer::class)->analyze($session->keyIntervals, $session->keyStrokeCount);
+
+        if ($timing['has_data'] && ! empty($timing['reasons'])) {
+            Log::warning('Keystroke timing flagged', [
+                'user_id' => Auth::id(),
+                'mode' => $this->mainMode,
+                'net_wpm' => $finalNetWpm,
+                'reasons' => $timing['reasons'],
+                'enforced' => self::KEYSTROKE_TIMING_ENFORCED,
+            ]);
+
+            if (self::KEYSTROKE_TIMING_ENFORCED) {
+                $check['reasons'] = array_merge($check['reasons'], $timing['reasons']);
+            }
+        }
+
         // Reject only what genuinely deserves it (cheating / empty session / stalling in
         // survival). The gate used to be `! $check['valid']`, which also threw away real
         // SLOW-TYPER results -- low throughput is slow, not cheating, and in time/words the
@@ -684,9 +715,24 @@ class TypingEngine extends Component
                 'isSurvivalPersonalBest' => $isSurvivalPersonalBest,
             ] = $this->resolvePersonalBest($user->id, $duration, $finalNetWpm);
 
+            // Longitudinal review (§7.5): a run that clears every hard gate but is far out of
+            // line with this player's own history is HELD for review, not rejected -- real
+            // players improve. `pending` rows still save and show on the player's profile but
+            // stay off the public leaderboard and don't advance highest_wpm until approved.
+            // Survival is excluded (its board metric is duration, not WPM). Computed BEFORE the
+            // transaction so it doesn't compare the row against itself.
+            $reviewReason = $this->mainMode === 'survival'
+                ? null
+                : app(LongitudinalBaseline::class)->reviewReasonFor(
+                    $user->id, $this->mainMode, (string) $this->subMode, $finalNetWpm
+                );
+            $reviewStatus = $reviewReason === null
+                ? TypingResult::REVIEW_CLEAR
+                : TypingResult::REVIEW_PENDING;
+
             DB::transaction(function () use (
                 &$xpEarned, $user, $duration, $finalNetWpm, $finalRawWpm, $finalAccuracy,
-                $correctKeystrokes, $incorrectKeystrokes, $score
+                $correctKeystrokes, $incorrectKeystrokes, $score, $reviewStatus, $reviewReason
 
             ) {
                 // XP based on volume + accuracy bonus. The formula is centralized in
@@ -710,6 +756,8 @@ class TypingEngine extends Component
                     'score' => $score, // net word count (survival), null for other modes
                     'xp_earned' => $xpEarned,
                     'ghost_data' => null, // filled selectively by ghost mode later
+                    'review_status' => $reviewStatus,
+                    'review_reason' => $reviewReason,
                 ]);
 
                 // Link to the war claim if this session works one (fail-safe: a solo attempt
@@ -718,7 +766,11 @@ class TypingEngine extends Component
 
                 // WPM record only from the measured time/words modes; survival is excluded
                 // (achieved under stamina pressure, not apples-to-apples, just a side stat).
-                if ($this->mainMode !== 'survival' && $finalNetWpm > (float) $user->highest_wpm) {
+                // A run held for review does NOT advance the PB -- that would leak a flagged
+                // number onto the profile/leaderboard before a human clears it.
+                if ($this->mainMode !== 'survival'
+                    && $reviewStatus === TypingResult::REVIEW_CLEAR
+                    && $finalNetWpm > (float) $user->highest_wpm) {
                     $user->highest_wpm = $finalNetWpm;
                     $user->save();
                 }

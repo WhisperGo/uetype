@@ -26,7 +26,19 @@ class TypingResult extends Model
         'score',
         'xp_earned',
         'ghost_data',
+        'review_status',
+        'review_reason',
     ];
+
+    // Review states for the anti-cheat queue (§7.5/§7.6). Only CLEAR and APPROVED count for
+    // the public leaderboard; PENDING is held for a human; REJECTED was declined.
+    public const REVIEW_CLEAR = 'clear';
+
+    public const REVIEW_PENDING = 'pending';
+
+    public const REVIEW_APPROVED = 'approved';
+
+    public const REVIEW_REJECTED = 'rejected';
 
     protected $casts = [
         'mode' => TypingMode::class,

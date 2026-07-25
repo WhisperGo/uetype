@@ -35,6 +35,10 @@ final class SoloSessionPayload
         /** Left `mixed`: TypingErrorInspector::sanitize() is the one that validates its shape. */
         public readonly mixed $errorEvents,
         public readonly float $maxIdleMs,
+        /** Inter-keystroke intervals (ms), a reservoir sample for timing analysis (§7.1). */
+        public readonly array $keyIntervals,
+        /** True total keystrokes the client saw, so the analyzer knows how much the sample covers. */
+        public readonly int $keyStrokeCount,
     ) {}
 
     /**
@@ -62,6 +66,10 @@ final class SoloSessionPayload
             ghostCharsAtFinish: isset($data['ghostCharsAtFinish']) ? (int) $data['ghostCharsAtFinish'] : null,
             errorEvents: $data['errorEvents'] ?? [],
             maxIdleMs: (float) ($data['maxIdleMs'] ?? 0),
+            // Default [] / 0: an older cached bundle sends neither. The analyzer treats an
+            // empty sample as "no data" (fail-safe log-only), never an automatic rejection.
+            keyIntervals: is_array($data['keyIntervals'] ?? null) ? $data['keyIntervals'] : [],
+            keyStrokeCount: max(0, (int) ($data['keyStrokeCount'] ?? 0)),
         );
     }
 }

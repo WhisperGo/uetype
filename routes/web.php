@@ -8,6 +8,7 @@ use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\MultiplayerPresenceController;
 use App\Http\Controllers\PresenceController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Livewire\About;
 use App\Livewire\Chat;
 use App\Livewire\ClanLeaderboard;
@@ -15,6 +16,7 @@ use App\Livewire\Clans;
 use App\Livewire\ClanShow;
 use App\Livewire\ClanWar;
 use App\Livewire\Friends;
+use App\Livewire\ReviewQueue;
 use App\Livewire\Settings;
 use App\Livewire\Stats;
 use App\Livewire\Terms;
@@ -74,6 +76,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/clan-war', ClanWar::class)->name('clan-war.index');
     Route::get('/clan-leaderboard', ClanLeaderboard::class)->name('clan-leaderboard.index');
     Route::get('/clans/{clan}', ClanShow::class)->name('clans.show');
+
+    // Admin-only anti-cheat review queue (§7.6). EnsureUserIsAdmin -> 404 for non-admins,
+    // same as the monitoring dashboard, so the page's existence doesn't leak.
+    Route::get('/review-queue', ReviewQueue::class)
+        ->middleware(EnsureUserIsAdmin::class)
+        ->name('review-queue');
 
     Volt::route('/multiplayer', 'multiplayer-lobby')->name('multiplayer.lobby');
 

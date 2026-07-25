@@ -26,6 +26,9 @@ class AntiCheatService
         'accuracy_impossible',
         'accuracy_progress_inconsistent',
         'consistency_impossible',
+        'keystroke_timing_uniform',
+        'keystroke_timing_impossible',
+        'keystroke_timing_identical',
     ];
 
     /**
