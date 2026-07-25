@@ -6,7 +6,7 @@
     <h1 class="font-display text-fluid-title tracking-wide text-foreground mb-4">{{ __('clan.title') }}</h1>
 
     <!-- ===== TABS ===== -->
-    <div class="border-b border-white/10 mb-6">
+    {{-- <div class="border-b border-white/10 mb-6">
         <nav class="flex gap-6 -mb-px font-mono text-sm" aria-label="{{ __('clan.tab.aria') }}">
             <button wire:click="setTab('my-clan')"
                 @class([
@@ -14,10 +14,10 @@
                     'border-gold text-foreground font-semibold' => $tab === 'my-clan',
                     'border-transparent text-muted hover:text-foreground' => $tab !== 'my-clan',
                 ])>
-                {{ __('clan.tab.my_clan') }}
-                @if ($this->pendingRequests->count() > 0)
+                {{-- {{ __('clan.tab.my_clan') }} --}}
+                {{-- @if ($this->pendingRequests->count() > 0)
                     <span class="ml-1 px-1.5 py-0.5 rounded bg-gold/20 text-gold text-[0.65rem]">{{ $this->pendingRequests->count() }}</span>
-                @endif
+                @endif --}}
             </button>
             @unless ($this->myClan)
                 <button wire:click="setTab('browse')"
@@ -38,7 +38,7 @@
                 </button>
             @endunless
         </nav>
-    </div>
+    {{-- </div> --}}
 
     {{-- TAB: MY CLAN --}}
     @if ($tab === 'my-clan')
