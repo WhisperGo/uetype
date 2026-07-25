@@ -204,3 +204,48 @@ it('clears DM history from the overlay for the clearing user only', function () 
             return $messages->isEmpty();
         });
 });
+
+/**
+ * Regression: the sender spamming WHILE their DM is open used to keep lighting the FAB's
+ * unread dot, because the new messages landed as unread even though the user was looking
+ * right at them. Opening the thread marks read once; refreshChat() (fired on each incoming
+ * message) must keep the OPEN thread read.
+ */
+it('does not show the unread badge for the DM the user is currently viewing', function () {
+    [$me, $friend] = overlayAcceptedFriends();
+
+    $overlay = Livewire::actingAs($me)->test(ChatOverlay::class)
+        ->call('openDm', $friend->username);
+
+    // The friend spams three more messages while the thread is open.
+    Message::create(['sender_id' => $friend->id, 'recipient_id' => $me->id, 'body' => 'spam 1']);
+    Message::create(['sender_id' => $friend->id, 'recipient_id' => $me->id, 'body' => 'spam 2']);
+    Message::create(['sender_id' => $friend->id, 'recipient_id' => $me->id, 'body' => 'spam 3']);
+
+    // The client relays each arrival as message-received while the overlay is active.
+    $overlay->call('refreshChat');
+
+    expect($overlay->get('unreadCount'))->toBe(0);
+    expect(Message::where('recipient_id', $me->id)->whereNull('read_at')->count())->toBe(0);
+});
+
+/** A message from a DIFFERENT friend, not the open one, must still count as unread. */
+it('still counts unread messages from a conversation that is not open', function () {
+    [$me, $friend] = overlayAcceptedFriends();
+    $other = User::factory()->create();
+    Friendship::create([
+        'requester_id' => $me->id,
+        'addressee_id' => $other->id,
+        'status' => FriendshipStatus::Accepted,
+    ]);
+
+    $overlay = Livewire::actingAs($me)->test(ChatOverlay::class)
+        ->call('openDm', $friend->username);
+
+    // Someone else messages while the user is viewing $friend's thread.
+    Message::create(['sender_id' => $other->id, 'recipient_id' => $me->id, 'body' => 'hey']);
+
+    $overlay->call('refreshChat');
+
+    expect($overlay->get('unreadCount'))->toBe(1);
+});
