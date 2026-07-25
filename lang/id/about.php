@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Tentang UeType',
+    'title' => 'TENTANG UETYPE',
     'tagline' => 'Aplikasi kecepatan mengetik bergaya permainan - balapan, naik level, dan asah ketikanmu.',
 
     'what_is' => 'Apa itu UeType',

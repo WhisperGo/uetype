@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Terms & Conditions',
+    'title' => 'TERMS & CONDITIONS',
     'last_updated' => 'Last updated July 2026',
 
     'sections' => [

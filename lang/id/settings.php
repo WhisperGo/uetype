@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Pengaturan',
+    'title' => 'PENGATURAN',
     'subtitle' => 'Kelola akun dan preferensi mengetikmu',
 
     'language' => [

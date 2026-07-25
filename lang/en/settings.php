@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Settings',
+    'title' => 'SETTINGS',
     'subtitle' => 'Manage your account and typing preferences',
 
     'language' => [
