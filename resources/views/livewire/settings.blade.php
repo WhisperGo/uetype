@@ -4,7 +4,7 @@
     <div class="max-w-4xl px-4 mx-auto space-y-10 sm:px-6 lg:px-8">
 
         <div>
-            <h1 class="font-display text-fluid-title text-foreground leading-none">{{ __('settings.title') }}</h1>
+            <h1 class="font-display text-fluid-title tracking-wide text-foreground">{{ __('settings.title') }}</h1>
             <p class="mt-3 font-mono text-sm text-muted">{{ __('settings.subtitle') }}</p>
         </div>
 

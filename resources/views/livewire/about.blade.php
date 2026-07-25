@@ -10,7 +10,7 @@
 
         {{-- Header --}}
         <div class="mb-10">
-            <h1 class="text-fluid-title font-mono font-bold text-foreground mb-2">{{ __('about.title') }}</h1>
+            <h1 class="font-display text-fluid-title tracking-wide text-foreground mb-2">{{ __('about.title') }}</h1>
             <p class="font-mono text-small text-muted">
                 {{ __('about.tagline') }}
             </p>
