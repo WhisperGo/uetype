@@ -109,22 +109,60 @@ class MultiplayerLobby extends Component
         $this->dispatch('subscribe-room', room: $room->code);
     }
 
+    /**
+     * Change the room's content language, HOST-ONLY, from inside the waiting room.
+     *
+     * Everyone races the same text, so language is a property of the room, not the player.
+     * Changing it regenerates the text (a fresh race in the new language) and broadcasts
+     * RoomUpdated so every client re-renders the new text and language badge. Only while
+     * 'waiting': swapping text mid-race would desync everyone. A non-host call is ignored
+     * server-side even though the UI already hides the control from non-hosts.
+     */
+    public function setRaceLang(string $lang): void
+    {
+        $room = Room::where('code', $this->roomCode)->first();
+
+        if (! $room || $room->host_id !== Auth::id() || $room->status !== 'waiting') {
+            return;
+        }
+
+        $lang = TypingLanguage::resolve($lang);
+
+        if ($lang === $room->language) {
+            return; // no change -> no regen, no broadcast
+        }
+
+        $room->update([
+            'language' => $lang,
+            'text_to_type' => $this->generateRaceText($lang),
+        ]);
+
+        $this->forgetRoomCache();
+
+        SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
+    }
+
     /** Create a fresh room, make the caller its host, and subscribe to its channel. */
     public function createRoom(): void
     {
         $user = Auth::user();
         $code = strtoupper(Str::random(6));
 
+        // Seed the room language from the player's solo preference, so it feels continuous;
+        // the host can change it inside the room afterwards.
+        $language = TypingLanguage::resolve(session('typing_preferences')['contentLang'] ?? null);
+
         // One transaction: leave old rooms + join the new one. If split, there is a
         // window where the player belongs to no room (or to two).
-        DB::transaction(function () use ($user, $code) {
+        DB::transaction(function () use ($user, $code, $language) {
             $this->departCurrentRooms($user->id);
 
             $room = Room::create([
                 'code' => $code,
                 'host_id' => $user->id,
                 'status' => 'waiting',
-                'text_to_type' => $this->generateRaceText(),
+                'language' => $language,
+                'text_to_type' => $this->generateRaceText($language),
             ]);
 
             RoomMember::create([
@@ -147,17 +185,16 @@ class MultiplayerLobby extends Component
     }
 
     /**
-     * Text for one race. This used to assemble its own from the wordlist -- a copy of
-     * TypingEngine's logic, but with indonesian.json HARDCODED. As a result multiplayer
-     * never supported English while solo did: a feature bug born from code duplication.
-     * Both now share the same TextGeneratorService, so the player's content language
-     * is honored here too.
+     * Text for one race in the given content language (en|id).
+     *
+     * This used to assemble its own text with indonesian.json HARDCODED, so multiplayer
+     * never supported English. It now shares TextGeneratorService with solo. The caller
+     * passes the room's language; playAgain reuses the room's stored language so a rematch
+     * stays in the same language.
      */
-    private function generateRaceText(): string
+    private function generateRaceText(string $language): string
     {
-        return app(TextGeneratorService::class)->forRace(
-            TypingLanguage::resolve(session('typing_preferences')['contentLang'] ?? null)
-        );
+        return app(TextGeneratorService::class)->forRace(TypingLanguage::resolve($language));
     }
 
     /** Join an existing waiting room by code; overflow racers become spectators. */
@@ -753,7 +790,8 @@ class MultiplayerLobby extends Component
                 'status' => 'waiting',
                 // Reset so checkSuddenDeath() doesn't auto-finish immediately off the old race timer.
                 'countdown_started_at' => null,
-                'text_to_type' => $this->generateRaceText(),
+                // Rematch keeps the room's language.
+                'text_to_type' => $this->generateRaceText($room->language),
             ]);
             RoomMember::where('room_id', $room->id)->update([
                 'is_ready' => false,

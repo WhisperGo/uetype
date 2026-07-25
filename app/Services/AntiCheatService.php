@@ -5,8 +5,8 @@ namespace App\Services;
 /** Server-side sanity check: recomputes wpm/accuracy and rejects impossible sessions. */
 class AntiCheatService
 {
-
     private const MAX_HUMAN_WPM = 300;
+
     /** Minimum session duration (seconds) to be considered meaningful. */
     private const MIN_DURATION_SECONDS = 1.0;
 

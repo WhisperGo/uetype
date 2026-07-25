@@ -6,6 +6,7 @@ return [
     'join_room' => 'Join Room',
     'join_room_desc' => 'Enter the code your friend shared with you',
     'or' => 'OR',
+    'race_language' => 'Typing language',
 
     'how_1' => 'Create or join a room',
     'how_2' => 'Share the code with friends',

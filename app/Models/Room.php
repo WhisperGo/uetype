@@ -11,7 +11,7 @@ class Room extends Model
     // Action monitoring: logs room create/update/delete (binafy/laravel-user-monitoring).
     use Actionable;
 
-    protected $fillable = ['code', 'host_id', 'status', 'text_to_type', 'countdown_started_at', 'race_starts_at'];
+    protected $fillable = ['code', 'host_id', 'status', 'text_to_type', 'language', 'countdown_started_at', 'race_starts_at'];
 
     // Time columns MUST be cast to datetime so they are always Carbon objects, not
     // strings. Without this, after refresh()/query they come back as strings and

@@ -250,10 +250,34 @@ DB/cron — proyek tak punya scheduler). Konsekuensinya kecil (not-ready yang re
 ready/host tak tersentuh beacon jadi restore mereka selalu jalan. Mid-race dilindungi (guard
 `status='waiting'`, sama seperti kick).
 
+### 3.13 Pilihan bahasa ketikan (host-only, di dalam room)
+
+Bahasa teks race (EN/ID) dipilih **di dalam waiting room**, di header sebelah kode room —
+**bukan** di layar create. Hanya **host** yang melihat tombolnya; peserta lain melihat **badge
+read-only** berisi bahasa room saat ini.
+
+Bahasa disimpan di kolom `rooms.language` (migrasi `add_language_to_rooms_table`), bukan sekadar
+properti komponen. Alasannya: harus **bertahan saat host refresh** dan **terlihat oleh joiner**;
+properti per-klien tak bisa keduanya.
+
+`setRaceLang()`:
+- **Gerbang server-side**: hanya host, hanya saat `status='waiting'`. Panggilan non-host diabaikan
+  walau UI sudah menyembunyikan tombolnya (pertahanan berlapis). Mengganti teks mid-race akan
+  men-desync semua orang.
+- Divalidasi lewat [`TypingLanguage::resolve()`](../../app/Support/TypingLanguage.php) (kode tak
+  dikenal → default `en`, jadi payload client tak bisa menyelundup ke generator teks).
+- **Regenerate teks** dalam bahasa baru + broadcast `RoomUpdated` supaya semua klien me-render
+  teks & badge baru. Kalau bahasa sama dengan yang sekarang, tak ada regen/broadcast.
+
+`createRoom()` menyemai `rooms.language` dari preferensi solo pemain
+(`session('typing_preferences')['contentLang']`) supaya terasa berkelanjutan; host bisa
+menggantinya di dalam room. `playAgain()` **mempertahankan** bahasa room untuk rematch.
+
+**Kenapa host-only:** semua peserta mengetik **teks yang sama**, jadi bahasa adalah properti
+room, bukan per-pemain.
+
 ## 4. Batasan Saat Ini
 
-- Teks race berbahasa campuran (kalimat default + kata Indonesia), belum multi-bahasa penuh
-  seperti mode solo.
 - WPM/place tersimpan di `room_members` tidak melalui jalur PB/leaderboard global — race adalah
   event sosial, bukan sumber rekor pribadi. Lihat diskusi di
   [`../wpm-accuracy-integrity.md`](../wpm-accuracy-integrity.md).

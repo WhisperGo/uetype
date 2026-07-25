@@ -36,6 +36,64 @@ describe('multiplayer lobby', function () {
             ->assertSee('Players');
     });
 
+    it('lets the host change the room language from inside the room and regenerates the text', function () {
+        Event::fake([RoomUpdated::class]);
+
+        $idWords = collect(
+            json_decode(file_get_contents(base_path('database/data/indonesian.json')), true)['words']
+        )->flip();
+
+        $this->actingAs(User::factory()->create());
+
+        $component = Livewire::test(MultiplayerLobby::class)->call('createRoom');
+        $room = Room::where('code', $component->get('roomCode'))->first();
+
+        // The host switches the room to Indonesian while waiting.
+        $component->call('setRaceLang', 'id');
+
+        $room->refresh();
+        expect($room->language)->toBe('id');
+
+        $tokens = collect(explode(' ', $room->text_to_type));
+        expect($tokens->every(fn ($w) => $idWords->has($w)))->toBeTrue();
+
+        Event::assertDispatched(RoomUpdated::class);
+    });
+
+    it('ignores a non-host trying to change the language', function () {
+        Event::fake([RoomUpdated::class]);
+
+        $host = User::factory()->create();
+        $joiner = User::factory()->create();
+
+        $this->actingAs($host);
+        $code = Livewire::test(MultiplayerLobby::class)->call('createRoom')->get('roomCode');
+        $room = Room::where('code', $code)->first();
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $joiner->id, 'role' => 'player', 'is_ready' => false]);
+
+        $original = $room->language;
+
+        // The joiner tries to switch it: the server must refuse.
+        $this->actingAs($joiner);
+        Livewire::test(MultiplayerLobby::class)->call('setRaceLang', $original === 'en' ? 'id' : 'en');
+
+        expect($room->fresh()->language)->toBe($original);
+    });
+
+    it('keeps the room language on a rematch', function () {
+        $this->actingAs(User::factory()->create());
+
+        $component = Livewire::test(MultiplayerLobby::class)->call('createRoom');
+        $room = Room::where('code', $component->get('roomCode'))->first();
+
+        $component->call('setRaceLang', 'id');
+        $room->update(['status' => 'finished']);
+
+        $component->call('playAgain');
+
+        expect($room->fresh()->language)->toBe('id');
+    });
+
     it('joins a room from the join-code array the paste handler populates', function () {
         // Handler paste menulis seluruh array joinCodeInput via $wire.set; ini
         // menegaskan kontrak itu: array 6-elemen -> joinRoom() memasukkan user.

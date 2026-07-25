@@ -166,6 +166,27 @@
                     <h2 class="text-fluid-title font-mono font-black tracking-[0.3em] text-foreground mt-1">
                         {{ $this->roomData->code }}</h2>
                 </div>
+
+                {{-- Race content language. HOST edits it (buttons regenerate the room text and
+                     broadcast); everyone else sees a read-only badge of the room's language. --}}
+                @php $roomLang = $this->roomData->language ?? 'en'; @endphp
+                <div class="flex flex-col items-center gap-2">
+                    <span class="text-xs font-mono tracking-widest text-muted uppercase">{{ __('multiplayer.race_language') }}</span>
+                    @if ($this->isHost)
+                        <div class="inline-flex items-stretch gap-0.5 p-[3px] rounded-lg bg-surface border border-border"
+                            role="group" aria-label="{{ __('multiplayer.race_language') }}">
+                            @foreach (['en' => 'EN', 'id' => 'ID'] as $code => $label)
+                                <button type="button" aria-label="{{ $label }}"
+                                    aria-pressed="{{ $roomLang === $code ? 'true' : 'false' }}"
+                                    wire:click="setRaceLang('{{ $code }}')"
+                                    class="px-[16px] py-[5px] rounded-md text-small font-mono font-bold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand {{ $roomLang === $code ? 'bg-brand text-foreground' : 'text-muted hover:text-foreground' }}">{{ $label }}</button>
+                            @endforeach
+                        </div>
+                    @else
+                        <span class="px-[16px] py-[5px] rounded-md bg-surface border border-border text-small font-mono font-bold text-foreground uppercase">{{ $roomLang }}</span>
+                    @endif
+                </div>
+
                 <button type="button"
                     x-on:click.prevent="copyRoomCode()"
                     x-bind:disabled="copied"

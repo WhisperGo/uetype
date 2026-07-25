@@ -6,6 +6,7 @@ return [
     'join_room' => 'Gabung Ruang',
     'join_room_desc' => 'Masukkan kode yang dibagikan temanmu',
     'or' => 'ATAU',
+    'race_language' => 'Bahasa ketikan',
 
     'how_1' => 'Buat atau gabung ruang',
     'how_2' => 'Bagikan kode ke teman',
