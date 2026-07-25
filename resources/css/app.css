@@ -21,6 +21,15 @@
     [x-cloak] {
         display: none !important;
     }
+
+    /* Always reserve the scrollbar's width. Without it /typing (sized to fit the viewport,
+       no scroll) and Multiplayer/Clan (long content, scrolls) render at viewport widths
+       ~15px apart, so every `max-w-7xl mx-auto` container -- the nav included -- shifts
+       ~7-8px sideways on each navigation. Also stops the page jumping when a modal locks
+       body scroll. */
+    html {
+        scrollbar-gutter: stable;
+    }
 }
 
 @layer utilities {
