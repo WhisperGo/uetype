@@ -45,10 +45,7 @@ class GhostPicker extends Component
             return 0.0;
         }
 
-        return (float) (TypingResult::where('user_id', Auth::id())
-            ->where('mode', $this->mainMode)
-            ->where('mode_config', $this->subMode)
-            ->max('net_wpm') ?? 0);
+        return TypingResult::bestNetWpmFor(Auth::id(), $this->mainMode, $this->subMode) ?? 0.0;
     }
 
     /**

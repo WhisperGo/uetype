@@ -62,12 +62,7 @@ class GhostResolver
             return null;
         }
 
-        $best = TypingResult::where('user_id', $userId)
-            ->where('mode', $mainMode)
-            ->where('mode_config', $subMode)
-            ->max('net_wpm');
-
-        return $best === null ? null : (float) $best;
+        return TypingResult::bestNetWpmFor($userId, $mainMode, $subMode);
     }
 
     /** The player's own record for the active mode+config. */

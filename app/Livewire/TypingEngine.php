@@ -701,15 +701,15 @@ class TypingEngine extends Component
                 $isSurvivalPersonalBest = $survivalPreviousBest === null
                     || $duration > (float) $survivalPreviousBest;
             } else {
-                $modeBest = TypingResult::where('user_id', $user->id)
-                    ->where('mode', $this->mainMode)
-                    ->where('mode_config', (string) $this->subMode)
-                    ->max('net_wpm');
+                $previousBest = TypingResult::bestNetWpmFor(
+                    $user->id,
+                    $this->mainMode,
+                    (string) $this->subMode
+                );
 
                 // No record in this bucket yet -> the first run sets it, the same rule
                 // survival applies above.
-                $previousBest = $modeBest === null ? null : (float) $modeBest;
-                $isPersonalBest = $modeBest === null || $finalNetWpm > (float) $modeBest;
+                $isPersonalBest = $previousBest === null || $finalNetWpm > $previousBest;
             }
 
             DB::transaction(function () use (

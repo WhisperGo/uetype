@@ -66,6 +66,13 @@ class MultiplayerLobby extends Component
     public const MAX_SPECTATORS = 5;
 
     /**
+     * Max race-progress updates accepted per second per player. The honest client emits
+     * ~8/sec (120ms throttle); 20 leaves room for bursts + the trailing flush while still
+     * capping a scripted flood (each accepted update also broadcasts to the whole room).
+     */
+    private const MAX_PROGRESS_UPDATES_PER_SECOND = 20;
+
+    /**
      * Restore the caller straight into their room on load (no re-entering the code).
      *
      * The component has no persisted client state across a full page load (the nav is a
@@ -541,13 +548,6 @@ class MultiplayerLobby extends Component
         $this->hasFinished = false;
         $this->resultSnapshot = [];
     }
-
-    /**
-     * Max race-progress updates accepted per second per player. The honest client emits
-     * ~8/sec (120ms throttle); 20 leaves room for bursts + the trailing flush while still
-     * capping a scripted flood (each accepted update also broadcasts to the whole room).
-     */
-    private const MAX_PROGRESS_UPDATES_PER_SECOND = 20;
 
     /**
      * Integrity note: the client's $liveWpm is DELIBERATELY not used for official
