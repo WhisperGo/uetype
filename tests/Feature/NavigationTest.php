@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Support\NavItems;
+use Illuminate\Support\Facades\Blade;
 
 /**
  * The nav menu used to be written twice -- desktop and mobile -- each with its own
@@ -59,4 +60,49 @@ it('leaves no commented-out menu markup', function () {
     $nav = file_get_contents(resource_path('views/layouts/navigation.blade.php'));
 
     expect($nav)->not->toContain('soon</span>');
+});
+
+/**
+ * ---- Geometri navbar ----
+ *
+ * PEST tak bisa mengukur piksel atau layout shift, jadi ketiga test di bawah mengunci
+ * KONTRAK MARKUP yang menyebabkannya -- bukan hasil visualnya. Bukti visual sungguhan
+ * hanya bisa lewat DevTools (Rendering -> Layout Shift Regions). Yang dijaga di sini
+ * adalah supaya penyebabnya tak diam-diam kembali.
+ */
+it('reserves the logo space before the image loads', function () {
+    // logo.png berukuran 6250x6250 (943 KB) tapi dirender pada h-12 dengan w-auto.
+    // Tanpa atribut dimensi, browser tak tahu rasionya sampai file tiba: lebar 0 dulu,
+    // lalu melompat ke 48px dan mendorong wordmark + seluruh grup menu ke kanan.
+    // Dimensi INTRINSIK (bukan 48) yang dipakai, karena komponen ini dirender pada tiga
+    // tinggi berbeda (h-12 di nav & guest, h-10 di halaman error) -- browser cuma perlu rasionya.
+    $html = $this->actingAs(User::factory()->create())->get(route('typing'))->assertOk()->getContent();
+
+    expect($html)->toContain('width="6250"')->toContain('height="6250"');
+});
+
+it('keeps the desktop nav links from stretching to the full bar height', function () {
+    // `align-items: stretch` default membuat tiap <a> setinggi bar (66px) padahal
+    // labelnya cuma 20px -- itu 23px area klik mati di atas dan bawah tiap kata.
+    // `sm:-my-px` sisa warisan Breeze: dulu untuk menimpakan `border-b-2` item aktif
+    // ke border bawah navbar, dan border itu sudah lama diganti warna + font-weight.
+    //
+    // Diperiksa pada HTML yang DIRENDER, bukan file sumbernya: komentar Blade dibuang
+    // saat kompilasi, jadi nama kelas yang disebut di komentar penjelas tak ikut terhitung.
+    $html = $this->actingAs(User::factory()->create())->get(route('typing'))->assertOk()->getContent();
+
+    expect($html)->toContain('sm:items-center')->not->toContain('sm:-my-px');
+});
+
+it('keeps the desktop nav link padding symmetric and tight', function () {
+    // `pt-1` (tanpa pasangan bawah) juga sisa Breeze -- ia menggeser label ~2px dari
+    // titik tengah bar. Padding simetris yang kecil menjaga kotak klik dekat dengan
+    // katanya, tapi tetap 32px sehingga masih di atas target sentuh minimum WCAG 2.5.8.
+    //
+    // Komponennya dirender SENDIRIAN, bukan lewat halaman: `pt-1` juga dipakai sah oleh
+    // wordmark UETYPE dan label bahasa di dropdown, jadi memindai seluruh halaman akan
+    // gagal karena alasan yang keliru.
+    $html = Blade::render('<x-nav-link href="/x">Solo</x-nav-link>');
+
+    expect($html)->toContain('py-1.5')->not->toContain('pt-1');
 });

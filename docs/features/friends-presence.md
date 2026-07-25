@@ -62,6 +62,11 @@ yang bisa macet.
 terlewat** sebelum dianggap offline. Ini menyeimbangkan responsivitas (cepat mendeteksi offline)
 dengan ketahanan (tak berkedip offline karena satu ping tersendat).
 
+**Konsumen kedua — sweep multiplayer:** sinyal `isOnline()`/`last_seen_at` yang sama juga dipakai
+di luar daftar teman. Multiplayer memakainya untuk menyapu member room yang "nyangkut" (ready/host
+yang menutup tab tanpa klik Leave): user yang offline = yang benar-benar pergi. Satu sinyal
+presence, dua pemakai — lihat [multiplayer-race.md](multiplayer-race.md) §3.14.
+
 ### 3.5 Broadcast presence hanya saat TRANSISI, bukan tiap heartbeat
 
 ```php
