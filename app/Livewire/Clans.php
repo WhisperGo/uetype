@@ -41,9 +41,9 @@ class Clans extends Component
 
     public string $newDescription = '';
 
+    /** Open on your own clan if you have one, otherwise the Browse tab. */
     public function mount(): void
     {
-        // Default tab: own clan if you have one, otherwise Browse.
         $this->tab = $this->myClan ? 'my-clan' : 'browse';
     }
 
@@ -212,6 +212,7 @@ class Clans extends Component
         $this->notify($userId);
     }
 
+    /** Leader-only: remove an active member (a leader can't kick themselves). */
     public function kickMember(int $clanMemberId): void
     {
         $member = ClanMember::where('id', $clanMemberId)
@@ -232,6 +233,7 @@ class Clans extends Component
         $this->notify($userId);
     }
 
+    /** Leave your clan; blocked for leaders (they must disband/transfer first). */
     public function leaveClan(): void
     {
         $membership = $this->myMembership;
@@ -261,6 +263,7 @@ class Clans extends Component
             ->first();
     }
 
+    /** Broadcast a clan update to one user (null notification = silent UI refresh). */
     private function notify(int $otherUserId, ?array $notification = null): void
     {
         SafeBroadcast::run(fn () => broadcast(new ClanUpdated($otherUserId, $notification)));
@@ -275,6 +278,7 @@ class Clans extends Component
     // #[Computed] caches it per request. The view access name is unchanged ($this->myClan),
     // so no view needs touching.
 
+    /** My active clan membership (with its clan), or null if I'm in none. */
     #[Computed]
     public function myMembership(): ?ClanMember
     {
@@ -284,12 +288,14 @@ class Clans extends Component
             ->first();
     }
 
+    /** The clan I'm an active member of, or null. */
     #[Computed]
     public function myClan(): ?Clan
     {
         return $this->myMembership?->clan;
     }
 
+    /** Active roster of my clan (with users), ordered by role. Empty if I'm in none. */
     #[Computed]
     public function myClanMembers()
     {
@@ -300,6 +306,7 @@ class Clans extends Component
         return $this->myClan->activeMembers()->with('user')->orderBy('role')->get();
     }
 
+    /** Pending join requests for my clan -- leader-only; empty otherwise. */
     #[Computed]
     public function pendingRequests()
     {
@@ -314,6 +321,7 @@ class Clans extends Component
             ->get();
     }
 
+    /** Search results (name match, capped at 20) tagged with my relation to each clan. */
     #[Computed]
     public function browseClans()
     {
