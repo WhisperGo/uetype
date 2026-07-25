@@ -35,7 +35,7 @@ test('saveResult menyimpan bahasa konten yang aktif ke typing_results', function
     Livewire::actingAs($user)->test(TypingEngine::class)
         ->call('setMode', 'words', '25')
         ->call('setContentLang', 'id')
-        ->call('saveResult', 30000, 150, 140, [40, 42], [45, 47], [], 0, 0, '', 0);
+        ->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 150, 'correctKeystrokes' => 140, 'wpmHistory' => [40, 42], 'rawHistory' => [45, 47]]);
 
     expect(TypingResult::first()->language)->toBe('id');
 });

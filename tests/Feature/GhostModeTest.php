@@ -93,7 +93,7 @@ it('ignores ghost data sent by the client while in survival mode', function () {
     Livewire::actingAs($user)->test(TypingEngine::class)
         ->call('setMode', 'survival', 'medium')
         // Klien "nakal" tetap mengirim data ghost.
-        ->call('saveResult', 30000, 150, 140, [40, 42], [45, 47], [], 0, 95.0, 'speedy', 120);
+        ->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 150, 'correctKeystrokes' => 140, 'wpmHistory' => [40, 42], 'rawHistory' => [45, 47], 'ghostWpm' => 95.0, 'ghostLabel' => 'speedy', 'ghostCharsAtFinish' => 120]);
 
     expect(session('typing_result.ghostResult'))->toBeNull();
 });
@@ -103,7 +103,7 @@ it('keeps ghost data in time mode', function () {
 
     Livewire::actingAs($user)->test(TypingEngine::class)
         ->call('setMode', 'time', '30')
-        ->call('saveResult', 30000, 150, 140, [40, 42], [45, 47], [], 0, 95.0, 'speedy', 120);
+        ->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 150, 'correctKeystrokes' => 140, 'wpmHistory' => [40, 42], 'rawHistory' => [45, 47], 'ghostWpm' => 95.0, 'ghostLabel' => 'speedy', 'ghostCharsAtFinish' => 120]);
 
     $ghost = session('typing_result.ghostResult');
 

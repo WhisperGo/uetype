@@ -81,7 +81,7 @@ it('does not record a time-mode session the player walked away from', function (
 
     // time 60 -> ambang jeda 15 detik. Ketik sebentar lalu diam 40 detik sampai timer habis.
     afkSession($user, 'time', '60', 60)
-        ->call('saveResult', 60000, 40, 40, [], [], [], 0, null, null, null, [], 40000)
+        ->call('saveResult', ['durationMs' => 60000, 'totalKeystrokes' => 40, 'correctKeystrokes' => 40, 'maxIdleMs' => 40000])
         ->assertRedirect(route('typing.result'));
 
     // Tidak ditulis ke DB sama sekali: tanpa baris riwayat, tanpa XP, tanpa PB.
@@ -103,7 +103,7 @@ it('still records a genuinely slow typist who never paused', function () {
     $user = User::factory()->create();
 
     afkSession($user, 'time', '60', 60)
-        ->call('saveResult', 60000, 25, 25, [], [], [], 0, null, null, null, [], 4000);
+        ->call('saveResult', ['durationMs' => 60000, 'totalKeystrokes' => 25, 'correctKeystrokes' => 25, 'maxIdleMs' => 4000]);
 
     expect(TypingResult::where('user_id', $user->id)->count())->toBe(1)
         ->and(session('typing_result')['afk'] ?? null)->toBeFalse();
@@ -118,14 +118,14 @@ it('scales the idle threshold with the length of the session', function () {
     // time 15 -> ambang = lantai 10 dtk. Jeda 12 dtk = AFK.
     $short = User::factory()->create();
     afkSession($short, 'time', '15', 15)
-        ->call('saveResult', 15000, 40, 40, [], [], [], 0, null, null, null, [], 12000);
+        ->call('saveResult', ['durationMs' => 15000, 'totalKeystrokes' => 40, 'correctKeystrokes' => 40, 'maxIdleMs' => 12000]);
 
     expect(TypingResult::where('user_id', $short->id)->count())->toBe(0);
 
     // time 120 -> ambang = 30 dtk. Jeda 12 dtk cuma jeda berpikir, tetap dicatat.
     $long = User::factory()->create();
     afkSession($long, 'time', '120', 120)
-        ->call('saveResult', 120000, 400, 400, [], [], [], 0, null, null, null, [], 12000);
+        ->call('saveResult', ['durationMs' => 120000, 'totalKeystrokes' => 400, 'correctKeystrokes' => 400, 'maxIdleMs' => 12000]);
 
     expect(TypingResult::where('user_id', $long->id)->count())->toBe(1);
 });
@@ -198,7 +198,7 @@ it('keeps recording a war attempt even when the player went idle', function () {
     app(SoloSessionGuard::class)->backdate(60);
 
     // Jeda 45 detik: jauh di atas ambang, tapi sesi ini terkunci war.
-    $component->call('saveResult', 60000, 200, 200, [], [], [], 0, null, null, null, [], 45000);
+    $component->call('saveResult', ['durationMs' => 60000, 'totalKeystrokes' => 200, 'correctKeystrokes' => 200, 'maxIdleMs' => 45000]);
 
     expect(TypingResult::where('user_id', $leader->id)->count())->toBe(1)
         ->and($claim->fresh()->typing_result_id)->not->toBeNull();

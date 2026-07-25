@@ -867,7 +867,23 @@ export default function typingGame(initialText) {
             const ghostLabelArg = this.ghostActive ? this.ghostLabel : null;
             const ghostCharsArg = this.ghostActive ? this.ghostCharIndex : null;
 
-            this.$wire.saveResult(durationMs, total, correct, this.wpmHistory, this.rawHistory, this.missedChars, this.drainEventCount, ghostWpmArg, ghostLabelArg, ghostCharsArg, this.errorEvents, this.maxIdleMs);
+            // One named object, not twelve positional arguments: adding a field no longer
+            // means counting commas here and in every caller. Keys map 1:1 to
+            // App\Support\SoloSessionPayload.
+            this.$wire.saveResult({
+                durationMs: durationMs,
+                totalKeystrokes: total,
+                correctKeystrokes: correct,
+                wpmHistory: this.wpmHistory,
+                rawHistory: this.rawHistory,
+                missedChars: this.missedChars,
+                drainEventCount: this.drainEventCount,
+                ghostWpm: ghostWpmArg,
+                ghostLabel: ghostLabelArg,
+                ghostCharsAtFinish: ghostCharsArg,
+                errorEvents: this.errorEvents,
+                maxIdleMs: this.maxIdleMs,
+            });
         }
     }
 }
