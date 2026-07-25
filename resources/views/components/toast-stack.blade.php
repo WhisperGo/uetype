@@ -34,7 +34,11 @@
             ],
         ],
     ]))"
-        class="fixed z-[60] bottom-5 right-5 flex flex-col gap-3 w-80 max-w-[calc(100vw-2.5rem)] pointer-events-none">
+        {{-- right-24 (not right-5): clears the draggable chat FAB, which parks in the
+             bottom-right corner (56px + 20px margin), so a toast never covers it. The
+             max-width subtracts that larger right offset (96px) plus a 20px left gap so the
+             card never spills off the left edge on a narrow screen. --}}
+        class="fixed z-[60] bottom-5 right-24 flex flex-col gap-3 w-80 max-w-[calc(100vw-7.25rem)] pointer-events-none">
         <template x-for="t in toasts" :key="t.id">
             <div x-transition:enter="transition ease-out duration-300"
                 x-transition:enter-start="opacity-0 translate-y-4"
