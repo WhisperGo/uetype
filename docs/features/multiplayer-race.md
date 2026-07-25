@@ -5,13 +5,15 @@
 **Model:** [`Room`](../../app/Models/Room.php), [`RoomMember`](../../app/Models/RoomMember.php)
 **Events:** `RoomUpdated`, `RaceProgressUpdated`, `SuddenDeathTriggered`,
 [`RoomMessageSent`](../../app/Events/RoomMessageSent.php),
-[`RoomPresenceChanged`](../../app/Events/RoomPresenceChanged.php)
+[`RoomPresenceChanged`](../../app/Events/RoomPresenceChanged.php),
+[`RoomInvitationSent`](../../app/Events/RoomInvitationSent.php)
 **View chat:** [`livewire/partials/room-chat.blade.php`](../../resources/views/livewire/partials/room-chat.blade.php)
+**Overlay undangan:** [`components/room-invite-overlay.blade.php`](../../resources/views/components/room-invite-overlay.blade.php)
 **JS:** [`resources/js/race-echo.js`](../../resources/js/race-echo.js) (langganan Echo + komponen Alpine `roomChat`),
 [`resources/js/multiplayer-nav.js`](../../resources/js/multiplayer-nav.js) (leave beacon + ready-confirm nav)
-**Leave service:** [`App\Services\RoomMembershipService`](../../app/Services/RoomMembershipService.php),
-[`MultiplayerPresenceController`](../../app/Http/Controllers/MultiplayerPresenceController.php)
-**Route:** `/multiplayer` (+ `POST /multiplayer/leave-beacon`, `POST /multiplayer/leave-confirm`)
+**Membership/leave service:** [`App\Services\RoomMembershipService`](../../app/Services/RoomMembershipService.php)
+(leave, settle, **sweep member basi**), [`MultiplayerPresenceController`](../../app/Http/Controllers/MultiplayerPresenceController.php)
+**Route:** `/multiplayer` (+ `?invite=CODE` untuk deep-link undangan, `POST /multiplayer/leave-beacon`, `POST /multiplayer/leave-confirm`)
 
 ---
 
@@ -275,6 +277,11 @@ DB/cron — proyek tak punya scheduler). Konsekuensinya kecil (not-ready yang re
 ready/host tak tersentuh beacon jadi restore mereka selalu jalan. Mid-race dilindungi (guard
 `status='waiting'`, sama seperti kick).
 
+**Celah yang tersisa — member "nyangkut":** beacon sengaja **menahan** ready/host agar bisa
+di-restore. Tapi kalau mereka **tutup tab / koneksi putus / pergi** tanpa kembali, baris mereka
+menggantung selamanya — menahan slot, dan (sebagai host) membuat room tak bisa dimulai/dibersihkan.
+Ini ditutup oleh **sweep member basi**, lihat §3.14.
+
 ### 3.13 Pilihan bahasa ketikan (host-only, di dalam room)
 
 Bahasa teks race (EN/ID) dipilih **di dalam waiting room**, di header sebelah kode room —
@@ -300,6 +307,49 @@ menggantinya di dalam room. `playAgain()` **mempertahankan** bahasa room untuk r
 
 **Kenapa host-only:** semua peserta mengetik **teks yang sama**, jadi bahasa adalah properti
 room, bukan per-pemain.
+
+### 3.14 Sweep member "nyangkut" (lazy, pakai sinyal presence)
+
+Menutup celah dari §3.12: member yang **di-keep** beacon (ready/host) tapi tak pernah kembali
+(tutup tab, koneksi putus, pergi tanpa klik **Leave**) meninggalkan baris `room_members` yang
+menggantung — menahan slot, dan sebagai host membuat room jadi "hantu" yang tak bisa dimulai atau
+dibersihkan siapa pun.
+
+[`RoomMembershipService::sweepOfflineMembers()`](../../app/Services/RoomMembershipService.php)
+menyapunya:
+
+| Aspek | Keputusan | Justifikasi |
+|-------|-----------|-------------|
+| **Sinyal deteksi** | User **offline** menurut `last_seen_at` (basi > `ONLINE_THRESHOLD_SECONDS` = 60 dtk, atau null setelah logout) | Numpang **heartbeat presence site-wide** yang sudah ada (lihat [friends-presence.md](friends-presence.md) §3.3–3.4). Heartbeat berhenti begitu tab ditutup/hidden — penanda "benar-benar pergi". Yang **menunggu diam-diam di lobby tetap ping**, jadi tak ikut tersapu. Jauh lebih akurat daripada menebak dari `updated_at`. **Tanpa kolom/endpoint/JS baru.** |
+| **Kapan jalan** | **Lazy saat lobby di-load** (`mount()`), bukan cron | Pola sama seperti [`ClanWarResolver`](../../app/Services/ClanWarResolver.php) — proyek tak punya scheduler. Setiap ada yang membuka `/multiplayer`, room hantu ikut dibersihkan. |
+| **Cakupan** | Hanya room **`waiting`** | Room `racing` diselesaikan oleh race-nya sendiri (finish/sudden death); mencabut peserta di tengah race merusak placement. Konsisten dengan guard leave/kick. |
+| **Host tersapu** | **Handoff** ke member tersisa (racer diprioritaskan), atau room dihapus kalau semua tersapu | Memakai ulang `settleAbandonedRoom()`/`reassignHostIfNeeded()` yang sama dengan leave/kick — satu definisi. Sisa member disiarkan `RoomUpdated` agar slot bebas/host baru langsung ter-render. |
+| **Pemanggil dikecualikan** | `exceptUserId` = user yang halamannya baru load | Ia provably hadir; heartbeat-nya mungkin belum mendarat pada fresh load, jadi jangan sampai menyapu diri sendiri. |
+
+**Catatan test:** `UserFactory` kini default **online** (`last_seen_at = now()`) karena akun uji
+merepresentasikan user aktif; test yang butuh user absen memakai state `->offline()`. Test
+presence yang peduli status sudah selalu men-set `last_seen_at` eksplisit, jadi tak terpengaruh.
+
+### 3.15 Undang teman ke room (dari slot kosong)
+
+Slot pemain yang kosong bisa **diklik** untuk mengundang teman. **Semua** member (bukan cuma host)
+boleh mengundang — mengundang bersifat kolaboratif. Undangan tiba sebagai **kartu notifikasi
+non-blocking di pojok kanan bawah** di halaman mana pun si teman berada.
+
+**Alur:** klik slot kosong → modal daftar teman (online di atas + tombol **Undang**, offline
+terlihat tapi disabled, yang sudah di room ditandai "Di ruang") → klik Undang →
+`invitePlayer($friendId)` menyiarkan [`RoomInvitationSent`](../../app/Events/RoomInvitationSent.php)
+→ teman menerima overlay Accept/Decline → **Accept** membuka `/multiplayer?invite=CODE`.
+
+| Aspek | Keputusan | Justifikasi |
+|-------|-----------|-------------|
+| **Model masuk** | Undangan + teman klik **terima** (bukan menyeret paksa) | Teman bisa sedang serius typing test; menariknya masuk secara paksa akan mengganggu. Kartu non-blocking + tombol memberi mereka kendali. |
+| **Channel** | Numpang `friends.{id}` yang **sudah** di-subscribe `toasts.js` | Tak perlu langganan Echo baru — `toasts.js` melempar `.room.invitation` sebagai window event `room-invite-received`, ditangkap [`room-invite-overlay`](../../resources/views/components/room-invite-overlay.blade.php). |
+| **Posisi overlay** | Kartu pojok kanan bawah (`bottom-24`), **bukan** overlay layar penuh | Overlay tengah + backdrop menutupi area ketik & memaksa reaksi. Kartu pojok tak memblokir; `bottom-24` agar tak bertumpuk dengan toast stack. Auto-hilang ~15 dtk kalau diabaikan. |
+| **Payload** | Nama + **avatar** + kode room | Kartu profil dirender klien tanpa round-trip ke server. |
+| **Auto-join** | `mount()` membaca `request()->query('invite')` | Livewire hanya inject route param ke `mount()`, bukan query param — jadi dibaca eksplisit. `joinRoomByCode()` (di-extract dari `joinRoom()`) dipakai bersama form kode manual & deep-link. |
+| **Anti-spam** | Rate-limit **10/menit per pengundang** (server) + cooldown **5 dtk per teman** (klien) | Undangan bisa jadi vektor spam toast. Cooldown klien: setelah mengundang, tombol teman itu menghitung mundur lalu bisa lagi — **tanpa refresh**. Rate-limit server = backstop sebenarnya. |
+| **Penjaga** | Hanya room `waiting`, hanya **teman Accepted** (bukan ID acak), bukan yang sudah di room, bukan diri sendiri | Otorisasi di server, bukan sekadar menyembunyikan tombol. |
 
 ## 4. Batasan Saat Ini
 

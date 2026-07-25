@@ -48,6 +48,8 @@ Dibangun dengan **Laravel 12 + Livewire 4 + Alpine.js + Tailwind CSS**, dengan
 - **Sudden death** (masa tenggang setelah pemenang pertama finis).
 - **Mode penonton (spectator)**: masuk untuk menonton tanpa membalap; luapan otomatis
   jadi penonton saat slot pemain penuh, dan bisa tukar peran saat menunggu.
+- **Undang teman**: klik slot kosong untuk mengundang teman; mereka menerima notifikasi
+  Accept/Decline non-blocking dan langsung bergabung.
 - **Chat ruang**: ngobrol sambil menunggu di lobby & di layar hasil (untuk ngajak main
   lagi), plus **notifikasi saat ada yang masuk/keluar** ruang.
 - Riwayat pertandingan permanen + statistik (win rate, placement, dsb).
