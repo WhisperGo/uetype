@@ -59,6 +59,7 @@ return [
     'reject_wpm' => 'Result not counted: your WPM exceeded the human limit, so it was flagged as impossible.',
     'reject_inconsistent' => 'Result not counted: the character counts were inconsistent and could not be verified.',
     'reject_empty' => 'Result not counted: no typing was recorded for this race.',
+    'reject_dnf' => 'Result not counted: you did not finish the race, so it was left out of your stats.',
     'not_counted' => 'Not counted',
     'you' => 'YOU',
     'full_results' => 'Full Results',

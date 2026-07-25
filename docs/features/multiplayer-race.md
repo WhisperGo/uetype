@@ -118,12 +118,21 @@ if (is_null($member->xp_earned) && $member->user) { /* addExp lalu set xp_earned
 aman dari double-award. EXP dihitung dengan rumus yang **sama persis** dengan solo (`User::addExp`).
 
 **Validasi hasil (sejajar solo):** sebelum EXP & baris riwayat ditulis, tiap hasil dilewatkan
-`isValidRaceResult()` → `AntiCheatService::rejectsRaceResult()`. Hasil yang **mustahil** (WPM di
-atas batas manusia, char inkonsisten) atau **kosong** (join tapi tak pernah mengetik, `no_input`)
-**ditolak**: tak masuk `multiplayer_match_history`, tak dapat EXP, dan ditandai
-`result_recorded = false` supaya rata-rata WPM pemain tak tercemar. Finisher **lambat** dan **DNF
-yang sempat mengetik** tetap dicatat (hasil sah, bukan curang). Pemain yang ditolak melihat badge
-**"Tidak dihitung"** di tabel hasil. Detail aturan: [`anti-cheat-wpm.md`](anti-cheat-wpm.md) §5.2.
+`isValidRaceResult()`. Yang **ditolak** (tak masuk `multiplayer_match_history`, tak dapat EXP,
+`result_recorded = false`):
+
+- **Mustahil** — WPM di atas batas manusia, char inkonsisten, atau fast-garbage (progress tinggi
+  + akurasi mustahil rendah).
+- **Kosong** — join tapi tak pernah mengetik (`no_input`).
+- **DNF** — **setiap** hasil DNF, baik menyerah (`giveUp`) maupun **AFK yang di-timeout** saat
+  sudden death. DNF berarti tak menyelesaikan, jadi bukan hasil ketik sungguhan; WPM rendahnya
+  akan menyeret rata-rata pemain kalau dicatat. (Dulu DNF-yang-sempat-mengetik masih dicatat —
+  aturannya sekarang **DNF tak pernah dicatat**.)
+
+Yang **tetap dicatat**: finisher **lambat** (WPM rendah nyata tapi benar-benar selesai). Pemain
+yang ditolak melihat badge **"Tidak dihitung"** + banner alasan spesifik (mis. `reject_dnf` untuk
+DNF). DNF tetap tampil di layar hasil dengan placement **`—`**. Detail aturan:
+[`anti-cheat-wpm.md`](anti-cheat-wpm.md) §5.2.
 
 **Peringkat dihitung SETELAH validasi.** Dulu nomor juara diambil dari urutan baris
 (`$index + 1`) sebelum validitas diketahui, jadi hasil yang ditolak tetap menempati podium —

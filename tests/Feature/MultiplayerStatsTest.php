@@ -27,8 +27,10 @@ function finishedRace(): array
         'race_starts_at' => now()->subSeconds(10),
     ]);
 
+    // Both actually finished (loser slower). A DNF is no longer recorded, so "one row per
+    // player" needs two genuine finishers -- the DNF exclusion is covered separately below.
     RoomMember::create(['room_id' => $room->id, 'user_id' => $winner->id, 'is_ready' => true, 'wpm' => 90, 'accuracy' => 98, 'progress_percent' => 100, 'finished_time_seconds' => 8]);
-    RoomMember::create(['room_id' => $room->id, 'user_id' => $loser->id, 'is_ready' => true, 'wpm' => 40, 'accuracy' => 85, 'progress_percent' => 60, 'finished_time_seconds' => 999]);
+    RoomMember::create(['room_id' => $room->id, 'user_id' => $loser->id, 'is_ready' => true, 'wpm' => 40, 'accuracy' => 85, 'progress_percent' => 100, 'finished_time_seconds' => 16]);
 
     return [$room, $winner, $loser];
 }
@@ -112,9 +114,10 @@ it('does not record an invalid (anti-cheat) result to history, protecting the wp
         ->and(RoomMember::where('user_id', $honest->id)->first()->result_recorded)->toBeTrue();
 });
 
-it('still records a plausible DNF / gave-up result (low throughput is not cheating)', function () {
-    // A gave-up player has low progress and the 999s sentinel: low throughput, but
-    // that is a legitimate DNF, not a cheat, so it stays recorded.
+it('does not record a DNF / gave-up result to history (protecting the wpm average)', function () {
+    // A DNF (gave up, or timed out for going AFK) did not finish, so it is not a real
+    // typing result and must stay out of permanent stats -- its low WPM would otherwise
+    // drag the player's average down.
     $quitter = User::factory()->create();
 
     $room = Room::create([
@@ -131,8 +134,8 @@ it('still records a plausible DNF / gave-up result (low throughput is not cheati
         ->set('roomCode', $room->code)->set('step', 'racing')
         ->call('finalizeRace', $room->id);
 
-    expect(MultiplayerMatchHistory::where('user_id', $quitter->id)->exists())->toBeTrue()
-        ->and(RoomMember::where('user_id', $quitter->id)->first()->result_recorded)->toBeTrue();
+    expect(MultiplayerMatchHistory::where('user_id', $quitter->id)->exists())->toBeFalse()
+        ->and(RoomMember::where('user_id', $quitter->id)->first()->result_recorded)->toBeFalse();
 });
 
 it('aggregates multiplayer stats from match history', function () {

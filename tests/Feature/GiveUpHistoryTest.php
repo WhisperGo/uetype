@@ -15,12 +15,12 @@ beforeEach(function () {
 });
 
 /**
- * B4: 999 adalah SENTINEL "tidak selesai", bukan durasi. Di room_members ia boleh
- * ada (transient, cuma untuk sorting), tapi TIDAK BOLEH mendarat di
- * multiplayer_match_history -- di sana kolomnya bermakna durasi tempuh, dan riwayat
- * itulah yang mem-backing statistik permanen pemain.
+ * A DNF means the player did NOT finish -- whether they gave up or were timed out for
+ * going AFK. It is not a real typing result, so it must not enter multiplayer_match_history
+ * at all: a DNF's low WPM would drag down the player's permanent average. (Previously a DNF
+ * was recorded with dnf=true; the rule is now "DNF is never recorded".)
  */
-test('pemain yang menyerah tidak mencatat 999 sebagai durasi di riwayat', function () {
+test('a player who gives up is not recorded to history at all', function () {
     $menyerah = User::factory()->create();
 
     $room = Room::create([
@@ -40,11 +40,47 @@ test('pemain yang menyerah tidak mencatat 999 sebagai durasi di riwayat', functi
         ->set('step', 'racing')
         ->call('giveUp');
 
-    $riwayat = MultiplayerMatchHistory::where('user_id', $menyerah->id)->first();
+    $member = RoomMember::where('user_id', $menyerah->id)->first();
 
-    expect($riwayat)->not->toBeNull()
-        ->and($riwayat->finished_time_seconds)->toBeNull()
-        ->and($riwayat->dnf)->toBeTrue();
+    // No history row, no XP, and marked not-recorded -- but still a DNF on the result screen.
+    expect(MultiplayerMatchHistory::where('user_id', $menyerah->id)->exists())->toBeFalse()
+        ->and($member->result_recorded)->toBeFalse()
+        ->and($member->isDnf())->toBeTrue();
+});
+
+/**
+ * The AFK case: a player types a little then stops, gets timed out when sudden death
+ * expires, and used to land in history at ~3 WPM. It must be excluded like any other DNF.
+ */
+test('an AFK player timed out at sudden death is not recorded to history', function () {
+    $active = User::factory()->create();
+    $afk = User::factory()->create();
+
+    $room = Room::create([
+        'code' => 'AFK900',
+        'host_id' => $active->id,
+        'status' => 'racing',
+        'text_to_type' => str_repeat('ab cde ', 14).'ab',
+        'race_starts_at' => now()->subSeconds(60),
+        'countdown_started_at' => now()->subSeconds(16), // sudden death window already elapsed
+    ]);
+    RoomMember::create(['room_id' => $room->id, 'user_id' => $active->id, 'role' => 'player', 'is_ready' => true, 'progress_percent' => 100, 'wpm' => 40, 'accuracy' => 95, 'finished_time_seconds' => 50]);
+    // Typed 8% then went AFK; never finished.
+    RoomMember::create(['room_id' => $room->id, 'user_id' => $afk->id, 'role' => 'player', 'is_ready' => true, 'progress_percent' => 8, 'wpm' => 3, 'accuracy' => 100]);
+
+    Livewire::actingAs($active)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'AFK900')
+        ->set('step', 'racing')
+        ->call('checkSuddenDeath');
+
+    $afkMember = RoomMember::where('user_id', $afk->id)->first();
+
+    expect(MultiplayerMatchHistory::where('user_id', $afk->id)->exists())->toBeFalse()
+        ->and($afkMember->result_recorded)->toBeFalse()
+        ->and($afkMember->isDnf())->toBeTrue();
+
+    // The player who actually finished is still recorded normally.
+    expect(MultiplayerMatchHistory::where('user_id', $active->id)->exists())->toBeTrue();
 });
 
 test('pemain yang benar-benar finish mencatat durasi asli dan dnf false', function () {

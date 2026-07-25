@@ -121,10 +121,12 @@ serangan *fast-garbage* (mis. **200 WPM dengan akurasi 3%**). Ambangnya: progres
 akurasi < 50%. Di bawah 50% progress, akurasi rendah itu upaya lemah yang **wajar**, jadi lantai
 akurasi tak diberlakukan.
 
-**Yang tetap dicatat (sengaja):** finisher **lambat** (WPM rendah nyata), **DNF yang benar-benar
-mengetik** (sentinel 999s), dan pemain **progress rendah** dengan akurasi rendah (upaya lemah) —
-semua hasil sah. Hanya yang **mustahil** (termasuk fast-garbage) dan **benar-benar kosong** yang
-dibuang.
+**Yang tetap dicatat (sengaja):** finisher **lambat** (WPM rendah nyata tapi benar-benar selesai)
+dan pemain **progress rendah** dengan akurasi rendah yang **menyelesaikan** (upaya lemah, bukan
+curang). Yang **dibuang**: **mustahil** (termasuk fast-garbage), **benar-benar kosong**, dan
+**setiap DNF** — baik menyerah maupun AFK-timeout (sentinel 999s). DNF berarti tak selesai, jadi
+bukan hasil ketik sungguhan; mencatatnya akan menyeret rata-rata WPM pemain. (Perubahan dari aturan
+lama yang masih mencatat DNF-yang-sempat-mengetik.)
 
 **Feedback ke pemain (alasan spesifik).** Pemain yang hasilnya ditolak melihat **banner berisi
 alasan konkret** — akurasi (`reject_accuracy`), WPM mustahil (`reject_wpm`), char inkonsisten

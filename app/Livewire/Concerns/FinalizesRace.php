@@ -174,12 +174,22 @@ trait FinalizesRace
     /**
      * Server-side validity gate for a finished race result, reusing AntiCheatService.
      * Rejects the impossible (WPM beyond human limits, inconsistent chars, AND a high
-     * progress paired with an impossibly low accuracy -- the "fast garbage" cheat) plus
-     * the truly-empty (no_input: joined but never typed). Does NOT reject a slow finish
-     * or a DNF that did type (real low WPM / 999s sentinel), which stay recorded.
+     * progress paired with an impossibly low accuracy -- the "fast garbage" cheat), the
+     * truly-empty (no_input: joined but never typed), AND every DNF.
+     *
+     * A DNF -- whether the player gave up or was timed out for going AFK -- means they did
+     * not finish, so it is not a real typing result and must not enter permanent history:
+     * a DNF's low WPM would drag down the player's average. The AFK case is exactly this:
+     * type a little, stop, get timed out at sudden death, then land in history at ~3 WPM.
+     * A DNF still shows on the result screen (with its DNF badge); it just isn't recorded.
      */
     private function isValidRaceResult(RoomMember $member, int $correctChars): bool
     {
+        // Not finished = not a recordable result, regardless of how far they got.
+        if ($member->isDnf()) {
+            return false;
+        }
+
         $duration = (float) ($member->finished_time_seconds ?? 0);
         $progress = max(0, min(100, (int) $member->progress_percent));
 

@@ -218,11 +218,18 @@ it('tells the player the SPECIFIC reason their result was rejected', function ()
         'progress_percent' => 100, 'wpm' => 900, 'accuracy' => 100, 'finished_time_seconds' => 1,
     ]))->toBe('multiplayer.reject_wpm');
 
-    // empty session: never typed
+    // empty session: never typed, but DID reach the finish path (real duration, not the
+    // DNF sentinel) -> the "no typing recorded" message.
     expect(rejectReasonFor([
-        'progress_percent' => 0, 'wpm' => 0, 'accuracy' => 0,
-        'finished_time_seconds' => RoomMember::DNF_SENTINEL_SECONDS,
+        'progress_percent' => 0, 'wpm' => 0, 'accuracy' => 0, 'finished_time_seconds' => 30,
     ]))->toBe('multiplayer.reject_empty');
+
+    // DNF (gave up / AFK timeout): the sentinel duration -> the "did not finish" message,
+    // which is checked before the anti-cheat reasons.
+    expect(rejectReasonFor([
+        'progress_percent' => 15, 'wpm' => 20, 'accuracy' => 90,
+        'finished_time_seconds' => RoomMember::DNF_SENTINEL_SECONDS,
+    ]))->toBe('multiplayer.reject_dnf');
 });
 
 it('returns no reject reason for a valid result', function () {

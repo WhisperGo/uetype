@@ -206,6 +206,12 @@ trait ReadsRoomState
             return null;
         }
 
+        // A DNF (gave up / timed out for AFK) is rejected for a plain reason that has no
+        // anti-cheat "reason" string, so it's handled before the reason mapping below.
+        if ((int) ($me['finished_time_seconds'] ?? 0) === RoomMember::DNF_SENTINEL_SECONDS) {
+            return 'multiplayer.reject_dnf';
+        }
+
         $progress = max(0, min(100, (int) ($me['progress_percent'] ?? 0)));
         $duration = (float) ($me['finished_time_seconds'] ?? 0);
         $correctChars = (int) round(($progress / 100) * mb_strlen($this->roomData?->text_to_type ?? ''));

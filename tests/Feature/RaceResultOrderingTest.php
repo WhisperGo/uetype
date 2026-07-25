@@ -87,10 +87,11 @@ it('shows the finisher above a higher-wpm quitter, matching the recorded standin
     // Riwayat permanen memang sudah benar sejak dulu -- yang diuji di sini tampilannya.
     expect($recordedFirst)->toBe($finisher->id);
 
-    // Urutan tampil mengikuti kolom otoritatif, bukan WPM.
+    // Urutan tampil mengikuti kolom otoritatif, bukan WPM. Penyelesai juara 1; yang
+    // menyerah (DNF) kini tak dapat nomor -- place null, ditampilkan sebagai '—'.
     expect($snapshot->first()['user_id'])->toBe($finisher->id)
         ->and($snapshot->first()['place'])->toBe(1)
-        ->and($snapshot->last()['place'])->toBe(2);
+        ->and($snapshot->last()['place'])->toBeNull();
 
     // Podium juara diisi penyelesai, bukan yang menyerah.
     $html = $comp->html();
@@ -112,11 +113,12 @@ it('keeps the displayed rank identical to the rank written to history', function
         ->set('step', 'racing')
         ->call('checkSuddenDeath');
 
-    // Urutan snapshot ADALAH yang dirender ($index + 1 di tabel, get(0..2) di podium),
-    // jadi membandingkannya dengan urutan riwayat menguji tepat invariannya:
-    // yang dilihat user = yang tercatat. Membandingkan key 'place' saja tidak cukup --
-    // kolom itu memang selalu benar; yang dulu salah adalah urutan barisnya.
-    $displayed = collect($comp->get('resultSnapshot'))->pluck('user_id')->all();
+    // Yang dilihat user = yang tercatat, dibandingkan atas peserta yang PUNYA place. DNF
+    // kini tak dicatat ke riwayat dan tak punya nomor, jadi ia muncul di layar sebagai '—'
+    // tapi tak ada di history -- bandingkan hanya baris ber-place agar invariannya tepat.
+    $displayed = collect($comp->get('resultSnapshot'))
+        ->whereNotNull('place')
+        ->pluck('user_id')->all();
     $recorded = MultiplayerMatchHistory::orderBy('place')->pluck('user_id')->all();
 
     expect($displayed)->toBe($recorded);

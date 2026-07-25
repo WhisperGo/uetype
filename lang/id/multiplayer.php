@@ -59,6 +59,7 @@ return [
     'reject_wpm' => 'Hasil tidak dihitung: WPM-mu melebihi batas manusia, jadi ditandai mustahil.',
     'reject_inconsistent' => 'Hasil tidak dihitung: jumlah karakter tidak konsisten dan tidak bisa diverifikasi.',
     'reject_empty' => 'Hasil tidak dihitung: tidak ada ketikan yang tercatat untuk race ini.',
+    'reject_dnf' => 'Hasil tidak dihitung: kamu tidak menyelesaikan race, jadi tidak dimasukkan ke statistikmu.',
     'not_counted' => 'Tidak dihitung',
     'you' => 'KAMU',
     'full_results' => 'Hasil Lengkap',
