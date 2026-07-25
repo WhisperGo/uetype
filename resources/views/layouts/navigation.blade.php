@@ -30,8 +30,14 @@
                     </a>
                 </div>
 
-                <!-- Navigation Links -->
-                <div class="hidden sm:-my-px sm:ms-10 sm:flex sm:gap-1">
+                {{-- Navigation Links.
+                     `sm:items-center` is load-bearing: flex items default to `stretch`, so
+                     without it every link grows to the full 64px bar height and picks up
+                     ~23px of invisible clickable space above and below its label. The old
+                     `sm:-my-px` was a Breeze leftover for an active `border-b-2` that no
+                     longer exists. `gap-2` moves 4px out of the links' padding (clickable)
+                     and into the gap (not clickable) -- same visual spacing, smaller targets. --}}
+                <div class="hidden sm:ms-10 sm:flex sm:items-center sm:gap-2">
                     @foreach ($navPrimary as $item)
                         <x-nav-link href="{{ $item['href'] }}" :active="$item['active']">
                             {{ __($item['label']) }}
