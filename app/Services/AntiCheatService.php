@@ -50,12 +50,14 @@ class AntiCheatService
      * Race-only WPM ceiling, tighter than MAX_HUMAN_WPM.
      *
      * In a race, progress% is client-reported, so "finishing" is a single number a
-     * tampered client can simply assert. Against a ~240-character text that makes a
-     * 10-second teleport read as 290 WPM -- under the 300 ceiling, therefore accepted as
-     * a legitimate win. The world record is ~210-230 and sustaining it over a full race
-     * is rarer still, so 250 rejects teleports while leaving genuine elite runs intact.
+     * tampered client can simply assert -- and because placement is ranked by finish
+     * TIME, a forged pace paced just under this ceiling would beat every honest player.
+     * The world record is ~210-230 and sustaining it over a full race is rarer still, so
+     * 240 sits just above genuine elite runs: it rejects a forged pace while leaving real
+     * elite runs intact. (A looser 250 still admitted a ~245-WPM forgery indistinguishable
+     * from a win; 240 narrows that window without touching honest play.)
      */
-    private const MAX_RACE_WPM = 250;
+    private const MAX_RACE_WPM = 240;
 
     /**
      * Do these reasons indicate MANIPULATION (not just a weak session)?

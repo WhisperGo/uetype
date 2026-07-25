@@ -128,3 +128,24 @@ it('rejects an empty session in every solo mode', function () {
     expect($this->service->rejectsSoloResult($result['reasons'], 'time'))->toBeTrue()
         ->and($this->service->rejectsSoloResult($result['reasons'], 'survival'))->toBeTrue();
 });
+
+/*
+|--------------------------------------------------------------------------
+| Ceiling WPM khusus race (MAX_RACE_WPM = 240)
+|--------------------------------------------------------------------------
+| Lebih ketat dari MAX_HUMAN_WPM (300). Di race, progress% dilaporkan client,
+| jadi "finish" cuma satu angka yang bisa dipacu client tampered. Rekor manusia
+| berkelanjutan ~210-230 WPM, jadi 240 menolak pace palsu tapi tetap meloloskan
+| run elit sungguhan.
+*/
+it('rejects a forged race pace that slips under the old 250 ceiling', function () {
+    // 205 karakter benar dalam 10 detik = ~246 WPM: lolos di ambang 250 lama,
+    // ditolak di ambang 240 baru (kemenangan-palsu client tampered).
+    expect($this->service->exceedsRaceSpeed(correctChars: 205, durationSeconds: 10.0))->toBeTrue();
+});
+
+it('still accepts a genuine elite race pace below the ceiling', function () {
+    // 195 karakter benar dalam 10 detik = ~234 WPM: pelari elite sungguhan,
+    // tetap lolos supaya perbaikan tak menghukum yang jujur.
+    expect($this->service->exceedsRaceSpeed(correctChars: 195, durationSeconds: 10.0))->toBeFalse();
+});
