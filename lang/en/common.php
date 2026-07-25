@@ -7,6 +7,6 @@ return [
 
     'footer' => [
         'about' => 'About',
-        'privacy' => 'Privacy',
+        'privacy' => 'Terms & Conditions',
     ],
 ];

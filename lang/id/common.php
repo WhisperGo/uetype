@@ -7,6 +7,6 @@ return [
 
     'footer' => [
         'about' => 'Tentang',
-        'privacy' => 'Privasi',
+        'privacy' => 'Ketentuan & Syarat',
     ],
 ];
