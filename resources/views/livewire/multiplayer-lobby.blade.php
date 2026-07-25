@@ -427,6 +427,25 @@
                 </span>
             </div>
 
+            {{-- FIXED SUDDEN-DEATH BANNER: pinned to the viewport so it stays visible even
+                 when the player has scrolled down to the typing input. Bound to the Alpine
+                 state (not a server @if), so it appears the instant the WebSocket fires,
+                 without waiting for a Livewire re-render. Only for racers who are still
+                 typing -- finished/spectator screens don't need it. --}}
+            <div x-show="suddenDeathActive && raceStarted && !isFinished" x-cloak
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 translate-y-2"
+                x-transition:enter-end="opacity-100 translate-y-0"
+                class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+                <div class="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-danger text-background shadow-xl border border-danger/40 animate-pulse">
+                    <span class="w-2 h-2 rounded-full bg-background"></span>
+                    <span class="font-mono text-sm font-bold uppercase tracking-wider">
+                        {{ __('multiplayer.sudden_death') }}
+                        <span class="tabular-nums">- <span x-text="suddenDeathRemaining"></span>s</span>
+                    </span>
+                </div>
+            </div>
+
             <!-- COUNTDOWN OVERLAY SCREEN: only for race start; the !suddenDeathActive guard keeps it from reappearing during the sudden-death countdown -->
             <template x-if="!raceStarted && !suddenDeathActive">
                 <div class="fixed inset-0 bg-background/95 flex flex-col items-center justify-center z-50 select-none">
