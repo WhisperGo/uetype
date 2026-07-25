@@ -186,7 +186,8 @@
                     }
                 }"
                 class="p-6 border bg-surface/40 border-border/40 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div>
+                {{-- Centered while stacked (mobile); left-aligned once the row lays out at sm. --}}
+                <div class="text-center sm:text-left">
                     <span class="text-xs font-mono tracking-widest text-muted uppercase">{{ __('multiplayer.room_code_share') }}</span>
                     <h2 class="text-fluid-title font-mono font-black tracking-[0.3em] text-foreground mt-1">
                         {{ $this->roomData->code }}</h2>
