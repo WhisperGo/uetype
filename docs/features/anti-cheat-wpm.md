@@ -70,6 +70,14 @@ throughput, seseorang bisa mengetik satu karakter lalu diam lama untuk memompa d
 "minimal 0.5 karakter/detik" memastikan durasi yang diklaim benar-benar diisi aktivitas mengetik.
 Hanya dicek di atas durasi minimum, karena sesi pendek wajar punya rasio lebih bising.
 
+> **Jangan pakai ambang ini untuk mendeteksi AFK di time/words.** Throughput adalah *rata-rata*,
+> dan pemula hunt-and-peck 5 WPM (25 karakter/60 detik = 0,42 cps) berada **di bawah** 0,5 —
+> memakainya sebagai gerbang di time/words akan membuang hasil pemain jujur, persis yang dicegah
+> §4 dan test "keeps a slow time-mode session". Sesi yang ditinggalkan ditangani terpisah lewat
+> **jeda terpanjang antar-keystroke** di [`TypingEngine::isAfkSession()`](../../app/Livewire/TypingEngine.php),
+> karena hanya jeda yang bisa membedakan "pergi" dari "lambat". Lihat
+> [typing-engine.md](typing-engine.md) §3.4.b.
+
 ### 4.4 Service murni & stateless — satu `check()`, tiga gerbang keputusan
 
 **Justifikasi:** satu fungsi `check()` tanpa state/DB dipanggil dari tiga tempat berbeda. Ini

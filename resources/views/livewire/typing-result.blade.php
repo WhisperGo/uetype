@@ -47,6 +47,19 @@
             $charsSpan = $statCount % 2 === 1 ? 'col-span-2 sm:col-span-1' : '';
         @endphp
 
+        {{-- Abandoned run: every number below is still shown, but nothing was written to the --}}
+        {{-- database (no XP, no personal best, not in stats). Deliberately `gold` and not the --}}
+        {{-- `danger` used by the multiplayer reject banner: that one is an anti-cheat verdict, --}}
+        {{-- while walking away is not an accusation -- just a session that wasn't really typed. --}}
+        @if ($afk)
+            <div class="mb-6 flex items-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-4 py-3 text-x-small font-mono text-gold">
+                <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>{{ __('result.afk_not_recorded') }}</span>
+            </div>
+        @endif
+
         @if ($isSurvival)
             <div x-data="{
                     duration: 0,

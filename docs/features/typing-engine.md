@@ -88,6 +88,56 @@ if ($this->mainMode !== 'survival' && $finalNetWpm > (float) $user->highest_wpm)
 jadi WPM-nya bukan perbandingan *apple-to-apple* dengan Time/Words. Rekor Survival diukur dari
 **lama bertahan** (`duration_seconds`), bukan WPM. Ini menjaga arti "rekor WPM" tetap konsisten.
 
+### 3.4.b Sesi yang ditinggalkan (AFK) tidak dicatat
+
+```php
+$isAfk = $this->isAfkSession((float) $maxIdleMs / 1000, $duration);
+// ambang = max(AFK_MIN_IDLE_SECONDS 10 dtk, durasi × AFK_IDLE_FRACTION 0.25)
+```
+
+Di mode **time**, timer berjalan sendiri sampai habis lalu **mengirim hasilnya** — jadi "ketik
+dua huruf lalu pergi" mendarat di riwayat sebagai baris 1 WPM dan **menyeret turun rata-rata**
+pemain (`AVG(net_wpm)` di halaman Stats). Mode **words** tak pernah submit kalau ditinggal
+(sesi hanya berakhir saat semua kata selesai), tapi AFK **di tengah** menggelembungkan durasi.
+**Survival** sudah aman dengan sendirinya: stamina habis → mati dalam hitungan detik.
+
+**Justifikasi tiga keputusan yang mudah salah:**
+
+1. **Sinyalnya JEDA, bukan throughput.** Godaannya adalah memakai ulang `throughput_too_low`
+   yang sudah ada. Itu keliru: throughput adalah **rata-rata**, dan pemula hunt-and-peck 5 WPM
+   = 25 karakter/60 detik = **0,42 cps — di bawah ambang 0,5**, jadi hasil pemula jujur ikut
+   dibuang. Justru itu *false positive* yang sengaja dihindari (lihat
+   [anti-cheat-wpm.md](anti-cheat-wpm.md) §4 dan test "keeps a slow time-mode session"). Pengetik
+   lambat menyebar ketikannya **merata**; sesi AFK punya **satu sunyi panjang**. Hanya jeda yang
+   bisa membedakan keduanya.
+
+2. **Ambang proporsional + lantai.** Jeda 12 detik adalah hampir seluruh sesi `time 15`, tapi
+   sekadar jeda berpikir di `time 120`. Ambang tetap akan berperilaku sangat berbeda antar
+   sub-mode, jadi ambangnya 25% durasi dengan lantai 10 detik (time 15 → 10 dtk, time 60 → 15
+   dtk, time 120 → 30 dtk).
+
+3. **Data jeda datang dari client — dan di sini itu aman.** Server tak pernah melihat keystroke
+   individual, jadi timing hanya ada di klien. Ini **tidak** melanggar prinsip "jangan percaya
+   client" karena **insentifnya terbalik**: menyembunyikan jeda hanya membeli hasil yang *lebih
+   buruk*, dan pemain yang ingin sesi buruknya dibuang sudah bisa sekadar **meninggalkan halaman**
+   sebelum timer habis. Berbeda dengan WPM, tak ada yang bisa dimenangkan dengan memalsukannya.
+
+**Clan War dikecualikan (`warLock !== null`) — ini menutup celah, bukan sekadar batas cakupan.**
+Hasil yang ditolak **tak pernah mengisi claim** (penolakan terjadi sebelum transaksi yang
+memanggil `attachToWarClaim()`), sehingga claim tetap terbuka. Kalau AFK ikut menolak hasil war,
+pemain yang sedang jelek tinggal **berhenti mengetik** untuk membuang percobaannya lalu mengulang
+slot itu — dan di war mode Words teksnya **tetap**, jadi ia mengulang dengan teks yang sudah
+dilihatnya. Itu mementahkan aturan "satu claim, satu teks, satu kesempatan" yang dijaga
+[ClanWarRerollTest](../../tests/Feature/ClanWarRerollTest.php). AFK saat war cukup jadi skor jelek
+untuk clan sendiri — merugikan pelakunya, bukan eksploit.
+
+**Ditampilkan, bukan ditelan.** Berbeda dari jalur reject anti-cheat (flash + redirect balik ke
+`/typing` tanpa pemain melihat apa pun), sesi AFK **tetap membuka layar hasil lengkap** dengan
+banner `result.afk_not_recorded` — hanya saja tak ada yang ditulis ke DB (tanpa XP, PB, achievement,
+maupun baris `typing_results`). Ini gratis karena halaman hasil membaca dari **session**, bukan DB.
+Sejajar dengan multiplayer yang menandai hasil DNF/ditolak di layar alih-alih menyembunyikannya
+([multiplayer-race.md](multiplayer-race.md) §3.6).
+
 ### 3.5 Consistency sebagai metrik presentasi (bukan anti-cheat)
 
 `computeConsistency()` menghitung **koefisien variasi** dari histori WPM per-detik

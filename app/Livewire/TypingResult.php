@@ -61,6 +61,9 @@ class TypingResult extends Component
     /** Compact error stream from the session: [{second, index, actual}]. Enriched at render time. */
     public $errorEvents;
 
+    /** True when the run was abandoned mid-session: every number still shows, nothing was saved. */
+    public $afk = false;
+
     public function mount()
     {
         $result = session('typing_result');
@@ -94,6 +97,7 @@ class TypingResult extends Component
         $this->textToType = $result['textToType'] ?? null;
         // ?? REQUIRED: old sessions (from before this deploy) don't have this key.
         $this->errorEvents = $result['errorEvents'] ?? [];
+        $this->afk = $result['afk'] ?? false;
     }
 
     /**

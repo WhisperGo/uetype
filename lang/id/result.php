@@ -18,6 +18,7 @@ return [
     'beat_ghost' => 'mengalahkan ghost',
     'lost_ghost' => 'kalah dari ghost',
     'vs_ghost' => 'vs :label (:wpm wpm)',
+    'afk_not_recorded' => 'Kamu meninggalkan tes ini cukup lama, jadi hasilnya tidak disimpan ke riwayat maupun statistikmu.',
 
     'stat' => [
         'avg_wpm' => 'rata-rata wpm',

@@ -18,6 +18,7 @@ return [
     'beat_ghost' => 'beat the ghost',
     'lost_ghost' => 'lost to the ghost',
     'vs_ghost' => 'vs :label (:wpm wpm)',
+    'afk_not_recorded' => 'You were away for a long stretch of this test, so it was not saved to your history or stats.',
 
     'stat' => [
         'avg_wpm' => 'avg wpm',

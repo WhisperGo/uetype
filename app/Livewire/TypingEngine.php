@@ -52,6 +52,20 @@ class TypingEngine extends Component
      */
     private const MAX_RESULTS_PER_MINUTE = 10;
 
+    /**
+     * Share of the session an idle gap may reach before the run counts as abandoned.
+     *
+     * Proportional rather than flat because the same pause means different things: 12
+     * seconds is most of a 15-second test but an ordinary hesitation in a 120-second one.
+     */
+    private const AFK_IDLE_FRACTION = 0.25;
+
+    /**
+     * Floor for the idle threshold, so short tests keep a usable pause budget. Reading a
+     * hard word, sneezing, glancing away -- all normal, none of them AFK.
+     */
+    private const AFK_MIN_IDLE_SECONDS = 10.0;
+
     // Locked: the client renders this text but must never set it. Without the lock a
     // tampered payload could swap in a much longer text to justify a huge character count.
     // mainMode/subMode can't be locked (the view @entangles them); a mode swapped after the
@@ -519,7 +533,8 @@ class TypingEngine extends Component
         $ghostWpm = null,
         $ghostLabel = null,
         $ghostCharsAtFinish = null,
-        $errorEvents = []
+        $errorEvents = [],
+        $maxIdleMs = 0
     ) {
         // Mode gate: normalize against the whitelist before it's used for score/mode_config,
         // so a wild difficulty/sub-mode can't reach the DB and pollute leaderboard filters.
@@ -636,6 +651,16 @@ class TypingEngine extends Component
             return $this->redirect(route('typing'));
         }
 
+        // AFK: a session the player walked away from is not an attempt at typing. In `time`
+        // the clock runs to zero and submits on its own, so "type two letters then leave"
+        // lands in history as a 1-WPM row and drags the player's average down for good.
+        //
+        // The signal is the GAP, not the average speed. A genuinely slow beginner spreads
+        // their keystrokes evenly; an abandoned run is one long silence. Throughput can't
+        // tell those apart -- 25 characters in 60 seconds is both a 5-WPM beginner and an
+        // idle tab -- which is why it stays reserved for survival (see AntiCheatService).
+        $isAfk = $this->isAfkSession((float) $maxIdleMs / 1000, $duration);
+
         $consistency = $this->computeConsistency($wpmHistory);
 
         $isPersonalBest = false;
@@ -645,7 +670,13 @@ class TypingEngine extends Component
         $survivalPreviousBest = null;
         $isSurvivalPersonalBest = false;
 
-        if (Auth::check()) {
+        if (Auth::check() && $isAfk) {
+            // Nothing is written for an abandoned run, but the result screen still renders
+            // (from the session, never the DB) and needs the player's current level.
+            $levelData = Auth::user()->levelData();
+        }
+
+        if (Auth::check() && ! $isAfk) {
             $user = Auth::user();
 
             // Captured before the transaction overwrites highest_wpm. Survival is excluded from the WPM record.
@@ -760,6 +791,10 @@ class TypingEngine extends Component
             'survivalPreviousBest' => $survivalPreviousBest !== null ? (float) $survivalPreviousBest : null,
             'isSurvivalPersonalBest' => $isSurvivalPersonalBest,
             'ghostResult' => $ghostResult,
+            // Abandoned run: the screen still shows every number, with a banner saying it
+            // was not recorded. Silently redirecting (the anti-cheat reject path) would
+            // read as the app eating the session.
+            'afk' => $isAfk,
             // Compact by design: indices only. The result page reconstructs words from
             // textToType (already above) rather than us storing the string twice.
             'errorEvents' => $errorEvents,
@@ -770,6 +805,32 @@ class TypingEngine extends Component
         // button restore the typing-engine snapshot -> @entangle undefined & stale $wire
         // (can't type / empty stats / finish hangs). A full load makes Back reload cleanly.
         $this->redirect(route('typing.result'));
+    }
+
+    /**
+     * Was this run abandoned mid-session? Decided from the longest gap between keystrokes
+     * (including the stretch after the last one, which is where a `time` run spends its
+     * silence) measured against a threshold that scales with the session length.
+     *
+     * Only the client can supply that timing -- the server never sees individual
+     * keystrokes. Trusting it here is safe in a way trusting WPM never is, because the
+     * incentive runs backwards: hiding a gap only buys you a WORSE result, and a player who
+     * wants a bad run thrown away can already just leave the page before the timer ends.
+     *
+     * War attempts are the one place where getting a result discarded WOULD pay: a rejected
+     * result never fills the claim (that happens further down, inside the transaction), so
+     * the slot would reopen and could be retried -- with the same fixed text in Words mode.
+     * They are therefore exempt: one claim, one chance, however the run goes.
+     */
+    private function isAfkSession(float $maxIdleSeconds, float $duration): bool
+    {
+        if ($this->warLock !== null) {
+            return false;
+        }
+
+        $threshold = max(self::AFK_MIN_IDLE_SECONDS, $duration * self::AFK_IDLE_FRACTION);
+
+        return $maxIdleSeconds > $threshold;
     }
 
     // Consistency: how steady WPM was across the session (from per-second wpmHistory).

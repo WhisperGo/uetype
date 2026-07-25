@@ -82,6 +82,12 @@ export default function typingGame(initialText) {
         typingTimeout: null,
         totalKeystrokes: 0,
         correctKeystrokes: 0,
+
+        // AFK tracking: timestamp of the last keystroke, and the longest gap between two of
+        // them. The server rejects abandoned runs from this (see TypingEngine::saveResult) --
+        // the gap is what separates "walked away" from "types slowly", which no average can.
+        lastKeyTime: null,
+        maxIdleMs: 0,
         wpmHistory: [],
         rawHistory: [],
         missedChars: {},
@@ -209,6 +215,8 @@ export default function typingGame(initialText) {
             this.currentWordIndex = 0;
             this.totalKeystrokes = 0;
             this.correctKeystrokes = 0;
+            this.lastKeyTime = null;
+            this.maxIdleMs = 0;
             this.wpmHistory = [];
             this.rawHistory = [];
             this.missedChars = {};
@@ -281,6 +289,19 @@ export default function typingGame(initialText) {
         //   actual    : the key pressed (handleInput already guarantees length 1), or null
         //               for a SKIPPED character -- the user pressed space, there was never a
         //               keystroke for this character.
+        // Record the gap since the previous keystroke, then stamp this one. Called for every
+        // real key INCLUDING backspace: correcting a word is still the player being present.
+        trackIdle() {
+            const now = Date.now();
+
+            if (this.lastKeyTime !== null) {
+                const gap = now - this.lastKeyTime;
+                if (gap > this.maxIdleMs) this.maxIdleMs = gap;
+            }
+
+            this.lastKeyTime = now;
+        },
+
         recordError(charIndex, actual) {
             if (this.errorEvents.length >= MAX_ERROR_EVENTS) return;
             this.errorEvents.push({
@@ -676,6 +697,10 @@ export default function typingGame(initialText) {
                 }, 1000);
             }
 
+            // After the start block: the first keystroke only stamps the clock (no gap to
+            // measure yet), every later one closes the interval since the previous key.
+            this.trackIdle();
+
             let bounds = this.wordBounds[this.currentWordIndex];
 
             if (e.key === 'Backspace') {
@@ -822,6 +847,14 @@ export default function typingGame(initialText) {
             // calculation, so the final WPM is identical to the WPM while typing.
             const durationMs = this.startTime ? (Date.now() - this.startTime) : 0;
 
+            // Trailing gap: in `time` the countdown ends the session by itself, so a player
+            // who walked away leaves their longest silence AFTER the final keystroke. Without
+            // closing that interval here the defining shape of an AFK run is never measured.
+            if (this.lastKeyTime !== null) {
+                const trailingIdle = Date.now() - this.lastKeyTime;
+                if (trailingIdle > this.maxIdleMs) this.maxIdleMs = trailingIdle;
+            }
+
             const correct = this.correctKeystrokes;
             const total = this.totalKeystrokes;
 
@@ -834,7 +867,7 @@ export default function typingGame(initialText) {
             const ghostLabelArg = this.ghostActive ? this.ghostLabel : null;
             const ghostCharsArg = this.ghostActive ? this.ghostCharIndex : null;
 
-            this.$wire.saveResult(durationMs, total, correct, this.wpmHistory, this.rawHistory, this.missedChars, this.drainEventCount, ghostWpmArg, ghostLabelArg, ghostCharsArg, this.errorEvents);
+            this.$wire.saveResult(durationMs, total, correct, this.wpmHistory, this.rawHistory, this.missedChars, this.drainEventCount, ghostWpmArg, ghostLabelArg, ghostCharsArg, this.errorEvents, this.maxIdleMs);
         }
     }
 }
