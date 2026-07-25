@@ -31,8 +31,9 @@ class About extends Component
             ['name' => 'Vite', 'icon' => 'simpleicon-vite', 'color' => '#646CFF'],
             ['name' => 'PHP', 'icon' => 'simpleicon-php', 'color' => '#777BB4'],
             ['name' => 'MySQL', 'icon' => 'simpleicon-mysql', 'color' => '#4479A1'],
-            // Reverb has no icon of its own in Simple Icons -- use the Laravel logo (part of its ecosystem).
-            ['name' => 'Laravel Reverb', 'icon' => 'simpleicon-laravel', 'color' => '#FF2D20'],
+            // Reverb's own logo (concentric radar rings) ships with the package; tinted in
+            // its brand purple. (Simple Icons only has "ReverbNation", an unrelated brand.)
+            ['name' => 'Laravel Reverb', 'icon' => 'icon-reverb-color', 'color' => '#6D28D9'],
             // color=null => the two-color Chart.js logo (pink + blue), not monochrome.
             ['name' => 'Chart.js', 'icon' => 'icon-chartjs-color', 'color' => null],
             // Social login uses Socialite with the Google OAuth provider.
