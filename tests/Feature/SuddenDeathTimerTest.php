@@ -81,24 +81,19 @@ test('sudden death tetap mulai walau sudah ada pemain lain yang tercatat finish'
     expect($room->fresh()->countdown_started_at)->not->toBeNull();
 });
 
-test('sudden death tetap mulai lewat giveUp walau sudah ada yang finish', function () {
-    $duluan = User::factory()->create();
+test('giveUp does not start sudden death (only a valid finish does)', function () {
     $menyerah = User::factory()->create();
     $masihNgetik = User::factory()->create();
 
     $room = Room::create([
         'code' => 'SD0003',
-        'host_id' => $duluan->id,
+        'host_id' => $menyerah->id,
         'status' => 'racing',
         'text_to_type' => 'the quick brown fox jumps over the lazy dog',
         'race_starts_at' => now()->subSeconds(10),
         'countdown_started_at' => null,
     ]);
 
-    RoomMember::create([
-        'room_id' => $room->id, 'user_id' => $duluan->id,
-        'is_ready' => true, 'progress_percent' => 100, 'finished_time_seconds' => 8,
-    ]);
     RoomMember::create(['room_id' => $room->id, 'user_id' => $menyerah->id, 'is_ready' => true, 'progress_percent' => 20]);
     RoomMember::create(['room_id' => $room->id, 'user_id' => $masihNgetik->id, 'is_ready' => true, 'progress_percent' => 30]);
 
@@ -107,7 +102,10 @@ test('sudden death tetap mulai lewat giveUp walau sudah ada yang finish', functi
         ->set('step', 'racing')
         ->call('giveUp');
 
-    expect($room->fresh()->countdown_started_at)->not->toBeNull();
+    // Conceding is not a finish: the clock must stay off so the remaining player keeps
+    // racing until someone actually finishes with a valid result.
+    expect($room->fresh()->countdown_started_at)->toBeNull()
+        ->and($room->fresh()->status)->toBe('racing');
 });
 
 /**

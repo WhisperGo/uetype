@@ -69,7 +69,15 @@ trait ManagesChatConversation
     #[On('message-received')]
     public function refreshChat(): void
     {
-        //
+        // A new message arrived. If the user is currently looking at that exact DM, mark it
+        // read right away -- otherwise the sender spamming while the thread is OPEN would
+        // pile up unread rows and light the notification dot for a conversation already on
+        // screen. The method itself just triggers a re-render (computed props re-run); the
+        // mark-read is the meaningful side effect. Clan chat has no per-message read state,
+        // so only DMs need this.
+        if ($this->activeMode === 'dm' && $this->activeFriend) {
+            $this->markDmAsRead($this->activeFriend->id);
+        }
     }
 
     // ---- ACTION: NAVIGATION ----
