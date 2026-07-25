@@ -15,7 +15,7 @@ it('redirects to the result page after a valid solo result', function () {
 
     Livewire::actingAs($user)->test(TypingEngine::class)
         ->call('setMode', 'time', '30')
-        ->call('saveResult', 30000, 150, 140, [40, 42], [45, 47], [], 0, 0, '', 0)
+        ->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 150, 'correctKeystrokes' => 140, 'wpmHistory' => [40, 42], 'rawHistory' => [45, 47]])
         ->assertRedirect(route('typing.result'));
 });
 
@@ -25,7 +25,7 @@ it('redirects back to typing when the result is rejected by anti-cheat', functio
     // 5000 karakter dalam 1 detik -> wpm mustahil -> ditolak.
     Livewire::actingAs($user)->test(TypingEngine::class)
         ->call('setMode', 'time', '30')
-        ->call('saveResult', 1000, 5000, 5000, [], [], [], 0, 0, '', 0)
+        ->call('saveResult', ['durationMs' => 1000, 'totalKeystrokes' => 5000, 'correctKeystrokes' => 5000])
         ->assertRedirect(route('typing'));
 
     expect(session('result_rejected'))->not->toBeNull();

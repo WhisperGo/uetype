@@ -40,7 +40,11 @@ function playBestScore(User $user, string $main, string $sub, int $durationMs, i
 
     app(SoloSessionGuard::class)->backdate($durationMs / 1000);
 
-    return $component->call('saveResult', $durationMs, $chars, $chars);
+    return $component->call('saveResult', [
+        'durationMs' => $durationMs,
+        'totalKeystrokes' => $chars,
+        'correctKeystrokes' => $chars,
+    ]);
 }
 
 it('treats each mode config as its own record', function () {

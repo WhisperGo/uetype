@@ -24,7 +24,7 @@ it('refuses a fabricated high-wpm payload in time mode', function () {
     // 1495 correct chars claimed in 60s = 299 WPM, just under the 300 ceiling. This used
     // to be stored verbatim and become the user's highest_wpm.
     playSolo($user, 'time', '30')
-        ->call('saveResult', 60000, 1495, 1495, [], [], [], 0, 0, '', 0)
+        ->call('saveResult', ['durationMs' => 60000, 'totalKeystrokes' => 1495, 'correctKeystrokes' => 1495])
         ->assertRedirect(route('typing'));
 
     expect(TypingResult::where('user_id', $user->id)->count())->toBe(0)
@@ -38,7 +38,7 @@ it('ignores a shortened duration in time mode', function () {
     $component = playSolo($user, 'time', '30');
     app(SoloSessionGuard::class)->backdate(30);
 
-    $component->call('saveResult', 5000, 400, 400, [], [], [], 0, 0, '', 0);
+    $component->call('saveResult', ['durationMs' => 5000, 'totalKeystrokes' => 400, 'correctKeystrokes' => 400]);
 
     $result = TypingResult::where('user_id', $user->id)->first();
 
@@ -51,7 +51,7 @@ it('refuses a character count the issued text could not produce', function () {
 
     // words 10 is a short text; 5000 chars is far beyond anything it contains.
     playSolo($user, 'words', '10')
-        ->call('saveResult', 60000, 5000, 5000, [], [], [], 0, 0, '', 0)
+        ->call('saveResult', ['durationMs' => 60000, 'totalKeystrokes' => 5000, 'correctKeystrokes' => 5000])
         ->assertRedirect(route('typing'));
 
     expect(TypingResult::where('user_id', $user->id)->count())->toBe(0);
@@ -64,7 +64,7 @@ it('rejects a result whose mode no longer matches the issued text', function () 
     $component = playSolo($user, 'time', '15');
 
     $component->set('subMode', '120')
-        ->call('saveResult', 120000, 2000, 2000, [], [], [], 0, 0, '', 0)
+        ->call('saveResult', ['durationMs' => 120000, 'totalKeystrokes' => 2000, 'correctKeystrokes' => 2000])
         ->assertRedirect(route('typing'));
 
     expect(TypingResult::where('user_id', $user->id)->count())->toBe(0)
@@ -81,9 +81,9 @@ it('rejects a submission once the issued session has been consumed', function ()
 
     $component = playSolo($user, 'time', '30');
     app(SoloSessionGuard::class)->backdate(30);
-    $component->call('saveResult', 30000, 300, 290, [], [], [], 0, 0, '', 0);
+    $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290]);
 
-    $component->call('saveResult', 30000, 300, 290, [], [], [], 0, 0, '', 0)
+    $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290])
         ->assertRedirect(route('typing'));
 
     expect(TypingResult::where('user_id', $user->id)->count())->toBe(1);
@@ -93,13 +93,13 @@ it('refuses to bank the same finished session twice', function () {
     $user = User::factory()->create();
 
     $component = playSolo($user, 'time', '30');
-    $component->call('saveResult', 30000, 300, 290, [], [], [], 0, 0, '', 0);
+    $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290]);
 
     $countAfterFirst = TypingResult::where('user_id', $user->id)->count();
 
     // Replaying the identical payload must not add a second row or more XP.
     $xpAfterFirst = $user->fresh()->total_xp;
-    $component->call('saveResult', 30000, 300, 290, [], [], [], 0, 0, '', 0);
+    $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290]);
 
     expect(TypingResult::where('user_id', $user->id)->count())->toBe($countAfterFirst)
         ->and($user->fresh()->total_xp)->toBe($xpAfterFirst);
@@ -115,7 +115,7 @@ it('still accepts an honest session', function () {
     // which would otherwise look like an automated forgery to the elapsed-time guard.
     app(SoloSessionGuard::class)->backdate(30);
 
-    $component->call('saveResult', 30000, 300, 290, [], [], [], 0, 0, '', 0)
+    $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290])
         ->assertRedirect(route('typing.result'));
 
     $result = TypingResult::where('user_id', $user->id)->first();

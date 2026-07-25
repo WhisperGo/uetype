@@ -16,8 +16,12 @@ it('stores a sanitised error stream in the session', function () {
 
     Livewire::actingAs($user)->test(TypingEngine::class)
         ->call('setMode', 'time', '30')
-        ->call('saveResult', 30000, 150, 140, [40, 42], [45, 47], ['e' => 1], 0, 0, '', 0, [
-            ['second' => 1, 'index' => 2, 'actual' => 'r'],
+        ->call('saveResult', [
+            'durationMs' => 30000, 'totalKeystrokes' => 150, 'correctKeystrokes' => 140,
+            'wpmHistory' => [40, 42], 'rawHistory' => [45, 47], 'missedChars' => ['e' => 1],
+            'errorEvents' => [
+                ['second' => 1, 'index' => 2, 'actual' => 'r'],
+            ],
         ]);
 
     expect(session('typing_result')['errorEvents'])->toBe([
@@ -26,14 +30,14 @@ it('stores a sanitised error stream in the session', function () {
 });
 
 it('defaults to an empty stream when the client sends nothing', function () {
-    // Membuktikan parameter ke-11 tak merusak kelima call site 10-argumen yang sudah ada
-    // (BackNavigationRedirect x2, GhostMode x2, LeaderboardLanguage), dan bahwa sesi lama
-    // dari request sebelum deploy tetap merender bersih.
+    // Kunci yang tak dikirim harus jatuh ke default (SoloSessionPayload::fromArray), bukan
+    // menggagalkan submit: bundle klien yang masih ter-cache belum tentu mengirim field
+    // terbaru, dan sesi lama dari sebelum deploy tetap harus merender bersih.
     $user = User::factory()->create();
 
     Livewire::actingAs($user)->test(TypingEngine::class)
         ->call('setMode', 'time', '30')
-        ->call('saveResult', 30000, 150, 140, [40, 42], [45, 47], [], 0, 0, '', 0);
+        ->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 150, 'correctKeystrokes' => 140, 'wpmHistory' => [40, 42], 'rawHistory' => [45, 47]]);
 
     expect(session('typing_result')['errorEvents'])->toBe([]);
 });
@@ -45,7 +49,7 @@ it('shrugs off a malformed error stream without breaking the save', function () 
 
     Livewire::actingAs($user)->test(TypingEngine::class)
         ->call('setMode', 'time', '30')
-        ->call('saveResult', 30000, 150, 140, [40, 42], [45, 47], [], 0, 0, '', 0, 'not-an-array')
+        ->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 150, 'correctKeystrokes' => 140, 'wpmHistory' => [40, 42], 'rawHistory' => [45, 47], 'errorEvents' => 'not-an-array'])
         ->assertRedirect(route('typing.result'));
 
     expect(session('typing_result')['errorEvents'])->toBe([]);
@@ -58,7 +62,7 @@ it('caps a flooded error stream', function () {
 
     Livewire::actingAs($user)->test(TypingEngine::class)
         ->call('setMode', 'time', '30')
-        ->call('saveResult', 30000, 150, 140, [40, 42], [45, 47], [], 0, 0, '', 0, $flood);
+        ->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 150, 'correctKeystrokes' => 140, 'wpmHistory' => [40, 42], 'rawHistory' => [45, 47], 'errorEvents' => $flood]);
 
     expect(session('typing_result')['errorEvents'])
         ->toHaveCount(TypingErrorInspector::MAX_EVENTS);
@@ -121,8 +125,12 @@ it('keeps the error stream out of the database', function () {
 
     Livewire::actingAs($user)->test(TypingEngine::class)
         ->call('setMode', 'time', '30')
-        ->call('saveResult', 30000, 150, 140, [40, 42], [45, 47], [], 0, 0, '', 0, [
-            ['second' => 1, 'index' => 2, 'actual' => 'r'],
+        ->call('saveResult', [
+            'durationMs' => 30000, 'totalKeystrokes' => 150, 'correctKeystrokes' => 140,
+            'wpmHistory' => [40, 42], 'rawHistory' => [45, 47],
+            'errorEvents' => [
+                ['second' => 1, 'index' => 2, 'actual' => 'r'],
+            ],
         ]);
 
     expect(TypingResult::first()->ghost_data)->toBeNull();

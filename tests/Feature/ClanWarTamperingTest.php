@@ -61,7 +61,7 @@ it('refuses a survival claim of time that never passed', function () {
     // Survival hard has the highest ceiling (150) and scores on duration, so claiming
     // 9999 seconds of survival used to buy full points outright.
     Livewire::actingAs($user)->test(TypingEngine::class, ['warClaimId' => $claim->id])
-        ->call('saveResult', 9999000, 6000, 6000, [], [], [], 0, 0, '', 0)
+        ->call('saveResult', ['durationMs' => 9999000, 'totalKeystrokes' => 6000, 'correctKeystrokes' => 6000])
         ->assertRedirect(route('typing'));
 
     $claim->refresh();
@@ -76,7 +76,7 @@ it('refuses a fabricated wpm claim in a time-mode war slot', function () {
 
     // 1500 chars "in" 120s = 150 WPM, exactly the ratio that maxes out the ceiling.
     Livewire::actingAs($user)->test(TypingEngine::class, ['warClaimId' => $claim->id])
-        ->call('saveResult', 120000, 1500, 1500, [], [], [], 0, 0, '', 0)
+        ->call('saveResult', ['durationMs' => 120000, 'totalKeystrokes' => 1500, 'correctKeystrokes' => 1500])
         ->assertRedirect(route('typing'));
 
     $claim->refresh();
@@ -90,7 +90,7 @@ it('refuses a fabricated words-mode war claim', function () {
 
     // A 10-word text is ~50 characters; 4000 is pure invention.
     Livewire::actingAs($user)->test(TypingEngine::class, ['warClaimId' => $claim->id])
-        ->call('saveResult', 60000, 4000, 4000, [], [], [], 0, 0, '', 0)
+        ->call('saveResult', ['durationMs' => 60000, 'totalKeystrokes' => 4000, 'correctKeystrokes' => 4000])
         ->assertRedirect(route('typing'));
 
     expect($claim->refresh()->typing_result_id)->toBeNull();
@@ -106,7 +106,7 @@ it('still scores an honest war attempt', function () {
     // elapsed-time guard would otherwise read as an automated forgery.
     app(SoloSessionGuard::class)->backdate(30);
 
-    $component->call('saveResult', 30000, 300, 290, [], [], [], 0, 0, '', 0)
+    $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290])
         ->assertRedirect(route('typing.result'));
 
     $claim->refresh();

@@ -13,6 +13,7 @@ use App\Services\GhostResolver;
 use App\Services\SoloSessionGuard;
 use App\Services\TextGeneratorService;
 use App\Services\TypingErrorInspector;
+use App\Support\SoloSessionPayload;
 use App\Support\TypingLanguage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -522,27 +523,21 @@ class TypingEngine extends Component
      * (anti-cheat), persist the result, update personal bests, XP and achievements, then
      * redirect to the result page. Client-supplied WPM/accuracy is never trusted.
      */
-    public function saveResult(
-        $durationMs,
-        $totalKeystrokes,
-        $correctKeystrokes,
-        $wpmHistory = [],
-        $rawHistory = [],
-        $missedChars = [],
-        $drainEventCount = 0,
-        $ghostWpm = null,
-        $ghostLabel = null,
-        $ghostCharsAtFinish = null,
-        $errorEvents = [],
-        $maxIdleMs = 0
-    ) {
+    public function saveResult(array $payload)
+    {
+        // One object instead of twelve positional arguments: the client reports a single
+        // event, and the array->types normalisation now lives in the payload itself.
+        // Client WPM/accuracy is NOT among them -- the server always recomputes it.
+        $session = SoloSessionPayload::fromArray($payload);
+
         // Mode gate: normalize against the whitelist before it's used for score/mode_config,
         // so a wild difficulty/sub-mode can't reach the DB and pollute leaderboard filters.
         [$this->mainMode, $this->subMode] = $this->normalizeMode($this->mainMode, $this->subMode);
 
-        // Client WPM/accuracy is NOT accepted -- the server always recomputes it (anti-cheat).
-        $totalKeystrokes = max(0, (int) $totalKeystrokes);
-        $correctKeystrokes = max(0, (int) $correctKeystrokes);
+        // Kept as locals because the pipeline below narrows them further (the character cap
+        // and the correct<=total clamp); the payload itself stays immutable.
+        $totalKeystrokes = $session->totalKeystrokes;
+        $correctKeystrokes = $session->correctKeystrokes;
 
         // Rate limit before any work: results are submitted once every 15+ seconds by a
         // real player, so a burst is either a bug or someone scripting attempts to find a
@@ -550,9 +545,7 @@ class TypingEngine extends Component
         $rateKey = 'save-result:'.(Auth::id() ?? request()->ip());
 
         if (RateLimiter::tooManyAttempts($rateKey, self::MAX_RESULTS_PER_MINUTE)) {
-            session()->flash('result_rejected', __('typing.result_rejected'));
-
-            return $this->redirect(route('typing'));
+            return $this->rejectSubmission();
         }
 
         RateLimiter::hit($rateKey, 60);
@@ -568,12 +561,11 @@ class TypingEngine extends Component
         // text was ever issued. Both are refused outright.
         if (! $guard->matchesIssuedSession($this->mainMode, (string) $this->subMode)) {
             $guard->clear();
-            session()->flash('result_rejected', __('typing.result_rejected'));
 
-            return $this->redirect(route('typing'));
+            return $this->rejectSubmission();
         }
 
-        $claimedDuration = max(0.0, (float) $durationMs / 1000);
+        $claimedDuration = max(0.0, $session->durationMs / 1000);
 
         // A duration longer than the session has been open is time that never passed. Only
         // the variable-length modes need this: `time` takes its duration from the sub-mode
@@ -585,9 +577,8 @@ class TypingEngine extends Component
         // in the other direction.
         if ($this->mainMode !== 'time' && $guard->claimsMoreTimeThanElapsed($claimedDuration)) {
             $guard->clear();
-            session()->flash('result_rejected', __('typing.result_rejected'));
 
-            return $this->redirect(route('typing'));
+            return $this->rejectSubmission();
         }
 
         // Duration comes from the SERVER, not the payload. In `time` mode the sub-mode
@@ -607,9 +598,8 @@ class TypingEngine extends Component
             // Silently clamping it would still hand the sender a valid result; refuse it
             // instead, the same way an impossible WPM is refused below.
             $guard->clear();
-            session()->flash('result_rejected', __('typing.result_rejected'));
 
-            return $this->redirect(route('typing'));
+            return $this->rejectSubmission();
         }
 
         // Correct can never exceed total; clamp so the pair stays coherent.
@@ -645,10 +635,7 @@ class TypingEngine extends Component
         // SLOW-TYPER results -- low throughput is slow, not cheating, and in time/words the
         // duration can't be pumped for any advantage.
         if ($antiCheat->rejectsSoloResult($check['reasons'], $this->mainMode)) {
-            session()->flash('result_rejected', __('typing.result_rejected'));
-
-            // Full-load (see note at the result redirect): avoid the broken SPA restore.
-            return $this->redirect(route('typing'));
+            return $this->rejectSubmission();
         }
 
         // AFK: a session the player walked away from is not an attempt at typing. In `time`
@@ -659,9 +646,9 @@ class TypingEngine extends Component
         // their keystrokes evenly; an abandoned run is one long silence. Throughput can't
         // tell those apart -- 25 characters in 60 seconds is both a 5-WPM beginner and an
         // idle tab -- which is why it stays reserved for survival (see AntiCheatService).
-        $isAfk = $this->isAfkSession((float) $maxIdleMs / 1000, $duration);
+        $isAfk = $this->isAfkSession($session->maxIdleMs / 1000, $duration);
 
-        $consistency = $this->computeConsistency($wpmHistory);
+        $consistency = $this->computeConsistency($session->wpmHistory);
 
         $isPersonalBest = false;
         $previousBest = null;
@@ -679,38 +666,14 @@ class TypingEngine extends Component
         if (Auth::check() && ! $isAfk) {
             $user = Auth::user();
 
-            // The record to beat is the best in THIS mode+config, read before the
-            // transaction inserts this session's own row.
-            //
-            // It used to be users.highest_wpm -- one global figure covering time AND words
-            // and every sub-mode at once. Short tests always score higher, so a `time 120`
-            // result was measured against a `time 15` record and the screen showed a
-            // negative delta almost every session. Survival already scoped its record this
-            // way; standard mode now matches it (and matches how the leaderboard buckets
-            // results, since mode_config is its filter key).
-            //
-            // highest_wpm is deliberately NOT replaced: it stays the cross-mode CAREER best
-            // behind the profile card, the friends list, the ghost picker and the WPM
-            // achievements. Two different questions, two different numbers.
-            if ($this->mainMode === 'survival') {
-                $survivalPreviousBest = TypingResult::where('user_id', $user->id)
-                    ->where('mode', 'survival')
-                    ->where('mode_config', (string) $this->subMode)
-                    ->max('duration_seconds');
-
-                $isSurvivalPersonalBest = $survivalPreviousBest === null
-                    || $duration > (float) $survivalPreviousBest;
-            } else {
-                $previousBest = TypingResult::bestNetWpmFor(
-                    $user->id,
-                    $this->mainMode,
-                    (string) $this->subMode
-                );
-
-                // No record in this bucket yet -> the first run sets it, the same rule
-                // survival applies above.
-                $isPersonalBest = $previousBest === null || $finalNetWpm > $previousBest;
-            }
+            // Read BEFORE the transaction below inserts this session's own row, or the
+            // result would be compared against itself.
+            [
+                'previousBest' => $previousBest,
+                'isPersonalBest' => $isPersonalBest,
+                'survivalPreviousBest' => $survivalPreviousBest,
+                'isSurvivalPersonalBest' => $isSurvivalPersonalBest,
+            ] = $this->resolvePersonalBest($user->id, $duration, $finalNetWpm);
 
             DB::transaction(function () use (
                 &$xpEarned, $user, $duration, $finalNetWpm, $finalRawWpm, $finalAccuracy,
@@ -763,26 +726,19 @@ class TypingEngine extends Component
             app(AchievementService::class)->syncUnlocks($user);
         }
 
-        // Ghost Mode: an ephemeral ghost-vs-player comparison (session-only), not written to
-        // the DB -- the underlying attempt is still saved normally like any mode.
-        // Server-side gate: ghost is ONLY valid for time/words, whatever the client sends.
-        $ghostResult = null;
-        if ($this->isGhostEligibleMode() && $ghostWpm !== null && (float) $ghostWpm > 0) {
-            $ghostCharsAtFinish = (int) $ghostCharsAtFinish;
-            $ghostResult = [
-                'label' => (string) $ghostLabel,
-                'wpm' => round((float) $ghostWpm, 2),
-                'playerWon' => $correctKeystrokes > $ghostCharsAtFinish,
-                'charDelta' => $correctKeystrokes - $ghostCharsAtFinish,
-            ];
-        }
+        $ghostResult = $this->buildGhostResult(
+            $session->ghostWpm,
+            $session->ghostLabel,
+            $session->ghostCharsAtFinish,
+            $correctKeystrokes
+        );
 
         // Per-character error stream: a PRESENTATION tier (session-only, never touches
         // score/XP/PB/leaderboard -- so no business with AntiCheatService). Still sanitized
         // like ghost: shape validated, values cast, length capped. Unlike missedChars,
         // which is raw but safe because it's only read via known-key lookups -- here
         // `actual` is genuinely RENDERED.
-        $errorEvents = TypingErrorInspector::sanitize($errorEvents);
+        $errorEvents = TypingErrorInspector::sanitize($session->errorEvents);
 
         session()->put('typing_result', [
             'wpm' => $finalNetWpm,
@@ -798,16 +754,16 @@ class TypingEngine extends Component
             'totalKeystrokes' => $totalKeystrokes,
             'correctKeystrokes' => $correctKeystrokes,
             'incorrectKeystrokes' => $incorrectKeystrokes,
-            'wpmHistory' => $wpmHistory,
-            'rawHistory' => $rawHistory,
-            'missedChars' => $missedChars,
+            'wpmHistory' => $session->wpmHistory,
+            'rawHistory' => $session->rawHistory,
+            'missedChars' => $session->missedChars,
             'xpEarned' => $xpEarned,
             'isPersonalBest' => $isPersonalBest,
             'previousBest' => $previousBest,
             'consistency' => $consistency,
             'levelData' => $levelData,
-            'drainEventCount' => (int) $drainEventCount,
-            'survivalPreviousBest' => $survivalPreviousBest !== null ? (float) $survivalPreviousBest : null,
+            'drainEventCount' => $session->drainEventCount,
+            'survivalPreviousBest' => $survivalPreviousBest,
             'isSurvivalPersonalBest' => $isSurvivalPersonalBest,
             'ghostResult' => $ghostResult,
             // Abandoned run: the screen still shows every number, with a banner saying it
@@ -824,6 +780,93 @@ class TypingEngine extends Component
         // button restore the typing-engine snapshot -> @entangle undefined & stale $wire
         // (can't type / empty stats / finish hangs). A full load makes Back reload cleanly.
         $this->redirect(route('typing.result'));
+    }
+
+    /**
+     * Refuse this submission: tell the player, then send them back to a fresh test.
+     *
+     * Five separate gates end exactly this way -- rate limit, mode/text mismatch, a duration
+     * longer than the session was open, an impossible character count, and the anti-cheat
+     * verdict -- and each used to repeat the same flash-and-redirect pair.
+     *
+     * Full page load, WITHOUT navigate:true, on purpose: leaving /typing through the SPA
+     * makes the Back button restore the typing-engine snapshot (@entangle undefined, stale
+     * $wire -> can't type, empty stats, finish hangs). A full load makes Back reload cleanly.
+     *
+     * Clearing the session guard is deliberately left to the caller: only the gates that
+     * have already consumed the issued text need it.
+     */
+    private function rejectSubmission()
+    {
+        session()->flash('result_rejected', __('typing.result_rejected'));
+
+        return $this->redirect(route('typing'));
+    }
+
+    /**
+     * The record this session is measured against, and whether it broke it.
+     *
+     * Survival is ranked by how long the player lasted, the standard modes by Net WPM, so
+     * the two read different columns -- but both scope the record to this mode+config
+     * bucket, and both treat an empty bucket as "first run sets it".
+     *
+     * That scoping is the point: users.highest_wpm is ONE cross-mode figure, so a `time 120`
+     * result used to be measured against a `time 15` sprint and the screen showed a negative
+     * delta almost every session. highest_wpm is not replaced by this -- it stays the career
+     * best behind the profile card, friends list, ghost picker and WPM achievements.
+     * See docs/features/typing-engine.md §3.4.a.
+     *
+     * @return array{previousBest: ?float, isPersonalBest: bool, survivalPreviousBest: ?float, isSurvivalPersonalBest: bool}
+     */
+    private function resolvePersonalBest(int $userId, float $duration, float $finalNetWpm): array
+    {
+        $blank = [
+            'previousBest' => null,
+            'isPersonalBest' => false,
+            'survivalPreviousBest' => null,
+            'isSurvivalPersonalBest' => false,
+        ];
+
+        if ($this->mainMode === 'survival') {
+            $best = TypingResult::where('user_id', $userId)
+                ->where('mode', 'survival')
+                ->where('mode_config', (string) $this->subMode)
+                ->max('duration_seconds');
+
+            return array_merge($blank, [
+                'survivalPreviousBest' => $best === null ? null : (float) $best,
+                'isSurvivalPersonalBest' => $best === null || $duration > (float) $best,
+            ]);
+        }
+
+        $best = TypingResult::bestNetWpmFor($userId, $this->mainMode, (string) $this->subMode);
+
+        return array_merge($blank, [
+            'previousBest' => $best,
+            'isPersonalBest' => $best === null || $finalNetWpm > $best,
+        ]);
+    }
+
+    /**
+     * The ephemeral ghost-vs-player comparison for the result screen: session-only, never
+     * written to the DB -- the underlying attempt is saved normally like any other run.
+     *
+     * Server-side gate: a ghost only counts in time/words, whatever the client sends.
+     */
+    private function buildGhostResult($ghostWpm, $ghostLabel, $ghostCharsAtFinish, int $correctKeystrokes): ?array
+    {
+        if (! $this->isGhostEligibleMode() || $ghostWpm === null || (float) $ghostWpm <= 0) {
+            return null;
+        }
+
+        $ghostCharsAtFinish = (int) $ghostCharsAtFinish;
+
+        return [
+            'label' => (string) $ghostLabel,
+            'wpm' => round((float) $ghostWpm, 2),
+            'playerWon' => $correctKeystrokes > $ghostCharsAtFinish,
+            'charDelta' => $correctKeystrokes - $ghostCharsAtFinish,
+        ];
     }
 
     /**
