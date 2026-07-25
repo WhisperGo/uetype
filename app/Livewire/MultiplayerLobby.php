@@ -19,6 +19,7 @@ use App\Support\SafeBroadcast;
 use App\Support\TypingLanguage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -542,6 +543,13 @@ class MultiplayerLobby extends Component
     }
 
     /**
+     * Max race-progress updates accepted per second per player. The honest client emits
+     * ~8/sec (120ms throttle); 20 leaves room for bursts + the trailing flush while still
+     * capping a scripted flood (each accepted update also broadcasts to the whole room).
+     */
+    private const MAX_PROGRESS_UPDATES_PER_SECOND = 20;
+
+    /**
      * Integrity note: the client's $liveWpm is DELIBERATELY not used for official
      * numbers. The server recomputes Net WPM itself (correct chars / time) via
      * AntiCheatService -- aligned with solo mode (TypingEngine::saveResult) -- so that
@@ -552,6 +560,15 @@ class MultiplayerLobby extends Component
     {
         $room = Room::where('code', $this->roomCode)->first();
         if (! $room || $room->status !== 'racing') {
+            return;
+        }
+
+        // The room flips to 'racing' the moment the host starts, but the synced 3-2-1
+        // countdown is still running until race_starts_at. The honest client only emits
+        // progress after beginRace() (post-countdown), so any progress arriving during the
+        // countdown is forged -- reject it so a scripted client can't bank a finish time
+        // (and thus a place) before the race has really begun.
+        if ($room->race_starts_at && now()->lt($room->race_starts_at)) {
             return;
         }
 
@@ -567,6 +584,17 @@ class MultiplayerLobby extends Component
         if ($member->role !== RoomMember::ROLE_PLAYER) {
             return;
         }
+
+        // Server-side rate limit on the race's hottest path: each accepted update
+        // recomputes WPM and broadcasts to every room member. The honest client
+        // self-throttles to ~8 emits/sec (120ms); this caps a scripted client that ignores
+        // that. Over-limit ticks are dropped silently -- progress is monotonic, so the next
+        // accepted tick still carries the latest position, nothing is lost.
+        $rateKey = 'race-progress:'.Auth::id();
+        if (RateLimiter::tooManyAttempts($rateKey, self::MAX_PROGRESS_UPDATES_PER_SECOND)) {
+            return;
+        }
+        RateLimiter::hit($rateKey, 1);
 
         $progressPercent = min(100, max(0, $progressPercent));
         $accuracy = min(100, max(0, $accuracy));

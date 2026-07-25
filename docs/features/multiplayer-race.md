@@ -120,9 +120,12 @@ lolos, hasil yang ditolak mendapat `place = null`, dan `player_count` hanya meng
 sah. Lihat [`anti-cheat-wpm.md`](anti-cheat-wpm.md) §8.2.
 
 **Jalur live juga dijaga** (`updateRaceProgress`): progress **wajib naik** (tak boleh mundur),
-**spectator tak boleh** mengirim progress sama sekali, dan laju yang mustahil (teleport ke 100%)
-**ditolak di sana** — bukan cuma saat finalisasi — karena waktu selesai yang menentukan juara
-tercatat pada saat progress masuk. Lihat [`anti-cheat-wpm.md`](anti-cheat-wpm.md) §8.
+**spectator tak boleh** mengirim progress sama sekali, dan laju yang mustahil (teleport ke 100%,
+plafon `MAX_RACE_WPM = 240`) **ditolak di sana** — bukan cuma saat finalisasi — karena waktu selesai
+yang menentukan juara tercatat pada saat progress masuk. Ditambah dua penjaga *hardening*: progress
+yang datang **selama countdown 3 detik** (`race_starts_at` belum lewat) ditolak, dan ada **rate-limit
+server-side** (20 update/detik/pemain) agar jalur terpanas race tak bisa dibanjiri client yang
+di-script. Lihat [`anti-cheat-wpm.md`](anti-cheat-wpm.md) §5.1 & §8.
 
 ### 3.7 Ketahanan terhadap host keluar / room hilang
 

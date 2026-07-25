@@ -104,6 +104,19 @@ Di sini **hanya sinyal mustahil** (`isCheating()`) yang membuat WPM di-nol-kan. 
 $netWpm = $antiCheat->isCheating($wpmCheck['reasons']) ? 0 : (int) round($wpmCheck['net_wpm']);
 ```
 
+**Dua penjaga tambahan di jalur ini** (`updateRaceProgress`), murni *hardening* tanpa memengaruhi
+pemain jujur:
+
+- **Guard countdown.** Room berstatus `racing` sejak host menekan mulai, tapi hitung mundur 3-2-1
+  masih berjalan sampai `race_starts_at`. Client jujur baru mengirim progress **setelah** countdown
+  (`beginRace()`), jadi progress yang datang lebih awal ditolak — mencegah client tampered mengunci
+  **waktu finish** (dan karenanya `place`) selama jendela countdown.
+- **Rate-limit server-side.** Maks `MAX_PROGRESS_UPDATES_PER_SECOND = 20` per pemain per detik
+  (client jujur ~8/dtk, throttle 120ms). Tiap update yang diterima menyiarkan ke **seluruh room**,
+  jadi batas ini memotong *flood* dari client yang di-script; tick di atas batas **di-drop
+  diam-diam** (progress monotonik, jadi tick berikutnya tetap membawa posisi terbaru — tak ada yang
+  hilang). Pola `RateLimiter` sama dengan `TypingEngine::saveResult()`.
+
 ### 5.2 Validasi hasil akhir — `FinalizesRace::isValidRaceResult()`
 
 Saat race difinalisasi, tiap hasil pemain divalidasi lewat `raceResultReasons()` →
@@ -238,12 +251,15 @@ Sekarang validitas dihitung lebih dulu untuk semua peserta, lalu nomor peringkat
 untuk hasil yang lolos. Hasil yang ditolak mendapat `place = null`, dan `player_count` hanya
 menghitung peserta yang sah (supaya "juara 1 dari 2" tak jadi kemenangan semu).
 
-### 8.3 Kenapa ada plafon WPM khusus race (250, bukan 300)
+### 8.3 Kenapa ada plafon WPM khusus race (240, bukan 300)
 
-Teks race ~240 karakter. Teleport ke 100% pada detik ke-10 menghasilkan **290 WPM** — masih
+Teks race ~240 karakter. Teleport ke 100% pada detik ke-10 menghasilkan **~288 WPM** — masih
 di bawah plafon umum 300, jadi dulu **lolos sebagai kemenangan sah**. Ambang race dipisah ke
-`MAX_RACE_WPM = 250`: cukup untuk menolak teleport, masih longgar untuk pengetik elite
-(rekor dunia ~210–230).
+`MAX_RACE_WPM = 240`. Kuncinya: juara diperingkat berdasarkan **waktu selesai**, jadi client yang
+di-tamper cukup memacu progress palsu tepat **di bawah** plafon untuk **selalu mengalahkan** pemain
+jujur — menurunkan plafon mempersempit jendela itu. 240 dipilih karena masih sedikit di atas rekor
+manusia berkelanjutan (~210–230), jadi run elite sungguhan tetap lolos. (Plafon 250 yang lebih
+longgar masih menerima pemalsuan ~245 WPM yang tak bisa dibedakan dari kemenangan sah.)
 
 Penolakan terjadi di **jalur live** (`updateRaceProgress`), bukan hanya saat finalisasi —
 karena yang menentukan juara adalah **waktu selesai**, dan itu tercatat saat progress masuk.

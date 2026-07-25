@@ -5,6 +5,7 @@ use App\Models\MultiplayerMatchHistory;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Models\User;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
 
 /**
@@ -214,4 +215,50 @@ it('does not let a rejected result take the podium on screen', function () {
 
     expect($podium)->toContain('Honest')
         ->and($podium)->not->toContain('Cheater');
+});
+
+/**
+ * Selama hitung mundur 3-2-1, room sudah berstatus 'racing' tapi race belum resmi mulai
+ * (race_starts_at masih di masa depan). Client jujur baru mengirim progress SETELAH
+ * countdown -- jadi progress yang datang lebih awal itu selalu palsu, dan menerimanya
+ * membiarkan client tampered mengunci waktu finish selama jendela countdown.
+ */
+it('ignores race progress sent before the countdown finishes', function () {
+    $user = User::factory()->create();
+    // race_starts_at 2 detik di masa DEPAN -> hitung mundur belum selesai.
+    $room = tamperRoom($user, startedSecondsAgo: -2);
+    $member = tamperMember($room, $user);
+
+    sendProgress($user, $room, 100, 200);
+
+    $member->refresh();
+
+    expect($member->progress_percent)->toBe(0)
+        ->and($member->finished_time_seconds)->toBeNull()
+        ->and($member->place)->toBeNull();
+});
+
+/**
+ * updateRaceProgress adalah jalur terpanas race dan tiap panggilan menyiarkan ke seluruh
+ * anggota room. Client jujur membatasi diri ~8 emit/detik (120ms); rate-limit server-side
+ * (20/detik) meloloskan itu tapi memotong client yang di-script agar tak membanjiri.
+ */
+it('drops race progress updates that exceed the per-second rate limit', function () {
+    $user = User::factory()->create();
+    $room = tamperRoom($user, startedSecondsAgo: 40);
+    $member = tamperMember($room, $user);
+
+    // Penuhi kuota per-detik (20) langsung di limiter, sinkron dalam satu jendela 1 detik
+    // supaya deterministik (20 panggilan Livewire beneran akan meluber >1 detik dan malah
+    // keburu meluruh -- itu justru bukti window 1 detiknya cuma membatasi flood, bukan
+    // pemakaian normal). Key-nya cerminan 'race-progress:'.Auth::id() di updateRaceProgress.
+    $key = 'race-progress:'.$user->id;
+    foreach (range(1, 20) as $ignored) {
+        RateLimiter::hit($key, 1);
+    }
+
+    // Kuota sudah penuh -> tick ini ditolak throttle, progres tetap di nilai awal (0).
+    sendProgress($user, $room, 90);
+
+    expect($member->refresh()->progress_percent)->toBe(0);
 });
