@@ -126,7 +126,8 @@ Dua pola arsitektur yang berulang di seluruh proyek (detail alasan ada di
   (pending/accepted/rejected/blocked).
 - **`messages`** — DM & clan chat dalam satu tabel (`recipient_id` XOR `clan_id`,
   ditegakkan via CHECK constraint), plus `edited_at`, `deleted_for_everyone_at`,
-  `reply_to_id` (self-referencing).
+  `reply_to_id` (self-referencing). Kolom `body` **dienkripsi saat disimpan** (cast
+  `'encrypted'`, dikunci `APP_KEY`) — lihat [`features/chat.md`](features/chat.md) §3.1.
 - **`message_clears`** — penanda "clear chat" per user per percakapan.
 - **`message_deletes`** — penanda "delete for me" per user per pesan.
 
@@ -154,7 +155,9 @@ Daftar lengkap ada di `app/Models/` (15 file). Yang paling sering disentuh:
 - **`Room`** / **`RoomMember`** — state live multiplayer race.
 - **`TypingResult`** — write-once, sumber data Stats & leaderboard solo. Kolom `review_status`
   (`clear`/`pending`/`approved`/`rejected`) menyaring hasil ber-flag anti-cheat dari papan
-  publik — lihat [anti-cheat-wpm.md](features/anti-cheat-wpm.md) §7.8.
+  publik — lihat [anti-cheat-wpm.md](features/anti-cheat-wpm.md) §7.8. Papan juga menerapkan
+  **gerbang kelayakan** (`LEADERBOARD_MIN_TYPING_SECONDS` = 1800 dtk / 30 menit akumulasi
+  `duration_seconds` lintas mode) sebelum hasil pemain tampil — §11.
 - **`Clan`** — sistem power/level paralel dengan `User` (`BASE_POWER = 1000`,
   `POWER_PER_LEVEL = 100`).
 - **`Message`** — helper visibilitas (`scopeVisibleTo`) yang mengecualikan pesan
@@ -331,11 +334,21 @@ Dokumen terkait lain:
   §12).
 - **Composer script `dev`:** menjalankan `serve` + `queue:listen` + `pail` +
   `npm run dev` bersamaan.
-- **Seeder** (`database/seeders/`): `LanguageSeeder`, `TextSeeder`,
-  `DummyDataSeeder` selalu jalan; `DummyUserSeeder`/`DummyMultiplayerSeeder`/
+- **Seeder** (`database/seeders/`): `DatabaseSeeder` menjalankan `DummyDataSeeder` +
+  membuat akun admin `test@example.com`; `DummyUserSeeder`/`DummyMultiplayerSeeder`/
   `DummyClanSeeder` hanya di env `local` (jadi basis akun `/dev-login`).
-- **Console command:** `clan-war:resolve` (`app/Console/Commands/ResolveClanWars.php`)
-  — jalur manual untuk resolusi Clan War di luar lazy-resolve saat halaman dibuka.
+  (`LanguageSeeder`/`TextSeeder` sudah **dihapus** bersama tabel `languages`/`texts` —
+  teks latihan kini dirakit `TextGeneratorService` dari wordlist JSON, bukan dari DB.)
+  Seeder manual (tak ikut `db:seed` default): `LeaderboardDemoSeeder` (akun eligible di
+  papan leaderboard, lihat [`features/anti-cheat-wpm.md`](features/anti-cheat-wpm.md) §11.5)
+  dan `ClanUiTestSeeder`.
+- **Console command** (`app/Console/Commands/`):
+  - `clan-war:resolve` (`ResolveClanWars.php`) — resolusi Clan War manual di luar lazy-resolve.
+  - `typing:audit [--wpm=150] [--limit=50]` (`AuditTypingResults.php`) — daftar hasil ber-WPM
+    mencurigakan (read-only), lihat [`features/anti-cheat-wpm.md`](features/anti-cheat-wpm.md) §7.6.
+  - `user:admin <email> [--revoke]` (`MakeUserAdmin.php`) — angkat/cabut hak admin (satu-satunya
+    cara masuk dashboard monitoring), lihat [`features/monitoring.md`](features/monitoring.md) §3.6.
+  - `achievements:backfill` (`BackfillAchievements.php`) — isi ulang achievement untuk data lama.
 
 ## 12. Hal yang Perlu Diperhatikan Tim (jebakan yang sudah pernah kejadian)
 

@@ -90,6 +90,12 @@ wajar, unik. Pesan error di-*localize* (`auth.username.taken`, `auth.username.fo
 
 ## 5. Dev Login (khusus lokal)
 
-`/dev-login` & `/dev-login2` login instan sebagai user dummy — **hanya aktif di environment
-`local`** (`app()->environment('local')`). Mempercepat pengujian multiplayer/chat tanpa OAuth. Aman
-karena route ini tak pernah terdaftar di produksi.
+`/dev-login` login instan sebagai user dummy — **hanya aktif di environment `local`**
+(`app()->environment('local')`). Default-nya masuk sebagai `dummy@uetype.test`; tambahkan
+`?email=...` untuk masuk sebagai user lain (mis. `/dev-login?email=leaderboard@uetype.test` untuk
+akun demo leaderboard — lihat [anti-cheat-wpm.md](anti-cheat-wpm.md) §11.5). Mempercepat pengujian
+multiplayer/chat tanpa OAuth. Aman karena route ini **tak pernah terdaftar di produksi** — itulah
+kenapa `/dev-login` mengembalikan **404** di `uetype.site`.
+
+Kalau email yang diminta tak ada, route mengembalikan 404 dengan pesan yang menyarankan
+`php artisan db:seed --class=DummyUserSeeder`.

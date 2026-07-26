@@ -544,8 +544,25 @@ Keunggulannya unik: gerbang ini **tidak bisa di-*pace*** (tak ada angka untuk di
 
 ### 11.4 Kalibrasi
 
-30 menit adalah interim **lembut** untuk basis pemain muda — top pemain saat ini baru ~28 menit.
-Naikkan lewat satu konstanta seiring basis tumbuh (Monkeytype memakai 2 jam). Angka final
-sebaiknya dari distribusi data nyata, bukan tebakan.
+30 menit adalah interim **lembut** untuk basis pemain muda yang saat ini masih sedikit yang
+menembusnya. Naikkan lewat satu konstanta (`LEADERBOARD_MIN_TYPING_SECONDS`) seiring basis
+tumbuh (Monkeytype memakai 2 jam). Angka final sebaiknya dari distribusi data nyata
+(`SUM(duration_seconds)` per pemain), bukan tebakan.
 
 Test: [`LeaderboardEligibilityTest`](../../tests/Feature/LeaderboardEligibilityTest.php).
+
+### 11.5 Mendemokan gerbang ini secara lokal
+
+[`LeaderboardDemoSeeder`](../../database/seeders/LeaderboardDemoSeeder.php) membuat satu akun
+(`leaderboard@uetype.test` / **LeaderboardPro**) yang total waktu ketiknya **melewati** ambang
+30 menit, jadi ia benar-benar tampil di papan — berbeda dari `DummyUserSeeder` yang sesi-sesinya
+pendek dan **tertahan** ("ketik lebih dulu"). Berguna untuk memperlihatkan kedua sisi gerbang:
+
+```bash
+php artisan db:seed --class=LeaderboardDemoSeeder   # akun eligible (di papan)
+php artisan db:seed --class=DummyUserSeeder         # akun belum-eligible (tertahan)
+```
+
+Login lokal lewat `/dev-login?email=leaderboard@uetype.test` (route dev hanya aktif saat
+`APP_ENV=local`; lihat [auth.md](auth.md)). Seeder ini **untuk demo/dev lokal saja** — jangan
+dijalankan di production.

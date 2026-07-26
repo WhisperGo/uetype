@@ -106,6 +106,39 @@ menyegarkan daftar pesan. Lihat [friends-presence.md](friends-presence.md#36).
 - Paginasi manual `PAGE_SIZE = 30` dengan offset `loadedOlder` untuk scroll-ke-atas — menghindari
   memuat seluruh riwayat sekaligus.
 
+### 3.1 Body dienkripsi saat disimpan (at rest)
+
+Kolom `body` di tabel `messages` **dienkripsi** memakai cast bawaan Laravel:
+
+```php
+// app/Models/Message.php
+protected $casts = [
+    'body' => 'encrypted',
+    // ...
+];
+```
+
+Yang tersimpan di DB adalah **ciphertext** (dikunci oleh `APP_KEY`, IV acak per tulis), dan
+di-*decrypt* transparan saat dibaca lewat model — kode pemanggil tetap melihat plaintext. Isi
+percakapan tak terbaca oleh siapa pun yang hanya punya akses baca ke tabel (dump DB, backup,
+DBA) tanpa `APP_KEY`.
+
+**Justifikasi & batasannya:**
+
+- Aman diterapkan **karena tak ada kode yang men-query `body` lewat SQL** — tak ada
+  `where`/`LIKE`/pencarian teks pada kolom ini. Enkripsi akan mematahkan query semacam itu,
+  tapi memang tak ada yang dipatahkan. (Kalau nanti butuh cari pesan, itu perlu pendekatan lain
+  seperti blind index, bukan `LIKE` pada kolom terenkripsi.)
+- IV acak per tulis berarti ciphertext berbeda tiap kali, jadi test **tak bisa** memakai
+  `assertDatabaseHas('messages', ['body' => '...'])`. Helper `assertMessageStored()` di
+  [`tests/Pest.php`](../../tests/Pest.php) mencocokkan baris lewat metadata lalu memverifikasi
+  body ter-*decrypt* via model — sekaligus membuktikan round-trip enkripsi bekerja.
+- **Chat room multiplayer tak terpengaruh**: itu broadcast-only, tak pernah disimpan ke
+  `messages` (lihat [`multiplayer-race.md`](multiplayer-race.md) §3.9).
+- Konsekuensi operasional: `APP_KEY` menjadi kunci pemulihan data chat. Kehilangan/mengganti
+  `APP_KEY` membuat semua pesan lama tak bisa didekripsi. `APP_KEY` **tidak** boleh ikut ganti
+  saat rotasi rutin tanpa proses re-enkripsi.
+
 ## 4. Overlay Global (Chat Bubble)
 
 **Komponen:** [`App\Livewire\ChatOverlay`](../../app/Livewire/ChatOverlay.php) — mounted
