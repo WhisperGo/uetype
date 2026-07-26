@@ -100,6 +100,23 @@
                         <x-btn-gold as="a" href="{{ route('clan-war.index') }}" wire:navigate>
                             {{ __('clan.clan_war') }}
                         </x-btn-gold>
+                        {{-- Clan chat was reachable only by going to the Chat page and
+                             picking the clan card there -- a detour away from the clan to
+                             get to the clan's own channel. ?mode=clan is already a
+                             supported entry point, and which clan it opens is derived
+                             server-side from the active membership, so the link carries no
+                             id and cannot be pointed at someone else's channel.
+
+                             Styled as a secondary action beside Leaderboard: Clan War is
+                             the page's primary call to action and stays the only gold
+                             button, or three competing buttons would flatten the hierarchy. --}}
+                        <a href="{{ route('chat.index', ['mode' => 'clan']) }}" wire:navigate
+                            class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition inline-flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z" />
+                            </svg>
+                            {{ __('clan.chat') }}
+                        </a>
                         <a href="{{ route('clan-leaderboard.index') }}" wire:navigate
                             class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
                             {{ __('clan.leaderboard') }}

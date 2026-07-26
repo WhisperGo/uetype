@@ -79,6 +79,22 @@ lama dari N hari" memberi kontrol tanpa kehilangan pesan terbaru.
 **Justifikasi:** percakapan bisa **dibagikan/di-bookmark** (mis. buka DM dengan user tertentu
 langsung dari URL), dan refresh tak kehilangan konteks.
 
+**Pintu masuk dari halaman Clan.** Hub clan dan halaman detail clan menaut langsung ke
+`?mode=clan`. Sebelumnya chat clan hanya bisa dicapai lewat halaman Chat lalu memilih kartu clan di
+sana — memutar menjauhi clan hanya untuk masuk ke kanal clan itu sendiri.
+
+Tautannya **tidak membawa id clan**: kanal diturunkan server-side dari keanggotaan aktif si
+pengunjung (`GuardsChatAccess::getMyClanProperty`), jadi tak ada yang bisa dimanipulasi di URL.
+Di halaman detail clan yang bersifat publik, tautan hanya dirender untuk anggota clan itu — bukan
+demi keamanan (kanalnya sudah aman), tapi karena tautan yang mengarah ke kanal clan **lain** milik
+si pengunjung adalah tautan yang berbohong soal tujuannya.
+
+**`mount()` membuang `?mode=clan` yang tak berpemilik.** Karena parameter ini kini datang dari
+navigasi biasa, ia bisa **hidup lebih lama dari keanggotaan** yang membenarkannya — keluar/dikick
+dari clan, lalu tekan tombol back atau buka bookmark lama. Tanpa penjaga ini halaman merender
+cabang percakapan tanpa clan di belakangnya: thread kosong tanpa header dan tanpa jalan kembali,
+karena inbox yang memuat kartu "kamu belum punya clan" pun tak ikut digambar.
+
 ### 2.7 Body listener kosong memicu re-render
 
 Sama seperti Friends/Clans: `#[On('message-received')]` kosong — menerima event sudah cukup untuk

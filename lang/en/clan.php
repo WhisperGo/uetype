@@ -9,6 +9,7 @@ return [
     'back_to_clan' => '← Back to Clan',
     'back_to_clan_plain' => 'Back to Clan',
     'clan_war' => 'Clan War',
+    'chat' => 'Clan Chat',
 
     'level' => 'Lv :level',
     'power' => 'power',

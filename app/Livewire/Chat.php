@@ -31,6 +31,23 @@ class Chat extends Component
     #[Url(as: 'with')]
     public ?string $withUsername = null;
 
+    /**
+     * Drop a ?mode=clan that the viewer has no clan for, falling back to the inbox.
+     *
+     * The clan pages link straight here with ?mode=clan, so the parameter now arrives from
+     * ordinary navigation rather than only from this page's own buttons -- and it can
+     * outlive the membership that justified it: leave or get kicked from a clan, then use
+     * the back button or an old bookmark. Without this the page renders the conversation
+     * branch with no clan behind it: an empty thread with no header and no way back,
+     * because the inbox that holds the "you are not in a clan" card is not drawn either.
+     */
+    public function mount(): void
+    {
+        if ($this->activeMode === 'clan' && ! $this->myClan) {
+            $this->activeMode = null;
+        }
+    }
+
     protected function pageSize(): int
     {
         return self::PAGE_SIZE;

@@ -51,6 +51,65 @@ it('requires authentication to view the chat page', function () {
     $this->get(route('chat.index'))->assertRedirect(route('login'));
 });
 
+// ---- ENTRY FROM THE CLAN PAGES ----
+//
+// Clan chat used to be reachable only by going to Chat and picking the clan card there.
+// The clan pages now link straight in with ?mode=clan.
+
+it('opens the clan conversation directly from a mode=clan url', function () {
+    [$clan, $members] = makeClanWithMembers(2);
+
+    Livewire::actingAs($members[0])
+        ->withQueryParams(['mode' => 'clan'])
+        ->test(Chat::class)
+        ->assertSet('activeMode', 'clan')
+        ->assertSee($clan->name);
+});
+
+it('shows the clan chat link on the clan hub for a member', function () {
+    [$clan, $members] = makeClanWithMembers(2);
+
+    Livewire::actingAs($members[1])
+        ->test(App\Livewire\Clans::class)
+        ->assertSee(__('clan.chat'))
+        ->assertSeeHtml('href="'.route('chat.index', ['mode' => 'clan']).'"');
+});
+
+it('shows the clan chat link on the clan detail page only to its own members', function () {
+    [$clan, $members] = makeClanWithMembers(2);
+
+    Livewire::actingAs($members[0])
+        ->test(App\Livewire\ClanShow::class, ['clan' => $clan])
+        ->assertSee(__('clan.chat'));
+
+    // An outsider viewing this public page would otherwise be offered a link that
+    // resolves to their own clan, or to nothing at all.
+    Livewire::actingAs(User::factory()->create())
+        ->test(App\Livewire\ClanShow::class, ['clan' => $clan])
+        ->assertDontSee(__('clan.chat'));
+});
+
+it('resolves mode=clan from the viewers own membership, not any url id', function () {
+    [$clanA, $membersA] = makeClanWithMembers(2);
+    [$clanB, $membersB] = makeClanWithMembers(2);
+
+    // Someone in clan B following a mode=clan link lands in clan B's channel -- the
+    // link carries no clan id to tamper with in the first place.
+    Livewire::actingAs($membersB[0])
+        ->withQueryParams(['mode' => 'clan'])
+        ->test(Chat::class)
+        ->assertSee($clanB->name)
+        ->assertDontSee($clanA->name);
+});
+
+it('does not open a clan conversation for someone with no clan', function () {
+    Livewire::actingAs(User::factory()->create())
+        ->withQueryParams(['mode' => 'clan'])
+        ->test(Chat::class)
+        ->assertOk()
+        ->assertSee(__('chat.no_clan_title'));
+});
+
 // ---- DM ----
 
 it('lets an accepted friend open a DM and send a message', function () {

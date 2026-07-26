@@ -30,9 +30,25 @@
                 </div>
             </div>
 
-            <div class="text-left sm:text-right shrink-0">
-                <p class="font-mono text-3xl sm:text-4xl font-bold leading-none text-gold tabular-nums">{{ number_format($clan->power) }}</p>
-                <p class="font-mono text-[0.6rem] uppercase tracking-wider text-muted mt-1">{{ __('clan.power') }}</p>
+            <div class="flex flex-col items-start sm:items-end gap-3 shrink-0">
+                <div class="text-left sm:text-right">
+                    <p class="font-mono text-3xl sm:text-4xl font-bold leading-none text-gold tabular-nums">{{ number_format($clan->power) }}</p>
+                    <p class="font-mono text-[0.6rem] uppercase tracking-wider text-muted mt-1">{{ __('clan.power') }}</p>
+                </div>
+
+                {{-- Members only: this page is public, and a chat link shown to an outsider
+                     would resolve to their own clan (or nothing), pointing somewhere other
+                     than where it appears to. The channel is safe regardless -- chat
+                     derives the clan from the viewer's membership, never from a URL. --}}
+                @if ($this->isMyClan)
+                    <a href="{{ route('chat.index', ['mode' => 'clan']) }}" wire:navigate
+                        class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition inline-flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z" />
+                        </svg>
+                        {{ __('clan.chat') }}
+                    </a>
+                @endif
             </div>
         </div>
 
