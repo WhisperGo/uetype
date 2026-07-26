@@ -65,12 +65,11 @@ it('lets an accepted friend open a DM in the overlay and send a message', functi
         ->set('body', 'Halo dari overlay!')
         ->call('sendMessage');
 
-    $this->assertDatabaseHas('messages', [
+    assertMessageStored([
         'sender_id' => $me->id,
         'recipient_id' => $friend->id,
         'clan_id' => null,
-        'body' => 'Halo dari overlay!',
-    ]);
+    ], 'Halo dari overlay!');
 });
 
 it('does not let the overlay DM a non-friend (trust boundary)', function () {
@@ -108,11 +107,10 @@ it('lets an active clan member open clan chat in the overlay and send a message'
         ->set('body', 'Halo clan!')
         ->call('sendMessage');
 
-    $this->assertDatabaseHas('messages', [
+    assertMessageStored([
         'sender_id' => $leader->id,
         'clan_id' => $clan->id,
-        'body' => 'Halo clan!',
-    ]);
+    ], 'Halo clan!');
     Event::assertDispatched(ClanMessageSent::class);
 });
 

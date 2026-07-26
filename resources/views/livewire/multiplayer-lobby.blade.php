@@ -932,32 +932,16 @@
                 </div>
             </div>
 
-            <!-- XP PROGRESS REPORT PANEL (real data from getMyXpResultProperty) -->
+            {{-- XP PROGRESS REPORT PANEL (real data from getMyXpResultProperty)
+
+                 Shares <x-xp-bar> with the solo result screen. This panel used to draw its own
+                 version and had drifted well away from it -- see the component's header for
+                 what differed and why the solo styling is the one that survived. --}}
             @php
                 $xp = $this->isSpectator ? null : $this->myXpResult;
-                $lvl = $xp['level'] ?? null;
-                $xpProgress = $lvl['progress'] ?? 0;
-                $xpNeeded = $lvl['needed'] ?? 0;
-                $xpBarWidth = $xpNeeded > 0 ? min(100, ($xpProgress / $xpNeeded) * 100) : 0;
             @endphp
-            @if ($xp)
-                <div class="p-5 border border-border/40 bg-surface/30 rounded-2xl space-y-2">
-                    <div class="flex justify-between items-center text-xs font-mono">
-                        <div class="flex flex-col">
-                            <span class="text-muted text-[10px] uppercase tracking-wide">{{ __('multiplayer.xp_earned') }}</span>
-                            <span class="text-2xl font-black text-gold mt-0.5">+{{ number_format($xp['earned']) }} XP</span>
-                        </div>
-                        <div class="text-right flex flex-col items-end">
-                            <span class="text-foreground font-bold text-xs">{{ number_format($xpProgress) }} / {{ number_format($xpNeeded) }} XP</span>
-                            <span class="text-muted text-[10px] mt-0.5">{{ __('multiplayer.level') }} {{ $lvl['level'] }} <span
-                                    class="text-muted/50">-</span> {{ $lvl['next_level'] }}</span>
-                        </div>
-                    </div>
-                    <div class="h-1.5 w-full bg-background/40 rounded-full overflow-hidden border border-border/20">
-                        <div class="h-full bg-brand rounded-full transition-all duration-500"
-                            style="width: {{ $xpBarWidth }}%"></div>
-                    </div>
-                </div>
+            @if ($xp && $xp['level'])
+                <x-xp-bar :earned="$xp['earned']" :level="$xp['level']" />
             @endif
 
             {{-- Chat on the result screen: used to invite people to play again. A SEPARATE

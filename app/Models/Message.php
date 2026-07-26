@@ -30,6 +30,12 @@ class Message extends Model
     ];
 
     protected $casts = [
+        // Chat body is encrypted at rest (Laravel's 'encrypted' cast, keyed by APP_KEY):
+        // stored ciphertext in the DB, transparently decrypted on read. Safe here because
+        // nothing queries the body in SQL (no LIKE/where/search) -- encryption would break
+        // that, but there is none to break. Room chat isn't affected: it's broadcast-only and
+        // never persisted (see RoomMessageSent).
+        'body' => 'encrypted',
         'read_at' => 'datetime',
         'edited_at' => 'datetime',
         'deleted_for_everyone_at' => 'datetime',

@@ -87,8 +87,8 @@ return [
     'th_wpm' => 'Net WPM',
     'th_accuracy' => 'Akurasi',
     'th_time' => 'Waktu',
-    'xp_earned' => 'XP Didapat',
-    'level' => 'Level',
+    // Tanpa 'xp_earned'/'level': panel XP kini <x-xp-bar>, dipakai bersama layar hasil solo,
+    // dan membaca `result.xp_*`. Set yang tak lengkap inilah yang dulu membuat keduanya beda.
     'play_again' => 'Main Lagi',
 
     'error_code_length' => 'Kode harus 6 digit lengkap!',

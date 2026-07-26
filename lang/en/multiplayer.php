@@ -87,8 +87,8 @@ return [
     'th_wpm' => 'Net WPM',
     'th_accuracy' => 'Accuracy',
     'th_time' => 'Time',
-    'xp_earned' => 'XP Earned',
-    'level' => 'Level',
+    // No 'xp_earned'/'level' here: the XP panel is <x-xp-bar>, shared with the solo result
+    // screen, and it reads `result.xp_*`. This partial set is what let the two screens drift.
     'play_again' => 'Play Again',
 
     'error_code_length' => 'The code must be a full 6 digits!',

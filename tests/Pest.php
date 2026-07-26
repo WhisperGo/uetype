@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Message;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -97,4 +98,24 @@ function countQueries(Closure $callback): int
         DB::disableQueryLog();
         DB::flushQueryLog();
     }
+}
+
+/**
+ * Assert a chat message was stored with the given metadata AND body.
+ *
+ * The `body` column is encrypted at rest (Message::$casts), so its ciphertext differs on
+ * every write (random IV) -- assertDatabaseHas('messages', ['body' => 'Halo']) can never
+ * match. Instead: match the row by its non-encrypted metadata, then confirm the DECRYPTED
+ * body through the model. This also proves the encrypt/decrypt round-trip works.
+ *
+ * $meta is the non-body attributes to match (sender_id, recipient_id, clan_id, reply_to_id…).
+ */
+function assertMessageStored(array $meta, string $expectedBody): void
+{
+    test()->assertDatabaseHas('messages', $meta);
+
+    $message = Message::query()->where($meta)->latest('id')->first();
+
+    expect($message)->not->toBeNull()
+        ->and($message->body)->toBe($expectedBody);
 }
