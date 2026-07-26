@@ -110,6 +110,32 @@ trait ReadsRoomState
     }
 
     /**
+     * The current player's saved race progress (0-100), so a mid-race reload resumes where
+     * they left off instead of restarting from the first word.
+     *
+     * The server persists only progress_percent (updateRaceProgress), not which word -- the
+     * arena reconstructs the word index from this percentage on init. 0 for a spectator, a
+     * fresh racer, or anyone not (yet) in the room. A finished/DNF player returns 0 too:
+     * mount() routes them via hasFinished/hasGivenUp, not back into live typing.
+     */
+    public function getMyResumeProgressProperty(): int
+    {
+        $room = $this->roomData;
+
+        if (! $room) {
+            return 0;
+        }
+
+        $member = $room->members->firstWhere('user_id', Auth::id());
+
+        if (! $member || $member->isSpectator() || $member->finished_time_seconds !== null) {
+            return 0;
+        }
+
+        return max(0, min(100, (int) $member->progress_percent));
+    }
+
+    /**
      * The ordered race result board.
      *
      * ORDERED BY `place`, the column writeFinalStandings() already settled -- NOT by a

@@ -45,6 +45,53 @@ describe('#1 mount restore', function () {
             ->assertSet('roomCode', 'MNT002');
     });
 
+    it('restores a mid-race refresher into the arena still racing (not conceded)', function () {
+        // A reload during a race is NOT a departure: the player stays a live racer and
+        // resumes typing. Only an explicit Give Up marks them DNF.
+        $host = User::factory()->create();
+        $refresher = User::factory()->create();
+        $room = makeRoom('MNT002B', 'racing', $host);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $refresher->id, 'role' => 'player', 'is_ready' => true, 'progress_percent' => 40]);
+
+        // The page unloads mid-race (beacon fires) -- but a race unload must NOT remove them.
+        $this->actingAs($refresher)->post(route('multiplayer.leave-beacon'))->assertOk();
+
+        // Still a member, still an active racer (not DNF), reopening lands back in the arena.
+        $stillMember = RoomMember::where('room_id', $room->id)->where('user_id', $refresher->id)->first();
+        expect($stillMember)->not->toBeNull()
+            ->and($stillMember->isDnf())->toBeFalse();
+
+        Livewire::actingAs($refresher)->test(MultiplayerLobby::class)
+            ->assertSet('step', 'racing')
+            ->assertSet('hasGivenUp', false)
+            ->assertSet('hasFinished', false);
+    });
+
+    it('exposes the racer saved progress so a reload resumes where they left off', function () {
+        $host = User::factory()->create();
+        $racer = User::factory()->create();
+        $room = makeRoom('MNT002C', 'racing', $host);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $racer->id, 'role' => 'player', 'is_ready' => true, 'progress_percent' => 55]);
+
+        // myResumeProgress feeds the arena's restoreProgress() so it rebuilds the word index.
+        Livewire::actingAs($racer)->test(MultiplayerLobby::class)
+            ->assertSet('myResumeProgress', 55);
+    });
+
+    it('resumes at 0 for a finished player (they are routed to results, not live typing)', function () {
+        $host = User::factory()->create();
+        $racer = User::factory()->create();
+        $room = makeRoom('MNT002D', 'racing', $host);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+        // Already finished with real progress; resume must be 0 so it never re-seeds typing.
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $racer->id, 'role' => 'player', 'is_ready' => true, 'progress_percent' => 100, 'finished_time_seconds' => 20]);
+
+        Livewire::actingAs($racer)->test(MultiplayerLobby::class)
+            ->assertSet('myResumeProgress', 0);
+    });
+
     it('restores a member who already finished with hasFinished set', function () {
         $host = User::factory()->create();
         $other = User::factory()->create();
@@ -145,7 +192,7 @@ describe('#2 leave-beacon', function () {
         $this->assertDatabaseMissing('room_members', ['room_id' => $room->id, 'user_id' => $spectator->id]);
     });
 
-    it('does nothing once the race has started (mid-race guard)', function () {
+    it('does nothing once the race has started (a race unload is a reload)', function () {
         $host = User::factory()->create();
         $racer = User::factory()->create();
         $room = makeRoom('BCN005', 'racing', $host);
@@ -154,6 +201,7 @@ describe('#2 leave-beacon', function () {
 
         $this->actingAs($racer)->post(route('multiplayer.leave-beacon'))->assertOk();
 
+        // Kept untouched: the row must survive so mount() restores them at their progress.
         $this->assertDatabaseHas('room_members', ['room_id' => $room->id, 'user_id' => $racer->id]);
     });
 
@@ -202,7 +250,7 @@ describe('#3 leave-confirm', function () {
         $this->assertDatabaseMissing('rooms', ['id' => $room->id]);
     });
 
-    it('does nothing mid-race', function () {
+    it('does nothing mid-race (a race nav is a reload, the row is kept)', function () {
         $host = User::factory()->create();
         $racer = User::factory()->create();
         $room = makeRoom('CNF004', 'racing', $host);
@@ -211,7 +259,10 @@ describe('#3 leave-confirm', function () {
 
         $this->actingAs($racer)->post(route('multiplayer.leave-confirm'))->assertOk();
 
-        $this->assertDatabaseHas('room_members', ['room_id' => $room->id, 'user_id' => $racer->id]);
+        // Row survives untouched so mount() can restore the racer at their progress.
+        $racerMember = RoomMember::where('room_id', $room->id)->where('user_id', $racer->id)->first();
+        expect($racerMember)->not->toBeNull()
+            ->and($racerMember->isDnf())->toBeFalse();
     });
 
     it('requires authentication', function () {

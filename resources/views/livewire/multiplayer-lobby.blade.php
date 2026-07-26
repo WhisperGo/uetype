@@ -436,6 +436,7 @@
                 raceStartsInMs: @js($this->raceStartsInMs),
                 suddenDeathActive: @js($this->suddenDeathActive),
                 suddenDeathRemaining: @js($this->suddenDeathRemaining),
+                resumeProgress: @js($this->myResumeProgress),
             })"
             @keydown.tab.prevent="if (raceStarted && !isFinished && !lockedByTimeout) $refs.typeInput?.focus()">
 

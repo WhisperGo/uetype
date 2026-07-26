@@ -6,6 +6,8 @@
  * #2 Auto-leave on page unload: a not-ready, non-host member who leaves /multiplayer (nav
  *    click, tab close, refresh-elsewhere) is removed from the room. The server
  *    (leave-beacon endpoint) decides who actually leaves; here we just fire the beacon.
+ *    Only fired while WAITING: a page-unload during a race is a reload, not a departure --
+ *    the row must survive so mount() restores the player at their saved progress.
  *
  * #3 Leave-confirm nav: ANY in-room member (ready or not) clicking an internal link AWAY
  *    from /multiplayer gets a confirmation OVERLAY (the <x-modal> in the lobby view, not
@@ -45,7 +47,8 @@ export function registerMultiplayerNav() {
         const el = flagsEl();
         if (!el) return; // not on /multiplayer
         // Only fire while genuinely in a waiting room; the server still re-checks
-        // (ready/host are kept, so their row survives for mount() restore).
+        // (ready/host are kept, so their row survives for mount() restore). Never during a
+        // race: an unload there is a reload, and the row must survive to restore progress.
         if (el.dataset.mpInRoom === '1' && el.dataset.mpWaiting === '1') {
             leaveRequest(el.dataset.mpLeaveBeacon);
         }

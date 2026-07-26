@@ -24,7 +24,10 @@ class MultiplayerPresenceController extends Controller
      * (their row survives so mount() can restore them when they return). Spectators (never
      * ready) are removed too -- they hold a spectator slot.
      *
-     * Only while the room is 'waiting': pulling someone mid-race would corrupt placement.
+     * Only while the room is 'waiting'. A page-unload during 'racing' is treated as a
+     * RELOAD, not a departure: the row is kept untouched so mount() restores the player
+     * into the arena at their saved progress. Pulling them out here would also corrupt
+     * placement. (An intentional leave is a separate, explicit action.)
      */
     public function leaveOnLeave(RoomMembershipService $memberships): JsonResponse
     {
@@ -47,7 +50,9 @@ class MultiplayerPresenceController extends Controller
      * ready (or as host). Either way they're leaving, so we perform a full leave -- host
      * handoff included via the service -- rather than merely un-readying.
      *
-     * Only while 'waiting' (same mid-race guard).
+     * Only while 'waiting'. A confirmed nav during 'racing' is treated as a reload (the row
+     * is kept so mount() restores them at their saved progress); pulling a competitor out
+     * mid-race would corrupt placement.
      */
     public function leaveOrUnready(RoomMembershipService $memberships): JsonResponse
     {
