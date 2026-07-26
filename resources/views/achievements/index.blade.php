@@ -58,11 +58,23 @@
             <!-- Achievement grid -->
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 @foreach ($achievements as $a)
+                    {{-- Kartu terkunci TIDAK memakai `opacity-50`.
+
+                         Peredupannya dulu bertumpuk: latar & border yang sudah lebih lemah,
+                         badge ikon abu-abu, LALU seluruh kartu dikali 0.5. Deskripsi
+                         `text-muted` berakhir di kontras 2.6:1 terhadap latar -- di bawah
+                         ambang WCAG AA (4.5:1), jadi syarat achievement-nya praktis tak
+                         terbaca. Justru itu informasi yang paling dibutuhkan pemain di kartu
+                         yang BELUM diraih.
+
+                         Bedanya kini dibawa sinyal yang menyasar, bukan tirai menyeluruh:
+                         latar, border, warna badge, dan warna judul. Empat sinyal itu sudah
+                         cukup membedakan tanpa mengorbankan keterbacaan. --}}
                     <div x-show="visible('{{ $a['category'] }}')" x-transition.opacity
                         class="flex items-center gap-4 p-4 border rounded-2xl transition
                             {{ $a['earned']
                                 ? 'bg-surface/60 border-white/10'
-                                : 'bg-surface/20 border-white/5 opacity-50' }}">
+                                : 'bg-surface/20 border-white/5' }}">
 
                         <!-- Icon badge -->
                         <div class="flex flex-col items-center justify-center w-14 h-14 rounded-xl shrink-0 border
@@ -80,19 +92,33 @@
                              Tinggi DIPESAN, bukan lebar diperlebar. Pada grid 4 kolom ruang teks
                              hanya 127px, sementara deskripsi terpanjang butuh 158px (Indonesia:
                              173px). `truncate` dulu memotongnya permanen -- dan halaman ini tak
-                             punya tooltip, jadi teksnya benar-benar tak bisa dibaca. Sekarang
-                             teks boleh memakai dua baris, dan KEDUA blok memesan tinggi dua
-                             baris supaya semua kartu tetap setinggi sama apa pun isinya:
-                             sebelumnya kartu "Earned" satu baris lebih tinggi, dan CSS grid
-                             meregangkan seluruh sel sebaris ikut naik. `leading-4` dipasang
-                             eksplisit agar dua baris jatuh tepat di 2rem. --}}
-                        <div class="min-w-0 flex-1">
-                            <h3 class="font-mono text-sm font-bold leading-5 text-foreground truncate"
+                             punya tooltip, jadi teksnya benar-benar tak bisa dibaca. Teks kini
+                             boleh memakai dua baris, dan tingginya dipesan supaya semua kartu
+                             tetap setinggi sama apa pun isinya: tanpa itu kartu "Earned" satu
+                             baris lebih tinggi, dan CSS grid meregangkan seluruh sel sebaris
+                             ikut naik.
+
+                             Tinggi dipesan SEKALI di wadah ini (5.625rem = 90px = h3 20 +
+                             mt-0.5 2 + desc 32 + mt-1 4 + status 32), bukan `min-h-[2rem]` di
+                             tiap anak. Keduanya menghasilkan kartu setinggi sama, tapi memesan
+                             per-anak menahan isi di ATAS tiap slot: kartu berdeskripsi satu
+                             baris menyisakan 32px mati di bawah, sehingga pusat optik teksnya
+                             jatuh ~16px di atas pusat badge ikon yang di-center oleh
+                             `items-center` kartu. Kelihatan miring padahal geometrinya "benar".
+
+                             `justify-center` membagi sisa ruang itu rata atas-bawah -- ruangnya
+                             tidak dihapus, hanya diseimbangkan, dan itulah arti center. Kartu
+                             yang isinya penuh 90px tak berubah sama sekali. `leading-4` tetap
+                             eksplisit supaya dua baris jatuh tepat di 2rem dan angka 90px di
+                             atas tidak meleset. --}}
+                        <div class="min-w-0 flex-1 flex flex-col justify-center min-h-[5.625rem]">
+                            {{-- Judul memikul beda earned/locked yang dulu dibawa opacity kartu. --}}
+                            <h3 class="font-mono text-sm font-bold leading-5 truncate {{ $a['earned'] ? 'text-foreground' : 'text-muted' }}"
                                 title="{{ __('achievements.defs.'.$a['key'].'.title') }}">{{ __('achievements.defs.'.$a['key'].'.title') }}</h3>
 
-                            <p class="mt-0.5 min-h-[2rem] font-mono text-xs leading-4 text-muted">{{ __('achievements.defs.'.$a['key'].'.description') }}</p>
+                            <p class="mt-0.5 font-mono text-xs leading-4 text-muted">{{ __('achievements.defs.'.$a['key'].'.description') }}</p>
 
-                            <div class="mt-1 min-h-[2rem] font-mono text-[0.7rem] leading-4">
+                            <div class="mt-1 font-mono text-[0.7rem] leading-4">
                                 @if ($a['earned'])
                                     <p class="flex items-center gap-1 text-gold">
                                         <svg class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
@@ -107,7 +133,11 @@
                                         <p class="text-muted/70">@localtime($a['unlocked_at'], 'd M Y')</p>
                                     @endif
                                 @else
-                                    <p class="text-muted/60">{{ __('achievements.locked') }}</p>
+                                    {{-- /80, bukan /60: pada ukuran 0.7rem yang /60 hanya
+                                         mencapai 3.1:1 -- tetap di bawah AA meski opacity
+                                         kartu sudah dibuang. /80 mencapai 4.5:1 sambil tetap
+                                         terbaca subordinat terhadap deskripsi. --}}
+                                    <p class="text-muted/80">{{ __('achievements.locked') }}</p>
                                 @endif
                             </div>
                         </div>

@@ -146,7 +146,39 @@ it('computes every stat in a single query', function () {
 it('lets long descriptions wrap instead of cutting them off', function () {
     $view = file_get_contents(resource_path('views/achievements/index.blade.php'));
 
-    expect($view)->toContain('min-h-[2rem]')->not->toContain('text-muted truncate');
+    expect($view)->toContain('min-h-[5.625rem]')->not->toContain('text-muted truncate');
+});
+
+/**
+ * Tinggi dipesan SEKALI di wadah teks lalu isinya di-center, bukan `min-h` di tiap anak.
+ *
+ * Kedua cara sama-sama membuat kartu setinggi sama, jadi mudah dikira setara. Bedanya:
+ * memesan per-anak menahan isi di ATAS tiap slot, sehingga kartu berdeskripsi satu baris
+ * menyisakan ruang mati di bawah dan pusat optik teksnya naik ~16px dari pusat badge ikon
+ * yang di-center kartu -- terlihat miring padahal geometrinya "benar".
+ */
+it('centres the card text against its icon instead of top-aligning it', function () {
+    // Komentar dibuang: prosanya sengaja MENJELASKAN mekanisme lama, jadi teks mentah
+    // akan menuduh dokumentasinya sendiri.
+    $view = tanpaKomentarBlade(file_get_contents(resource_path('views/achievements/index.blade.php')));
+
+    expect($view)->toContain('flex flex-col justify-center min-h-[5.625rem]')
+        // Pemesanan per-anak yang lama tak boleh kembali: ia mengembalikan ruang matinya.
+        ->and($view)->not->toContain('min-h-[2rem]');
+});
+
+/**
+ * Kartu terkunci tak boleh diredupkan dengan `opacity` menyeluruh.
+ *
+ * Peredupannya bertumpuk (latar lemah + border lemah + badge abu + kartu x0.5), dan
+ * deskripsi `text-muted` jatuh ke kontras 2.6:1 -- di bawah WCAG AA 4.5:1. Justru syarat
+ * achievement pada kartu yang BELUM diraih itulah yang paling perlu dibaca. Bedanya kini
+ * dibawa warna judul, latar, border, dan badge.
+ */
+it('keeps locked achievement text readable', function () {
+    $view = tanpaKomentarBlade(file_get_contents(resource_path('views/achievements/index.blade.php')));
+
+    expect($view)->not->toContain('opacity-50');
 });
 
 it('renders the achievements page with every definition listed', function () {
