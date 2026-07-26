@@ -64,6 +64,15 @@ class TypingResult extends Component
     /** True when the run was abandoned mid-session: every number still shows, nothing was saved. */
     public $afk = false;
 
+    /**
+     * Achievement KEYS unlocked by this very session, straight from
+     * AchievementService::syncUnlocks(). Titles are resolved in the view from the lang
+     * files -- the only place they live. Empty for guests and for abandoned runs.
+     *
+     * @var array<int, string>
+     */
+    public $newAchievements = [];
+
     public function mount()
     {
         $result = session('typing_result');
@@ -98,6 +107,8 @@ class TypingResult extends Component
         // ?? REQUIRED: old sessions (from before this deploy) don't have this key.
         $this->errorEvents = $result['errorEvents'] ?? [];
         $this->afk = $result['afk'] ?? false;
+        // `?? []` on purpose: a session stored before this key existed must still render.
+        $this->newAchievements = $result['newAchievements'] ?? [];
     }
 
     /**
