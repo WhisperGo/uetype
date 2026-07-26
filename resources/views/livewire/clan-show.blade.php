@@ -44,7 +44,11 @@
     <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">{{ __('clan.members_heading', ['count' => $this->members->count()]) }}</p>
     <div class="space-y-3 mb-10">
         @foreach ($this->members as $member)
-            <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl group hover:border-white/10 transition {{ $member->role->value === 'leader' ? 'ring-1 ring-gold/20' : '' }}" wire:key="member-{{ $member->id }}">
+            <div @class([
+                    'flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl group hover:border-white/10 transition',
+                    'ring-1 ring-gold/20' => $member->role->value === 'leader',
+                    'ring-1 ring-white/10' => $member->role->value === 'co-leader',
+                ]) wire:key="member-{{ $member->id }}">
                 <a href="{{ route('profile.show', $member->user) }}" wire:navigate class="flex items-center gap-4 flex-1 min-w-0">
                     <x-friend-avatar :user="$member->user" />
                     <div class="flex-1 min-w-0">

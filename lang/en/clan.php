@@ -35,12 +35,22 @@ return [
         'accept' => 'Accept',
         'reject' => 'Reject',
         'kick' => 'Kick',
+        'manage' => 'Manage Clan',
+        'edit' => 'Edit Clan Identity',
+        'edit_heading' => 'Edit Clan Identity',
+        'edit_save' => 'Save Changes',
+        'edit_cancel' => 'Cancel',
+        'promote' => 'Make Co-Leader',
+        'demote' => 'Demote to Member',
+        'transfer' => 'Transfer Leadership',
+        'disband' => 'Disband Clan',
     ],
 
     'browse' => [
         'search_placeholder' => 'Search by clan name…',
         'joined' => 'Joined',
         'request_sent' => 'Request Sent',
+        'cancel_request' => 'Cancel',
         'join' => '+ Join',
     ],
 
@@ -142,16 +152,38 @@ return [
         'cancel_claim_title' => 'Cancel this claim?',
         'cancel_claim_body' => 'This mode slot will open up again for other clan members. Unsubmitted progress will be lost.',
         'cancel_claim_confirm' => 'Cancel Claim',
+        'promote_title' => 'Make :name a Co-Leader?',
+        'promote_body' => 'Co-Leaders can accept join requests and remove members, but cannot disband the clan or change its leadership.',
+        'promote_confirm' => 'Make Co-Leader',
+        'demote_title' => 'Demote :name to member?',
+        'demote_body' => 'They will lose access to join requests and to removing members.',
+        'demote_confirm' => 'Demote',
+        'transfer_title' => 'Transfer leadership to :name?',
+        'transfer_body' => 'They become Leader and you step down to a regular member. You cannot undo this yourself - only the new Leader can hand it back.',
+        'transfer_confirm' => 'Transfer Leadership',
+        'disband_title' => 'Disband :name?',
+        'disband_body' => 'Every member will be removed and this clan permanently deleted along with its war history. This cannot be undone.',
+        'disband_prompt' => 'Type :name to confirm',
+        'disband_confirm' => 'Disband Clan',
     ],
 
     'aria' => [
         'back_leaderboard' => 'Back to leaderboard',
         'emblem' => ':key',
         'color' => ':key',
+        'member_actions' => 'Actions for :name',
     ],
 
     'role' => [
         'leader' => 'Leader',
+        'co-leader' => 'Co-Leader',
+    ],
+
+    'roster' => [
+        'last_seen' => 'seen :time',
+        'never_seen' => 'never seen',
+        'war_points' => ':points war pts',
+        'joined' => 'joined :time',
     ],
 
     'attr' => [
@@ -162,6 +194,8 @@ return [
     'error' => [
         'max_members' => 'Clan has reached the maximum of :max members.',
         'mode_taken' => 'This mode was just taken by another member.',
+        'disband_during_war' => 'A clan cannot be disbanded while a Clan War is running. Finish the war first.',
+        'disband_name_mismatch' => 'The clan name does not match.',
     ],
 
     // Notification messages to ANOTHER user (toast). Same pattern as friends.notify.*.
@@ -171,5 +205,10 @@ return [
         'war_challenged' => ':clan challenged your clan to a Clan War',
         'war_accepted' => ':clan accepted your Clan War challenge',
         'war_declined' => ':clan declined your Clan War challenge',
+        'leadership_received' => 'You are now the Leader of :clan',
+        'promoted' => 'You were promoted to Co-Leader of :clan',
+        'demoted' => 'You are a regular member of :clan again',
+        'disbanded' => ':clan was disbanded by its leader',
+        'identity_updated' => 'Your clan is now called :clan',
     ],
 ];

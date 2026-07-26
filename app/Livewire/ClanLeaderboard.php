@@ -16,7 +16,10 @@ class ClanLeaderboard extends Component
     /** All clans ranked by power, with active-member and war-win counts. */
     public function getRankingProperty()
     {
-        $clans = Clan::withCount('activeMembers as members_count')
+        // Empty clans are left out: a ranking is a list of clans you could face, and one
+        // with nobody in it can neither be challenged nor climb.
+        $clans = Clan::populated()
+            ->withCount('activeMembers as members_count')
             ->orderByDesc('power')
             ->orderBy('name')
             ->get();

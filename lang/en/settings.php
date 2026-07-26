@@ -29,5 +29,7 @@ return [
         'confirm_placeholder' => 'Type your username',
         'confirm_cancel' => 'Cancel',
         'confirm_delete' => 'Delete Account',
+        'leads_clan' => 'You lead :clan. Deleting your account would delete the clan and remove every member. Transfer leadership to someone else, or disband the clan, then come back here.',
+        'leads_clan_cta' => 'Go to Clan',
     ],
 ];

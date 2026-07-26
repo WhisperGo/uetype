@@ -35,12 +35,22 @@ return [
         'accept' => 'Terima',
         'reject' => 'Tolak',
         'kick' => 'Keluarkan',
+        'manage' => 'Kelola Clan',
+        'edit' => 'Ubah Identitas Clan',
+        'edit_heading' => 'Ubah Identitas Clan',
+        'edit_save' => 'Simpan Perubahan',
+        'edit_cancel' => 'Batal',
+        'promote' => 'Jadikan Co-Leader',
+        'demote' => 'Turunkan ke Anggota',
+        'transfer' => 'Serahkan Kepemimpinan',
+        'disband' => 'Bubarkan Clan',
     ],
 
     'browse' => [
         'search_placeholder' => 'Cari berdasarkan nama clan…',
         'joined' => 'Tergabung',
         'request_sent' => 'Permintaan Terkirim',
+        'cancel_request' => 'Batalkan',
         'join' => '+ Gabung',
     ],
 
@@ -142,16 +152,38 @@ return [
         'cancel_claim_title' => 'Batalkan klaim ini?',
         'cancel_claim_body' => 'Slot mode ini akan terbuka lagi untuk anggota clan lain. Progres yang belum di-submit akan hilang.',
         'cancel_claim_confirm' => 'Batalkan Klaim',
+        'promote_title' => 'Jadikan :name Co-Leader?',
+        'promote_body' => 'Co-Leader bisa menerima permintaan gabung dan mengeluarkan anggota, tapi tidak bisa membubarkan clan atau mengubah kepemimpinan.',
+        'promote_confirm' => 'Jadikan Co-Leader',
+        'demote_title' => 'Turunkan :name ke anggota?',
+        'demote_body' => 'Dia akan kehilangan akses mengelola permintaan gabung dan mengeluarkan anggota.',
+        'demote_confirm' => 'Turunkan',
+        'transfer_title' => 'Serahkan kepemimpinan ke :name?',
+        'transfer_body' => 'Dia akan menjadi Leader dan kamu turun menjadi anggota biasa. Tindakan ini tidak bisa dibatalkan sendiri - hanya Leader baru yang bisa mengembalikannya.',
+        'transfer_confirm' => 'Serahkan Kepemimpinan',
+        'disband_title' => 'Bubarkan :name?',
+        'disband_body' => 'Seluruh anggota akan dikeluarkan dan clan ini dihapus permanen beserta riwayat war-nya. Tindakan ini tidak bisa dibatalkan.',
+        'disband_prompt' => 'Ketik :name untuk mengonfirmasi',
+        'disband_confirm' => 'Bubarkan Clan',
     ],
 
     'aria' => [
         'back_leaderboard' => 'Kembali ke papan peringkat',
         'emblem' => ':key',
         'color' => ':key',
+        'member_actions' => 'Aksi untuk :name',
     ],
 
     'role' => [
         'leader' => 'Leader',
+        'co-leader' => 'Co-Leader',
+    ],
+
+    'roster' => [
+        'last_seen' => 'aktif :time',
+        'never_seen' => 'belum pernah aktif',
+        'war_points' => ':points poin war',
+        'joined' => 'gabung :time',
     ],
 
     'attr' => [
@@ -162,6 +194,8 @@ return [
     'error' => [
         'max_members' => 'Clan sudah mencapai batas maksimal :max anggota.',
         'mode_taken' => 'Mode ini baru saja diambil oleh anggota lain.',
+        'disband_during_war' => 'Clan tidak bisa dibubarkan selama masih ada Clan War berjalan. Selesaikan war-nya dulu.',
+        'disband_name_mismatch' => 'Nama clan tidak cocok.',
     ],
 
     // Notification messages to ANOTHER user (toast). Same pattern as friends.notify.*.
@@ -171,5 +205,10 @@ return [
         'war_challenged' => ':clan menantang clan-mu untuk Clan War',
         'war_accepted' => ':clan menerima tantangan Clan War-mu',
         'war_declined' => ':clan menolak tantangan Clan War-mu',
+        'leadership_received' => 'Kamu sekarang Leader dari :clan',
+        'promoted' => 'Kamu diangkat menjadi Co-Leader di :clan',
+        'demoted' => 'Kamu kembali menjadi anggota biasa di :clan',
+        'disbanded' => ':clan telah dibubarkan oleh leader-nya',
+        'identity_updated' => 'Identitas clan-mu kini menjadi :clan',
     ],
 ];

@@ -29,5 +29,7 @@ return [
         'confirm_placeholder' => 'Ketik username-mu',
         'confirm_cancel' => 'Batal',
         'confirm_delete' => 'Hapus Akun',
+        'leads_clan' => 'Kamu adalah Leader dari :clan. Menghapus akun akan ikut menghapus clan beserta seluruh anggotanya. Serahkan kepemimpinan ke orang lain, atau bubarkan clan-nya dulu, lalu kembali ke sini.',
+        'leads_clan_cta' => 'Ke Halaman Clan',
     ],
 ];
