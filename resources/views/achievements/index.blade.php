@@ -28,7 +28,7 @@
                     </p>
                 </div>
                 <div class="h-2 overflow-hidden rounded-full bg-white/5">
-                    <div class="h-full rounded-full bg-gradient-to-r from-brand to-gold transition-all duration-500"
+                    <div class="h-full rounded-full bg-gold from-brand to-gold transition-all duration-500"
                         style="width: {{ $progressPercent }}%"></div>
                 </div>
             </div>
