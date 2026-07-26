@@ -642,31 +642,27 @@ const registerRaceArena = (Alpine) => {
             const active = track.querySelector(`[data-word-index="${this.currentWordIndex}"]`);
             if (!active) return;
 
-            // Compute an ABSOLUTE offset from the layout, never an incremental one.
+            // The active word's distance from the top of the track = the absolute translateY
+            // needed to bring it to the top visible line.
             //
-            // The old code read the active word's `offsetTop`, which is measured from the nearest
-            // POSITIONED ancestor (offsetParent). Neither the track nor its wrappers are `relative`,
-            // so offsetParent walked up to a card far above the paragraph -- baking that card's own
-            // page position into the offset. The paragraph then slid up out of the clipping window
-            // once the player advanced, so the active word vanished off the top.
+            // offsetTop is PURE LAYOUT: a CSS `transform` never changes it, and it is not a
+            // live-animated value, so it can be read at any moment (even mid-transition) and
+            // always returns the word's settled position. The track is `position: relative`
+            // (see the Blade), which makes it the offsetParent, so offsetTop is measured from the
+            // track top -- not from some card far above, which was the original "paragraph slides
+            // off screen" bug.
             //
-            // The obvious "add the gap to the current offset" is ALSO wrong: getBoundingClientRect()
-            // reads the word's position while the 150ms slide transition is still animating, so the
-            // gap is a partial, in-flight value. Accumulating those partial deltas makes the offset
-            // drift a little more every keystroke -- the "position keeps changing, scroll is
-            // erratic" bug.
+            // Two earlier attempts failed and are worth remembering:
+            //   - Viewport-rect deltas read mid-animation gave in-flight values; accumulating
+            //     them (`+= gap`) drifted a little more each keystroke.
+            //   - Even an absolute rect-delta wobbled because the active word used to gain
+            //     padding + bold + a ring on activation, which changed its WIDTH and re-wrapped
+            //     the whole paragraph. Every word now carries identical box metrics (see Blade),
+            //     so moving the cursor never reflows a line and offsetTop stays monotonic.
             //
-            // Fix: measure the active word's top RELATIVE TO THE TRACK'S top. Both elements are
-            // translated together by the same translateY, so their difference cancels the transform
-            // out entirely and yields the word's pure, final layout position inside the track --
-            // which IS exactly the absolute translateY needed to bring that word to the track's top
-            // edge. It doesn't matter that the read happens mid-animation, because the delta between
-            // two elements that move together is transform-independent. Line one gives 0 (nothing
-            // moves until line two), preserving lookahead.
-            const trackTop = track.getBoundingClientRect().top;
-            const activeTop = active.getBoundingClientRect().top;
-
-            this.wordScrollOffset = Math.max(0, activeTop - trackTop);
+            // Line one gives offsetTop 0, so nothing moves until the player reaches line two,
+            // preserving the maximum lookahead.
+            this.wordScrollOffset = Math.max(0, active.offsetTop);
         },
 
         restoreProgress() {

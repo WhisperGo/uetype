@@ -676,11 +676,26 @@
                            the same figure the solo engine uses, so it follows the line-height
                            instead of a pixel guess that breaks when the type scale changes. --}}
                       <div class="overflow-hidden" style="max-height: 4.875em;">
+                      {{-- `relative` makes THIS element the offsetParent of the words, so
+                           syncWordScroll() can read each word's offsetTop as its distance from the
+                           track top -- pure layout, immune to the translateY transform and to
+                           mid-animation timing. Without it offsetParent walked up to a card far
+                           above and the paragraph slid off screen. --}}
                       <div x-ref="wordsTrack"
-                        class="flex flex-wrap gap-x-2 gap-y-1 transition-transform duration-150 ease-out"
+                        class="relative flex flex-wrap gap-x-2 gap-y-1 transition-transform duration-150 ease-out"
                         :style="`transform: translateY(-${wordScrollOffset}px)`">
                         <template x-for="(word, wIdx) in words" :key="wIdx">
+                            {{-- Every word carries the SAME box metrics at all times: `px-1`
+                                 padding and a transparent `ring`/`border` slot are present on
+                                 non-active words too (via the base classes below), and the active
+                                 state only recolours them. If activation added padding/bold/ring
+                                 that a resting word lacks, the active word would change WIDTH,
+                                 shifting where the line wraps -- and because syncWordScroll()
+                                 measures the active word's laid-out position, that reflow made the
+                                 paragraph jump erratically (sudden scroll to top). Keeping metrics
+                                 constant means moving the cursor never re-wraps a line. --}}
                             <span :data-word-index="wIdx"
+                                class="px-1 rounded ring-1 ring-transparent"
                                 {{-- No "passed with an error" state exists any more: word-lock
                                      means a word behind the cursor was necessarily typed
                                      exactly, so every one of them is simply correct. --}}
@@ -688,12 +703,13 @@
                                      space. Without the second case a rejected space left the
                                      word looking perfectly fine whenever the typed text was a
                                      correct prefix -- nothing on screen said "you are being
-                                     stopped here". --}}
+                                     stopped here". Note: NO font-bold on the active word -- a
+                                     wider glyph run would re-wrap the line just like padding. --}}
                                 :class="{
                                     'text-active': wIdx < currentWordIndex,
-                                    'text-danger bg-danger/15 ring-1 ring-danger/40 px-1 rounded underline underline-offset-4 decoration-2': wIdx ===
+                                    'text-danger bg-danger/15 ring-danger/40 underline underline-offset-4 decoration-2': wIdx ===
                                         currentWordIndex && (hasError || justBlocked),
-                                    'text-foreground font-bold ring-1 ring-border/50 bg-foreground/5 px-1 rounded': wIdx ===
+                                    'text-foreground ring-border/50 bg-foreground/5': wIdx ===
                                         currentWordIndex && !hasError && !justBlocked,
                                     'text-muted': wIdx > currentWordIndex
                                 }"

@@ -301,32 +301,41 @@ it('membatasi paragraf balapan jadi jendela tiga baris yang menggeser sendiri', 
         ->toContain('translateY(-${wordScrollOffset}px)')
         // Penanda yang dipakai syncWordScroll() untuk menemukan kata aktif.
         ->toContain(':data-word-index="wIdx"');
+
+    // Track WAJIB `relative`: itu yang membuatnya jadi offsetParent, sehingga offsetTop kata
+    // aktif diukur dari atas track (bukan kartu jauh di atas -> paragraf tergeser keluar layar).
+    expect($markup)->toMatch('/x-ref="wordsTrack"\s+class="relative /');
+
+    // Metrik kotak tiap kata WAJIB konstan (padding + ring transparan pada SEMUA kata), supaya
+    // kata aktif tak berubah lebar saat aktif -> tak me-reflow baris -> scroll tak meloncat.
+    expect($markup)->toContain('class="px-1 rounded ring-1 ring-transparent"');
+
+    // Isolasi <span> kata (dari :data-word-index sampai x-text) untuk memastikan state aktifnya
+    // TIDAK menambah font-bold -- glyph yang melebar ikut me-rewrap baris seperti padding.
+    preg_match('/:data-word-index="wIdx".*?x-text="word"/s', $markup, $wordSpan);
+    expect($wordSpan[0] ?? '')->not->toContain('font-bold');
 });
 
 /**
- * Jendelanya harus digeser ke offset ABSOLUT dari posisi kata aktif yang dilay-out browser,
- * bukan dari jumlah baris yang dihitung sendiri (kata membungkus beda di tiap lebar layar).
+ * Jendelanya digeser ke offsetTop kata aktif -- posisi LAYOUT murni, diukur dari track yang
+ * `position: relative` (offsetParent-nya). offsetTop kebal terhadap transform translateY dan
+ * bukan nilai teranimasi, jadi bisa dibaca kapan pun dan selalu mengembalikan posisi final.
  *
- * Diukur lewat getBoundingClientRect(): top kata aktif dikurangi top TRACK. Keduanya digeser
- * translateY yang sama, jadi selisihnya membatalkan transform dan menghasilkan posisi layout
- * MURNI kata itu di dalam track -- yakni offset absolut yang dibutuhkan. Bukan `offsetTop`
- * (menabrak offsetParent tak-terduga -> paragraf keluar layar di HP), dan bukan penjumlahan
- * delta ke offset lama (rect dibaca selagi transisi 150ms berjalan -> nilai parsial yang
- * terakumulasi -> scroll "berubah-ubah" tiap keystroke).
+ * Ini menutup dua kegagalan sebelumnya: (1) getBoundingClientRect() dibaca selagi transisi
+ * 150ms jalan -> nilai parsial yang terakumulasi -> drift tiap keystroke; (2) kata aktif dulu
+ * menambah padding/bold/ring saat aktif -> lebarnya berubah -> paragraf ter-rewrap -> scroll
+ * meloncat. Metrik kotak kini konstan (diuji di test markup di atas).
  *
  * Dan ia wajib dipanggil di dua tempat: setiap kali kata maju, serta saat init -- karena
  * reload di tengah balapan mendarat di kata yang bisa jauh di bawah.
  */
-it('menggeser jendela paragraf ke offset absolut posisi nyata kata aktif', function () {
+it('menggeser jendela paragraf ke offsetTop kata aktif (posisi layout murni)', function () {
     $sync = raceMethodSource('syncWordScroll()');
 
     expect($sync)->toContain('data-word-index')
-        // Offset absolut (top kata - top track), bukan panggilan `active.offsetTop` yang lama
-        // dan bukan akumulasi `+=` yang menyebabkan drift.
-        ->and($sync)->toContain('getBoundingClientRect')
-        ->and($sync)->toContain('activeTop - trackTop')
-        ->and($sync)->not->toContain('active.offsetTop')
-        ->and($sync)->not->toContain('wordScrollOffset +');
+        // offsetTop kata aktif, bukan getBoundingClientRect() yang rentan waktu-baca animasi.
+        ->and($sync)->toContain('active.offsetTop')
+        ->and($sync)->not->toContain('getBoundingClientRect');
 
     $arena = tanpaKomentarJs(file_get_contents(resource_path('js/race-arena.js')));
 
