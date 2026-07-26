@@ -93,7 +93,10 @@ it('moves the chat javascript out of blade and into modules', function () {
     expect($appJs)->toContain('chat-runtime')
         ->and($appJs)->toContain('chat-dock');
 
-    // Logika dock (drag + clamp viewport) tak lagi ditulis inline di Blade.
+    // Logika dock tak lagi ditulis inline di Blade. Nama-nama ini berasal dari FAB yang
+    // dulu bisa digeser; drag-nya sendiri sudah dibuang seluruhnya (lihat ChatOverlayTest
+    // "tidak lagi menawarkan FAB yang bisa digeser"), jadi keduanya kini menjaga dua hal
+    // sekaligus: tak inline, dan tak kembali.
     expect(chatOverlaySource())->not->toContain('pxToAnchor')
         ->and(chatOverlaySource())->not->toContain('startDrag(e)');
 

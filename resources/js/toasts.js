@@ -6,9 +6,15 @@
  * toast and a chat toast arriving together would OVERLAP. Merging them fixed that bug
  * and dropped ~280 lines of markup that had been copied three times.
  *
- * Display policy: ONLY ONE toast at the bottom-right at a time. A new notification
- * replaces the old one (see push()) so rapid-fire notifications don't stack up and fill
- * the screen.
+ * Display policy: ONLY ONE toast at a time. A new notification replaces the old one (see
+ * push()) so rapid-fire notifications don't stack up and fill the screen.
+ *
+ * Position is NOT set here or in the component markup: the toast is a child of
+ * `.notif-lane` (resources/css/app.css), which owns the corner on behalf of every
+ * notification. Anchoring itself is what once put it on top of the chat FAB.
+ *
+ * Nothing is shown while a typing test or race is running -- it is held and released
+ * afterwards (see setTestActive()).
  *
  * Echo subscriptions stay per-channel (their payloads & display rules differ), but they
  * all push into the single slot via push().
@@ -26,6 +32,9 @@ export default function toastStack(config) {
         toasts: [],
         _seq: 0,
         _dismissTimer: null,
+        // A typing test or race is running: nothing may pop up until it ends. See push().
+        testActive: false,
+        _pending: null,
 
         init() {
             // Server-rendered pages queue toasts here. Registered BEFORE the Echo guard
@@ -33,6 +42,14 @@ export default function toastStack(config) {
             // returning early would silently disable them wherever Echo is unavailable.
             this.drainQueue();
             window.addEventListener('uetype-toast', () => this.drainQueue());
+
+            // The chat FAB already hides itself while a session runs, on the grounds that
+            // even a STILL button is a distraction mid-test. A toast is strictly worse: it
+            // slides in, animated, at the edge of vision, exactly while the player's WPM is
+            // being measured. Held rather than dropped -- see setTestActive().
+            window.addEventListener('test-activity', (e) => {
+                this.setTestActive(!!(e.detail && e.detail.active));
+            });
 
             if (!window.Echo) return; // Echo is loaded via app.js
 
@@ -216,7 +233,49 @@ export default function toastStack(config) {
         // request"s) no longer fill the screen. Since `x-for` uses :key=id, replacing the
         // array contents triggers a leave transition (old one out) + enter (new one in) at once.
 
+        /**
+         * Enter/leave a typing or racing session.
+         *
+         * Held toasts use ONE slot, not a queue, because that is already the display policy
+         * (see push): a newer notification replaces an older one. Buffering a backlog only
+         * to show the last of it would be the same outcome with more state.
+         */
+        setTestActive(active) {
+            this.testActive = active;
+
+            if (this.testActive) {
+                // Clear anything on screen when the session starts, so a toast that arrived
+                // a moment earlier doesn't sit there for the whole test.
+                if (this._dismissTimer) clearTimeout(this._dismissTimer);
+                if (this.toasts.length) {
+                    // Strip the id: push() builds `{ id, ...toast }`, so a stale id in the
+                    // payload would spread OVER the new one, leaving the auto-dismiss timer
+                    // chasing an id the rendered toast no longer has -- it would never close.
+                    const { id, ...payload } = this.toasts[0]; // eslint-disable-line no-unused-vars
+                    this._pending = payload;
+                }
+                this.toasts = [];
+
+                return;
+            }
+
+            const held = this._pending;
+            this._pending = null;
+
+            // Shown through push() so it gets a fresh id and a full 6 seconds -- a held
+            // toast must not appear already half-expired.
+            if (held) this.push(held);
+        },
+
         push(toast) {
+            // Mid-session: hold it instead. Not dropped -- the player still wants to know a
+            // friend messaged, just not while they're being timed.
+            if (this.testActive) {
+                this._pending = toast;
+
+                return;
+            }
+
             const id = ++this._seq;
 
             // Cancel the previous toast's auto-dismiss timer: otherwise the old timer could

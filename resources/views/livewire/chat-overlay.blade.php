@@ -1,38 +1,64 @@
-{{-- Floating chat overlay: a draggable toggle bubble (FAB) plus a docked drawer with
-     a conversation picker and thread view. Mirrors the full chat page in a compact form.
-     Its Echo subscription is owned by the global toast in the layout; this overlay only
-     listens to relayed window events. --}}
+{{-- Floating chat overlay: a toggle bubble (FAB) plus a docked drawer with a conversation
+     picker and thread view. Mirrors the full chat page in a compact form. Its Echo
+     subscription is owned by the global toast in the layout; this overlay only listens to
+     relayed window events.
+
+     The FAB OWNS the bottom-right corner and is pinned there. Nothing that appears
+     unbidden may anchor to this corner -- notifications live in `.notif-lane` on the
+     opposite side (see resources/css/app.css). It used to be draggable; see the header of
+     resources/js/chat-dock.js for why that was removed. --}}
 <div x-data="chatOverlayDock(@entangle('open'))" class="font-mono">
-    {{-- Toggle button (draggable): hidden while a test/race session is active.
-         @entangle('open') syncs the value to the server (triggering a fresh content render). --}}
-    <button x-show="!hidden" x-cloak x-ref="bubble"
-        @pointerdown="startDrag($event)"
-        :style="bubbleStyle()"
-        {{-- Deliberately NOT using <x-btn-gold>: this is a round FAB with drag logic,
-             not a text button. Forcing it into that component would only add props no
-             one uses. --}}
-        class="fixed z-[56] w-14 h-14 rounded-full bg-gold hover:bg-gold/90 text-background shadow-xl flex items-center justify-center transition-colors touch-none select-none cursor-grab active:cursor-grabbing"
+    {{-- Toggle button: hidden while a test/race session is active.
+         @entangle('open') syncs the value to the server (triggering a fresh content render).
+
+         Plain @click on a native <button>, so Enter/Space work with no keyboard handler of
+         our own. This is not a detail to "optimise" back into a pointer event: doing so is
+         exactly what made the chat unreachable by keyboard before. --}}
+    <button x-show="!hidden" x-cloak
+        @click="open = ! open"
+        :aria-expanded="open ? 'true' : 'false'"
+        aria-controls="chat-overlay-panel"
+        {{-- Deliberately NOT using <x-btn-gold>: this is a round icon FAB, not a text
+             button. Forcing it into that component would only add props no one uses.
+
+             hover:-translate-y-0.5 + active:scale-95 is where the "more feel" that used to
+             justify dragging now lives -- on the button's REACTION rather than its
+             position. The press feedback also replaces the tactile cue lost with
+             `active:cursor-grabbing`. `transition` (not transition-colors) so transform and
+             shadow ease too; the reduced-motion block in app.css flattens all of it. --}}
+        class="fixed z-[56] bottom-5 right-5 w-14 h-14 rounded-full bg-gold hover:bg-gold/90 text-background shadow-xl hover:shadow-2xl flex items-center justify-center transition duration-200 hover:-translate-y-0.5 active:scale-95 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         aria-label="{{ __('chat.title') }}">
-        <svg class="w-6 h-6 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        {{-- Rotates slightly while the drawer is open: a quiet "this is the thing that is
+             currently showing", not a second icon to maintain. --}}
+        <svg class="w-6 h-6 pointer-events-none transition-transform duration-200" :class="open ? 'rotate-12' : ''"
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8-1.17 0-2.29-.2-3.32-.56L3 21l1.56-4.68C3.57 15.19 3 13.65 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
         @if ($this->unreadCount > 0)
-            <span class="absolute -top-1 -right-1 px-1.5 py-0.5 min-w-[1.25rem] text-center font-mono text-[0.65rem] font-bold text-white bg-danger rounded-full border-2 border-background pointer-events-none">
+            {{-- wire:key carries the COUNT, so Livewire replaces this element whenever the
+                 number changes and the new node replays chat-badge-pop once. That is the
+                 whole trigger -- no JS listener, and no risk of animating on the wrong
+                 event: the count already excludes your own messages and the thread you are
+                 looking at, because it comes from the same query that renders it. --}}
+            <span wire:key="fab-unread-{{ $this->unreadCount }}"
+                class="chat-badge-pop absolute -top-1 -right-1 px-1.5 py-0.5 min-w-[1.25rem] text-center font-mono text-[0.65rem] font-bold text-white bg-danger rounded-full border-2 border-background pointer-events-none">
                 {{ $this->unreadCount > 9 ? '9+' : $this->unreadCount }}
             </span>
         @endif
     </button>
 
-    {{-- Drawer: anchored to the bubble's position and kept within the viewport. --}}
-    <div x-show="open && !hidden" x-cloak x-ref="panel"
+    {{-- Drawer: opens upward from the pinned FAB. bottom-24 (6rem) clears the button's
+         lane -- 56px button + 20px bottom margin + 20px gap -- the same clearance
+         `.notif-lane` uses on mobile. max-h-[70vh] keeps it whole on short viewports, so
+         no JS measuring is needed. --}}
+    <div x-show="open && !hidden" x-cloak id="chat-overlay-panel"
         x-transition:enter="transition ease-out duration-200"
         x-transition:enter-start="opacity-0 translate-y-4"
         x-transition:enter-end="opacity-100 translate-y-0"
         x-transition:leave="transition ease-in duration-150"
         x-transition:leave-start="opacity-100 translate-y-0"
         x-transition:leave-end="opacity-0 translate-y-4"
-        :style="panelStyle()"
-        class="fixed z-[55] w-96 max-w-[calc(100vw-2.5rem)] h-[32rem] max-h-[70vh] bg-surface border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        class="fixed z-[55] bottom-24 right-5 w-96 max-w-[calc(100vw-2.5rem)] h-[32rem] max-h-[70vh] bg-surface border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
         @if ($activeMode === null)
             {{-- PICKER --}}

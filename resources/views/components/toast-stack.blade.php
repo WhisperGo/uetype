@@ -1,14 +1,20 @@
 {{-- ===== GLOBAL TOAST =====
-     ONE container for all notifications (friends, clan, chat). Previously three
-     separate components rendered three containers at the exact same coordinates,
+     ONE container for all notifications (friends, clan, chat, achievements). Previously
+     three separate components rendered three containers at the exact same coordinates,
      so toasts arriving at once overlapped.
 
-     Shows only ONE toast at a time (bottom-right): a new notification replaces the
-     previous one instead of piling upward -- see push() in resources/js/toasts.js.
+     Shows only ONE toast at a time: a new notification replaces the previous one instead
+     of piling upward -- see push() in resources/js/toasts.js.
 
-     Applies on ALL pages: a player may be typing or in multiplayer when a
-     notification arrives. Kept outside {{ '{{ $slot }}' }} so it survives across
-     wire:navigate. Logic lives in resources/js/toasts.js. --}}
+     Carries NO positioning of its own: it is a child of `.notif-lane` in
+     layouts/app.blade.php, which owns the corner for every notification. It used to
+     anchor itself `fixed bottom-5 right-5`, the same corner as the chat FAB, and covered
+     it on every single toast.
+
+     role="status" (aria-live=polite) sits on the container, which is always in the DOM
+     even while empty, so a toast appearing INSIDE it is announced. Without this a screen
+     reader never learned an achievement had unlocked or a message had arrived -- the
+     toast came and went leaving no trace at all. Logic lives in resources/js/toasts.js. --}}
 @auth
     <div x-data="toastStack(@js([
         'userId' => Auth::id(),
@@ -34,18 +40,23 @@
             ],
         ],
     ]))"
-        {{-- right-24 (not right-5): clears the draggable chat FAB, which parks in the
-             bottom-right corner (56px + 20px margin), so a toast never covers it. The
-             max-width subtracts that larger right offset (96px) plus a 20px left gap so the
-             card never spills off the left edge on a narrow screen. --}}
-        class="fixed z-[60] bottom-5 right-24 flex flex-col gap-3 w-80 max-w-[calc(100vw-7.25rem)] pointer-events-none">
+        {{-- A plain wrapper, deliberately NOT `display: contents`: that would flatten this
+             div into the lane's flex flow, but it has historically dropped elements from
+             the accessibility tree in some browsers -- fatal for a live region whose whole
+             job is to be announced. An empty wrapper costs one invisible zero-height flex
+             child; that is the cheaper trade. --}}
+        role="status" aria-live="polite" aria-atomic="true">
         <template x-for="t in toasts" :key="t.id">
+            {{-- Enters and leaves UPWARD, toward the lane's anchor edge. Motion should run
+                 along the axis the element is attached to; the old downward/sideways exit
+                 was a leftover from the bottom-right corner and would now push the card
+                 into the middle of the screen instead of tucking it away. --}}
             <div x-transition:enter="transition ease-out duration-300"
-                x-transition:enter-start="opacity-0 translate-y-4"
+                x-transition:enter-start="opacity-0 -translate-y-4"
                 x-transition:enter-end="opacity-100 translate-y-0"
                 x-transition:leave="transition ease-in duration-200"
-                x-transition:leave-start="opacity-100 translate-x-0"
-                x-transition:leave-end="opacity-0 translate-x-4"
+                x-transition:leave-start="opacity-100 translate-y-0"
+                x-transition:leave-end="opacity-0 -translate-y-4"
                 class="pointer-events-auto flex items-start gap-3 p-4 rounded-2xl border shadow-lg bg-surface border-white/10 backdrop-blur">
                 <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
                     :class="{
