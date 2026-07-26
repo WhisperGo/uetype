@@ -113,10 +113,12 @@ akurasi tak melonjak palsu ke 100%.
 
 Konsekuensi UX yang disengaja: kata yang salah **tidak menjebak** — huruf salah cukup diabaikan
 (tak masuk), dan biayanya hanya waktu. Penolakan (huruf salah maupun spasi yang belum sah) diberi
-sinyal lewat flag `justBlocked` (getaran `race-typo` + baris `multiplayer.word_must_match`). Karena
-karakter salah tak pernah masuk lagi, `hasError` praktis selalu `false`; `justBlocked` yang menjadi
-pemicu utama warna merah, termasuk saat spasi ditolak padahal ketikan masih prefiks benar (ketik
-`"the"` untuk `"then"` lalu spasi — layar tetap memberi sinyal ditahan).
+sinyal lewat flag `justBlocked`: **warna merah** pada kata aktif & input, plus baris
+`multiplayer.word_must_match`. (Efek getar `race-typo` sebelumnya **sudah dilepas** — warna merah
+jadi satu-satunya isyarat.) Karena karakter salah tak pernah masuk lagi, `hasError` praktis selalu
+`false`; `justBlocked` yang menjadi pemicu utama warna merah, termasuk saat spasi ditolak padahal
+ketikan masih prefiks benar (ketik `"the"` untuk `"then"` lalu spasi — layar tetap memberi sinyal
+ditahan).
 
 ### 3.3 Countdown sinkron pakai durasi RELATIF, bukan jam server absolut
 
