@@ -298,38 +298,35 @@ it('membatasi paragraf balapan jadi jendela tiga baris yang menggeser sendiri', 
         // Dipotong, dan TIDAK boleh jadi area gulir kedua yang harus digeser tangan.
         ->toContain('class="overflow-hidden" style="max-height: 4.875em;"')
         ->toContain('x-ref="wordsTrack"')
-        // Jendela klip yang STASIONER -- syncWordScroll() mengukur kata aktif terhadapnya
-        // (bukan offsetTop, yang menabrak offsetParent tak-terduga dan menggeser paragraf
-        // keluar layar di HP).
-        ->toContain('x-ref="wordsWindow"')
         ->toContain('translateY(-${wordScrollOffset}px)')
         // Penanda yang dipakai syncWordScroll() untuk menemukan kata aktif.
         ->toContain(':data-word-index="wIdx"');
 });
 
 /**
- * Jendelanya harus digeser dari posisi NYATA kata aktif yang dilay-out browser, bukan dari
- * jumlah baris yang dihitung sendiri: kata membungkus berbeda di tiap lebar layar, jadi
- * hitungan JS akan berbeda dari yang benar-benar dilay-out.
+ * Jendelanya harus digeser ke offset ABSOLUT dari posisi kata aktif yang dilay-out browser,
+ * bukan dari jumlah baris yang dihitung sendiri (kata membungkus beda di tiap lebar layar).
  *
- * Diukur lewat getBoundingClientRect() terhadap jendela klip yang STASIONER -- BUKAN offsetTop.
- * offsetTop diukur dari offsetParent (leluhur ber-`position`), dan track/pembungkusnya tak
- * ada yang `relative`, jadi offsetParent menabrak kartu jauh di atas paragraf -- posisinya ikut
- * masuk ke offset, menggeser paragraf keluar jendela sehingga di HP kata aktif tak terlihat.
+ * Diukur lewat getBoundingClientRect(): top kata aktif dikurangi top TRACK. Keduanya digeser
+ * translateY yang sama, jadi selisihnya membatalkan transform dan menghasilkan posisi layout
+ * MURNI kata itu di dalam track -- yakni offset absolut yang dibutuhkan. Bukan `offsetTop`
+ * (menabrak offsetParent tak-terduga -> paragraf keluar layar di HP), dan bukan penjumlahan
+ * delta ke offset lama (rect dibaca selagi transisi 150ms berjalan -> nilai parsial yang
+ * terakumulasi -> scroll "berubah-ubah" tiap keystroke).
  *
  * Dan ia wajib dipanggil di dua tempat: setiap kali kata maju, serta saat init -- karena
  * reload di tengah balapan mendarat di kata yang bisa jauh di bawah.
  */
-it('menggeser jendela paragraf dari posisi nyata kata aktif', function () {
+it('menggeser jendela paragraf ke offset absolut posisi nyata kata aktif', function () {
     $sync = raceMethodSource('syncWordScroll()');
 
     expect($sync)->toContain('data-word-index')
-        // Pengukuran yang benar: rect kata aktif vs rect jendela stasioner, bukan panggilan
-        // `active.offsetTop` yang lama (kata "offsetTop" masih boleh muncul di komentar yang
-        // menjelaskan bug lamanya -- yang dilarang adalah pemakaian nyatanya).
+        // Offset absolut (top kata - top track), bukan panggilan `active.offsetTop` yang lama
+        // dan bukan akumulasi `+=` yang menyebabkan drift.
         ->and($sync)->toContain('getBoundingClientRect')
-        ->and($sync)->toContain('wordsWindow')
-        ->and($sync)->not->toContain('active.offsetTop');
+        ->and($sync)->toContain('activeTop - trackTop')
+        ->and($sync)->not->toContain('active.offsetTop')
+        ->and($sync)->not->toContain('wordScrollOffset +');
 
     $arena = tanpaKomentarJs(file_get_contents(resource_path('js/race-arena.js')));
 

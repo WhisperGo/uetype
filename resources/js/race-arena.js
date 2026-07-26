@@ -637,29 +637,36 @@ const registerRaceArena = (Alpine) => {
          */
         syncWordScroll() {
             const track = this.$refs.wordsTrack;
-            const windowEl = this.$refs.wordsWindow;
-            if (!track || !windowEl) return;
+            if (!track) return;
 
             const active = track.querySelector(`[data-word-index="${this.currentWordIndex}"]`);
             if (!active) return;
 
-            // Measure the active word against the STATIONARY clipping window, not via offsetTop.
+            // Compute an ABSOLUTE offset from the layout, never an incremental one.
             //
             // The old code read the active word's `offsetTop`, which is measured from the nearest
             // POSITIONED ancestor (offsetParent). Neither the track nor its wrappers are `relative`,
             // so offsetParent walked up to a card far above the paragraph -- baking that card's own
             // page position into the offset. The paragraph then slid up out of the clipping window
-            // once the player advanced, so they saw only words already passed (all green) or an
-            // empty box, never the active word. That is the "next word not rendering on mobile" bug.
+            // once the player advanced, so the active word vanished off the top.
             //
-            // getBoundingClientRect() is viewport-relative and layout-context independent. The
-            // window element does NOT move (only the track inside it is translated), so the gap
-            // between the active word's top and the window's top -- ADDED to the offset already
-            // applied -- lands the active line exactly at the window's top edge. Line one gives a
-            // zero gap, so nothing moves until the player reaches line two, preserving lookahead.
-            const gap = active.getBoundingClientRect().top - windowEl.getBoundingClientRect().top;
+            // The obvious "add the gap to the current offset" is ALSO wrong: getBoundingClientRect()
+            // reads the word's position while the 150ms slide transition is still animating, so the
+            // gap is a partial, in-flight value. Accumulating those partial deltas makes the offset
+            // drift a little more every keystroke -- the "position keeps changing, scroll is
+            // erratic" bug.
+            //
+            // Fix: measure the active word's top RELATIVE TO THE TRACK'S top. Both elements are
+            // translated together by the same translateY, so their difference cancels the transform
+            // out entirely and yields the word's pure, final layout position inside the track --
+            // which IS exactly the absolute translateY needed to bring that word to the track's top
+            // edge. It doesn't matter that the read happens mid-animation, because the delta between
+            // two elements that move together is transform-independent. Line one gives 0 (nothing
+            // moves until line two), preserving lookahead.
+            const trackTop = track.getBoundingClientRect().top;
+            const activeTop = active.getBoundingClientRect().top;
 
-            this.wordScrollOffset = Math.max(0, this.wordScrollOffset + gap);
+            this.wordScrollOffset = Math.max(0, activeTop - trackTop);
         },
 
         restoreProgress() {
