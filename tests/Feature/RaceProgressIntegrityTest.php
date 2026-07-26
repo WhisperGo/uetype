@@ -83,6 +83,32 @@ it('reuses the existing typo shake instead of adding another animation', functio
         ->and(file_get_contents(resource_path('css/app.css')))->toContain('.race-typo');
 });
 
+it('re-signals every repeated rejection, not just the first of a burst', function () {
+    // Re-adding a CSS class that is already applied does NOT restart its animation, so a
+    // player leaning on the spacebar got exactly one shake and then silence -- which reads
+    // as "nothing is stopping me" at the very moment they are pushing hardest. The flag is
+    // dropped for one frame so the animation runs again on every refusal.
+    $arena = file_get_contents(resource_path('js/race-arena.js'));
+
+    expect($arena)->toContain('nudgeBlocked()')
+        ->toContain('requestAnimationFrame')
+        // And the pending restart is cancelled rather than left to fire after the player
+        // has already moved on (or after the component is torn down).
+        ->toContain('cancelAnimationFrame');
+});
+
+it('marks the word and the input, not only the hint line', function () {
+    $markup = tanpaKomentarBlade(
+        file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php'))
+    );
+
+    // A refused space where the typed text is still a correct prefix leaves `hasError` false,
+    // so without these the active word and the input both stayed looking perfectly healthy.
+    expect($markup)
+        ->toContain('currentWordIndex && (hasError || justBlocked)')
+        ->toContain("text-danger': hasError || justBlocked");
+});
+
 it('teaches the rule instead of leaving the player to guess it', function () {
     foreach (['en', 'id'] as $locale) {
         expect(require base_path("lang/{$locale}/multiplayer.php"))

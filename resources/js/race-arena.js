@@ -173,6 +173,7 @@ const registerRaceArena = (Alpine) => {
          * just sees a dead spacebar. Cleared on the next keystroke by checkInput().
          */
         justBlocked: false,
+        _blockedFrame: null,
 
         // Local player's progress & WPM, reactive, read by the own mascot lane in the view. Updated each checkInput().
         progressPercent: 0,
@@ -310,6 +311,10 @@ const registerRaceArena = (Alpine) => {
                 clearTimeout(this._emitTimer);
                 this._emitTimer = null;
             }
+            if (this._blockedFrame) {
+                cancelAnimationFrame(this._blockedFrame);
+                this._blockedFrame = null;
+            }
         },
 
         // Sync the remaining time from the server & make sure the local clock is running.
@@ -360,11 +365,39 @@ const registerRaceArena = (Alpine) => {
             if (this.$wire) this.$wire.checkSuddenDeath();
         },
 
+        /**
+         * Signal a refused space, and make sure it signals AGAIN on every repeat.
+         *
+         * Re-adding a CSS class that is already applied does not restart its animation, so a
+         * burst of rejected spaces used to shake exactly once and then sit silent -- which
+         * reads as "nothing is stopping me" precisely when the player is leaning on the key
+         * hardest. Dropping the flag for one frame restarts it every time.
+         */
+        nudgeBlocked() {
+            if (this._blockedFrame) cancelAnimationFrame(this._blockedFrame);
+
+            this.justBlocked = false;
+            this._blockedFrame = requestAnimationFrame(() => {
+                this._blockedFrame = null;
+                this.justBlocked = true;
+            });
+        },
+
+        /** Drop the refusal signal, cancelling a restart that hasn't painted yet. */
+        clearBlocked() {
+            if (this._blockedFrame) {
+                cancelAnimationFrame(this._blockedFrame);
+                this._blockedFrame = null;
+            }
+
+            this.justBlocked = false;
+        },
+
         checkInput() {
             if (this.lockedByTimeout || this.isFinished || !this.raceStarted) return;
 
             // Any keystroke means the player is acting on the refused space, so drop the hint.
-            this.justBlocked = false;
+            this.clearBlocked();
 
             let targetWord = this.words[this.currentWordIndex];
 
@@ -521,7 +554,7 @@ const registerRaceArena = (Alpine) => {
             // Covers an untouched word too (an empty string never equals a target word), so
             // space-spam is refused by this same gate rather than a separate check.
             if (this.typedText !== targetWord) {
-                this.justBlocked = true;
+                this.nudgeBlocked();
 
                 return;
             }

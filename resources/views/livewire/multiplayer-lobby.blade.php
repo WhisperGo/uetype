@@ -646,12 +646,17 @@
                                 {{-- No "passed with an error" state exists any more: word-lock
                                      means a word behind the cursor was necessarily typed
                                      exactly, so every one of them is simply correct. --}}
+                                {{-- The active word turns red for a typo AND for a refused
+                                     space. Without the second case a rejected space left the
+                                     word looking perfectly fine whenever the typed text was a
+                                     correct prefix -- nothing on screen said "you are being
+                                     stopped here". --}}
                                 :class="{
                                     'text-active': wIdx < currentWordIndex,
                                     'text-danger bg-danger/15 ring-1 ring-danger/40 px-1 rounded underline underline-offset-4 decoration-2': wIdx ===
-                                        currentWordIndex && hasError,
+                                        currentWordIndex && (hasError || justBlocked),
                                     'text-foreground font-bold ring-1 ring-border/50 bg-foreground/5 px-1 rounded': wIdx ===
-                                        currentWordIndex && !hasError,
+                                        currentWordIndex && !hasError && !justBlocked,
                                     'text-muted': wIdx > currentWordIndex
                                 }"
                                 x-text="word"></span>
@@ -681,10 +686,13 @@
                             @keydown.space="handleSpace($event)" :disabled="!raceStarted || isFinished || lockedByTimeout"
                             :placeholder="lockedByTimeout ? @js(__('multiplayer.input_locked')) : (isFinished ? @js(__('multiplayer.input_finished')) : (raceStarted ? @js(__('multiplayer.input_type')) :
                                 @js(__('multiplayer.input_wait'))))"
+                            {{-- Danger styling covers the refused space too, so the field the
+                                 player is looking at reacts as well -- a lone hint line under
+                                 the box was too easy to miss mid-race. --}}
                             :class="{
-                                'border-danger/60 focus:ring-danger focus:border-danger bg-danger/10 text-danger': hasError,
+                                'border-danger/60 focus:ring-danger focus:border-danger bg-danger/10 text-danger': hasError || justBlocked,
                                 'focus:ring-1 focus:ring-gold focus:border-gold border-border/40 text-foreground': !
-                                    hasError
+                                    hasError && !justBlocked
                             }"
                             class="w-full px-5 py-4 bg-background border rounded-xl font-mono text-base transition-all duration-200 placeholder-muted/60 disabled:opacity-40 disabled:cursor-not-allowed" />
 
