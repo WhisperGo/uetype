@@ -642,27 +642,33 @@ const registerRaceArena = (Alpine) => {
             const active = track.querySelector(`[data-word-index="${this.currentWordIndex}"]`);
             if (!active) return;
 
-            // The active word's distance from the top of the track = the absolute translateY
-            // needed to bring it to the top visible line.
+            // Mirror the SOLO engine's scroll rule (typing-game.js) so both feel identical.
             //
-            // offsetTop is PURE LAYOUT: a CSS `transform` never changes it, and it is not a
-            // live-animated value, so it can be read at any moment (even mid-transition) and
-            // always returns the word's settled position. The track is `position: relative`
-            // (see the Blade), which makes it the offsetParent, so offsetTop is measured from the
-            // track top -- not from some card far above, which was the original "paragraph slides
-            // off screen" bug.
+            // The rule keeps the active line on the MIDDLE of the three visible lines and only
+            // scrolls when the active line reaches the THIRD line -- not the moment it leaves
+            // line one. That is what fixes the "drops early / rises again on the first letter of
+            // the next line" jitter: the window is quantised to whole line steps and reacts a
+            // full line later, so line 1 and line 2 both sit still.
             //
-            // Two earlier attempts failed and are worth remembering:
-            //   - Viewport-rect deltas read mid-animation gave in-flight values; accumulating
-            //     them (`+= gap`) drifted a little more each keystroke.
-            //   - Even an absolute rect-delta wobbled because the active word used to gain
-            //     padding + bold + a ring on activation, which changed its WIDTH and re-wrapped
-            //     the whole paragraph. Every word now carries identical box metrics (see Blade),
-            //     so moving the cursor never reflows a line and offsetTop stays monotonic.
-            //
-            // Line one gives offsetTop 0, so nothing moves until the player reaches line two,
-            // preserving the maximum lookahead.
-            this.wordScrollOffset = Math.max(0, active.offsetTop);
+            // offsetTop is used because it is PURE LAYOUT: a CSS `transform` never changes it and
+            // it is not an animated value, so it reads the same at any moment (even mid-slide).
+            // The track is `position: relative` (see Blade) so offsetTop is measured from the
+            // track top. Every word carries identical box metrics (see Blade) so activation never
+            // re-wraps a line and offsetTop stays monotonic.
+
+            // First word anchors the top of line one; its height is one line stride. The track
+            // has NO row gap (see Blade), so stride == line height exactly, same as solo.
+            const firstWord = track.querySelector('[data-word-index="0"]');
+            const containerTop = firstWord ? firstWord.offsetTop : 0;
+            const lineHeight = (firstWord || active).offsetHeight;
+            if (!lineHeight) return;
+
+            // Active line's top, measured from line one and quantised to whole line steps.
+            const currentTop = active.offsetTop - containerTop;
+
+            // Scroll only at line three (currentTop >= 2*lh); then land the active line on the
+            // MIDDLE visible line (currentTop - lh), leaving one line of context above it.
+            this.wordScrollOffset = currentTop >= lineHeight * 2 ? currentTop - lineHeight : 0;
         },
 
         restoreProgress() {

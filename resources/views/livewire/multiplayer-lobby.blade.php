@@ -681,8 +681,13 @@
                            track top -- pure layout, immune to the translateY transform and to
                            mid-animation timing. Without it offsetParent walked up to a card far
                            above and the paragraph slid off screen. --}}
+                      {{-- No `gap-y`: rows stack with NO vertical gap so three lines occupy
+                           exactly 4.875em (3 x leading-relaxed), matching the clip window and the
+                           solo engine's gapless stride. A row gap would push the third line past
+                           the window AND make the line stride disagree with the line-height the
+                           scroll math assumes. Word spacing is horizontal only (`gap-x-2`). --}}
                       <div x-ref="wordsTrack"
-                        class="relative flex flex-wrap gap-x-2 gap-y-1 transition-transform duration-150 ease-out"
+                        class="relative flex flex-wrap gap-x-2 transition-transform duration-150 ease-out"
                         :style="`transform: translateY(-${wordScrollOffset}px)`">
                         <template x-for="(word, wIdx) in words" :key="wIdx">
                             {{-- Every word carries the SAME box metrics at all times: `px-1`

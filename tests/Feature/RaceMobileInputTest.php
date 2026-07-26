@@ -314,28 +314,40 @@ it('membatasi paragraf balapan jadi jendela tiga baris yang menggeser sendiri', 
     // TIDAK menambah font-bold -- glyph yang melebar ikut me-rewrap baris seperti padding.
     preg_match('/:data-word-index="wIdx".*?x-text="word"/s', $markup, $wordSpan);
     expect($wordSpan[0] ?? '')->not->toContain('font-bold');
+
+    // Track TIDAK boleh punya row-gap (`gap-y-*`): tiga baris harus muat persis 4.875em (3 x
+    // leading-relaxed) sesuai jendela klip & stride gapless mesin solo. Gap baris akan mendorong
+    // baris ketiga keluar jendela DAN membuat stride tak sama dengan line-height yang diasumsikan
+    // logika scroll. Spasi antar kata horizontal saja (`gap-x-2`).
+    preg_match('/x-ref="wordsTrack"\s+class="([^"]*)"/', $markup, $trackClass);
+    expect($trackClass[1] ?? '')->toContain('gap-x-2')
+        ->not->toMatch('/\bgap-y-/');
 });
 
 /**
- * Jendelanya digeser ke offsetTop kata aktif -- posisi LAYOUT murni, diukur dari track yang
- * `position: relative` (offsetParent-nya). offsetTop kebal terhadap transform translateY dan
- * bukan nilai teranimasi, jadi bisa dibaca kapan pun dan selalu mengembalikan posisi final.
+ * Aturan scroll HARUS meniru mesin solo (typing-game.js): kata aktif ditahan di baris TENGAH
+ * dari tiga baris tampak, dan jendela baru bergeser saat kata aktif mencapai baris KETIGA --
+ * bukan saat baru meninggalkan baris satu. Inilah yang menghilangkan jitter "turun kepagian /
+ * naik lagi di huruf pertama baris berikutnya": window dikuantisasi ke kelipatan line-height dan
+ * baru bereaksi satu baris lebih lambat, jadi baris 1 dan 2 sama-sama diam.
  *
- * Ini menutup dua kegagalan sebelumnya: (1) getBoundingClientRect() dibaca selagi transisi
- * 150ms jalan -> nilai parsial yang terakumulasi -> drift tiap keystroke; (2) kata aktif dulu
- * menambah padding/bold/ring saat aktif -> lebarnya berubah -> paragraf ter-rewrap -> scroll
- * meloncat. Metrik kotak kini konstan (diuji di test markup di atas).
+ * Diukur lewat offsetTop -- posisi LAYOUT murni (kebal transform & timing animasi), dari track
+ * `position: relative`. Metrik kotak tiap kata konstan (diuji di test markup) supaya baris tak
+ * pernah ter-rewrap saat cursor pindah.
  *
  * Dan ia wajib dipanggil di dua tempat: setiap kali kata maju, serta saat init -- karena
  * reload di tengah balapan mendarat di kata yang bisa jauh di bawah.
  */
-it('menggeser jendela paragraf ke offsetTop kata aktif (posisi layout murni)', function () {
+it('meniru aturan scroll solo: geser di baris ketiga, tahan kata aktif di baris tengah', function () {
     $sync = raceMethodSource('syncWordScroll()');
 
     expect($sync)->toContain('data-word-index')
         // offsetTop kata aktif, bukan getBoundingClientRect() yang rentan waktu-baca animasi.
         ->and($sync)->toContain('active.offsetTop')
-        ->and($sync)->not->toContain('getBoundingClientRect');
+        ->and($sync)->not->toContain('getBoundingClientRect')
+        // Rumus solo: geser hanya saat baris ketiga (currentTop >= 2*lh), turunkan satu baris.
+        ->and($sync)->toContain('lineHeight * 2')
+        ->and($sync)->toContain('currentTop - lineHeight');
 
     $arena = tanpaKomentarJs(file_get_contents(resource_path('js/race-arena.js')));
 
