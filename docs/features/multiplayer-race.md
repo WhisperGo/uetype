@@ -517,6 +517,58 @@ mengosongkan field, dan fitur Gboard "dobel spasi jadi titik" (rancangan di atas
 dengan sopan, tapi tak bisa mematikannya). Checklistnya di
 [`../mobile-test-checklist.md`](../mobile-test-checklist.md).
 
+### 3.17 Arena di layar sempit (temuan uji perangkat, 2026-07-26)
+
+Dua masalah yang **hanya muncul di HP** dan tak satu pun tertangkap test — keduanya soal
+layout, bukan logika, jadi seluruh angka di baliknya sebenarnya benar.
+
+#### Lintasan menyusut ke lebar nol
+
+Baris lane menaruh tiga kolom lebar-tetap dalam satu baris: badge peringkat, nama (`w-40`),
+dan WPM (`w-16`). Bersama gap dan padding itu butuh **~324px**, sementara layar 360px hanya
+menyisakan **~250px** untuk lane. Akibatnya lintasan yang `flex-1` menyusut ke **lebar nol**
+dan barisnya tetap meluber — angka WPM terpotong di tepi kanan.
+
+Yang dilihat pemain: maskot duduk persis di atas bendera finis, tanpa lintasan di antaranya.
+Terbaca sebagai **"balapannya tidak jalan"**, padahal ia hanya tak muat.
+
+Perbaikannya: di bawah `sm` lintasan **turun ke barisnya sendiri** selebar penuh
+(`order-last basis-full`), dan kolom nama melepas lebar tetapnya (`flex-1 min-w-0 sm:w-40`) —
+begitu lintasan pindah baris, alignment antar-lane tak lagi bergantung padanya. Dari `sm` ke
+atas markup-nya berperilaku persis seperti sebelumnya.
+
+#### Paragraf dan field tak bisa dilihat bersamaan
+
+Paragraf dirender setinggi seluruh teks — di HP sekitar **14 baris** — sehingga field ketik
+berada jauh di bawah lipatan layar. Tiap ketikan membuat browser menggulir field yang difokus
+kembali ke tampilan, jadi pemain hanya bisa melihat **kata-katanya ATAU field-nya, tak pernah
+keduanya**: baca ke depan, gulir turun, ketik, tertarik turun lagi, gulir naik lagi. Praktis
+tak bisa dimainkan walau setiap keystroke sebenarnya terdaftar dengan benar.
+
+Sekarang paragrafnya **dipotong tiga baris** dan **menggeser dirinya sendiri** agar kata yang
+sedang diketik selalu berada di baris teratas yang terlihat, dengan dua baris lookahead di
+bawahnya. Field tak pernah berpindah relatif terhadap teks, jadi tak ada lagi yang perlu
+digulir.
+
+Tiga keputusan di dalamnya:
+
+| Hal | Kenapa |
+|---|---|
+| `overflow-hidden`, **bukan** `auto` | Ini tak boleh berubah jadi area gulir kedua yang harus digeser tangan — itu memindahkan masalahnya, bukan menyelesaikannya |
+| Digeser dari **`offsetTop` kata aktif**, bukan hitungan baris di JS | Kata membungkus berbeda di tiap lebar layar; hitungan sendiri akan berbeda dari yang benar-benar dilay-out browser |
+| Tingginya dalam **`em`** (`4.875em` = 3 × `leading-relaxed`) | Mengikuti line-height, bukan tebakan piksel yang patah begitu skala tipografi berubah. Angka yang sama dipakai mesin ketik solo |
+
+`syncWordScroll()` dipanggil dari **dua** tempat: `advanceWord()` (kata maju) dan `init()`
+(reload di tengah balapan mendarat di kata yang bisa jauh di bawah). Keduanya lewat
+`$nextTick` — kata aktif mendapat padding saat menjadi aktif, sehingga barisnya bisa reflow
+dan `offsetTop` baru bisa dipercaya setelah Alpine menerapkan kelas barunya.
+
+> **Yang sengaja belum disentuh:** `interactive-widget=resizes-content` pada viewport meta,
+> yang akan membuat Android menyusutkan layout viewport saat keyboard naik. Itu memengaruhi
+> **semua** halaman sekaligus dan belum terverifikasi di perangkat; jendela tiga baris di atas
+> seharusnya sudah cukup. Simpan sebagai langkah berikutnya kalau uji perangkat menunjukkan
+> field-nya masih tertutup keyboard.
+
 ## 4. Batasan Saat Ini
 
 - WPM/place tersimpan di `room_members` tidak melalui jalur PB/leaderboard global — race adalah

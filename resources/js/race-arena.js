@@ -157,6 +157,9 @@ const registerRaceArena = (Alpine) => {
         resumeProgress: config.resumeProgress ?? 0,
         words: [],
         currentWordIndex: 0,
+        // Pixels the paragraph is slid up by, so the word being typed stays inside the
+        // three-line window. Written only by syncWordScroll().
+        wordScrollOffset: 0,
         typedText: '',
         startTime: null,
         isFinished: false,
@@ -205,6 +208,11 @@ const registerRaceArena = (Alpine) => {
             if (!this.isSpectator && this.resumeProgress > 0) {
                 this.restoreProgress();
             }
+
+            // A mid-race reload lands on a word that may be far down the paragraph, so the
+            // window has to be positioned before the player sees it. Runs for a fresh racer
+            // too, where it settles on 0 -- one call rather than a branch.
+            this.$nextTick(() => this.syncWordScroll());
 
             // Clear positions ONLY when entering a different race. If this component is
             // re-init'd for the same race (Livewire morph, sudden death), each mascot's
@@ -612,6 +620,31 @@ const registerRaceArena = (Alpine) => {
          * carries on. We never restore a PARTIAL word -- word-lock only credits whole words,
          * so a partial prefix was never part of the saved progress anyway.
          */
+        /**
+         * Slide the paragraph so the word being typed sits on the top visible line.
+         *
+         * The paragraph is clipped to three lines; without this the player would have to
+         * scroll it by hand, and on a phone every keystroke re-scrolls the focused input back
+         * into view, so they could never see the words and the field at the same time.
+         *
+         * Reads offsetTop rather than counting lines: the words wrap differently at every
+         * width, and a line count computed in JS would disagree with what the browser
+         * actually laid out. Landing the active line at the top (offset 0 for the first line,
+         * so nothing moves until the player reaches line two) buys the most lookahead.
+         *
+         * Silent when the ref is missing -- spectators and the finished/gave-up screens render
+         * no paragraph at all.
+         */
+        syncWordScroll() {
+            const track = this.$refs.wordsTrack;
+            if (!track) return;
+
+            const active = track.querySelector(`[data-word-index="${this.currentWordIndex}"]`);
+            if (!active) return;
+
+            this.wordScrollOffset = active.offsetTop;
+        },
+
         restoreProgress() {
             const totalChars = this.textToType.length;
             const targetCorrect = Math.round((this.resumeProgress / 100) * totalChars);
@@ -701,6 +734,11 @@ const registerRaceArena = (Alpine) => {
             this.typedText = '';
             this.hasError = false;
             this.prevTypedLength = 0;
+
+            // After the DOM has re-rendered: the active word gains padding when it becomes
+            // active, which can reflow the line it sits on, so offsetTop is only trustworthy
+            // once Alpine has applied the new classes.
+            this.$nextTick(() => this.syncWordScroll());
 
             // The last word can also finish via space (not only via an exact match in checkInput()).
             if (this.currentWordIndex >= this.words.length) {

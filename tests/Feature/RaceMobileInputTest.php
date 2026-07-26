@@ -238,7 +238,92 @@ it('menjaga x-model bebas modifier yang membuat nilai ketikan basi', function ()
         ->and($tag)->not->toMatch('/x-model\.(lazy|debounce|throttle)/');
 });
 
-// ===== 3. Konfirmasi exact-match =====
+// ===== 3. Layout arena di layar sempit =====
+
+/**
+ * Lintasan balapan MENGHILANG di HP.
+ *
+ * Baris lane menaruh tiga kolom lebar-tetap dalam satu baris: badge peringkat, nama (`w-40`),
+ * dan WPM (`w-16`) -- bersama gap dan padding butuh ~324px. Layar 360px hanya menyisakan ~250px
+ * untuk lane, jadi lintasan yang `flex-1` menyusut ke lebar NOL dan barisnya tetap meluber
+ * (angka WPM terpotong di tepi kanan). Maskot lalu duduk persis di atas bendera finis tanpa
+ * lintasan di antaranya -- terbaca sebagai "balapannya tidak jalan", padahal cuma tak muat.
+ *
+ * Perbaikannya: di bawah `sm`, lintasan turun ke barisnya sendiri selebar penuh.
+ */
+it('memberi lintasan balapan satu baris penuh di layar sempit', function () {
+    $markup = tanpaKomentarBlade(
+        file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php'))
+    );
+
+    expect($markup)
+        // Barisnya boleh membungkus di bawah sm, dan kembali satu baris dari sm ke atas.
+        ->toContain('flex flex-wrap items-center rounded-xl')
+        ->toContain('sm:flex-nowrap')
+        // Lintasan turun ke bawah dan mengambil lebar penuh -- bukan sisa ruang (yang nol).
+        ->toContain('order-last basis-full sm:order-none sm:basis-auto sm:flex-1');
+});
+
+/**
+ * Nama pemain tak boleh lagi mengunci lebar tetap di HP: begitu lintasan pindah baris,
+ * alignment antar-lane tak lagi bergantung padanya, dan lebar tetap hanya menyisakan ruang
+ * lebih sedikit untuk nama yang panjang.
+ */
+it('melepas lebar tetap kolom nama di layar sempit', function () {
+    $markup = tanpaKomentarBlade(
+        file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php'))
+    );
+
+    expect($markup)->toContain('flex-1 min-w-0 sm:flex-none flex items-center gap-2 font-mono')
+        // Lebar tetapnya kini hanya berlaku dari sm ke atas.
+        ->toContain('sm:w-40')
+        ->toContain('sm:w-32');
+});
+
+/**
+ * Paragraf balapan dulu dirender setinggi seluruh teks -- di HP sekitar 14 baris, sehingga
+ * field ketik berada jauh di bawah layar. Tiap ketikan membuat browser menggulir field yang
+ * difokus kembali ke tampilan, jadi pemain bisa melihat KATA-nya atau FIELD-nya, tak pernah
+ * keduanya: baca ke depan, gulir turun, ketik, tertarik turun lagi, gulir naik lagi.
+ *
+ * Sekarang paragrafnya dipotong tiga baris dan menggeser dirinya sendiri mengikuti kata yang
+ * sedang diketik -- pola yang sama dengan mesin ketik solo.
+ */
+it('membatasi paragraf balapan jadi jendela tiga baris yang menggeser sendiri', function () {
+    $markup = tanpaKomentarBlade(
+        file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php'))
+    );
+
+    expect($markup)
+        // Dipotong, dan TIDAK boleh jadi area gulir kedua yang harus digeser tangan.
+        ->toContain('class="overflow-hidden" style="max-height: 4.875em;"')
+        ->toContain('x-ref="wordsTrack"')
+        ->toContain('translateY(-${wordScrollOffset}px)')
+        // Penanda yang dipakai syncWordScroll() untuk menemukan kata aktif.
+        ->toContain(':data-word-index="wIdx"');
+});
+
+/**
+ * Jendelanya harus digeser dari posisi NYATA kata aktif (offsetTop), bukan dari jumlah baris
+ * yang dihitung sendiri: kata membungkus berbeda di tiap lebar layar, jadi hitungan JS akan
+ * berbeda dari yang benar-benar dilay-out browser.
+ *
+ * Dan ia wajib dipanggil di dua tempat: setiap kali kata maju, serta saat init -- karena
+ * reload di tengah balapan mendarat di kata yang bisa jauh di bawah.
+ */
+it('menggeser jendela paragraf dari posisi nyata kata aktif', function () {
+    $sync = raceMethodSource('syncWordScroll()');
+
+    expect($sync)->toContain('data-word-index')
+        ->and($sync)->toContain('active.offsetTop');
+
+    $arena = tanpaKomentarJs(file_get_contents(resource_path('js/race-arena.js')));
+
+    // Dipanggil dari advanceWord() (kata maju) dan init() (reload di tengah balapan).
+    expect(substr_count($arena, 'this.syncWordScroll()'))->toBe(2);
+});
+
+// ===== 4. Konfirmasi exact-match =====
 
 /**
  * Dua aksi paling tak bisa dibatalkan di aplikasi ini dijaga dengan "ketik ulang namanya",

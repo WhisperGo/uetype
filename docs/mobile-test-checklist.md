@@ -40,6 +40,10 @@ Butuh dua perangkat: buat room dari desktop, join dari HP.
 | A11 | Biarkan autocorrect mengganti kata (ketik kata mirip) | Kata pengganti ditolak, field kembali ke prefiks benar | `autocorrect="off"` tak sampai |
 | A12 | Selesaikan balapan sampai garis akhir | Layar hasil muncul, WPM & akurasi **masuk akal** | Akurasi tepat 100% padahal ada typo = credit keystroke swipe tak jalan |
 | A13 | Putar layar ke landscape di tengah balapan | Teks & lintasan tetap terbaca, ketikan tak hilang | — |
+| A14 | Lihat panel **LIVE STANDINGS** | Tiap lane: nama + WPM di baris atas, **lintasan penuh** di baris bawah. Maskot & bendera finis terpisah jelas | Kalau maskot masih menempel di bendera, lane belum membungkus |
+| A15 | Ketik terus sampai melewati baris pertama paragraf | Paragraf **menggeser sendiri**; kata aktif naik ke baris teratas, dua baris berikutnya terlihat | Kalau tak bergeser, `syncWordScroll()` tak terpanggil |
+| A16 | Sepanjang balapan, tanpa menggulir sama sekali | Paragraf **dan** field ketik terlihat bersamaan | Kalau field tertutup keyboard, kita perlu `interactive-widget=resizes-content` |
+| A17 | Reload halaman di tengah balapan | Paragraf langsung terposisi di kata tempat kamu berhenti, bukan di kata pertama | `syncWordScroll()` di `init()` tak jalan |
 
 ### ⚠ Dua langkah yang paling penting dilaporkan balik
 

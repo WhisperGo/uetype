@@ -558,8 +558,18 @@
                                     return `rotate(${(w / 120) * -8}deg) scale(${1 + (w / 120) * 0.12})`;
                                 },
                             }"
-                            {{-- Your own lane is fully highlighted (blue card), as in the design. --}}
-                            class="flex items-center rounded-xl transition-colors duration-300 {{ $dense ? 'gap-3 py-1.5' : 'gap-4 py-2' }} {{ $isSelf ? 'bg-brand/25 border border-gold/70 px-3' : 'border border-transparent px-3' }}">
+                            {{-- Your own lane is fully highlighted (blue card), as in the design.
+
+                                 WRAPS on narrow screens. The three fixed columns (badge + name +
+                                 wpm) plus gaps need ~324px, and a 360px phone leaves the lane
+                                 barely 250px -- so `flex-1` on the track resolved to ZERO width
+                                 and the row still overflowed, clipping the wpm off-screen. The
+                                 mascot then sat on top of the finish flag with no visible track
+                                 between them, which reads as "the race isn't rendering".
+                                 Below `sm` the track therefore takes a full-width line of its
+                                 own (order-last), where it has the whole row to move across.
+                                 From `sm` up nothing changes: one row, exactly as before. --}}
+                            class="flex flex-wrap items-center rounded-xl transition-colors duration-300 sm:flex-nowrap {{ $dense ? 'gap-x-3 gap-y-1 sm:gap-3 py-1.5' : 'gap-x-3 gap-y-1 sm:gap-4 py-2' }} {{ $isSelf ? 'bg-brand/25 border border-gold/70 px-3' : 'border border-transparent px-3' }}">
 
                             {{-- Live rank. Finished players are marked green
                                  (this design has no separate "FINISHED" badge). --}}
@@ -569,8 +579,10 @@
                                     : 'border-gold/70 bg-gold/10 text-gold'"
                                 x-text="liveRank"></div>
 
-                            {{-- Name: fixed width so all tracks start at the same x. --}}
-                            <div class="shrink-0 flex items-center gap-2 font-mono {{ $dense ? 'w-32' : 'w-40' }}">
+                            {{-- Name: fixed width from `sm` up so all tracks start at the same x.
+                                 On a phone the track is on its own line, so alignment no longer
+                                 depends on this and the name may take the space it needs. --}}
+                            <div class="flex-1 min-w-0 sm:flex-none flex items-center gap-2 font-mono {{ $dense ? 'sm:w-32' : 'sm:w-40' }}">
                                 <span class="truncate {{ $dense ? 'text-xs' : 'text-sm' }} {{ $isSelf ? 'text-foreground font-bold' : 'text-foreground/90' }}">{{ $player->user->username }}</span>
                                 @if ($isSelf)
                                     <span class="shrink-0 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-gold text-background">{{ __('multiplayer.you') }}</span>
@@ -585,7 +597,10 @@
                                 // mascot (centered on the progress point) isn't clipped at 0% or 100%.
                                 $half = $dense ? 12 : 14;
                             @endphp
-                            <div class="relative flex-1 min-w-0 flex items-center {{ $dense ? 'h-8' : 'h-10' }}">
+                            {{-- order-last + basis-full: on a phone this drops onto its own line
+                                 BELOW the name/wpm row, so it gets the full width instead of
+                                 whatever those columns left over (which was nothing). --}}
+                            <div class="relative order-last basis-full sm:order-none sm:basis-auto sm:flex-1 min-w-0 flex items-center {{ $dense ? 'h-8' : 'h-10' }}">
 
                                 {{-- Rail: inset by $half px on left & right so the mascot (centered
                                      on the progress point) isn't clipped at 0% or 100%. --}}
@@ -636,11 +651,36 @@
                 {{-- No shake on a typo/refused space: the red highlight on the active word and
                      the input (driven by hasError || justBlocked below) is the sole cue. --}}
                 <div class="border bg-surface/40 border-border/40 rounded-3xl shadow-xl {{ $dense ? 'p-5 space-y-4' : 'p-8 space-y-6' }}">
+                    {{-- ===== PARAGRAPH: A BOUNDED, SELF-SCROLLING WINDOW =====
+
+                         The whole text used to render at full height. On a phone that is ~14
+                         lines, so the input sat far below the fold -- and every keystroke made
+                         the browser scroll the focused input back into view. The player could
+                         see the words OR the field, never both: read ahead, scroll down, type,
+                         get yanked back down, scroll up again. Unplayable in practice even
+                         though every keystroke was registering correctly.
+
+                         Now the paragraph is clipped to three lines and slides itself so the
+                         word being typed is always on the top visible line, with the next two
+                         lines of lookahead under it. The field never moves relative to the
+                         text, so there is nothing left to scroll: the same solution the solo
+                         engine already uses (typing-engine.md), which is why the height here is
+                         also expressed in `em` and follows the line-height rather than a pixel
+                         guess.
+
+                         `overflow-hidden` (not `auto`): this must never become a second thing
+                         the player has to scroll by hand. --}}
                     <!-- PARAGRAPH DRAFT BLOCK WITH TYPERACER COLOR INDICATORS -->
-                    <div
-                        class="font-mono text-xl leading-relaxed tracking-wide select-none p-5 bg-background/30 rounded-xl border border-border/20 flex flex-wrap gap-x-2 gap-y-1">
+                    <div class="font-mono text-xl leading-relaxed tracking-wide select-none p-5 bg-background/30 rounded-xl border border-border/20">
+                      {{-- The clipping window. Three lines at leading-relaxed (1.625) = 4.875em,
+                           the same figure the solo engine uses, so it follows the line-height
+                           instead of a pixel guess that breaks when the type scale changes. --}}
+                      <div class="overflow-hidden" style="max-height: 4.875em;">
+                      <div x-ref="wordsTrack"
+                        class="flex flex-wrap gap-x-2 gap-y-1 transition-transform duration-150 ease-out"
+                        :style="`transform: translateY(-${wordScrollOffset}px)`">
                         <template x-for="(word, wIdx) in words" :key="wIdx">
-                            <span
+                            <span :data-word-index="wIdx"
                                 {{-- No "passed with an error" state exists any more: word-lock
                                      means a word behind the cursor was necessarily typed
                                      exactly, so every one of them is simply correct. --}}
@@ -659,7 +699,9 @@
                                 }"
                                 x-text="word"></span>
                         </template>
-                    </div>
+                      </div>{{-- /words track --}}
+                      </div>{{-- /clipping window --}}
+                    </div>{{-- /paragraph card --}}
 
                     {{-- SUDDEN-DEATH COUNTDOWN, right above the input where the player is
                          looking. Bound to the Alpine state so it appears the instant the
