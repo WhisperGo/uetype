@@ -63,12 +63,11 @@ it('lets an accepted friend open a DM and send a message', function () {
         ->set('body', 'Halo!')
         ->call('sendMessage');
 
-    $this->assertDatabaseHas('messages', [
+    assertMessageStored([
         'sender_id' => $me->id,
         'recipient_id' => $friend->id,
         'clan_id' => null,
-        'body' => 'Halo!',
-    ]);
+    ], 'Halo!');
 });
 
 it('broadcasts DirectMessageSent to the recipient when a DM is sent', function () {
@@ -182,12 +181,11 @@ it('lets an active clan member open clan chat and send a message', function () {
         ->set('body', 'Halo clan!')
         ->call('sendMessage');
 
-    $this->assertDatabaseHas('messages', [
+    assertMessageStored([
         'sender_id' => $leader->id,
         'clan_id' => $clan->id,
         'recipient_id' => null,
-        'body' => 'Halo clan!',
-    ]);
+    ], 'Halo clan!');
 });
 
 it('broadcasts ClanMessageSent when a clan message is sent', function () {
@@ -252,7 +250,7 @@ it('clears DM history for the clearing user only, leaving the other participant 
     expect($friendMessages)->toHaveCount(1);
 
     // Baris pesan aslinya TETAP ada di database, tak terhapus sungguhan.
-    $this->assertDatabaseHas('messages', ['sender_id' => $me->id, 'recipient_id' => $friend->id, 'body' => 'pesan lama']);
+    assertMessageStored(['sender_id' => $me->id, 'recipient_id' => $friend->id], 'pesan lama');
 });
 
 it('clears only messages older than N days when scope is "days"', function () {
@@ -487,12 +485,11 @@ it('sends a DM as a reply, storing reply_to_id', function () {
         ->call('sendMessage')
         ->assertSet('replyingToId', null); // reset setelah kirim
 
-    $this->assertDatabaseHas('messages', [
+    assertMessageStored([
         'sender_id' => $me->id,
         'recipient_id' => $friend->id,
-        'body' => 'jawaban!',
         'reply_to_id' => $original->id,
-    ]);
+    ], 'jawaban!');
 });
 
 it('sends a clan message as a reply', function () {
@@ -506,12 +503,11 @@ it('sends a clan message as a reply', function () {
         ->set('body', 'siap!')
         ->call('sendMessage');
 
-    $this->assertDatabaseHas('messages', [
+    assertMessageStored([
         'sender_id' => $member->id,
         'clan_id' => $clan->id,
-        'body' => 'siap!',
         'reply_to_id' => $original->id,
-    ]);
+    ], 'siap!');
 });
 
 it('ignores a reply target from a different conversation (drops reply_to_id)', function () {
@@ -529,12 +525,11 @@ it('ignores a reply target from a different conversation (drops reply_to_id)', f
         ->call('sendMessage');
 
     // Terkirim, tapi TANPA reply_to_id (target lintas-percakapan ditolak).
-    $this->assertDatabaseHas('messages', [
+    assertMessageStored([
         'sender_id' => $me->id,
         'recipient_id' => $friend->id,
-        'body' => 'halo',
         'reply_to_id' => null,
-    ]);
+    ], 'halo');
 });
 
 it('does not let a stranger start a reply to a message they cannot see', function () {
@@ -559,11 +554,10 @@ it('sends a DM via the /chat/send endpoint and broadcasts', function () {
         ->assertOk()
         ->assertJson(['ok' => true]);
 
-    $this->assertDatabaseHas('messages', [
+    assertMessageStored([
         'sender_id' => $me->id,
         'recipient_id' => $friend->id,
-        'body' => 'via endpoint',
-    ]);
+    ], 'via endpoint');
     Event::assertDispatched(DirectMessageSent::class);
 });
 
@@ -586,7 +580,7 @@ it('sends a clan message via the endpoint for an active member', function () {
         ->postJson(route('chat.send'), ['mode' => 'clan', 'body' => 'halo clan'])
         ->assertOk();
 
-    $this->assertDatabaseHas('messages', ['sender_id' => $leader->id, 'clan_id' => $clan->id, 'body' => 'halo clan']);
+    assertMessageStored(['sender_id' => $leader->id, 'clan_id' => $clan->id], 'halo clan');
     Event::assertDispatched(ClanMessageSent::class);
 });
 
