@@ -1,12 +1,4 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="max-w-5xl px-4 mx-auto sm:px-6 lg:px-8">
-            <h2 class="font-display text-fluid-title tracking-wide text-foreground">
-                {{ __('achievements.header') }}
-            </h2>
-        </div>
-    </x-slot>
-
     @php
         $progressPercent = $total > 0 ? ($earnedCount / $total) * 100 : 0;
     @endphp
@@ -36,7 +28,7 @@
                     </p>
                 </div>
                 <div class="h-2 overflow-hidden rounded-full bg-white/5">
-                    <div class="h-full rounded-full bg-gradient-to-r from-brand to-gold transition-all duration-500"
+                    <div class="h-full rounded-full bg-gold from-brand to-gold transition-all duration-500"
                         style="width: {{ $progressPercent }}%"></div>
                 </div>
             </div>
