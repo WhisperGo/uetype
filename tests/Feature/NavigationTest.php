@@ -106,3 +106,15 @@ it('keeps the desktop nav link padding symmetric and tight', function () {
 
     expect($html)->toContain('py-1.5')->not->toContain('pt-1');
 });
+
+it('keeps the email out of the nav, including the mobile panel', function () {
+    // The mobile hamburger printed the address under the username while the desktop
+    // dropdown showed only username + level. A nav panel opens wherever the user happens
+    // to be standing, so it is the wrong surface for an address; Settings and your own
+    // profile already show it.
+    $user = User::factory()->create(['email' => 'private-address@example.com']);
+
+    $html = $this->actingAs($user)->get(route('typing'))->assertOk()->getContent();
+
+    expect($html)->toContain($user->username)->not->toContain('private-address@example.com');
+});

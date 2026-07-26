@@ -189,12 +189,14 @@
 
         <div class="pt-4 pb-1 border-t border-white/5">
             @auth
+                {{-- Username and level only, matching the desktop dropdown. The email
+                     belongs to Settings and your own profile, not a nav panel that opens
+                     over the shoulder of anyone nearby. --}}
                 <div class="px-4">
                     <div class="flex items-center gap-2">
                         <span class="text-base font-medium text-foreground">{{ Auth::user()->username }}</span>
                         <span class="font-mono text-xs text-muted">lv. {{ Auth::user()->levelData()['level'] }}</span>
                     </div>
-                    <div class="text-sm font-medium text-muted">{{ Auth::user()->email }}</div>
                 </div>
                 <div class="mt-3 space-y-1">
                     @foreach ($navAccount as $item)
