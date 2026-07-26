@@ -686,21 +686,32 @@
                            solo engine's gapless stride. A row gap would push the third line past
                            the window AND make the line stride disagree with the line-height the
                            scroll math assumes. Word spacing is horizontal only (`gap-x-2`). --}}
+                      {{-- `content-start` + an 85ms transition mirror the solo engine's text
+                           track: wrapped lines anchor to the top consistently, and the slide is
+                           quick enough that no partial "fourth line" lingers visibly in the clip
+                           window while the paragraph advances (a slow slide left a half-line
+                           crossing the edge long enough to read as a flicker). --}}
                       <div x-ref="wordsTrack"
-                        class="relative flex flex-wrap gap-x-2 transition-transform duration-150 ease-out"
+                        class="relative flex flex-wrap content-start gap-x-2 transition-transform duration-[85ms] ease-out"
                         :style="`transform: translateY(-${wordScrollOffset}px)`">
                         <template x-for="(word, wIdx) in words" :key="wIdx">
                             {{-- Every word carries the SAME box metrics at all times: `px-1`
-                                 padding and a transparent `ring`/`border` slot are present on
-                                 non-active words too (via the base classes below), and the active
-                                 state only recolours them. If activation added padding/bold/ring
-                                 that a resting word lacks, the active word would change WIDTH,
-                                 shifting where the line wraps -- and because syncWordScroll()
-                                 measures the active word's laid-out position, that reflow made the
-                                 paragraph jump erratically (sudden scroll to top). Keeping metrics
-                                 constant means moving the cursor never re-wraps a line. --}}
+                                 padding on ALL words, and the active highlight uses `outline`
+                                 (drawn OUTSIDE the box, zero layout cost) + a background FILL --
+                                 never a `ring`/`border`. Two reasons:
+
+                                 1. Constant metrics: if activation added padding/bold/border that
+                                    a resting word lacks, the active word would change WIDTH and
+                                    re-wrap the line, making the scroll jump.
+                                 2. No stroke at the clip edge: a 1px ring/border on resting words
+                                    sat exactly on the window's bottom edge and got clipped
+                                    mid-stroke; sub-pixel rounding then made that line flicker
+                                    in/out as the paragraph shifted -- the "next line suddenly
+                                    appears/disappears" bug. Padding is invisible space (nothing to
+                                    clip), a background fill clips cleanly, and an outline is not
+                                    part of layout, so none of them flicker at the edge. --}}
                             <span :data-word-index="wIdx"
-                                class="px-1 rounded ring-1 ring-transparent"
+                                class="px-1 rounded outline-none"
                                 {{-- No "passed with an error" state exists any more: word-lock
                                      means a word behind the cursor was necessarily typed
                                      exactly, so every one of them is simply correct. --}}
@@ -712,9 +723,9 @@
                                      wider glyph run would re-wrap the line just like padding. --}}
                                 :class="{
                                     'text-active': wIdx < currentWordIndex,
-                                    'text-danger bg-danger/15 ring-danger/40 underline underline-offset-4 decoration-2': wIdx ===
+                                    'text-danger bg-danger/15 outline outline-1 outline-danger/40 underline underline-offset-4 decoration-2': wIdx ===
                                         currentWordIndex && (hasError || justBlocked),
-                                    'text-foreground ring-border/50 bg-foreground/5': wIdx ===
+                                    'text-foreground bg-foreground/5 outline outline-1 outline-border/50': wIdx ===
                                         currentWordIndex && !hasError && !justBlocked,
                                     'text-muted': wIdx > currentWordIndex
                                 }"

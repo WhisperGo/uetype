@@ -306,14 +306,20 @@ it('membatasi paragraf balapan jadi jendela tiga baris yang menggeser sendiri', 
     // aktif diukur dari atas track (bukan kartu jauh di atas -> paragraf tergeser keluar layar).
     expect($markup)->toMatch('/x-ref="wordsTrack"\s+class="relative /');
 
-    // Metrik kotak tiap kata WAJIB konstan (padding + ring transparan pada SEMUA kata), supaya
-    // kata aktif tak berubah lebar saat aktif -> tak me-reflow baris -> scroll tak meloncat.
-    expect($markup)->toContain('class="px-1 rounded ring-1 ring-transparent"');
+    // Metrik kotak tiap kata WAJIB konstan (padding pada SEMUA kata), supaya kata aktif tak
+    // berubah lebar saat aktif -> tak me-reflow baris -> scroll tak meloncat. Base-nya
+    // `outline-none`: highlight aktif pakai OUTLINE (di luar box, tanpa biaya layout), bukan
+    // ring/border yang tergores separuh di tepi jendela klip lalu berkedip.
+    expect($markup)->toContain('class="px-1 rounded outline-none"');
 
-    // Isolasi <span> kata (dari :data-word-index sampai x-text) untuk memastikan state aktifnya
-    // TIDAK menambah font-bold -- glyph yang melebar ikut me-rewrap baris seperti padding.
+    // Isolasi <span> kata (dari :data-word-index sampai x-text) untuk cek dua hal pada kata aktif:
+    // (1) TIDAK font-bold (glyph melebar -> rewrap baris seperti padding), dan (2) highlight-nya
+    // pakai `outline`, BUKAN `ring`/`border` yang berkedip di tepi jendela.
     preg_match('/:data-word-index="wIdx".*?x-text="word"/s', $markup, $wordSpan);
-    expect($wordSpan[0] ?? '')->not->toContain('font-bold');
+    expect($wordSpan[0] ?? '')
+        ->not->toContain('font-bold')
+        ->not->toContain('ring-')
+        ->toContain('outline outline-1');
 
     // Track TIDAK boleh punya row-gap (`gap-y-*`): tiga baris harus muat persis 4.875em (3 x
     // leading-relaxed) sesuai jendela klip & stride gapless mesin solo. Gap baris akan mendorong
