@@ -160,22 +160,7 @@
 
                 @auth
                     @if ($levelData)
-                        <div class="bg-surface/70 border border-white/5 rounded-2xl p-4">
-                            <div class="flex items-start justify-between mb-3">
-                                <div class="flex flex-col gap-2">
-                                    <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
-                                    <span class="text-xl sm:text-2xl font-bold font-mono text-foreground leading-none">{{ __('result.xp_gained', ['amount' => $xpEarned]) }}</span>
-                                </div>
-                                <div class="text-right font-mono text-xs text-muted leading-relaxed">
-                                    <div>{{ __('result.xp_progress', ['progress' => number_format($levelData['progress']), 'needed' => number_format($levelData['needed'])]) }}</div>
-                                    <div>{{ __('result.xp_level_up', ['from' => $levelData['level'], 'to' => $levelData['next_level']]) }}</div>
-                                </div>
-                            </div>
-                            <div class="h-2 overflow-hidden rounded-full bg-white/5">
-                                <div class="h-full rounded-full bg-foreground transition-all"
-                                    style="width: {{ $levelData['needed'] > 0 ? min(100, ($levelData['progress'] / $levelData['needed']) * 100) : 0 }}%"></div>
-                            </div>
-                        </div>
+                        <x-xp-bar :earned="$xpEarned" :level="$levelData" />
                     @endif
                 @endauth
 
@@ -277,22 +262,7 @@
             {{-- XP + level bar (full-width within the centered column) --}}
             @auth
                 @if ($levelData)
-                    <div class="bg-surface/70 border border-white/5 rounded-2xl p-4">
-                        <div class="flex items-start justify-between mb-3">
-                            <div class="flex flex-col gap-2">
-                                <span class="font-mono text-xs uppercase tracking-[0.2em] text-muted">{{ __('result.xp_earned') }}</span>
-                                <span class="text-xl sm:text-2xl font-bold font-mono text-foreground leading-none">{{ __('result.xp_gained', ['amount' => $xpEarned]) }}</span>
-                            </div>
-                            <div class="text-right font-mono text-xs text-muted leading-relaxed">
-                                <div>{{ __('result.xp_progress', ['progress' => number_format($levelData['progress']), 'needed' => number_format($levelData['needed'])]) }}</div>
-                                <div>{{ __('result.xp_level_up', ['from' => $levelData['level'], 'to' => $levelData['next_level']]) }}</div>
-                            </div>
-                        </div>
-                        <div class="h-2 overflow-hidden rounded-full bg-white/5">
-                            <div class="h-full rounded-full bg-foreground transition-all"
-                                style="width: {{ $levelData['needed'] > 0 ? min(100, ($levelData['progress'] / $levelData['needed']) * 100) : 0 }}%"></div>
-                        </div>
-                    </div>
+                    <x-xp-bar :earned="$xpEarned" :level="$levelData" />
                 @endif
             @endauth
         </div>{{-- /scoreboard center --}}

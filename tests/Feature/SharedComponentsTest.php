@@ -73,8 +73,46 @@ it('tidak menyisakan kelas tombol emas yang ditulis tangan', function () {
     );
 });
 
+/**
+ * Panel "XP earned + progres level" ada TIGA kali: dua kali identik di layar hasil solo
+ * (satu per cabang layout) dan sekali lagi di panel hasil multiplayer -- dan salinan
+ * multiplayer sudah menyimpang di belasan detail: bar 1.5px alih-alih 2px, track ber-border,
+ * angka `font-black` emas alih-alih `font-bold` foreground, label 10px, dan "Level 1 - 2"
+ * ditulis dengan tanda hubung sementara solo memakai panah dari string lang-nya sendiri.
+ *
+ * Informasi yang sama tampil berbeda tergantung mode yang baru dimainkan. Persis kelas
+ * masalah yang file test ini dibuat untuk mencegah.
+ */
+it('tidak menyisakan markup XP bar yang ditulis tangan', function () {
+    $pelanggar = [];
+
+    foreach (bladeViews() as $path) {
+        if (basename($path) === 'xp-bar.blade.php') {
+            continue;
+        }
+
+        $isi = file_get_contents($path);
+
+        // Ciri khas panelnya: label "xp earned" -- baik versi solo maupun multiplayer.
+        if (str_contains($isi, "__('result.xp_earned')") || str_contains($isi, "__('multiplayer.xp_earned')")) {
+            $pelanggar[] = basename($path);
+        }
+    }
+
+    expect($pelanggar)->toBeEmpty(
+        'Pakai <x-xp-bar>, jangan salin markupnya: '.implode(', ', $pelanggar)
+    );
+});
+
+it('memakai satu desain XP bar di layar hasil solo maupun multiplayer', function () {
+    foreach (['typing-result', 'multiplayer-lobby'] as $view) {
+        expect(file_get_contents(resource_path("views/livewire/{$view}.blade.php")))
+            ->toContain('<x-xp-bar');
+    }
+});
+
 it('menyediakan komponen bersama yang diharapkan', function () {
-    foreach (['empty-state', 'btn-gold', 'btn-ghost', 'friend-avatar', 'toast-stack', 'room-invite-overlay'] as $name) {
+    foreach (['empty-state', 'btn-gold', 'btn-ghost', 'friend-avatar', 'toast-stack', 'room-invite-overlay', 'xp-bar'] as $name) {
         expect(file_exists(resource_path("views/components/{$name}.blade.php")))
             ->toBeTrue("Komponen {$name} hilang");
     }
