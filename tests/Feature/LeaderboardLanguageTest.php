@@ -12,9 +12,37 @@ use Livewire\Volt\Volt;
  * dicatat, dan papan + rank memfilternya (satu sumber kebenaran lewat $scoped()).
  */
 
+/**
+ * Give a user enough accumulated typing time to clear the leaderboard eligibility gate,
+ * via one neutral warm-up row added on their first result. The warm-up is language 'en';
+ * tests that assert per-language boards use a distinct language for the row under test, so
+ * it never skews the id board. Keeps these ranking assertions about players who earned a spot.
+ */
+function langMakeEligible(User $user): void
+{
+    if (TypingResult::where('user_id', $user->id)->exists()) {
+        return;
+    }
+
+    TypingResult::create([
+        'user_id' => $user->id,
+        'mode' => 'time',
+        'mode_config' => '60',
+        'language' => 'en',
+        'net_wpm' => 30,
+        'raw_wpm' => 35,
+        'accuracy' => 95,
+        'correct_chars' => 150,
+        'incorrect_chars' => 8,
+        'duration_seconds' => TypingResult::LEADERBOARD_MIN_TYPING_SECONDS,
+    ]);
+}
+
 /** Helper: satu baris hasil ketik dengan bahasa eksplisit. */
 function langResult(User $user, string $lang, string $mode = 'time', string $config = '30', float $wpm = 90): TypingResult
 {
+    langMakeEligible($user);
+
     return TypingResult::create([
         'user_id' => $user->id,
         'mode' => $mode,

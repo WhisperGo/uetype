@@ -20,6 +20,7 @@ return [
 
     'your_rank' => 'Posisi Peringkat Kamu:',
     'unranked' => 'Belum Berperingkat',
+    'eligibility_pending' => 'Ketik :minutes menit lagi untuk masuk papan',
 
     'player' => 'Nama Pemain',
     'wpm' => 'Kecepatan (WPM)',
