@@ -2,9 +2,9 @@
 
 namespace App\Livewire;
 
-use App\Enums\ClanRole;
 use App\Models\Clan;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /** A single clan's detail page: profile, active members, and stats (read-only). */
@@ -17,8 +17,14 @@ class ClanShow extends Component
         $this->clan = $clan;
     }
 
-    /** Active members of this clan, in authority order. */
-    public function getMembersProperty()
+    /**
+     * Active members of this clan, in authority order.
+     *
+     * #[Computed], not a plain getter: the view reads $this->members three times (count,
+     * heading, loop) and Livewire does not cache old-style getters.
+     */
+    #[Computed]
+    public function members()
     {
         return $this->clan->orderedActiveMembers();
     }
@@ -26,34 +32,26 @@ class ClanShow extends Component
     /**
      * Whether the viewer is an active member of THIS clan.
      *
-     * Gates the clan-chat link: this page is public, so it is regularly viewed by people
-     * with no claim on the channel. Offering them a way in would only lead to a chat that
-     * resolves to their own clan (or nothing at all) -- a link that lies about where it
-     * goes. The channel itself is safe either way, since chat derives the clan from the
-     * viewer's own membership rather than from any id in the URL.
+     * Gates the clan-chat link. The page is public, and for an outsider that link would
+     * resolve to their own clan or to nothing -- a link that lies about where it goes.
+     * The channel itself is safe regardless: chat derives the clan from the viewer's
+     * membership, never from a URL.
      */
-    public function getIsMyClanProperty(): bool
+    #[Computed]
+    public function isMyClan(): bool
     {
         return Auth::check() && Auth::user()->clan?->id === $this->clan->id;
     }
 
-    /**
-     * This clan's finished-war history, summarized from the clan's viewpoint
-     * (result, opponent, power delta) via a model helper.
-     */
-    public function getHistoryProperty()
+    /** Finished-war history from this clan's viewpoint (result, opponent, power delta). */
+    #[Computed]
+    public function history()
     {
         return $this->clan->finishedWars()
             ->map(fn ($war) => array_merge(
                 ['war' => $war],
                 $this->clan->warSummary($war)
             ));
-    }
-
-    /** The leader role value, so the view can flag the leader row. */
-    public function getIsLeaderRole(): string
-    {
-        return ClanRole::Leader->value;
     }
 
     public function render()

@@ -17,7 +17,7 @@ function userInClan(?string $clanName = null): array
 {
     $user = User::factory()->create();
     $clan = Clan::create([
-        'name' => $clanName ?? 'Clan '.uniqid(),
+        'name' => $clanName ?? 'Clan '.uniqid('', true),
         'tag' => 'TAG',
         'leader_id' => $user->id,
         'power' => 1000,

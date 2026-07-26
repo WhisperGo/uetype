@@ -31,7 +31,7 @@ function overlayAcceptedFriends(): array
 function overlayClanWithMembers(int $memberCount = 2): array
 {
     $leader = User::factory()->create();
-    $clan = Clan::create(['name' => 'Overlay Clan '.uniqid(), 'leader_id' => $leader->id, 'power' => 1000]);
+    $clan = Clan::create(['name' => 'Overlay Clan '.uniqid('', true), 'leader_id' => $leader->id, 'power' => 1000]);
     ClanMember::create(['clan_id' => $clan->id, 'user_id' => $leader->id, 'role' => ClanRole::Leader, 'status' => ClanMemberStatus::Active]);
 
     $members = [$leader];

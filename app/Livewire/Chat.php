@@ -32,14 +32,12 @@ class Chat extends Component
     public ?string $withUsername = null;
 
     /**
-     * Drop a ?mode=clan that the viewer has no clan for, falling back to the inbox.
+     * Drop a ?mode=clan the viewer has no clan for, falling back to the inbox.
      *
-     * The clan pages link straight here with ?mode=clan, so the parameter now arrives from
-     * ordinary navigation rather than only from this page's own buttons -- and it can
-     * outlive the membership that justified it: leave or get kicked from a clan, then use
-     * the back button or an old bookmark. Without this the page renders the conversation
-     * branch with no clan behind it: an empty thread with no header and no way back,
-     * because the inbox that holds the "you are not in a clan" card is not drawn either.
+     * The clan pages link straight here, so the parameter can outlive the membership that
+     * justified it (leave a clan, then hit back or an old bookmark). Without this the page
+     * renders the conversation branch with no clan behind it: an empty thread with no
+     * header, and no inbox to show the "you are not in a clan" card either.
      */
     public function mount(): void
     {

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 /** A player clan (guild): identity, Elo power, members, and war history. */
 class Clan extends Model
@@ -86,18 +87,11 @@ class Clan extends Model
     }
 
     /**
-     * Only clans that still have at least one active member.
+     * Only clans with at least one active member.
      *
-     * A clan cannot normally empty out -- the leader can't kick or leave themselves, so
-     * disband and transfer are the only exits -- but a roster CAN reach zero through data
-     * repair, a cascade, or a future path we haven't written yet. When it does, the clan
-     * is a ghost: it lists in Browse with "0 members", can be sent join requests nobody
-     * can approve, and can be challenged to a war it cannot possibly play, handing the
-     * challenger free Elo.
-     *
-     * Hiding rather than deleting: the row is harmless where it sits, and deleting it
-     * would cascade into the war records of OPPOSING clans whose power has already moved
-     * -- the same reason disband is blocked mid-war.
+     * An empty clan is a ghost: nobody can approve its join requests, and challenging it
+     * to a war it cannot play is free Elo. Hidden rather than deleted -- deleting cascades
+     * into the war records of opposing clans whose power has already moved.
      */
     public function scopePopulated(Builder $query): Builder
     {
@@ -105,12 +99,10 @@ class Clan extends Model
     }
 
     /**
-     * Active roster in authority order: leader, then co-leaders, then members.
+     * Active roster in authority order: leader, co-leaders, members.
      *
-     * Sorted in PHP on the enum's rank(), not `orderBy('role')` in SQL. The role column
-     * holds a string, so the database sorts it alphabetically -- which put 'co-leader'
-     * ABOVE 'leader'. Every roster reads through here so the order can never drift
-     * between the two pages that render it.
+     * Sorted in PHP on rank(), not `orderBy('role')`: role is a string column, so SQL
+     * sorts it alphabetically and puts 'co-leader' above 'leader'.
      */
     public function orderedActiveMembers()
     {
@@ -157,22 +149,18 @@ class Clan extends Model
     }
 
     /**
-     * Points each member scored in the last finished war, keyed by user id.
+     * Points each member scored in a war, keyed by user id. One aggregate for the whole
+     * roster, not one query per member.
      *
-     * Scoped to the last war rather than all-time on purpose: the roster shows this to
-     * help a leader judge who is pulling their weight NOW. An all-time total would rank a
-     * long-idle veteran above an active newcomer, which is the opposite of what the number
-     * is being read for. Members with no claim are simply absent from the map -- the view
-     * distinguishes "scored zero" from "wasn't in the clan yet".
+     * The roster passes the LAST FINISHED war, not an all-time total: the number is read
+     * to judge who is pulling their weight now, and all-time would rank an idle veteran
+     * above an active newcomer. Members with no claim are absent from the map, so callers
+     * can tell "scored zero" from "wasn't here yet".
      *
-     * One aggregate query for the whole roster, not one per member.
-     *
-     * @return \Illuminate\Support\Collection<int, float>
+     * @return Collection<int, float>
      */
-    public function lastWarContributions(): \Illuminate\Support\Collection
+    public function warContributions(?ClanWar $war): Collection
     {
-        $war = $this->lastFinishedWar();
-
         if (! $war) {
             return collect();
         }

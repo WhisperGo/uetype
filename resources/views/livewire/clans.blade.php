@@ -13,22 +13,12 @@
 
     {{-- ===== TABS =====
 
-         Rendered only when there is something to switch BETWEEN. A member of a clan has no
-         Browse/Create tabs, so the whole bar -- rule included -- stays out of the document.
-         The "My Clan" tab was previously removed by commenting out its LABEL while leaving
-         the <button> itself alive: an 8px-wide (px-1 either side) unlabelled control that
-         pushed the whole row 12px right of the page title and the cards below it, stayed
-         focusable and clickable, and was announced by screen readers as an unnamed button.
-         A clan member was left with a bar holding nothing but that empty button.
+         Rendered only when there is something to switch between: a clan member has no
+         Browse/Create tabs, so the whole bar stays out of the document rather than
+         rendering empty.
 
-         Styled as chips, matching the category filters on the Achievements page: a filled
-         pill for the active choice, an outlined one for the rest. The previous underline tabs
-         carried no gap and only px-1, so "Browse Clans" ended at the exact pixel where
-         "Create Clan" began and the pair read as a single run of text. A chip's own border
-         and padding make each target legible on its own, and gap-2 separates them.
-
-         aria-label lives on the nav, and aria-current marks the active chip -- the underline
-         version conveyed the selection through colour alone. --}}
+         Chips (the Achievements filter pattern), not underlines: each target is legible on
+         its own, and aria-current marks the selection instead of colour alone. --}}
     @unless ($this->myClan)
         <nav class="flex flex-wrap gap-2 mb-6" aria-label="{{ __('clan.tab.aria') }}">
             @foreach (['browse', 'create'] as $tabKey)
@@ -54,7 +44,7 @@
                  than sitting below it. The form carries its own live preview, so showing
                  both would put two versions of the same clan on screen at once, the card
                  above still displaying the values being edited away. --}}
-            @if ($editing && $this->myMembership->role->value === 'leader')
+            @if ($editing && $this->canManageClan)
                 <form wire:submit.prevent="saveClanIdentity" class="p-5 sm:p-6 border bg-surface/70 border-white/10 rounded-3xl mb-6 max-w-lg">
                     <p class="font-mono text-xs uppercase tracking-widest text-muted mb-5">{{ __('clan.my_clan.edit_heading') }}</p>
 
@@ -100,16 +90,9 @@
                         <x-btn-gold as="a" href="{{ route('clan-war.index') }}" wire:navigate>
                             {{ __('clan.clan_war') }}
                         </x-btn-gold>
-                        {{-- Clan chat was reachable only by going to the Chat page and
-                             picking the clan card there -- a detour away from the clan to
-                             get to the clan's own channel. ?mode=clan is already a
-                             supported entry point, and which clan it opens is derived
-                             server-side from the active membership, so the link carries no
-                             id and cannot be pointed at someone else's channel.
-
-                             Styled as a secondary action beside Leaderboard: Clan War is
-                             the page's primary call to action and stays the only gold
-                             button, or three competing buttons would flatten the hierarchy. --}}
+                        {{-- The link carries no clan id: chat derives the channel from the
+                             viewer's active membership, so it cannot be pointed elsewhere.
+                             Secondary styling keeps Clan War the only gold button. --}}
                         <a href="{{ route('chat.index', ['mode' => 'clan']) }}" wire:navigate
                             class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition inline-flex items-center gap-1.5">
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -124,7 +107,7 @@
                         {{-- The leader has no Leave button: leaving is the one thing they
                              cannot do directly. Their exits live in the Manage menu --
                              transfer (hand it over, then leave) or disband. --}}
-                        @if ($this->myMembership->role->value === 'leader')
+                        @if ($this->canManageClan)
                             <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
                                 <button type="button" @click="open = !open"
                                     class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition inline-flex items-center gap-1.5">
@@ -167,8 +150,8 @@
 
             {{-- Incoming join requests. Visible to whoever holds roster powers -- the
                  leader and co-leaders -- matching the server-side gate exactly. --}}
-            @php $canManage = $this->myMembership->role->canManageMembers(); @endphp
-            @if ($canManage && $this->pendingRequests->count() > 0)
+            
+            @if ($this->canManageMembers && $this->pendingRequests->count() > 0)
                 <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">{{ __('clan.my_clan.join_requests', ['count' => $this->pendingRequests->count()]) }}</p>
                 <div class="space-y-3 mb-8">
                     @foreach ($this->pendingRequests as $req)
@@ -208,19 +191,14 @@
                             'ring-1 ring-white/10' => $member->role->value === 'co-leader',
                         ]) wire:key="member-{{ $member->id }}">
                         <a href="{{ route('profile.show', $user) }}" wire:navigate class="flex items-center gap-4 flex-1 min-w-0">
-                            {{-- Online state rides on the avatar dot, as it does in the
-                                 friends list, instead of spending a slot in the meta line. --}}
+                            {{-- Online rides on the avatar dot (as in friends), not the meta line. --}}
                             <x-friend-avatar :user="$user" :online="$row['online']" />
                             <div class="flex-1 min-w-0">
                                 <p class="font-mono text-sm font-bold text-foreground truncate group-hover:text-gold transition-colors">{{ $user->username }}</p>
 
-                                {{-- Meta line: level, war contribution, joined. Separated by
-                                     middots on one wrapping line rather than stacked rows --
-                                     three stacked lines per member turns a 20-person roster
-                                     into a wall of text.
-
-                                     "last seen" appears ONLY when offline: for someone
-                                     online it would repeat what the dot already says. --}}
+                                {{-- One wrapping line, not stacked rows: three lines per member
+                                     turns a 20-person roster into a wall of text. "last seen"
+                                     shows only when offline, where the dot says nothing. --}}
                                 <p class="font-mono text-xs text-muted mt-0.5 flex flex-wrap items-center gap-x-1.5">
                                     <span>{{ __('clan.user_level', ['level' => $user->levelData()['level']]) }}</span>
 
@@ -231,10 +209,8 @@
 
                                     @if (! is_null($row['contribution']))
                                         <span aria-hidden="true">·</span>
-                                        {{-- Zero is called out, not left to read as a plain
-                                             number: it is the one value a leader is looking
-                                             for, and it is otherwise the quietest thing on
-                                             the row. --}}
+                                        {{-- Only non-zero goes gold: zero is what a leader is
+                                             scanning for, so it must not glow like a score. --}}
                                         <span @class(['text-gold' => $row['contribution'] > 0])>
                                             {{ __('clan.roster.war_points', ['points' => number_format($row['contribution'], 0)]) }}
                                         </span>
@@ -251,22 +227,18 @@
                             $isSelf = $member->user_id === auth()->id();
                             // Mirrors the rank gate in kickMember/changeRole: you may only
                             // act on someone strictly below you, and never on yourself.
-                            $canActOnRow = $canManage && ! $isSelf
+                            $canActOnRow = $this->canManageMembers && ! $isSelf
                                 && $member->role->rank() > $this->myMembership->role->rank();
-                            $iOwnClan = $this->myMembership->role->canManageClan();
+                            $iOwnClan = $this->canManageClan;
                         @endphp
 
                         <x-clan.role-badge :role="$member->role" />
 
                         @if ($canActOnRow)
-                            {{-- A member row can now carry up to three actions (promote or
-                                 demote, transfer, kick), so they collapse into a kebab --
-                                 the same menu pattern as the friends list. Three bare
-                                 buttons would not fit a narrow row, and putting a
-                                 destructive Kick beside a routine Promote invites misclicks.
-
-                                 Not hidden behind group-hover like the old single button:
-                                 hover-only controls are unreachable on touch. --}}
+                            {{-- Up to three actions per row, so they collapse into a kebab
+                                 (the friends-list pattern): a bare destructive Kick beside a
+                                 routine Promote invites misclicks. Always visible, never
+                                 group-hover -- hover-only controls are dead on touch. --}}
                             <div class="shrink-0 relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
                                 <button type="button" @click="open = !open"
                                     aria-label="{{ __('clan.aria.member_actions', ['name' => $user->username]) }}"
@@ -366,16 +338,10 @@
                                 <span class="px-4 py-1.5 font-mono text-xs font-bold text-gold border border-gold/40 rounded-lg shrink-0">{{ __('clan.browse.joined') }}</span>
                                 @break
                             @case('pending')
-                                {{-- Status as plain text, withdraw as its own button beside
-                                     it -- the same pairing the friends page uses for a sent
-                                     request.
-
-                                     This replaces a single control that swapped its label on
-                                     hover: that hid the action entirely on touch, where
-                                     there is no hover state, and made the row's meaning
-                                     depend on where the pointer happened to be. Two elements,
-                                     both always visible, say what is true and what you can
-                                     do about it at the same time. --}}
+                                {{-- Status text plus a separate button, as on the friends page.
+                                     One control swapping its label on hover would hide the
+                                     action on touch and make the row's meaning depend on
+                                     pointer position. --}}
                                 <div class="flex items-center gap-3 shrink-0">
                                     <span class="font-mono text-xs text-muted">{{ __('clan.browse.request_sent') }}</span>
                                     <button type="button" wire:click="cancelJoinRequest({{ $row['clan']->id }})"
@@ -414,11 +380,10 @@
 
     {{-- ===== CONFIRMATION MODALS (themed, replace native wire:confirm) ===== --}}
     @if ($this->myClan)
-        {{-- Leave Clan (anyone but the leader, whose exit is transfer or disband).
-             Gated on the same condition as its trigger button: rendered for a leader it
-             would be a modal nothing can open, yet still reachable by dispatching the
-             event by hand -- offering a confirmation for an action the server refuses. --}}
-        @if ($this->myMembership->role->value !== 'leader')
+        {{-- Leave Clan (anyone but the leader, whose exits are transfer and disband).
+             Gated like its trigger: otherwise it is a modal nothing opens, still reachable
+             by dispatching the event, confirming an action the server refuses. --}}
+        @unless ($this->canManageClan)
         <x-modal name="confirm-leave" maxWidth="md">
             <div class="p-6">
                 <p class="font-mono text-sm font-bold text-foreground">{{ __('clan.modal.leave_title', ['name' => $this->myClan->name]) }}</p>
@@ -435,13 +400,12 @@
                 </div>
             </div>
         </x-modal>
-        @endif
+        @endunless
 
-        {{-- Role changes (leader only): promote, demote and transfer share ONE modal.
-             All three ask the same question -- "apply this role change to this member?" --
+        {{-- Promote, demote and transfer share ONE modal: all three ask the same question,
              so the copy is swapped from the dispatched action rather than rendering three
              near-identical modals per roster row. --}}
-        @if ($this->myMembership->role->value === 'leader')
+        @if ($this->canManageClan)
             <div x-data="{
                     roleId: null,
                     roleLabel: '',
@@ -484,10 +448,9 @@
                                 class="px-4 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
                                 {{ __('clan.modal.cancel') }}
                             </button>
-                            {{-- Transfer is styled gold, not danger: it hands the clan on
-                                 rather than destroying anything, and colouring it red next
-                                 to the genuinely destructive Kick would flatten the
-                                 difference between them. --}}
+                            {{-- Transfer is gold, not danger: it hands the clan on rather than
+                                 destroying it, and red here would flatten the difference from
+                                 a genuinely destructive Kick. --}}
                             <button type="button" @click="run()"
                                 :class="action === 'transfer'
                                     ? 'bg-gold text-background hover:bg-gold/80'
@@ -516,9 +479,8 @@
                             class="px-4 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
                             {{ __('clan.modal.cancel') }}
                         </button>
-                        {{-- Deliberately does NOT close the modal on click: disband can fail
-                             server-side (name mismatch, war in progress) and the error is
-                             rendered right here. Closing optimistically would hide it. --}}
+                        {{-- Does NOT close on click: disband can fail server-side (name
+                             mismatch, war running) and the error renders right here. --}}
                         <button type="button" wire:click="disbandClan"
                             class="px-4 py-2 font-mono text-xs font-bold text-foreground bg-danger hover:bg-danger/80 rounded-lg transition">
                             {{ __('clan.modal.disband_confirm') }}
@@ -529,7 +491,7 @@
         @endif
 
         {{-- Kick member: one modal, target stored from the event --}}
-        @if ($this->myMembership->role->canManageMembers())
+        @if ($this->canManageMembers)
             <div x-data="{ kickId: null, kickLabel: '' }"
                 @open-modal.window="if ($event.detail?.name === 'confirm-kick') { kickId = $event.detail.id; kickLabel = $event.detail.label; $dispatch('open-modal', 'confirm-kick') }">
                 <x-modal name="confirm-kick" maxWidth="md">

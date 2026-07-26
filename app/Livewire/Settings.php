@@ -2,10 +2,8 @@
 
 namespace App\Livewire;
 
-use App\Enums\ClanMemberStatus;
 use App\Enums\ClanRole;
 use App\Models\Clan;
-use App\Models\ClanMember;
 use App\Support\Locale;
 use App\Support\UsernameRules;
 use Illuminate\Support\Facades\Auth;
@@ -60,37 +58,28 @@ class Settings extends Component
     }
 
     /**
-     * True if this user leads a clan, which blocks account deletion.
+     * The clan this user leads, if any -- which blocks account deletion.
      *
-     * Read from the pivot role rather than clans.leader_id: role is what grants the
-     * powers, and checking the same field the permission gates use means the two can
-     * never disagree about who is a leader.
+     * Read from the pivot role, not clans.leader_id: role is what grants the powers, so
+     * checking the same field the permission gates use keeps the two from disagreeing.
      */
     #[Computed]
     public function leadsClan(): ?Clan
     {
-        $membership = ClanMember::with('clan')
-            ->where('user_id', Auth::id())
-            ->where('status', ClanMemberStatus::Active)
-            ->where('role', ClanRole::Leader)
-            ->first();
+        $membership = Auth::user()?->activeClanMembership;
 
-        return $membership?->clan;
+        return $membership?->role === ClanRole::Leader ? $membership->clan : null;
     }
 
     /**
      * Permanently delete the account after the user retypes their username to confirm.
      *
-     * A clan leader is refused. `clans.leader_id` cascades on user delete, so deleting a
-     * leader's account silently destroyed the whole clan -- every membership row with it,
-     * and (through a second cascade) the war records of the OPPOSING clans, whose power
-     * had already moved. That is a lot of other people's data destroyed as a side effect
-     * of one person leaving.
+     * A clan leader is refused: `clans.leader_id` cascades on user delete, so this would
+     * destroy the whole clan, every membership, and -- through a second cascade -- the war
+     * records of opposing clans whose power had already moved.
      *
-     * Refusing is deliberate rather than auto-transferring to the longest-serving member:
-     * silently handing someone a clan they never asked to lead is its own surprise. The
-     * leader is pointed at transfer or disband, both of which now exist, and both of
-     * which are an explicit choice.
+     * Refused rather than auto-transferred: handing someone a clan they never asked to
+     * lead is its own surprise. Transfer and disband both exist and are explicit choices.
      */
     public function deleteAccount(): void
     {

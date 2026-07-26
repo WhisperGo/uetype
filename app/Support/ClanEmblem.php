@@ -98,12 +98,12 @@ final class ClanEmblem
     }
 
     /**
-     * Validation rules for clan identity, keyed by the four field names given.
+     * Validation rules for clan identity, keyed by the caller's field names.
      *
-     * Shared by create and edit so the two can never drift -- a name limit tightened in
-     * one place but not the other would let an edit save something create would reject.
-     * `$ignoreClanId` makes the unique check skip the clan being edited, without which a
-     * leader could not save the form while leaving the name untouched.
+     * Shared by create and edit so the two cannot drift -- a limit tightened in one place
+     * would otherwise let edit save what create rejects. `$ignoreClanId` skips the unique
+     * check for the clan being edited, without which saving an untouched name collides
+     * with itself.
      *
      * @param  array{name:string, tag:string, emblem:string, color:string, description:string}  $fields
      */

@@ -36,10 +36,9 @@
                     <p class="font-mono text-[0.6rem] uppercase tracking-wider text-muted mt-1">{{ __('clan.power') }}</p>
                 </div>
 
-                {{-- Members only: this page is public, and a chat link shown to an outsider
-                     would resolve to their own clan (or nothing), pointing somewhere other
-                     than where it appears to. The channel is safe regardless -- chat
-                     derives the clan from the viewer's membership, never from a URL. --}}
+                {{-- Members only: for an outsider this link would resolve to their own clan
+                     (or nothing), pointing somewhere other than it appears to. The channel
+                     is safe regardless -- chat derives the clan from membership, not a URL. --}}
                 @if ($this->isMyClan)
                     <a href="{{ route('chat.index', ['mode' => 'clan']) }}" wire:navigate
                         class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition inline-flex items-center gap-1.5">
