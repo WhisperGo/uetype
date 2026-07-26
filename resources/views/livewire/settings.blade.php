@@ -113,26 +113,49 @@
             <div class="p-6 sm:p-8" x-data="{ typed: '' }"
                 x-on:close-modal.window="$event.detail === 'confirm-account-deletion' ? typed = '' : null">
                 <h2 class="font-display text-xl text-foreground">{{ __('settings.danger.confirm_title') }}</h2>
-                <p class="mt-3 font-mono text-sm text-muted">{{ __('settings.danger.confirm_body') }}</p>
 
-                <input type="text" wire:model="confirmUsername" x-model="typed"
-                    placeholder="{{ __('settings.danger.confirm_placeholder') }}"
-                    class="w-full px-4 py-2.5 mt-5 font-mono text-sm rounded-xl bg-background border border-white/10 text-foreground focus:border-danger focus:ring-1 focus:ring-danger focus:outline-none">
-                @error('confirmUsername')
-                    <p class="mt-2 font-mono text-xs text-danger">{{ $message }}</p>
-                @enderror
+                {{-- A clan leader cannot delete their account: the FK cascade would take
+                     the whole clan with it. Say so up front and offer the way out, rather
+                     than letting them type their full username only to be refused. The
+                     server enforces this regardless -- this block just stops the dead end
+                     being a surprise. --}}
+                @if ($this->leadsClan)
+                    <div class="p-4 mt-4 border rounded-xl bg-danger/5 border-danger/20">
+                        <p class="font-mono text-sm text-danger">{{ __('settings.danger.leads_clan', ['clan' => $this->leadsClan->name]) }}</p>
+                        <a href="{{ route('clans.index') }}" wire:navigate
+                            class="inline-block mt-3 px-4 py-2 font-mono text-xs font-semibold transition border rounded-lg border-danger/40 text-danger hover:bg-danger/10">
+                            {{ __('settings.danger.leads_clan_cta') }}
+                        </a>
+                    </div>
 
-                <div class="flex justify-end gap-3 mt-6">
-                    <button type="button" x-on:click="$dispatch('close-modal', 'confirm-account-deletion')"
-                        class="px-4 py-2 font-mono text-sm font-medium transition border rounded-xl border-white/10 text-muted hover:text-foreground">
-                        {{ __('settings.danger.confirm_cancel') }}
-                    </button>
-                    <button type="button" wire:click="deleteAccount"
-                        x-bind:disabled="typed !== @js(auth()->user()->username)"
-                        class="px-4 py-2 font-mono text-sm font-semibold text-white transition rounded-xl bg-danger hover:bg-danger/80 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none">
-                        {{ __('settings.danger.confirm_delete') }}
-                    </button>
-                </div>
+                    <div class="flex justify-end mt-6">
+                        <button type="button" x-on:click="$dispatch('close-modal', 'confirm-account-deletion')"
+                            class="px-4 py-2 font-mono text-sm font-medium transition border rounded-xl border-white/10 text-muted hover:text-foreground">
+                            {{ __('settings.danger.confirm_cancel') }}
+                        </button>
+                    </div>
+                @else
+                    <p class="mt-3 font-mono text-sm text-muted">{{ __('settings.danger.confirm_body') }}</p>
+
+                    <input type="text" wire:model="confirmUsername" x-model="typed"
+                        placeholder="{{ __('settings.danger.confirm_placeholder') }}"
+                        class="w-full px-4 py-2.5 mt-5 font-mono text-sm rounded-xl bg-background border border-white/10 text-foreground focus:border-danger focus:ring-1 focus:ring-danger focus:outline-none">
+                    @error('confirmUsername')
+                        <p class="mt-2 font-mono text-xs text-danger">{{ $message }}</p>
+                    @enderror
+
+                    <div class="flex justify-end gap-3 mt-6">
+                        <button type="button" x-on:click="$dispatch('close-modal', 'confirm-account-deletion')"
+                            class="px-4 py-2 font-mono text-sm font-medium transition border rounded-xl border-white/10 text-muted hover:text-foreground">
+                            {{ __('settings.danger.confirm_cancel') }}
+                        </button>
+                        <button type="button" wire:click="deleteAccount"
+                            x-bind:disabled="typed !== @js(auth()->user()->username)"
+                            class="px-4 py-2 font-mono text-sm font-semibold text-white transition rounded-xl bg-danger hover:bg-danger/80 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none">
+                            {{ __('settings.danger.confirm_delete') }}
+                        </button>
+                    </div>
+                @endif
             </div>
         </x-modal>
 

@@ -102,6 +102,31 @@ Menu akun di nav menampilkan **titik kecil bernuansa brand** saat ada permintaan
 | **Real-time** | Endpoint ringan [`GET /friends/pending-count`](../../app/Http/Controllers/FriendController.php) yang di-*fetch* oleh [`nav-badges.js`](../../resources/js/nav-badges.js) saat event `friendship-updated-remote` | Nav adalah **partial statis** (bukan Livewire), jadi tak bisa query ulang sendiri. Endpoint memastikan badge selalu akurat — **naik** saat request masuk, **turun** saat dibatalkan/diterima/ditolak. Penghitung optimistic (+1 saja) akan meleset pada cancel/reject. |
 | **Tanpa langganan Echo baru** | Mendengar `friendship-updated-remote` yang **sudah** disiarkan `toasts.js` | Satu subscriber `friends.{id}` (lihat §3.6 & [chat.md](chat.md)); nav numpang event window yang sama, tak menambah listener Echo. |
 
+### 3.8 Tombol kembali di profil publik mengikuti asal kunjungan
+
+Profil publik ([`ProfileController::show`](../../app/Http/Controllers/ProfileController.php)) dibuka
+dari **lima** tempat: roster clan, detail clan, Friends, Chat, dan Leaderboard. Panah kembalinya
+dulu di-hardcode ke `route('friends.index')`, jadi membuka profil anggota clan lalu menekan kembali
+melempar pengguna ke halaman yang tak pernah ia buka — dan posisinya di roster hilang.
+
+Tujuannya kini diturunkan dari **`Referer`** di server, bukan parameter `?from=`, supaya tak ada
+pemanggil yang perlu mengirim apa pun dan tautan yang dibagikan tetap berperilaku benar.
+
+`Referer` dikendalikan klien, jadi dijaga dua hal:
+
+| Penjaga | Justifikasi |
+|---------|-------------|
+| Host **harus** sama dengan host request | Tanpa ini, header dari luar akan diterima mentah ke `href` — setiap halaman profil jadi **open redirect** ke mana saja. |
+| Path **tidak boleh** halaman profil (`/users/…`) | Melompat profil → profil akan membuat panah menunjuk ke profil yang baru saja ditinggalkan, bukan daftar tempat pengguna memulai. |
+
+Kalau tak ada referer yang layak (kunjungan langsung, bookmark, header dibuang demi privasi),
+jatuh ke Friends — panah selalu mengarah ke suatu tempat yang masuk akal.
+
+**Di klien**, `href` hasil server tetap dipasang sebagai tautan asli (klik tengah, buka di tab baru,
+dan render tanpa JS tetap jalan), sementara handler klik mendahulukan `history.back()` bila memang
+ada riwayat — itu **memulihkan posisi scroll** halaman sebelumnya. Kembali ke roster 20 orang di
+posisi paling atas, alih-alih di tempat yang sedang dibaca, adalah bentuk tersesat tersendiri.
+
 ## 4. Real-time Aman
 
 Semua broadcast presence/friendship lewat [`SafeBroadcast`](../../app/Support/SafeBroadcast.php) —

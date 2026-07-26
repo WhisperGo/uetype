@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Validation\Rule;
+
 /** Catalog of clan emblem icons and colors; the source of truth for badges. */
 final class ClanEmblem
 {
@@ -93,5 +95,32 @@ final class ClanEmblem
     public static function colors(): array
     {
         return self::COLORS;
+    }
+
+    /**
+     * Validation rules for clan identity, keyed by the four field names given.
+     *
+     * Shared by create and edit so the two can never drift -- a name limit tightened in
+     * one place but not the other would let an edit save something create would reject.
+     * `$ignoreClanId` makes the unique check skip the clan being edited, without which a
+     * leader could not save the form while leaving the name untouched.
+     *
+     * @param  array{name:string, tag:string, emblem:string, color:string, description:string}  $fields
+     */
+    public static function identityRules(array $fields, ?int $ignoreClanId = null): array
+    {
+        $unique = Rule::unique('clans', 'name');
+
+        if ($ignoreClanId !== null) {
+            $unique->ignore($ignoreClanId);
+        }
+
+        return [
+            $fields['name'] => ['required', 'string', 'min:3', 'max:40', $unique],
+            $fields['tag'] => ['nullable', 'string', 'max:6'],
+            $fields['emblem'] => ['required', 'string', Rule::in(self::iconKeys())],
+            $fields['color'] => ['required', 'string', Rule::in(self::colorKeys())],
+            $fields['description'] => ['nullable', 'string', 'max:160'],
+        ];
     }
 }

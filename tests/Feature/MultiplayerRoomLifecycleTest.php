@@ -250,19 +250,32 @@ describe('#3 leave-confirm', function () {
         $this->assertDatabaseMissing('rooms', ['id' => $room->id]);
     });
 
-    it('does nothing mid-race (a race nav is a reload, the row is kept)', function () {
+    it('removes a racer who confirms leaving mid-race (an explicit leave, not a reload)', function () {
         $host = User::factory()->create();
         $racer = User::factory()->create();
         $room = makeRoom('CNF004', 'racing', $host);
         RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
-        RoomMember::create(['room_id' => $room->id, 'user_id' => $racer->id, 'role' => 'player', 'is_ready' => true]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $racer->id, 'role' => 'player', 'is_ready' => true, 'progress_percent' => 30]);
 
+        // Pressing "Leave" on the overlay is a deliberate choice -- they leave for good, even
+        // mid-race. (Contrast the beacon test below: a reload keeps the row.)
         $this->actingAs($racer)->post(route('multiplayer.leave-confirm'))->assertOk();
 
-        // Row survives untouched so mount() can restore the racer at their progress.
-        $racerMember = RoomMember::where('room_id', $room->id)->where('user_id', $racer->id)->first();
-        expect($racerMember)->not->toBeNull()
-            ->and($racerMember->isDnf())->toBeFalse();
+        $this->assertDatabaseMissing('room_members', ['room_id' => $room->id, 'user_id' => $racer->id]);
+        // The room and the still-racing host are untouched.
+        $this->assertDatabaseHas('room_members', ['room_id' => $room->id, 'user_id' => $host->id]);
+    });
+
+    it('distinguishes a confirmed leave from a reload beacon mid-race', function () {
+        $host = User::factory()->create();
+        $racer = User::factory()->create();
+        $room = makeRoom('CNF005', 'racing', $host);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $racer->id, 'role' => 'player', 'is_ready' => true, 'progress_percent' => 30]);
+
+        // The beacon (reload / tab close) mid-race must NOT remove them -- restore relies on it.
+        $this->actingAs($racer)->post(route('multiplayer.leave-beacon'))->assertOk();
+        $this->assertDatabaseHas('room_members', ['room_id' => $room->id, 'user_id' => $racer->id]);
     });
 
     it('requires authentication', function () {

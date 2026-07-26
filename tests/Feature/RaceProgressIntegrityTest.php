@@ -74,20 +74,22 @@ it('still signals a rejected space, including when the word is a correct prefix'
         ->and($markup)->toContain('justBlocked');
 });
 
-it('reuses the existing typo shake instead of adding another animation', function () {
+it('does not shake on a typo -- the red highlight is the only cue', function () {
+    // The shake animation was removed on request: a mistyped key still turns the active word
+    // and the input red, but the container no longer jitters. Guard against it creeping back.
     $markup = tanpaKomentarBlade(
         file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php'))
     );
 
-    expect($markup)->toContain("'race-typo': hasError || justBlocked")
-        ->and(file_get_contents(resource_path('css/app.css')))->toContain('.race-typo');
+    expect($markup)->not->toContain('race-typo')
+        ->and(file_get_contents(resource_path('css/app.css')))->not->toContain('race-typo');
 });
 
 it('re-signals every repeated rejection, not just the first of a burst', function () {
-    // Re-adding a CSS class that is already applied does NOT restart its animation, so a
-    // player leaning on the spacebar got exactly one shake and then silence -- which reads
-    // as "nothing is stopping me" at the very moment they are pushing hardest. The flag is
-    // dropped for one frame so the animation runs again on every refusal.
+    // justBlocked drives the red highlight on every refused key/space. Left simply set, a
+    // burst of refusals wouldn't visibly re-signal (the flag is already true). Dropping it
+    // for one frame via rAF re-asserts the cue on each refusal; the pending frame is
+    // cancelled if the player moves on (or the component is torn down) before it fires.
     $arena = file_get_contents(resource_path('js/race-arena.js'));
 
     expect($arena)->toContain('nudgeBlocked()')

@@ -16,10 +16,10 @@ class ClanShow extends Component
         $this->clan = $clan;
     }
 
-    /** Active members of this clan, ordered by role. */
+    /** Active members of this clan, in authority order. */
     public function getMembersProperty()
     {
-        return $this->clan->activeMembers()->with('user')->orderBy('role')->get();
+        return $this->clan->orderedActiveMembers();
     }
 
     /**

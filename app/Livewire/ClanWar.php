@@ -60,9 +60,19 @@ class ClanWar extends Component
         return $this->myMembership?->clan;
     }
 
+    /**
+     * Declaring, accepting and declining a war stakes the clan's permanent Elo power,
+     * so it stays with the single leader -- a co-leader's remit is the roster.
+     */
     public function getIsLeaderProperty(): bool
     {
         return $this->myMembership?->role === ClanRole::Leader;
+    }
+
+    /** Roster powers (leader or co-leader); enough to cancel a teammate's stale claim. */
+    public function getCanManageMembersProperty(): bool
+    {
+        return (bool) $this->myMembership?->role->canManageMembers();
     }
 
     public function getMyActiveWarProperty(): ?ClanWarModel
@@ -102,7 +112,10 @@ class ClanWar extends Component
                     ->select('opponent_clan_id')
             );
 
-        return Clan::where('id', '!=', $this->myClan->id)
+        // populated(): a clan with no active members cannot field a single mode claim, so
+        // challenging one is free Elo rather than a war.
+        return Clan::populated()
+            ->where('id', '!=', $this->myClan->id)
             ->whereNotIn('id', $busyClanIds)
             ->orderByDesc('power')
             ->get();
@@ -261,8 +274,8 @@ class ClanWar extends Component
             return;
         }
 
-        // Only the claimer or a leader may cancel.
-        if ($claim->user_id !== Auth::id() && ! $this->isLeader) {
+        // The claimer, or anyone with roster powers, may free a slot sitting unplayed.
+        if ($claim->user_id !== Auth::id() && ! $this->canManageMembers) {
             return;
         }
 
@@ -275,7 +288,10 @@ class ClanWar extends Component
             return;
         }
 
-        $opponent = Clan::find($opponentClanId);
+        // populated(): re-checked HERE, not just filtered out of the list above. Hiding an
+        // empty clan from the picker is presentation; without this gate the id could still
+        // be posted directly, and an unplayable clan is a free 3-day walkover.
+        $opponent = Clan::populated()->find($opponentClanId);
 
         // Server-side re-validation: don't trust the list shown on the client.
         if (! $opponent || $opponent->id === $this->myClan->id || $opponent->activeWar() !== null) {

@@ -41,9 +41,9 @@ Ternyata **mode solo dan mode multiplayer tidak konsisten** satu sama lain:
   - `raw_wpm` = seluruh karakter yang diketik (termasuk yang salah) / menit
   - `net_wpm` = **hanya karakter benar** / menit → ini yang dipakai sebagai skor akhir
   - Sesi yang tidak masuk akal (WPM > 300, throughput terlalu rendah, dsb) **ditolak**, tidak disimpan.
-- [`TypingEngine::saveResult()`](../app/Livewire/TypingEngine.php#L384) memakai `net_wpm` hasil
+- [`TypingEngine::saveResult()`](../app/Livewire/TypingEngine.php#L536) memakai `net_wpm` hasil
   hitung ulang server sebagai `highest_wpm` (PB) — bukan raw WPM.
-- [`User::addExp()`](../app/Models/User.php#L110) sudah memberi bobot: EXP dikalikan
+- [`User::addExp()`](../app/Models/User.php#L112) sudah memberi bobot: EXP dikalikan
   `0.5 + 0.5 * (accuracy / 100)`, jadi akurasi 100% = EXP penuh, akurasi 0% = EXP setengah dari
   karakter benar yang sama.
 
@@ -77,7 +77,7 @@ rawan predictable-gaming.
 
 ### a. Net WPM otoritatif dihitung server, bukan dari client
 
-[`updateRaceProgress()`](../app/Livewire/MultiplayerLobby.php#L351) tidak lagi memakai `$liveWpm`
+[`updateRaceProgress()`](../app/Livewire/MultiplayerLobby.php#L683) tidak lagi memakai `$liveWpm`
 dari client untuk angka resmi. Parameter itu tetap ada di signature (kompatibilitas payload) tapi
 diabaikan untuk perhitungan:
 
@@ -93,8 +93,8 @@ diabaikan untuk perhitungan:
 
 ### b. Hasil akhir digerbang sebelum masuk riwayat & EXP
 
-[`finalizeRace()`](../app/Livewire/MultiplayerLobby.php#L195) memanggil
-[`isValidRaceResult()`](../app/Livewire/MultiplayerLobby.php#L261) (memakai `AntiCheatService`
+[`finalizeRace()`](../app/Livewire/Concerns/FinalizesRace.php#L39) memanggil
+[`isValidRaceResult()`](../app/Livewire/Concerns/FinalizesRace.php#L218) (memakai `AntiCheatService`
 yang sama) sebelum menulis hasil:
 
 - **Valid** → EXP diberikan (`addExp()`, sudah dibobot akurasi seperti sebelumnya) dan baris baru

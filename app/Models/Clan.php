@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ClanMemberStatus;
 use App\Enums\ClanWarStatus;
 use Binafy\LaravelUserMonitoring\Traits\Actionable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -84,6 +85,40 @@ class Clan extends Model
         return $this->members()->where('status', ClanMemberStatus::Active);
     }
 
+    /**
+     * Only clans that still have at least one active member.
+     *
+     * A clan cannot normally empty out -- the leader can't kick or leave themselves, so
+     * disband and transfer are the only exits -- but a roster CAN reach zero through data
+     * repair, a cascade, or a future path we haven't written yet. When it does, the clan
+     * is a ghost: it lists in Browse with "0 members", can be sent join requests nobody
+     * can approve, and can be challenged to a war it cannot possibly play, handing the
+     * challenger free Elo.
+     *
+     * Hiding rather than deleting: the row is harmless where it sits, and deleting it
+     * would cascade into the war records of OPPOSING clans whose power has already moved
+     * -- the same reason disband is blocked mid-war.
+     */
+    public function scopePopulated(Builder $query): Builder
+    {
+        return $query->whereHas('members', fn (Builder $q) => $q->where('status', ClanMemberStatus::Active));
+    }
+
+    /**
+     * Active roster in authority order: leader, then co-leaders, then members.
+     *
+     * Sorted in PHP on the enum's rank(), not `orderBy('role')` in SQL. The role column
+     * holds a string, so the database sorts it alphabetically -- which put 'co-leader'
+     * ABOVE 'leader'. Every roster reads through here so the order can never drift
+     * between the two pages that render it.
+     */
+    public function orderedActiveMembers()
+    {
+        return $this->activeMembers()->with('user')->get()
+            ->sortBy(fn (ClanMember $m) => [$m->role->rank(), mb_strtolower($m->user->username ?? '')])
+            ->values();
+    }
+
     /** The clan's current pending/ongoing war (either side), or null if free. */
     public function activeWar(): ?ClanWar
     {
@@ -107,6 +142,48 @@ class Clan extends Model
             ->latest('updated_at')
             ->take($limit)
             ->get();
+    }
+
+    /** The most recently finished war involving this clan, or null. */
+    public function lastFinishedWar(): ?ClanWar
+    {
+        return ClanWar::where(function ($q) {
+            $q->where('challenger_clan_id', $this->id)
+                ->orWhere('opponent_clan_id', $this->id);
+        })
+            ->where('status', ClanWarStatus::Finished)
+            ->latest('updated_at')
+            ->first();
+    }
+
+    /**
+     * Points each member scored in the last finished war, keyed by user id.
+     *
+     * Scoped to the last war rather than all-time on purpose: the roster shows this to
+     * help a leader judge who is pulling their weight NOW. An all-time total would rank a
+     * long-idle veteran above an active newcomer, which is the opposite of what the number
+     * is being read for. Members with no claim are simply absent from the map -- the view
+     * distinguishes "scored zero" from "wasn't in the clan yet".
+     *
+     * One aggregate query for the whole roster, not one per member.
+     *
+     * @return \Illuminate\Support\Collection<int, float>
+     */
+    public function lastWarContributions(): \Illuminate\Support\Collection
+    {
+        $war = $this->lastFinishedWar();
+
+        if (! $war) {
+            return collect();
+        }
+
+        return ClanWarModeClaim::where('clan_war_id', $war->id)
+            ->where('clan_id', $this->id)
+            ->whereNotNull('typing_result_id')
+            ->groupBy('user_id')
+            ->selectRaw('user_id, SUM(points) as total')
+            ->pluck('total', 'user_id')
+            ->map(fn ($v) => (float) $v);
     }
 
     /**

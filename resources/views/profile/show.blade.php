@@ -21,7 +21,25 @@
                  fluid-title). The back arrow stays for another player's public profile. --}}
             <div class="flex items-center gap-3">
                 @if($isPublic)
-                    <a href="{{ route('friends.index') }}" wire:navigate class="text-muted hover:text-foreground transition" aria-label="{{ __('profile.back') }}">
+                    {{-- Back goes where you came from, not to a fixed page. A profile is
+                         opened from the clan roster, clan detail, friends, chat and the
+                         leaderboard; this arrow used to always return to Friends, so most
+                         routes in landed somewhere the visitor had never been.
+
+                         href carries the origin worked out server-side from the Referer,
+                         so the arrow is a real link -- middle-click, open-in-new-tab and a
+                         no-JS render all keep working.
+
+                         The click handler prefers history.back() when this page was
+                         actually navigated to, because that restores the previous page's
+                         scroll position: returning to a 20-person roster at the top,
+                         instead of where you were reading, is its own kind of lost. It
+                         falls through to the href on a direct visit, where there is no
+                         history entry to go back to. --}}
+                    <a href="{{ $backUrl }}" wire:navigate
+                        x-data
+                        @click="if (window.history.length > 1) { $event.preventDefault(); window.history.back() }"
+                        class="text-muted hover:text-foreground transition" aria-label="{{ __('profile.back') }}">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                         </svg>

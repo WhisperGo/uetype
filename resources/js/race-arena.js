@@ -377,12 +377,12 @@ const registerRaceArena = (Alpine) => {
         },
 
         /**
-         * Signal a refused space, and make sure it signals AGAIN on every repeat.
+         * Signal a refused key/space, and make sure it signals AGAIN on every repeat.
          *
-         * Re-adding a CSS class that is already applied does not restart its animation, so a
-         * burst of rejected spaces used to shake exactly once and then sit silent -- which
+         * justBlocked drives the red highlight on the active word and input. Left simply set
+         * to true, a burst of refusals wouldn't visibly re-signal (it's already true) -- which
          * reads as "nothing is stopping me" precisely when the player is leaning on the key
-         * hardest. Dropping the flag for one frame restarts it every time.
+         * hardest. Dropping the flag for one frame re-asserts the cue every time.
          */
         nudgeBlocked() {
             if (this._blockedFrame) cancelAnimationFrame(this._blockedFrame);

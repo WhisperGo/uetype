@@ -65,6 +65,119 @@ it('builds the public profile url from the username, not the numeric id (anti-en
     actingAs($me)->get('/users/'.$other->id)->assertNotFound();
 });
 
+// ---- BACK ARROW ----
+//
+// A public profile is reached from the clan roster, clan detail, friends, chat and the
+// leaderboard. The arrow used to be hardcoded to Friends, so returning from a clan
+// member's profile dropped the visitor on a page they had never been on.
+
+/**
+ * The href on the profile's back arrow, as rendered.
+ *
+ * Anchored on the aria-label and scanned backwards to the nearest href, rather than
+ * matching attributes in order: the tag also carries an Alpine @click containing "> 1",
+ * so any `[^>]*` between the two attributes stops at the wrong character.
+ */
+function backArrowHref(string $html): ?string
+{
+    $label = 'aria-label="'.__('profile.back').'"';
+    $labelPos = strpos($html, $label);
+
+    if ($labelPos === false) {
+        return null;
+    }
+
+    $tagStart = strrpos(substr($html, 0, $labelPos), '<a ');
+
+    if ($tagStart === false) {
+        return null;
+    }
+
+    preg_match('/href="([^"]*)"/', substr($html, $tagStart, $labelPos - $tagStart), $m);
+
+    return $m[1] ?? null;
+}
+
+it('points the back arrow at the page the visitor came from', function (string $from) {
+    $me = User::factory()->create();
+    $other = User::factory()->create(['username' => 'targetplayer']);
+
+    $html = actingAs($me)
+        ->get(route('profile.show', $other), ['referer' => url($from)])
+        ->assertOk()
+        ->getContent();
+
+    expect(backArrowHref($html))->toBe($from);
+})->with([
+    'clan roster' => '/clans',
+    'clan detail' => '/clans/1',
+    'leaderboard' => '/leaderboard',
+    'chat' => '/chat',
+]);
+
+it('keeps the query string of the origin page', function () {
+    $me = User::factory()->create();
+    $other = User::factory()->create();
+
+    // Losing ?mode=dm&with=x would return the visitor to a different chat than the one
+    // they left.
+    $html = actingAs($me)
+        ->get(route('profile.show', $other), ['referer' => url('/chat?mode=dm&with=someone')])
+        ->assertOk()
+        ->getContent();
+
+    expect(backArrowHref($html))->toBe('/chat?mode=dm&amp;with=someone');
+});
+
+it('falls back to friends when there is no referer', function () {
+    $me = User::factory()->create();
+    $other = User::factory()->create();
+
+    $html = actingAs($me)
+        ->get(route('profile.show', $other))
+        ->assertOk()
+        ->getContent();
+
+    expect(backArrowHref($html))->toBe(route('friends.index'));
+});
+
+it('refuses an off-site referer rather than linking to it (open redirect)', function () {
+    $me = User::factory()->create();
+    $other = User::factory()->create();
+
+    $response = actingAs($me)
+        ->get(route('profile.show', $other), ['referer' => 'https://evil.example.com/phish'])
+        ->assertOk();
+
+    // The Referer is client-controlled: echoing it into an href unchecked would turn
+    // every profile page into a redirect to anywhere.
+    $response->assertDontSee('evil.example.com');
+    expect(backArrowHref($response->getContent()))->toBe(route('friends.index'));
+});
+
+it('does not point back at another profile page', function () {
+    $me = User::factory()->create();
+    $other = User::factory()->create();
+
+    // Hopping profile -> profile would otherwise make the arrow lead to the profile just
+    // left, never back to the list the visitor started from.
+    $html = actingAs($me)
+        ->get(route('profile.show', $other), ['referer' => url('/users/someoneelse')])
+        ->assertOk()
+        ->getContent();
+
+    expect(backArrowHref($html))->toBe(route('friends.index'));
+});
+
+it('renders no back arrow on your own profile', function () {
+    $me = User::factory()->create();
+
+    actingAs($me)
+        ->get(route('profile.me'))
+        ->assertOk()
+        ->assertDontSee(__('profile.back'));
+});
+
 it('sends a friend request via the friend button', function () {
     $me = User::factory()->create();
     $other = User::factory()->create();

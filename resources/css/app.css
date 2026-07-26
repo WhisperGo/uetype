@@ -175,15 +175,6 @@
         80% { transform: translateX(1.5px) scale(1.02); }
     }
 
-    @keyframes race-typo-shake {
-        0%, 100% { transform: translateX(0); }
-        25% { transform: translateX(-3px); }
-        75% { transform: translateX(3px); }
-    }
-    .race-typo {
-        animation: race-typo-shake 0.18s ease-in-out;
-    }
-
     @keyframes race-surge {
         0% { transform: scale(1); }
         45% { transform: scale(1.14); }
