@@ -85,6 +85,22 @@
         }
     }
 
+    /* Shown only where the primary pointer is a finger.
+
+       Deliberately a POINTER query, not a width query: a narrow desktop window still has a
+       physical keyboard, so a "tap to type" hint there would be nonsense. Used by the typing
+       area, whose keyboard-summoning input is invisible and therefore needs something on
+       screen telling touch users to tap first. */
+    .touch-only {
+        display: none;
+    }
+
+    @media (pointer: coarse) {
+        .touch-only {
+            display: flex;
+        }
+    }
+
     /* ===== CHAT FAB: MICRO-INTERACTION =====
        The FAB used to be draggable, sold as "more feel". That put the delight budget on
        the button's POSITION -- the one property a user needs to stay predictable, and it

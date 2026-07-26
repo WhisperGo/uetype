@@ -27,6 +27,11 @@ return [
 
     'caps_lock' => 'Caps Lock is on',
 
+    // Touch devices only: the keyboard-summoning input is invisible, so without this nothing
+    // on screen says the text has to be tapped before the keyboard will open.
+    'tap_to_type' => 'Tap here to start typing',
+    'input_aria' => 'Typing test input',
+
     'result_rejected' => 'This session was rejected by server validation (implausible) and was not saved.',
 
     'aria' => [
