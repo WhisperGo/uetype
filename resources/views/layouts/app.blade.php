@@ -50,14 +50,26 @@
         </footer>
 
         @auth
-            <x-toast-stack />
+            {{-- ===== NOTIFICATION LANE =====
+                 Everything that appears unbidden shares ONE lane, top-right below the
+                 navbar, so nothing can ever cover the chat button, which owns the
+                 bottom-right corner. Positioning lives entirely in `.notif-lane`
+                 (resources/css/app.css); the children below carry none of their own, and
+                 stack via flex.
 
-            {{-- ===== ROOM INVITE NOTIFICATION =====
-                 A friend's race-room invitation, shown as a non-blocking bottom-right card
-                 with Accept/Decline on any page (so it never covers the typing area). Driven
-                 by the `room-invite-received` window event that <x-toast-stack /> raises from
-                 the friends.{id} channel. --}}
-            <x-room-invite-overlay />
+                 Order matters: the invite comes FIRST so it sits nearest the anchor edge
+                 and stays put. The toast is transient and appends below it -- reverse the
+                 two and every arriving toast would shove the invite, which needs a
+                 decision, down the screen and back up again. Both live outside
+                 {{ '{{ $slot }}' }} to survive wire:navigate -- a notification may arrive
+                 while the player is typing or racing.
+
+                 The invite has no Echo subscription of its own: <x-toast-stack /> listens on
+                 friends.{id} and re-raises `room-invite-received` as a window event. --}}
+            <div class="notif-lane">
+                <x-room-invite-overlay />
+                <x-toast-stack />
+            </div>
 
             {{-- ===== GLOBAL CHAT OVERLAY =====
                  A chat drawer openable from any page, mounted once here (outside

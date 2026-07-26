@@ -33,6 +33,85 @@
 }
 
 @layer utilities {
+    /* The single home for anything that appears UNBIDDEN: toasts and room invites.
+       One lane, one owner -- see docs/design-system.md "Layering & Anchor".
+
+       TOP-right, and the "top" matters as much as the "right".
+
+       Bottom-right is out: it belongs to the chat FAB. A 320px toast anchored `right-5`
+       fully contains a 56px button anchored `right-5`, at a higher z-index, so every toast
+       covered the chat button AND blocked it from being clicked for six seconds -- unread
+       badge included. A transient thing and a permanent control cannot share a corner.
+
+       Bottom-LEFT solved that but read as unusual: most apps put notifications on the
+       right. Moving to the TOP keeps the right-hand side people expect while separating
+       from the FAB on a different AXIS -- not merely by a gap that a layout change could
+       eat. It also drops the mobile special case entirely: the bottom edge was contested,
+       the top edge is not, so one anchor now serves every screen size.
+
+       `top: 5rem` clears the h-16 (4rem) navbar plus a 1rem gap. It must never become
+       `top: 0`: the navbar's right side holds the account dropdown and its friend-request
+       dot, so covering it would just move the original bug from one control to another.
+       (The navbar is not sticky on /typing, but a fixed lane sits in the same place
+       regardless, so the position stays consistent across pages.)
+
+       Children stack via flex, so a new kind of notification needs no coordinates of its
+       own. That is the point: the invite card once hard-coded its own `bottom-24` to dodge
+       the toast, measured against the TOAST rather than the FAB, and the two conventions
+       drifted apart.
+
+       Anchoring at the top also settles the stacking: a transient toast added BELOW a
+       persistent invite leaves the invite where it is. Anchored at the bottom, the same
+       toast pushed the invite upward every time it appeared and dropped it again when it
+       expired. */
+    .notif-lane {
+        position: fixed;
+        z-index: 80;
+        top: 5rem;
+        left: 1.25rem;
+        right: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        /* The lane spans a wide area but must not swallow clicks meant for the page
+           beneath it; each card re-enables pointer events for itself. */
+        pointer-events: none;
+    }
+
+    @media (min-width: 640px) {
+        .notif-lane {
+            left: auto;
+            width: 20rem;
+        }
+    }
+
+    /* ===== CHAT FAB: MICRO-INTERACTION =====
+       The FAB used to be draggable, sold as "more feel". That put the delight budget on
+       the button's POSITION -- the one property a user needs to stay predictable, and it
+       cost keyboard access to do it (see resources/js/chat-dock.js). The budget moved to
+       the button's REACTIONS instead: nothing structural changes, and unlike a drag nobody
+       has to discover it.
+
+       Both effects are one-shot, never looping. A badge that pulses forever stops reading
+       as "new" within seconds and turns into visual noise on every page.
+
+       No reduced-motion guard needed here: the global block at the end of this file
+       already flattens every animation and transition. */
+
+    /* Fires when the unread COUNT changes. The replay is free: the badge carries
+       wire:key="...{count}", so Livewire swaps the element on each new value and the fresh
+       node runs its animation once. Keying off the server-rendered count means the signal
+       is already correct -- own messages and the currently-open thread are excluded by the
+       same query that draws the number. */
+    @keyframes chat-badge-pop {
+        0% { transform: scale(0.4); opacity: 0; }
+        70% { transform: scale(1.15); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    .chat-badge-pop {
+        animation: chat-badge-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
     /* Slim gold-themed scrollbar, used in the chat message list. Firefox uses
        scrollbar-width/color; WebKit (Chrome/Edge) uses the ::-webkit-scrollbar
        pseudo-element. A transparent thumb that thickens on hover so it's unobtrusive

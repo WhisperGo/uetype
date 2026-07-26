@@ -229,6 +229,97 @@ it('does not show the unread badge for the DM the user is currently viewing', fu
     expect(Message::where('recipient_id', $me->id)->whereNull('read_at')->count())->toBe(0);
 });
 
+/**
+ * ===== TOMBOL FAB: AKSES KEYBOARD =====
+ *
+ * Tombol chat dulu HANYA punya @pointerdown (untuk membedakan geser dari ketuk saat
+ * FAB masih bisa di-drag). Akibatnya Enter/Space -- yang oleh browser dikirim sebagai
+ * event `click` -- tak didengarkan siapa pun, jadi pengguna keyboard-only tak bisa
+ * membuka chat overlay di halaman mana pun.
+ *
+ * Drag sudah dibuang, jadi tak ada lagi alasan menghindari `click`. Test ini mengunci
+ * keduanya sekaligus: klik harus ada, pointerdown tak boleh kembali.
+ */
+it('membuka chat lewat click sehingga tombolnya bisa dipakai dengan keyboard', function () {
+    $markup = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/chat-overlay.blade.php')));
+
+    expect($markup)->toContain('@click="open = ! open"')
+        ->and($markup)->not->toContain('@pointerdown');
+});
+
+it('tidak lagi menawarkan FAB yang bisa digeser', function () {
+    // Komentar dibuang: keduanya sengaja MENJELASKAN kenapa drag dibuang, jadi teks
+    // mentahnya memuat istilah yang justru sedang dilarang.
+    $markup = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/chat-overlay.blade.php')));
+    $js = file_get_contents(resource_path('js/chat-dock.js'));
+
+    // Affordance drag di markup.
+    expect($markup)->not->toContain('cursor-grab')
+        ->and($markup)->not->toContain('bubbleStyle()')
+        ->and($markup)->not->toContain('panelStyle()');
+
+    // Dan logikanya di modul: cek pemanggilan, bukan sekadar penyebutan di prosa.
+    expect($js)->not->toContain('startDrag(')
+        ->and($js)->not->toContain('window.__chatOverlayAnchor');
+});
+
+/**
+ * ===== MICRO-INTERACTION FAB =====
+ *
+ * Pengganti drag: "sensasi" dipindah dari POSISI tombol (properti yang justru harus
+ * stabil, dan yang dulu memakan akses keyboard) ke REAKSI tombol.
+ *
+ * Badge di-key dengan jumlah unread supaya Livewire mengganti elemennya tiap kali angka
+ * berubah -- node baru memutar animasinya sekali. Tanpa key, angkanya di-morph di tempat
+ * dan animasi tak pernah terulang.
+ */
+it('memutar ulang animasi badge tiap jumlah unread berubah', function () {
+    $markup = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/chat-overlay.blade.php')));
+
+    expect($markup)->toContain('chat-badge-pop')
+        ->and($markup)->toMatch('/wire:key="fab-unread-\{\{ \$this->unreadCount \}\}"/');
+
+    expect(file_get_contents(resource_path('css/app.css')))
+        ->toContain('@keyframes chat-badge-pop');
+});
+
+it('memberi umpan balik hover dan tekan pada FAB', function () {
+    $markup = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/chat-overlay.blade.php')));
+
+    // Dipersempit ke class TOMBOL-nya saja: `transition-colors` sah dipakai elemen lain di
+    // dalam drawer, jadi mencari di seluruh berkas akan salah tuduh.
+    preg_match('/class="(fixed z-\[56\][^"]*)"/', $markup, $fab);
+    expect($fab)->not->toBeEmpty('Class FAB tak ditemukan -- selektornya berubah?');
+
+    // Angkat saat hover, mengecil saat ditekan -- yang terakhir menggantikan isyarat
+    // taktil yang hilang bersama `active:cursor-grabbing`.
+    expect($fab[1])->toContain('hover:-translate-y-0.5')
+        ->and($fab[1])->toContain('active:scale-95')
+        // `transition-colors` saja tak akan meng-ease transform & shadow-nya.
+        ->and($fab[1])->not->toContain('transition-colors');
+});
+
+/**
+ * Animasi baru tak boleh memaksa pengguna dengan sensitivitas vestibular. Tak ada guard
+ * per-animasi: blok global di app.css meratakan semuanya sekaligus -- test ini memastikan
+ * blok itu tetap ada saat animasi bertambah.
+ */
+it('tetap menghormati preferensi kurangi gerakan setelah animasi baru ditambahkan', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)->toContain('prefers-reduced-motion')
+        ->and($css)->toContain('animation-duration: 0.01ms !important');
+});
+
+/** Drawer harus diumumkan sebagai milik tombolnya, bukan panel lepas. */
+it('menghubungkan tombol FAB dengan drawer lewat aria', function () {
+    $markup = file_get_contents(resource_path('views/livewire/chat-overlay.blade.php'));
+
+    expect($markup)->toContain('aria-controls="chat-overlay-panel"')
+        ->and($markup)->toContain('id="chat-overlay-panel"')
+        ->and($markup)->toContain(':aria-expanded');
+});
+
 /** A message from a DIFFERENT friend, not the open one, must still count as unread. */
 it('still counts unread messages from a conversation that is not open', function () {
     [$me, $friend] = overlayAcceptedFriends();

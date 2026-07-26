@@ -84,6 +84,91 @@ Tiga keluarga font, satu skala modular (~1.2):
 - Butuh warna yang belum ada perannya? Tambahkan **token semantic baru** yang menunjuk primitive —
   jangan tulis hex langsung di komponen.
 
+## Layering & anchor (elemen melayang)
+
+Semua elemen `fixed` di aplikasi ini berbagi satu tumpukan. Nilainya bukan angka acak —
+urutannya menyatakan siapa yang boleh menutupi siapa:
+
+| z-index | Elemen | Berkas |
+|---|---|---|
+| 55 | Drawer chat | `livewire/chat-overlay.blade.php` |
+| 56 | FAB chat (tombol bulat) | `livewire/chat-overlay.blade.php` |
+| 57 | Modal clear-chat | `components/chat/clear-modal.blade.php` |
+| 70 | Modal umum | `components/modal.blade.php` |
+| 80 | `.notif-lane` (toast + undangan room) | `css/app.css` |
+
+Notifikasi berada **di atas modal** dengan sengaja: ia kecil, transien, dan duduk di kanan
+atas, sementara modal terpusat — jadi tak saling menutupi isi.
+
+### Aturan: satu pojok, satu pemilik
+
+- **Kanan bawah = *action corner*.** Kontrol permanen yang dituju pengguna dengan sengaja.
+  Saat ini FAB chat, dan **hanya** FAB chat.
+- **Kanan atas (di bawah navbar) = *notification lane* (`.notif-lane`).** Apa pun yang
+  muncul tanpa diminta.
+
+**Jangan pernah menambatkan elemen baru langsung ke pojok dengan `fixed bottom-* right-*`.**
+Notifikasi baru cukup dijadikan anak `.notif-lane` di `layouts/app.blade.php` — ia akan
+menumpuk otomatis lewat flex, tanpa koordinat sendiri.
+
+**Kenapa aturan ini ada.** Dulu toast dan FAB chat sama-sama menambat ke kanan bawah. Toast
+selebar 320px pada `right-5` sepenuhnya memuat tombol 56px pada `right-5`, dengan z lebih
+tinggi — jadi setiap toast menutupi tombol chat **sekaligus memblokirnya dari klik** selama
+6 detik, termasuk badge unread-nya. Kartu undangan room lalu menambal sendiri dengan
+`bottom-24` hardcoded, tapi mengukurnya terhadap **toast**, bukan terhadap **FAB** —
+sehingga lahir dua konvensi yang saling tidak tahu dan posisi notifikasi jadi tak bisa
+diprediksi. Satu lane menutup seluruh kelas bug itu.
+
+**Kenapa atas, bukan kiri bawah.** Kiri bawah juga memisahkan diri dari FAB (dan itu
+spesifikasi snackbar Material Design — dipakai Gmail/Drive), tapi terbaca asing: mayoritas
+aplikasi menaruh notifikasi di sisi kanan. Pindah ke **atas** mempertahankan sisi kanan yang
+diharapkan orang sambil memisahkan diri dari FAB pada **sumbu berbeda** — bukan sekadar
+jarak yang bisa termakan perubahan layout. Bonusnya, kasus khusus mobile jadi hilang: sisi
+bawah diperebutkan, sisi atas tidak, jadi satu anchor cukup untuk semua ukuran layar.
+
+**`top: 5rem` tak boleh jadi `top: 0`.** Sisi kanan navbar (`h-16` = 4rem) memuat dropdown
+akun dan titik badge friend-request. Menutupinya hanya memindahkan bug aslinya dari satu
+kontrol ke kontrol lain. Dijaga `ToastStackTest` sebagai perbandingan angka, bukan
+pencocokan string.
+
+**Menambat di atas juga menyelesaikan urutan tumpukan.** Toast transien yang ditambahkan
+**di bawah** kartu undangan yang persisten tidak menggeser kartu itu. Waktu lane masih
+menambat di bawah, tiap toast yang muncul mendorong undangan ke atas lalu menjatuhkannya
+lagi saat kedaluwarsa.
+
+**FAB chat tidak boleh dibuat draggable lagi.** Elemen melayang yang bisa dipindah membuat
+tak ada elemen `fixed` lain yang bisa punya jarak aman yang benar, dan implementasi drag
+sebelumnya mematikan akses keyboard ke chat (tombol hanya punya `@pointerdown`, sehingga
+Enter/Space tak sampai ke mana-mana). Alasan lengkapnya ada di kepala
+`resources/js/chat-dock.js`; `ChatOverlayTest` menjaganya agar tidak kembali.
+
+### Micro-interaction: reaksi, bukan posisi
+
+Budget "sensasi" ditaruh pada **reaksi** komponen, bukan pada **posisinya**. Posisi adalah
+properti yang pengguna andalkan untuk stabil — memasang kejutan di situ melawan memori otot,
+dan pada kasus FAB draggable ia menghabiskan akses keyboard sebagai gantinya.
+
+Yang berlaku sekarang di FAB chat:
+
+| Efek | Cara | Kenapa |
+|---|---|---|
+| Angkat saat hover | `hover:-translate-y-0.5 hover:shadow-2xl` | menegaskan ia bisa diklik |
+| Mengecil saat ditekan | `active:scale-95` | mengganti isyarat taktil `active:cursor-grabbing` |
+| Ikon miring saat drawer terbuka | `:class="open ? 'rotate-12' : ''"` | status, tanpa ikon kedua |
+| Badge "pop" saat unread berubah | `wire:key` + `@keyframes chat-badge-pop` | menarik mata ke informasi baru |
+
+Dua aturan yang mengikat:
+
+1. **Satu kali jalan, jangan berulang.** Badge yang berdenyut terus berhenti terbaca sebagai
+   "baru" dalam hitungan detik dan berubah jadi kebisingan visual di tiap halaman.
+2. **Pemicunya sinyal yang benar, bukan yang mudah.** Badge di-key dengan jumlah unread dari
+   server, jadi pesanmu sendiri dan percakapan yang sedang dibuka sudah terkecualikan oleh
+   query yang sama yang menggambar angkanya. Mendengarkan event pesan mentah akan menyala
+   pada kejadian yang keliru.
+
+**Tak perlu guard `prefers-reduced-motion` per animasi** — blok global di akhir `app.css`
+sudah meratakan seluruh `animation` dan `transition` sekaligus.
+
 ## Menambah token / tema
 
 - **Token semantic baru:** tambah `--color-x` di `app.css` (`:root`) lalu daftarkan di

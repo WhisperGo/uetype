@@ -10,9 +10,12 @@
      over the socket, so Accept can deep-link straight to /multiplayer?invite=CODE where
      mount() auto-joins -- no server round-trip to render the card.
 
-     Sits above the toast stack (both anchor bottom-right): an invite needs a decision, so it
-     takes priority over a transient toast. Auto-dismisses after a while if ignored, so it
-     doesn't linger for a typist who never looks over. --}}
+     Carries NO positioning of its own: it is a child of `.notif-lane` in
+     layouts/app.blade.php and sits ABOVE the toast in that lane, because an invite needs a
+     decision while a toast is transient. It used to hard-code `bottom-24` to dodge the
+     toast -- measured against the TOAST rather than the chat FAB, which is how two
+     conventions grew apart. Auto-dismisses after a while if ignored, so it doesn't linger
+     for a typist who never looks over. --}}
 @auth
     <div x-data="{
         show: false,
@@ -20,8 +23,17 @@
         mascot: '/icon/uetype_mascot.png',
         autoHideMs: 15000,
         _timer: null,
+        testActive: false,
+        _pending: null,
         receive(detail) {
             if (!detail?.roomCode) return;
+            // Mid-test or mid-race: hold it, and crucially DON'T arm the timer. A card that
+            // isn't on screen must not be counting down -- a 15s timer started during a
+            // two-minute race would expire the invite before it was ever seen.
+            if (this.testActive) {
+                this._pending = detail;
+                return;
+            }
             this.invite = {
                 inviterUsername: detail.inviterUsername || '',
                 inviterAvatar: detail.inviterAvatar || null,
@@ -31,6 +43,21 @@
             // Re-arm the auto-dismiss each time a fresh invite lands.
             if (this._timer) clearTimeout(this._timer);
             this._timer = setTimeout(() => { this.show = false; }, this.autoHideMs);
+        },
+        setTestActive(active) {
+            this.testActive = !!active;
+            if (this.testActive) {
+                // A card already on screen when the test starts is stashed, not dropped, so
+                // it returns with a full countdown instead of a half-spent one.
+                if (this.show) { this._pending = this.invite; this.dismiss(); }
+                return;
+            }
+            const held = this._pending;
+            this._pending = null;
+            // Replayed through receive(), so the countdown starts from zero. A held invite
+            // may be stale by now; that's harmless -- MultiplayerLobby::mount() just fails
+            // to join a dead code and the player lands on the lobby as usual.
+            if (held) this.receive(held);
         },
         accept() {
             const code = this.invite.roomCode;
@@ -46,20 +73,21 @@
         },
     }"
         x-on:room-invite-received.window="receive($event.detail)"
+        x-on:test-activity.window="setTestActive($event.detail && $event.detail.active)"
         x-show="show"
         x-cloak
         role="alertdialog"
         aria-modal="false"
         :aria-hidden="show ? 'false' : 'true'"
+        {{-- Upward, matching the toast below it: the lane is anchored at the top, so both
+             cards tuck back toward that edge rather than across the screen. --}}
         x-transition:enter="transition ease-out duration-300"
-        x-transition:enter-start="opacity-0 translate-y-4 translate-x-4"
-        x-transition:enter-end="opacity-100 translate-y-0 translate-x-0"
+        x-transition:enter-start="opacity-0 -translate-y-4"
+        x-transition:enter-end="opacity-100 translate-y-0"
         x-transition:leave="transition ease-in duration-200"
-        x-transition:leave-start="opacity-100 translate-x-0"
-        x-transition:leave-end="opacity-0 translate-x-4"
-        {{-- bottom-24 (not bottom-5): clears the toast stack, which anchors bottom-right too,
-             so a coincidental chat/friend toast and this invite don't overlap. --}}
-        class="fixed z-[80] bottom-24 right-5 w-80 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-2xl border border-brand-bright/30 bg-surface shadow-2xl backdrop-blur">
+        x-transition:leave-start="opacity-100 translate-y-0"
+        x-transition:leave-end="opacity-0 -translate-y-4"
+        class="pointer-events-auto overflow-hidden rounded-2xl border border-brand-bright/30 bg-surface shadow-2xl backdrop-blur">
 
         {{-- Accent glow strip at the top --}}
         <div class="h-1 w-full bg-gradient-to-r from-brand-bright/60 via-gold/60 to-brand-bright/60"></div>

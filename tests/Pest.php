@@ -71,6 +71,19 @@ function arenaSourceAll(): string
     ]);
 }
 
+/**
+ * Markup Blade tanpa blok komentar `{{-- ... --}}`.
+ *
+ * Konvensi proyek ini menyuruh komentar menjelaskan ALASAN sebuah keputusan, yang berarti
+ * komentar sering menyebut justru pola yang sudah dilarang ("dulu menambat di X, sekarang
+ * tidak"). Assertion yang membaca teks mentah akan menuduh prosanya sendiri dan gagal
+ * dengan alasan yang salah. Pakai ini kalau yang diuji adalah markup AKTIF.
+ */
+function tanpaKomentarBlade(string $markup): string
+{
+    return preg_replace('/\{\{--.*?--\}\}/s', '', $markup);
+}
+
 function countQueries(Closure $callback): int
 {
     DB::flushQueryLog();
