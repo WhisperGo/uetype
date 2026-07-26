@@ -41,9 +41,10 @@ Butuh dua perangkat: buat room dari desktop, join dari HP.
 | A12 | Selesaikan balapan sampai garis akhir | Layar hasil muncul, WPM & akurasi **masuk akal** | Akurasi tepat 100% padahal ada typo = credit keystroke swipe tak jalan |
 | A13 | Putar layar ke landscape di tengah balapan | Teks & lintasan tetap terbaca, ketikan tak hilang | — |
 | A14 | Lihat panel **LIVE STANDINGS** | Tiap lane: nama + WPM di baris atas, **lintasan penuh** di baris bawah. Maskot & bendera finis terpisah jelas | Kalau maskot masih menempel di bendera, lane belum membungkus |
-| A15 | Ketik terus sampai melewati baris pertama paragraf | Paragraf **menggeser sendiri**; kata aktif naik ke baris teratas, dua baris berikutnya terlihat | Kalau tak bergeser, `syncWordScroll()` tak terpanggil |
+| A15 | Ketik terus sampai melewati baris **kedua** paragraf | Baris 1 & 2 **diam sama sekali**; paragraf baru **menggeser sendiri** satu baris tepat saat kata aktif masuk baris **ketiga**, lalu kata aktif duduk di baris **tengah** (satu baris konteks di atas, satu lookahead di bawah) | Kalau tak bergeser, `syncWordScroll()` tak terpanggil. Kalau bergeser sejak baris kedua, rumusnya bukan rumus solo |
 | A16 | Sepanjang balapan, tanpa menggulir sama sekali | Paragraf **dan** field ketik terlihat bersamaan | Kalau field tertutup keyboard, kita perlu `interactive-widget=resizes-content` |
 | A17 | Reload halaman di tengah balapan | Paragraf langsung terposisi di kata tempat kamu berhenti, bukan di kata pertama | `syncWordScroll()` di `init()` tak jalan |
+| A18 | Ketik **melewati baris ketiga** sampai akhir tanpa berhenti, sementara lawan juga aktif | Paragraf hanya bergeser **turun**, satu baris per lompatan, dan **tak pernah melompat balik ke atas** | Kalau kotaknya melompat tiba-tiba: `wire:ignore` pada kartu paragraf hilang → morph Livewire (dari emit progres kita sendiri, ~8x/detik) menghapus inline `transform`-nya. Lihat `docs/features/multiplayer-race.md` |
 
 ### ⚠ Dua langkah yang paling penting dilaporkan balik
 

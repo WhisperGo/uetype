@@ -545,9 +545,12 @@ kembali ke tampilan, jadi pemain hanya bisa melihat **kata-katanya ATAU field-ny
 keduanya**: baca ke depan, gulir turun, ketik, tertarik turun lagi, gulir naik lagi. Praktis
 tak bisa dimainkan walau setiap keystroke sebenarnya terdaftar dengan benar.
 
-Sekarang paragrafnya **dipotong tiga baris** dan **menggeser dirinya sendiri** agar kata yang
-sedang diketik selalu berada di baris teratas yang terlihat, dengan dua baris lookahead di
-bawahnya. Field tak pernah berpindah relatif terhadap teks, jadi tak ada lagi yang perlu
+Sekarang paragrafnya **dipotong tiga baris** dan **menggeser dirinya sendiri**. Aturannya persis
+menyalin mesin ketik solo: jendela **tak bergerak sama sekali** sampai kata aktif mencapai baris
+**ketiga**, lalu baris itu mendarat di baris **tengah** — satu baris konteks di atas, satu baris
+lookahead di bawah. Bereaksi satu baris lebih lambat daripada "kata aktif ke baris teratas" inilah
+yang menghilangkan jitter "turun kepagian lalu naik lagi di huruf pertama baris berikutnya": baris 1
+dan 2 sama-sama diam. Field tak pernah berpindah relatif terhadap teks, jadi tak ada lagi yang perlu
 digulir.
 
 Tiga keputusan di dalamnya:
@@ -555,13 +558,66 @@ Tiga keputusan di dalamnya:
 | Hal | Kenapa |
 |---|---|
 | `overflow-hidden`, **bukan** `auto` | Ini tak boleh berubah jadi area gulir kedua yang harus digeser tangan — itu memindahkan masalahnya, bukan menyelesaikannya |
-| Digeser dari **`offsetTop` kata aktif**, bukan hitungan baris di JS | Kata membungkus berbeda di tiap lebar layar; hitungan sendiri akan berbeda dari yang benar-benar dilay-out browser |
+| Indeks baris tiap kata di-**snapshot** dari `offsetTop` yang benar-benar diukur (`_lineOf`), tak pernah ditebak dari jumlah karakter | Kata membungkus berbeda di tiap lebar layar; hitungan sendiri akan berbeda dari yang benar-benar dilay-out browser. Tapi baris sebuah kata adalah **fakta layout** — ia hanya berubah saat re-wrap nyata, bukan saat mengetik — jadi diukur sekali lalu dibaca dari map itu, bukan di-re-measure tiap panggil |
 | Tingginya dalam **`em`** (`4.875em` = 3 × `leading-relaxed`) | Mengikuti line-height, bukan tebakan piksel yang patah begitu skala tipografi berubah. Angka yang sama dipakai mesin ketik solo |
 
-`syncWordScroll()` dipanggil dari **dua** tempat: `advanceWord()` (kata maju) dan `init()`
-(reload di tengah balapan mendarat di kata yang bisa jauh di bawah). Keduanya lewat
-`$nextTick` — kata aktif mendapat padding saat menjadi aktif, sehingga barisnya bisa reflow
-dan `offsetTop` baru bisa dipercaya setelah Alpine menerapkan kelas barunya.
+`syncWordScroll()` dipicu dari **empat** tempat, semuanya lewat `scheduleWordScroll()` (rAF, jadi
+`offsetTop` dibaca pasca-layout — pola `schedulePositionUpdate()` mesin solo):
+
+1. `advanceWord()` — kata maju.
+2. `checkInput()` — **self-heal tiap ketikan**. Ini yang dipunyai solo (`updatePosition()` jalan
+   dari ~9 titik) dan dulu tak dipunyai balapan: solo recompute tiap karakter sehingga satu frame
+   buruk terkoreksi sendiri, sementara balapan cuma recompute saat kata maju — jadi apa pun yang
+   salah bertahan sampai spasi berikutnya.
+3. `init()` — reload di tengah balapan mendarat di kata yang bisa jauh di bawah.
+4. `_invalidateScroll()` — setiap penyebab **re-wrap**, yang juga menggugurkan snapshot `_lineOf`.
+   `window.resize` saja tak cukup: flip `$arenaDense` saat racer ke-4 masuk (`p-8` → `p-5`), banner
+   sudden-death yang muncul in-flow di atas kotak, dan lane lawan yang membungkus lalu mengubah
+   lebar kartu — tak satu pun memicu `resize`, jadi ada `ResizeObserver` pada track. `resize`
+   dipertahankan di sampingnya karena di sebagian browser mobile keyboard lunak mengubah visual
+   viewport tanpa mengubah ukuran track. `document.fonts.ready` menangkap web font yang mendarat
+   setelah paint pertama: diukur sebelum itu, snapshot-nya menggambarkan layout font **fallback** —
+   salah untuk seluruh balapan, dan itu bukan resize, jadi tak ada lagi yang mengoreksinya.
+
+#### Kenapa kartu paragrafnya `wire:ignore`
+
+Ini perbaikan untuk bug "kotaknya terkadang berpindah tiba-tiba", dan hal paling berharga di
+halaman ini — **enam upaya** gagal sebelum akar masalahnya ketemu.
+
+`checkInput()` memanggil `$wire.updateRaceProgress()` pada **setiap ketikan** (dithrottle ~120ms di
+`emitProgress()`), jadi selagi pemain mengetik arena di-morph Livewire **~8x per detik**. HTML server
+untuk track kata **tak punya atribut `style`** — transform-nya ada semata karena Alpine mengevaluasi
+`:style` di klien. Morphdom membandingkan HTML-server-tanpa-style dengan DOM-hidup-dengan-transform,
+lalu **menghapus atributnya**: paragraf melompat ke `translateY(0)`, dan karena track membawa
+`transition-transform duration-[85ms]`, lompatan itu **dianimasikan**.
+
+Alpine tak memperbaikinya. `:style` hanya dievaluasi ulang saat dependensi reaktifnya
+(`wordScrollOffset`) **berubah**, dan di antara dua kata maju nilainya konstan — jadi efeknya tak
+pernah jalan lagi dan transform tetap hilang sampai spasi berikutnya. Bug ini hanya tampak setelah
+offset-nya bukan nol (kata aktif di baris 3+) dan hanya kalau ada morph yang mendarat di antara dua
+kata maju: **intermiten secara struktural**, itulah "terkadang"-nya.
+
+Enam upaya sebelumnya semuanya mengubah **RUMUS** di dalam `syncWordScroll()`. Tak ada rumus yang
+selamat kalau atributnya dihapus dari elemen yang ditulisinya.
+
+Dua catatan yang mudah salah duga:
+
+- Progres **lawan** bukan penyebabnya. `.race.progress` masuk langsung ke Alpine store tanpa
+  round-trip Livewire (`race-echo.js`), jadi pemain lain tak pernah me-morph DOM kita. Yang me-morph
+  adalah emit **kita sendiri**.
+- Mesin solo lolos tanpa `wire:ignore` pada track teksnya karena `updatePosition()` jalan tiap
+  ketikan — self-heal menutupi masalahnya — dan solo tak punya panggilan `$wire` per ketikan. Caret
+  solo, yang tak seberuntung itu, **sudah** memakai `wire:ignore` dan mendokumentasikan kegagalan ini
+  persis (lihat `typing-engine.blade.php`). Perbaikannya dua lapis: (1) `wire:ignore` supaya Livewire
+  tak pernah menyentuh elemennya, (2) transform reaktif supaya Alpine selalu memasangnya. Track kata
+  balapan sudah punya lapisan kedua, tapi tidak lapisan pertama.
+
+Aman di-`wire:ignore` karena tak ada nilai server-rendered di dalam kartu itu: kata-katanya dari
+`textToType` (tetap sepanjang balapan) dan semua state yang menatanya (`currentWordIndex`,
+`hasError`, `justBlocked`, `wordScrollOffset`) ada di klien. Atributnya dipasang pada div paragraf
+**dalam**, bukan kartu luar, karena padding kartu luar digerakkan `$dense` dan harus tetap bisa
+di-morph. `wire:ignore` memblokir morph, bukan teardown Alpine — dan `wire:key` root sudah stabil,
+jadi `raceArena` tidak di-remount.
 
 > **Yang sengaja belum disentuh:** `interactive-widget=resizes-content` pada viewport meta,
 > yang akan membuat Android menyusutkan layout viewport saat keyboard naik. Itu memengaruhi

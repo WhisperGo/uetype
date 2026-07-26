@@ -302,6 +302,18 @@ it('membatasi paragraf balapan jadi jendela tiga baris yang menggeser sendiri', 
         // Penanda yang dipakai syncWordScroll() untuk menemukan kata aktif.
         ->toContain(':data-word-index="wIdx"');
 
+    // Kartu paragraf WAJIB `wire:ignore`. checkInput() memanggil $wire.updateRaceProgress() tiap
+    // ketikan (dithrottle ~120ms), jadi tiap respons Livewire me-morph subtree ini ~8x/detik. HTML
+    // server untuk track TAK punya atribut `style` -- transform-nya ada semata karena Alpine
+    // mengevaluasi :style di klien -- jadi morphdom MENGHAPUSNYA dan paragraf melompat ke
+    // translateY(0), sambil dianimasikan 85ms oleh transition-transform. Alpine tak memperbaikinya:
+    // :style hanya dievaluasi ulang saat wordScrollOffset BERUBAH, dan di antara dua kata maju ia
+    // konstan. Inilah bug "kotaknya terkadang berpindah tiba-tiba"; enam upaya sebelumnya semuanya
+    // mengubah RUMUS di syncWordScroll(), padahal tak ada rumus yang selamat kalau atributnya
+    // dihapus dari elemen yang ditulisinya. Perbaikan dua lapis yang sama sudah dipakai caret solo
+    // (typing-engine.blade.php): wire:ignore + transform reaktif.
+    expect($markup)->toMatch('/wire:ignore\s+class="font-mono text-xl leading-relaxed/');
+
     // Track WAJIB `relative`: itu yang membuatnya jadi offsetParent, sehingga offsetTop kata
     // aktif diukur dari atas track (bukan kartu jauh di atas -> paragraf tergeser keluar layar).
     expect($markup)->toMatch('/x-ref="wordsTrack"\s+class="relative /');
@@ -349,12 +361,16 @@ it('meniru aturan scroll solo: geser di baris ketiga, tahan kata aktif di baris 
     $sync = raceMethodSource('syncWordScroll()');
 
     expect($sync)->toContain('data-word-index')
-        // offsetTop kata aktif, bukan getBoundingClientRect() yang rentan waktu-baca animasi.
-        ->and($sync)->toContain('active.offsetTop')
         ->and($sync)->not->toContain('getBoundingClientRect')
-        // Rumus solo: geser hanya saat baris ketiga (currentTop >= 2*lh), turunkan satu baris.
-        ->and($sync)->toContain('lineHeight * 2')
-        ->and($sync)->toContain('currentTop - lineHeight');
+        // Baris tiap kata di-SNAPSHOT sekali ke _lineOf[], lalu dibaca dari map itu -- BUKAN
+        // re-measure live tiap panggil (yang goyang saat morph/transisi -> "turun lagi").
+        ->and($sync)->toContain('_lineOf')
+        // Snapshot: bulatkan offsetTop tiap kata jadi indeks baris.
+        ->and($sync)->toContain('Math.round')
+        ->and($sync)->toContain('el.offsetTop')
+        // Rumus solo: geser hanya saat baris ketiga (index >= 2), turunkan satu baris.
+        ->and($sync)->toContain('lineIndex >= 2')
+        ->and($sync)->toContain('(lineIndex - 1) * lineHeight');
 
     // Recompute dijadwalkan lewat rAF (seperti schedulePositionUpdate solo), dibaca pasca-layout.
     $schedule = raceMethodSource('scheduleWordScroll()');
@@ -363,11 +379,44 @@ it('meniru aturan scroll solo: geser di baris ketiga, tahan kata aktif di baris 
 
     $arena = tanpaKomentarJs(file_get_contents(resource_path('js/race-arena.js')));
 
-    // syncWordScroll dipanggil TEPAT sekali di kode (dari dalam rAF scheduleWordScroll); titik
-    // pemicunya (init, advanceWord, resize) semua lewat scheduleWordScroll.
+    // syncWordScroll dipanggil TEPAT sekali di kode (dari dalam rAF scheduleWordScroll); semua
+    // titik pemicu lewat scheduleWordScroll. Assertion ini yang mencegah perbaikan di masa depan
+    // memanggilnya sinkron lalu membaca offsetTop pra-reflow.
     expect(substr_count($arena, 'this.syncWordScroll()'))->toBe(1);
-    // Dipicu dari init (reload di tengah balapan), advanceWord (kata maju), dan resize (re-wrap).
-    expect(substr_count($arena, 'this.scheduleWordScroll()'))->toBeGreaterThanOrEqual(3);
+    // Dipicu dari EMPAT tempat: init (reload di tengah balapan), _invalidateScroll (re-wrap:
+    // resize / ResizeObserver / fonts.ready), advanceWord (kata maju), dan checkInput (SELF-HEAL
+    // tiap ketikan). Yang terakhir itu yang dipunyai solo dan dulu tak dipunyai balapan: solo
+    // recompute tiap karakter sehingga satu frame buruk terkoreksi sendiri, sementara balapan cuma
+    // recompute saat kata maju -- jadi apa pun yang salah bertahan sampai spasi berikutnya.
+    expect(substr_count($arena, 'this.scheduleWordScroll()'))->toBeGreaterThanOrEqual(4);
+});
+
+/**
+ * Snapshot baris (_lineOf) hanya sah untuk LEBAR dan FONT saat ia diukur, jadi setiap penyebab
+ * re-wrap wajib menggugurkannya. Kelewat satu, dan _lineOf diam-diam terus menggeser ke baris yang
+ * kata aktifnya sudah tak di sana lagi -- tanpa jalur pulih, karena offset-nya fungsi murni dari
+ * map yang kini salah. Gejalanya beda dari lompatan berulang: jendela mendarat di baris yang salah
+ * lalu bertahan begitu.
+ */
+it('menggugurkan snapshot baris di setiap penyebab re-wrap, bukan cuma resize window', function () {
+    $init = raceMethodSource('init()');
+
+    expect($init)
+        // Rotate / resize window. Tetap ada di samping observer: di sebagian browser mobile
+        // keyboard lunak mengubah visual viewport tanpa mengubah ukuran track.
+        ->toContain("addEventListener('resize'")
+        // Perubahan pada box TRACK sendiri -- TAK ADA yang memicu `resize`: flip $arenaDense saat
+        // racer ke-4 masuk (p-8 -> p-5), banner sudden-death yang muncul in-flow di atas kotak,
+        // lane lawan yang membungkus dan mengubah lebar kartu.
+        ->toContain('ResizeObserver')
+        // Web font yang mendarat setelah paint pertama me-rewrap semua baris. Diukur sebelum itu,
+        // snapshot-nya menggambarkan layout font FALLBACK -- salah untuk seluruh balapan, dan ini
+        // bukan resize, jadi tak ada lagi yang akan mengoreksinya.
+        ->toContain('document.fonts');
+
+    // Observer memegang referensi ke elemen track, jadi WAJIB dilepas saat komponen mati --
+    // paragrafnya dibuang saat selesai/menyerah.
+    expect(raceMethodSource('destroy()'))->toContain('_scrollObserver');
 });
 
 // ===== 4. Konfirmasi exact-match =====

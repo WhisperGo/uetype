@@ -671,7 +671,43 @@
                          `overflow-hidden` (not `auto`): this must never become a second thing
                          the player has to scroll by hand. --}}
                     <!-- PARAGRAPH DRAFT BLOCK WITH TYPERACER COLOR INDICATORS -->
-                    <div class="font-mono text-xl leading-relaxed tracking-wide select-none p-5 bg-background/30 rounded-xl border border-border/20">
+                    {{-- `wire:ignore` -- THE fix for "the box jumps suddenly" (`berpindah tiba-tiba`).
+
+                         checkInput() calls $wire.updateRaceProgress() on EVERY keystroke (throttled
+                         to ~120ms in emitProgress), so every Livewire response morphs this subtree:
+                         the arena is morphed ~8x per second while the player types. The server HTML
+                         for the track below has NO `style` attribute -- the transform exists only
+                         because Alpine evaluated `:style` on the client -- so morphdom diffed
+                         server-HTML-without-style against live-DOM-with-transform and STRIPPED the
+                         attribute. The paragraph snapped to translateY(0), and since the track
+                         carries `transition-transform duration-[85ms]`, it ANIMATED there: the jump.
+
+                         Alpine did not repair it. `:style` is only re-evaluated when its reactive
+                         dependency (wordScrollOffset) CHANGES, and between two word advances that
+                         value is constant -- so the effect never re-ran and the transform stayed
+                         stripped until the next space. Visible only once the offset is non-zero
+                         (active word on line 3+), and only when a morph lands between two advances,
+                         which is why it was intermittent.
+
+                         Six earlier attempts all changed the FORMULA inside syncWordScroll(). No
+                         formula survives the attribute being deleted from the element it writes to.
+                         Note the morphs come from our OWN emit -- an OPPONENT's progress arrives via
+                         `.race.progress` straight into the Alpine store with no Livewire round-trip
+                         (race-echo.js), so other players never morph our DOM.
+
+                         Safe to ignore: nothing in here is server-rendered. The words come from
+                         `textToType` (fixed for the whole race) and every state that styles them
+                         (currentWordIndex, hasError, justBlocked, wordScrollOffset) lives on the
+                         client. It goes on THIS div, not the card above, because the card's padding
+                         is $dense-driven and must stay morphable -- these classes are all static.
+                         `wire:ignore` blocks morphing, not Alpine teardown, and the root
+                         `wire:key="race-arena-..."` is stable, so raceArena is not remounted.
+
+                         Exactly the two-layer fix the solo caret already documents: (1) wire:ignore
+                         so Livewire never touches the element, (2) a reactive transform so Alpine
+                         always sets it. See typing-engine.blade.php. --}}
+                    <div wire:ignore
+                        class="font-mono text-xl leading-relaxed tracking-wide select-none p-5 bg-background/30 rounded-xl border border-border/20">
                       {{-- The clipping window. Three lines at leading-relaxed (1.625) = 4.875em,
                            the same figure the solo engine uses, so it follows the line-height
                            instead of a pixel guess that breaks when the type scale changes. --}}

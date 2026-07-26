@@ -164,6 +164,12 @@ const registerRaceArena = (Alpine) => {
         // out -- mirrors the solo engine's schedulePositionUpdate/positionFrame exactly, which
         // is what makes the two scrolls feel identical (offsetTop read post-reflow, not pre).
         _scrollFrame: null,
+        // Scroll layout snapshot: _lineOf maps wordIndex -> its visual line number, measured ONCE
+        // from the fully-wrapped paragraph so a read taken mid-transition can't move a word between
+        // lines; _lineH is one line's height. Both dropped by _invalidateScroll() on every cause of
+        // a re-wrap (resize, ResizeObserver on the track, fonts.ready) and on (re)init.
+        _lineOf: null,
+        _lineH: null,
         typedText: '',
         startTime: null,
         isFinished: false,
@@ -213,6 +219,11 @@ const registerRaceArena = (Alpine) => {
                 this.restoreProgress();
             }
 
+            // Fresh render -> drop the cached line snapshot so it is re-measured from the newly
+            // laid-out paragraph (word count/width may differ from a previous race).
+            this._lineOf = null;
+            this._lineH = null;
+
             // A mid-race reload lands on a word that may be far down the paragraph, so the
             // window has to be positioned before the player sees it. Runs for a fresh racer
             // too, where it settles on 0 -- one call rather than a branch. $nextTick waits for
@@ -252,13 +263,40 @@ const registerRaceArena = (Alpine) => {
             this._onSuddenDeath = (ev) => this.syncSuddenDeath(ev.detail.remaining);
             window.addEventListener('race-sudden-death', this._onSuddenDeath);
 
-            // Re-sync the window on resize/orientation change: a new width re-wraps the paragraph,
-            // so the active word's line (and therefore its offsetTop) changes. Solo self-corrects
-            // because it recomputes on every keystroke; the race only recomputes on word-advance,
-            // so without this a rotate/resize mid-word would leave the window on a stale line.
-            // rAF-coalesced via scheduleWordScroll, so a burst of resize events costs one read.
-            this._onResize = () => this.scheduleWordScroll();
+            // A word's line number is only valid for the WIDTH and FONT it was measured at, so
+            // every cause of a re-wrap has to drop the snapshot and re-measure. Miss one and
+            // _lineOf silently keeps scrolling to a line the word is no longer on, with no way
+            // back: the offset is a pure function of the (now wrong) map. rAF-coalesced via
+            // scheduleWordScroll, so a burst of events costs one read.
+            this._invalidateScroll = () => {
+                this._lineOf = null;
+                this._lineH = null;
+                this.scheduleWordScroll();
+            };
+
+            // 1. Rotate / window resize. Kept alongside the observer below because on some mobile
+            //    browsers the soft keyboard resizes the visual viewport without resizing the track.
+            this._onResize = this._invalidateScroll;
             window.addEventListener('resize', this._onResize);
+
+            // 2. Anything that changes the TRACK's own box -- none of which fire `resize`: the
+            //    $arenaDense flip when the 4th racer joins (p-8 -> p-5), the sudden-death banner
+            //    appearing in flow above the box, an opponent lane wrapping and changing the card
+            //    width. Each re-wraps the paragraph. The observer also fires once on observe,
+            //    which doubles as the initial measurement.
+            if (typeof ResizeObserver !== 'undefined') {
+                this._scrollObserver = new ResizeObserver(() => this._invalidateScroll());
+                this.$nextTick(() => {
+                    if (this.$refs.wordsTrack) this._scrollObserver.observe(this.$refs.wordsTrack);
+                });
+            }
+
+            // 3. The web font landing after first paint re-wraps every line. Measured before that,
+            //    the snapshot describes a FALLBACK-font layout -- wrong for the whole race, and
+            //    this is not a resize, so nothing else would ever correct it.
+            if (document.fonts && document.fonts.ready) {
+                document.fonts.ready.then(() => this._invalidateScroll());
+            }
         },
 
         // One race's identity: room + start time. A rematch in the same room uses a new
@@ -330,6 +368,12 @@ const registerRaceArena = (Alpine) => {
             if (this._onResize) {
                 window.removeEventListener('resize', this._onResize);
                 this._onResize = null;
+            }
+            // The observer holds a reference to the track element, so it must be disconnected or
+            // it outlives the component (the paragraph is removed on finish/give-up).
+            if (this._scrollObserver) {
+                this._scrollObserver.disconnect();
+                this._scrollObserver = null;
             }
             if (this._scrollFrame) {
                 cancelAnimationFrame(this._scrollFrame);
@@ -438,6 +482,15 @@ const registerRaceArena = (Alpine) => {
 
             // Any keystroke means the player is acting on the refused space, so drop the hint.
             this.clearBlocked();
+
+            // SELF-HEAL the window on every keystroke -- the one thing solo does and the race did
+            // not. Solo's updatePosition() runs from ~9 sites, every keystroke among them, so a
+            // single bad frame corrects itself on the next character. The race only recomputed on
+            // word-advance, so anything wrong -- a stale line snapshot, or a morph that wiped the
+            // track's inline transform -- survived until the next space. Cheap: rAF-coalesced to
+            // one call per frame, and once the snapshot exists syncWordScroll is a map lookup, not
+            // a DOM read.
+            this.scheduleWordScroll();
 
             let targetWord = this.words[this.currentWordIndex];
 
@@ -631,31 +684,6 @@ const registerRaceArena = (Alpine) => {
             }, delay);
         },
 
-        /**
-         * Rebuild the word position from a saved progress percentage (mid-race reload).
-         *
-         * The server stores only progress_percent, so convert it back to a correct-character
-         * count and consume whole "word + space" spans until the next word wouldn't fit. The
-         * cursor lands at the START of the first unfinished word: past words count toward
-         * progress (correctCharsFromPastWords) and typedText is empty, so the player simply
-         * carries on. We never restore a PARTIAL word -- word-lock only credits whole words,
-         * so a partial prefix was never part of the saved progress anyway.
-         */
-        /**
-         * Slide the paragraph so the word being typed sits on the top visible line.
-         *
-         * The paragraph is clipped to three lines; without this the player would have to
-         * scroll it by hand, and on a phone every keystroke re-scrolls the focused input back
-         * into view, so they could never see the words and the field at the same time.
-         *
-         * Reads offsetTop rather than counting lines: the words wrap differently at every
-         * width, and a line count computed in JS would disagree with what the browser
-         * actually laid out. Landing the active line at the top (offset 0 for the first line,
-         * so nothing moves until the player reaches line two) buys the most lookahead.
-         *
-         * Silent when the ref is missing -- spectators and the finished/gave-up screens render
-         * no paragraph at all.
-         */
         // Coalesce scroll updates to one per animation frame, run AFTER layout -- the exact
         // shape of the solo engine's schedulePositionUpdate(). Reading offsetTop inside rAF (not
         // synchronously / in $nextTick) guarantees the paragraph has already re-laid-out, so the
@@ -669,42 +697,92 @@ const registerRaceArena = (Alpine) => {
             });
         },
 
+        /**
+         * Slide the paragraph so the word being typed stays inside the three-line window.
+         *
+         * The paragraph is clipped to three lines; without this the player would have to scroll
+         * it by hand, and on a phone every keystroke re-scrolls the focused input back into
+         * view, so they could never see the words and the field at the same time.
+         *
+         * Solo's rule, verbatim (typing-game.js updatePosition): nothing moves until the active
+         * word reaches the THIRD line, and that line then lands on the MIDDLE visible line --
+         * one line of context above, one of lookahead below. Reacting a line later than "active
+         * word to the top" is what removed the jitter of dropping early and bouncing back on the
+         * next line's first letter: lines 1 and 2 are both dead still.
+         *
+         * Each word's line index is SNAPSHOT once into _lineOf and read from that map after. A
+         * word's line is a fact of the text layout -- it changes only on a real re-wrap, and
+         * every cause of one invalidates the snapshot (see init(): resize, a ResizeObserver on
+         * the track, and fonts.ready). Reading it live per call meant re-measuring a paragraph
+         * that could be mid-morph or mid-transform-transition.
+         *
+         * Silent when the ref is missing -- spectators and the finished/gave-up screens render
+         * no paragraph at all.
+         */
         syncWordScroll() {
             const track = this.$refs.wordsTrack;
             if (!track) return;
 
-            const active = track.querySelector(`[data-word-index="${this.currentWordIndex}"]`);
-            if (!active) return;
-
-            // Mirror the SOLO engine's scroll rule (typing-game.js) so both feel identical.
+            // MEASURE EVERY WORD'S LINE ONCE, then never trust a live re-measure again.
             //
-            // The rule keeps the active line on the MIDDLE of the three visible lines and only
-            // scrolls when the active line reaches the THIRD line -- not the moment it leaves
-            // line one. That is what fixes the "drops early / rises again on the first letter of
-            // the next line" jitter: the window is quantised to whole line steps and reacts a
-            // full line later, so line 1 and line 2 both sit still.
+            // Why not just measure the active word each time: reading offsetTop against a
+            // paragraph that is mid-transform-transition returns a transient value, so the active
+            // word's computed line could flip between frames and the paragraph bobbed up and down.
             //
-            // offsetTop is used because it is PURE LAYOUT: a CSS `transform` never changes it and
-            // it is not an animated value, so it reads the same at any moment (even mid-slide).
-            // The track is `position: relative` (see Blade) so offsetTop is measured from the
-            // track top. Every word carries identical box metrics (see Blade) so activation never
-            // re-wraps a line and offsetTop stays monotonic.
+            // Treat each word's line as a FIXED FACT of the text layout instead. A word's line
+            // only changes on a real re-wrap, never while typing -- so the first time we can
+            // cleanly measure the full paragraph we snapshot the line index of every word into
+            // _lineOf[] and read from that map after. Every cause of a re-wrap drops the snapshot
+            // (see init(): resize, ResizeObserver on the track, fonts.ready), which is what keeps
+            // "measure once" from turning into "measure once, wrongly, forever".
+            //
+            // NOTE: this snapshot is NOT what fixed the box jumping -- that was the missing
+            // `wire:ignore` on the paragraph card (see the Blade comment). An OPPONENT's progress
+            // never morphs our DOM at all: `.race.progress` goes straight into the Alpine store
+            // with no Livewire round-trip (race-echo.js).
+            if (!this._lineOf) {
+                const first = track.querySelector('[data-word-index="0"]');
+                const lineH = first ? first.offsetHeight : 0;
+                const top0 = first ? first.offsetTop : 0;
+                if (!lineH) return; // paragraph not laid out yet; a later call will catch it.
 
-            // First word anchors the top of line one; its height is one line stride. The track
-            // has NO row gap (see Blade), so stride == line height exactly, same as solo.
-            const firstWord = track.querySelector('[data-word-index="0"]');
-            const containerTop = firstWord ? firstWord.offsetTop : 0;
-            const lineHeight = (firstWord || active).offsetHeight;
-            if (!lineHeight) return;
+                this._lineH = lineH;
+                const map = {};
+                let maxLine = 0;
+                track.querySelectorAll('[data-word-index]').forEach((el) => {
+                    const idx = Number(el.dataset.wordIndex);
+                    const line = Math.max(0, Math.round((el.offsetTop - top0) / lineH));
+                    map[idx] = line;
+                    if (line > maxLine) maxLine = line;
+                });
+                // Only trust the snapshot once the paragraph has actually wrapped into multiple
+                // lines (a single-line measure mid-morph would map every word to line 0). Until
+                // then, leave _lineOf null and retry on the next scheduled call.
+                if (maxLine === 0 && Object.keys(map).length > 1) return;
+                this._lineOf = map;
+            }
 
-            // Active line's top, measured from line one and quantised to whole line steps.
-            const currentTop = active.offsetTop - containerTop;
+            // The active word's line comes from the snapshot, not a live read.
+            const lineIndex = this._lineOf[this.currentWordIndex] ?? 0;
+            const lineHeight = this._lineH;
 
-            // Scroll only at line three (currentTop >= 2*lh); then land the active line on the
-            // MIDDLE visible line (currentTop - lh), leaving one line of context above it.
-            this.wordScrollOffset = currentTop >= lineHeight * 2 ? currentTop - lineHeight : 0;
+            // Solo's rule: scroll only once the active word reaches the THIRD line (index >= 2),
+            // then land that line on the MIDDLE visible line (index - 1), keeping one line of
+            // context above. Offset is always a whole number of line heights -> never mid-line,
+            // and it is a pure step function of the (fixed) line index -> it can never bob back.
+            this.wordScrollOffset = lineIndex >= 2 ? (lineIndex - 1) * lineHeight : 0;
         },
 
+        /**
+         * Rebuild the word position from a saved progress percentage (mid-race reload).
+         *
+         * The server stores only progress_percent, so convert it back to a correct-character
+         * count and consume whole "word + space" spans until the next word wouldn't fit. The
+         * cursor lands at the START of the first unfinished word: past words count toward
+         * progress (correctCharsFromPastWords) and typedText is empty, so the player simply
+         * carries on. We never restore a PARTIAL word -- word-lock only credits whole words,
+         * so a partial prefix was never part of the saved progress anyway.
+         */
         restoreProgress() {
             const totalChars = this.textToType.length;
             const targetCorrect = Math.round((this.resumeProgress / 100) * totalChars);
