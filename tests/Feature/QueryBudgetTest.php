@@ -154,7 +154,7 @@ test('browse clan tidak menembak query per clan', function () {
         for ($i = 0; $i < $n; $i++) {
             $leader = User::factory()->create();
             $clan = Clan::create([
-                'name' => 'Clan '.uniqid(),
+                'name' => 'Clan '.uniqid('', true),
                 'leader_id' => $leader->id,
                 'power' => 1000,
             ]);

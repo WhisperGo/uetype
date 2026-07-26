@@ -34,7 +34,7 @@ function makeAcceptedFriends(): array
 function makeClanWithMembers(int $memberCount = 2): array
 {
     $leader = User::factory()->create();
-    $clan = Clan::create(['name' => 'Test Clan '.uniqid(), 'leader_id' => $leader->id, 'power' => 1000]);
+    $clan = Clan::create(['name' => 'Test Clan '.uniqid('', true), 'leader_id' => $leader->id, 'power' => 1000]);
     ClanMember::create(['clan_id' => $clan->id, 'user_id' => $leader->id, 'role' => ClanRole::Leader, 'status' => ClanMemberStatus::Active]);
 
     $members = [$leader];

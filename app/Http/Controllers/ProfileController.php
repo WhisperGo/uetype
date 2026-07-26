@@ -28,9 +28,8 @@ class ProfileController extends Controller
             return $this->me($request);
         }
 
-        // array_merge, NOT the `+` operator: `+` keeps the LEFT side's value for a key
-        // that already exists, so the payload's default backUrl would silently win and
-        // every profile would still point at Friends.
+        // array_merge, NOT `+`: `+` keeps the left side's value for an existing key, so the
+        // payload's default backUrl would silently win.
         return view('profile.show', array_merge(
             $this->profilePayload($user, public: true),
             ['backUrl' => $this->backUrl($request)],
@@ -38,23 +37,17 @@ class ProfileController extends Controller
     }
 
     /**
-     * Where the profile's back arrow should point: the page the visitor came from.
+     * Where the profile's back arrow points: the page the visitor came from.
      *
-     * Public profiles are reached from at least five places (clan roster, clan detail,
-     * friends, chat, leaderboard), but the arrow used to be hardcoded to Friends -- so
-     * opening a clan member's profile and going back dumped you on a page you were never
-     * on, losing your place in the roster.
+     * Profiles are reached from five places (clan roster, clan detail, friends, chat,
+     * leaderboard). Read from the Referer, not a `?from=` param, so no caller has to pass
+     * anything and shared links still behave.
      *
-     * Derived from the Referer rather than a `?from=` parameter so no caller has to
-     * remember to pass anything, and so a link shared into chat still behaves.
+     * The header is client-controlled, hence two guards: same host, or it is an open
+     * redirect; and not a profile page, or hopping profile to profile points the arrow at
+     * the one just left instead of the list it started from.
      *
-     * Two guards on that header, which is client-controlled:
-     *  - it must be a URL on THIS host, or it becomes an open redirect to anywhere;
-     *  - it must not be a profile page, or bouncing between two profiles would make the
-     *    arrow point at the one you just left instead of the list you started from.
-     *
-     * Falls back to Friends when there is no usable referer (a direct visit, a bookmark,
-     * a privacy-stripped header) so the arrow always leads somewhere sensible.
+     * Falls back to Friends when there is no usable referer.
      */
     private function backUrl(Request $request): string
     {

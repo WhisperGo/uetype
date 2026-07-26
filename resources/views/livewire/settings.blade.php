@@ -114,11 +114,9 @@
                 x-on:close-modal.window="$event.detail === 'confirm-account-deletion' ? typed = '' : null">
                 <h2 class="font-display text-xl text-foreground">{{ __('settings.danger.confirm_title') }}</h2>
 
-                {{-- A clan leader cannot delete their account: the FK cascade would take
-                     the whole clan with it. Say so up front and offer the way out, rather
-                     than letting them type their full username only to be refused. The
-                     server enforces this regardless -- this block just stops the dead end
-                     being a surprise. --}}
+                {{-- A leader cannot delete their account (the FK cascade would take the clan
+                     with it). Said up front with the way out, rather than after they type
+                     their whole username. The server enforces it regardless. --}}
                 @if ($this->leadsClan)
                     <div class="p-4 mt-4 border rounded-xl bg-danger/5 border-danger/20">
                         <p class="font-mono text-sm text-danger">{{ __('settings.danger.leads_clan', ['clan' => $this->leadsClan->name]) }}</p>

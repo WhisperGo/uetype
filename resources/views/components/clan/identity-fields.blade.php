@@ -1,11 +1,8 @@
-{{-- The clan identity form: live preview, name, tag, description, emblem and colour
-     pickers. Shared by the Create tab and the leader's Edit form, which ask for exactly
-     the same five values -- keeping one copy means a field added or a limit changed lands
-     in both, and the two forms cannot drift apart visually.
+{{-- The clan identity form, shared by the Create tab and the leader's Edit form: both ask
+     for the same five values, so one copy keeps them from drifting.
 
-     Field names are passed in rather than hardcoded, because the two callers bind to
-     different Livewire properties (new* vs edit*). Each caller's error keys follow the
-     same names, so @error works unchanged. --}}
+     Field names are props because the callers bind to different Livewire properties
+     (new* vs edit*); error keys follow those names, so @error works unchanged. --}}
 @props([
     'name',
     'tag',

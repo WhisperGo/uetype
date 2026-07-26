@@ -41,13 +41,11 @@ class Clans extends Component
 
     public string $newDescription = '';
 
-    // Disband confirmation: the leader must retype the clan name, matching the
-    // retype-to-confirm pattern already used for account deletion in Settings.
+    // Retype-to-confirm for disband, matching the account-deletion pattern in Settings.
     public string $confirmDisbandName = '';
 
-    // Edit-identity form (leader only), seeded from the clan by startEditClan().
-    // Kept separate from the new* create-form fields so an abandoned edit can never
-    // leak into the create form, or vice versa.
+    // Edit-identity form (leader only), seeded by startEditClan(). Separate from the new*
+    // fields so an abandoned edit cannot leak into the create form.
     public bool $editing = false;
 
     public string $editName = '';
@@ -90,14 +88,21 @@ class Clans extends Component
     /**
      * Drop the computed cache after membership changes.
      *
-     * #[Computed] caches per REQUEST, and the view renders AFTER the action runs -- so
-     * without this, an action that changes membership (create/join/leave/approve) would
-     * re-render with stale pre-change values. Must be called in every action that touches
-     * clan_members.
+     * #[Computed] caches per request and the view renders AFTER the action, so any action
+     * touching clan_members must call this or re-render stale pre-change values.
      */
     private function forgetClanCache(): void
     {
-        unset($this->myMembership, $this->myClan, $this->myClanMembers, $this->pendingRequests, $this->browseClans);
+        unset(
+            $this->myMembership,
+            $this->myClan,
+            $this->myClanMembers,
+            $this->pendingRequests,
+            $this->browseClans,
+            // Derived from the role, so a transfer that demotes me must drop these too.
+            $this->canManageMembers,
+            $this->canManageClan,
+        );
     }
 
     /** Create a new clan (if you're not already in one) and make the creator its leader. */
@@ -107,12 +112,9 @@ class Clans extends Component
             return;
         }
 
-        // Trim into the PROPERTIES before validating, not into separate local variables.
-        // validate() used to check the raw $this->newName while Clan::create stored the
-        // trimmed version -> a name "  ab  " (6 chars) passed min:3 then saved as "ab"
-        // (2 chars). Worse: unique checked the spaced string, so a trimmed name clashing
-        // with an existing clan passed validation then hit the DB constraint -> 500.
-        // Validating the final value closes both holes.
+        // Trim into the PROPERTIES, so validation sees the value that gets stored.
+        // Validating the raw input instead lets "  ab  " pass min:3 and save as "ab", and
+        // lets a name that collides only once trimmed reach the DB constraint as a 500.
         $this->newName = trim($this->newName);
         $this->newTag = trim($this->newTag);
         $this->newDescription = trim($this->newDescription);
@@ -192,16 +194,11 @@ class Clans extends Component
     }
 
     /**
-     * Withdraw my own pending join request.
+     * Withdraw my own pending join request; without it, an applicant to an inactive clan
+     * is stuck until a leader acts.
      *
-     * Scoped to Auth::id() AND Pending status, so this can only ever delete a request the
-     * caller made themselves -- it can't be turned into a way to cancel someone else's,
-     * nor into a back door out of an active membership (that is leaveClan, which has its
-     * own leader guard).
-     *
-     * Without this a request could only be cleared by the leader accepting or rejecting
-     * it, so an applicant to an inactive clan was stuck: the row sat there indefinitely
-     * and the Browse row showed a dead "Request Sent" label with no way back.
+     * Scoped to Auth::id() AND Pending: never someone else's request, and never a back
+     * door out of an active membership (that is leaveClan, with its own leader guard).
      */
     public function cancelJoinRequest(int $clanId): void
     {
@@ -275,7 +272,7 @@ class Clans extends Component
      */
     public function kickMember(int $clanMemberId): void
     {
-        if (! $this->canManageMembers()) {
+        if (! $this->canManageMembers) {
             return;
         }
 
@@ -329,20 +326,18 @@ class Clans extends Component
     /**
      * Leader-only: hand the clan to an active member, stepping down to member yourself.
      *
-     * Both the pivot role AND clans.leader_id move, inside one transaction. They are two
-     * records of the same fact -- role drives permissions, leader_id is what clan-war
-     * notifications address -- so a partial update would leave a clan whose "leader" by
-     * one measure is a plain member by the other.
+     * The pivot role and clans.leader_id move in ONE transaction: role drives permissions,
+     * leader_id addresses clan-war notifications, and a partial update leaves a clan whose
+     * leader by one measure is a plain member by the other.
      */
     public function transferLeadership(int $clanMemberId): void
     {
-        $me = $this->myMembership;
-
-        if (! $me || ! $me->role->canManageClan()) {
+        if (! $this->canManageClan) {
             return;
         }
 
-        $clan = $me->clan;
+        $me = $this->myMembership;
+        $clan = $this->myClan;
 
         $target = ClanMember::where('id', $clanMemberId)
             ->where('clan_id', $clan->id)
@@ -368,21 +363,18 @@ class Clans extends Component
     }
 
     /**
-     * Load the clan's current identity into the edit form and open it.
+     * Load the clan's identity into the edit form and open it.
      *
-     * Seeded on open rather than kept in sync continuously: the form fields are also the
-     * live preview, so binding them to the clan directly would make an abandoned edit
-     * look like it had been applied.
+     * Seeded on open, not bound to the clan: the fields double as the live preview, so
+     * binding would make an abandoned edit look applied.
      */
     public function startEditClan(): void
     {
-        $me = $this->myMembership;
-
-        if (! $me || ! $me->role->canManageClan()) {
+        if (! $this->canManageClan) {
             return;
         }
 
-        $clan = $me->clan;
+        $clan = $this->myClan;
 
         $this->editName = $clan->name;
         $this->editTag = (string) $clan->tag;
@@ -410,13 +402,11 @@ class Clans extends Component
      */
     public function saveClanIdentity(): void
     {
-        $me = $this->myMembership;
-
-        if (! $me || ! $me->role->canManageClan()) {
+        if (! $this->canManageClan) {
             return;
         }
 
-        $clan = $me->clan;
+        $clan = $this->myClan;
 
         // Trim into the properties before validating, for the same reason createClan
         // does: a padded name must not pass min:3 and then be stored shorter.
@@ -475,14 +465,14 @@ class Clans extends Component
      */
     private function changeRole(int $clanMemberId, ClanRole $from, ClanRole $to, string $messageKey): void
     {
-        $me = $this->myMembership;
-
-        if (! $me || ! $me->role->canManageClan()) {
+        if (! $this->canManageClan) {
             return;
         }
 
+        $clan = $this->myClan;
+
         $target = ClanMember::where('id', $clanMemberId)
-            ->where('clan_id', $me->clan->id)
+            ->where('clan_id', $clan->id)
             ->where('status', ClanMemberStatus::Active)
             ->where('role', $from)
             ->first();
@@ -497,27 +487,23 @@ class Clans extends Component
 
         $this->notify($target->user_id, [
             'type' => 'accepted',
-            'message' => __($messageKey, ['clan' => $me->clan->name]),
+            'message' => __($messageKey, ['clan' => $clan->name]),
         ]);
     }
 
     /**
      * Leader-only: permanently delete the clan, confirmed by retyping its name.
      *
-     * Blocked while a war is pending or ongoing: the opposing clan has already committed
-     * mode claims and, once accepted, a power snapshot. Letting a losing leader dissolve
-     * the clan mid-war would be a free way to dodge an Elo loss, and the cascade would
-     * delete the opponent's war record along with it.
+     * Blocked mid-war: dissolving would dodge an Elo loss for free, and the cascade would
+     * take the opponent's war record with it.
      */
     public function disbandClan(): void
     {
-        $me = $this->myMembership;
-
-        if (! $me || ! $me->role->canManageClan()) {
+        if (! $this->canManageClan) {
             return;
         }
 
-        $clan = $me->clan;
+        $clan = $this->myClan;
 
         if ($clan->activeWar() !== null) {
             $this->addError('disband', __('clan.error.disband_during_war'));
@@ -557,16 +543,29 @@ class Clans extends Component
         }
     }
 
-    /** True if I hold roster powers (leader or co-leader) in a clan I'm actually in. */
-    private function canManageMembers(): bool
+    /**
+     * Roster powers (approve, reject, kick): leader and co-leaders.
+     *
+     * Public so the view gates on the SAME predicate the actions do; a blade re-deriving
+     * this from the role could drift from the server gate.
+     */
+    #[Computed]
+    public function canManageMembers(): bool
     {
         return $this->myClan && $this->myMembership->role->canManageMembers();
+    }
+
+    /** Ownership powers (promote, demote, transfer, disband, edit): leader only. */
+    #[Computed]
+    public function canManageClan(): bool
+    {
+        return $this->myClan && $this->myMembership->role->canManageClan();
     }
 
     /** A pending ClanMember row for my clan; leader and co-leaders may approve/reject. */
     private function pendingForMyLeadership(int $clanMemberId): ?ClanMember
     {
-        if (! $this->canManageMembers()) {
+        if (! $this->canManageMembers) {
             return null;
         }
 
@@ -609,16 +608,11 @@ class Clans extends Component
     }
 
     /**
-     * Active roster of my clan, in authority order, each row carrying the context a
-     * leader needs to judge it: online state, last-seen time, points scored in the last
-     * finished war, and when they joined.
+     * Active roster with the context a leader needs to judge each row: presence, war
+     * contribution, join date.
      *
-     * The contribution map is fetched ONCE for the whole roster and looked up per row --
-     * a per-member query here would be 20 extra round trips on a full clan.
-     *
-     * `contribution` is null (not 0.0) for a member with no claim in that war, so the view
-     * can tell "scored nothing" apart from "wasn't here yet"; and it stays null throughout
-     * when the clan has never finished a war.
+     * `contribution` is null (not 0.0) when the clan has never finished a war, so the view
+     * never accuses a member of idling in a war that never ran.
      */
     #[Computed]
     public function myClanMembers()
@@ -627,14 +621,16 @@ class Clans extends Component
             return collect();
         }
 
-        $contributions = $this->myClan->lastWarContributions();
-        $hasWarHistory = $contributions->isNotEmpty() || $this->myClan->lastFinishedWar() !== null;
+        // Fetched once for the whole roster; a per-member lookup would be 20 extra
+        // queries on a full clan.
+        $lastWar = $this->myClan->lastFinishedWar();
+        $contributions = $this->myClan->warContributions($lastWar);
 
         return $this->myClan->orderedActiveMembers()->map(fn (ClanMember $member) => [
             'member' => $member,
             'user' => $member->user,
             'online' => $member->user->isOnline(),
-            'contribution' => $hasWarHistory ? ($contributions[$member->user_id] ?? 0.0) : null,
+            'contribution' => $lastWar ? ($contributions[$member->user_id] ?? 0.0) : null,
             'joined_at' => $member->created_at,
         ]);
     }
@@ -643,7 +639,7 @@ class Clans extends Component
     #[Computed]
     public function pendingRequests()
     {
-        if (! $this->canManageMembers()) {
+        if (! $this->canManageMembers) {
             return collect();
         }
 

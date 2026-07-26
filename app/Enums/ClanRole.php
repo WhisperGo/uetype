@@ -5,10 +5,9 @@ namespace App\Enums;
 /**
  * A user's role in a clan, ordered by authority: leader > co-leader > member.
  *
- * Co-leaders share the leader's day-to-day roster powers (approve, reject, kick) but
- * never the clan's existence or ownership: only the single leader may transfer
- * leadership, promote/demote, or disband. That split is what makes it safe to hand the
- * role out -- a co-leader can help run the clan without being able to destroy it.
+ * Co-leaders share the roster powers but never ownership -- only the leader may transfer,
+ * promote/demote or disband. That split is what makes the role safe to hand out: a
+ * co-leader can help run the clan without being able to destroy it.
  */
 enum ClanRole: string
 {
@@ -17,9 +16,8 @@ enum ClanRole: string
     case Member = 'member';
 
     /**
-     * Sort weight for rosters (leader first). The roster used to `orderBy('role')`, which
-     * sorted the STRING -- with a third role that alphabetises to co-leader, leader,
-     * member, putting the leader second.
+     * Sort weight for rosters, leader first. Needed because the role column is a string:
+     * sorting it in SQL alphabetises 'co-leader' above 'leader'.
      */
     public function rank(): int
     {

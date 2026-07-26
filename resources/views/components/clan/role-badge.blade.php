@@ -1,9 +1,6 @@
-{{-- Role badge for a clan roster row. Renders nothing for a plain member: a badge on
-     every row would make the two that carry authority stop standing out.
-
-     Gold (the app's authority accent) marks the single leader; the co-leader badge is
-     deliberately quieter -- outline only, muted foreground -- so the hierarchy reads at a
-     glance instead of two gold badges competing. --}}
+{{-- Role badge for a roster row. Nothing for a plain member -- a badge on every row would
+     stop the two that carry authority from standing out. Gold marks the single leader;
+     co-leader stays quieter so two gold badges do not compete. --}}
 @props(['role'])
 
 @php
