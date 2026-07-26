@@ -2,6 +2,9 @@
 
 **Service utama:** [`App\Services\AntiCheatService`](../../app/Services/AntiCheatService.php)
 **Penjaga sesi solo:** [`App\Services\SoloSessionGuard`](../../app/Services/SoloSessionGuard.php)
+**Analisis timing keystroke:** [`App\Services\KeystrokeAnalyzer`](../../app/Services/KeystrokeAnalyzer.php)
+**Baseline per-pemain:** [`App\Services\LongitudinalBaseline`](../../app/Services/LongitudinalBaseline.php)
+**Antrean review admin:** [`App\Livewire\ReviewQueue`](../../app/Livewire/ReviewQueue.php) (`/review-queue`)
 **Dipakai oleh:** [`TypingEngine::saveResult()`](../../app/Livewire/TypingEngine.php) (solo),
 [`MultiplayerLobby::updateRaceProgress()`](../../app/Livewire/MultiplayerLobby.php) (WPM live race),
 dan [`FinalizesRace::isValidRaceResult()`](../../app/Livewire/Concerns/FinalizesRace.php) (validasi hasil akhir race)
@@ -226,7 +229,7 @@ Saat hasil dikirim, empat pemeriksaan berjalan:
 |---|---|
 | **Kecocokan sesi** | mode+sub-mode saat submit harus sama dengan yang diterbitkan; kalau tidak → tolak |
 | **Durasi mode `time`** | diambil dari **sub-mode** (30 = 30 detik), payload diabaikan |
-| **Plafon karakter** | melebihi batas fisik (durasi × 15 cps) atau panjang teks × 3 → **tolak** |
+| **Plafon karakter** | melebihi batas fisik (durasi × 13 cps) atau panjang teks × 2.5 → **tolak** |
 | **Anti-replay** | satu teks terbit = satu kiriman; sesi dihapus setelah dipakai |
 
 `textToType` juga diberi `#[Locked]` supaya client tak bisa menukarnya dengan teks panjang.
@@ -252,8 +255,15 @@ hanya menurunkan WPM sendiri).
 
 Mengetik bukan satu tombol satu karakter: salah ketik, backspace, dan mengulang kata
 menambah keystroke nyata. Teks 25 kata (~130 karakter) wajar menghasilkan 150+ keystroke,
-jadi plafon tekstual memakai **faktor 3× + 50** — longgar terhadap pengetik berantakan,
+jadi plafon tekstual memakai **faktor 2.5× + 50** — longgar terhadap pengetik berantakan,
 tetap rapat terhadap angka fabrikasi (ribuan karakter atas teks 130 karakter).
+
+> **Diperketat dari 15→13 cps dan 3×→2.5×** (mengikuti rekomendasi laporan bot-Python §7.3/§7.4).
+> 13 cps ≈ 156 WPM **berkelanjutan** — masih di atas run jujur mana pun (rekor dunia 210–230 WPM
+> adalah puncak, bukan rata-rata berkelanjutan), sekaligus mempersempit ruang yang dulu dipakai
+> "bot sabar" (yang menunggu durasi nyata lalu memalsukan payload penuh) untuk menembus ~180–200
+> WPM. Angka ini **interim konservatif**: nilai final sebaiknya diambil dari distribusi `net_wpm`
+> install ini sendiri (p99.9), bukan dari dokumen.
 
 ### 7.6 Data lama
 
@@ -264,6 +274,80 @@ tetap rapat terhadap angka fabrikasi (ribuan karakter atas teks 130 karakter).
 php artisan typing:audit                 # ambang default 150 WPM
 php artisan typing:audit --wpm=120       # ambang lebih ketat
 ```
+
+### 7.7 Deteksi berlapis di luar plafon karakter
+
+Plafon karakter (§7.2) menutup *besaran* — berapa banyak yang mungkin diketik dalam sekian
+detik. Tapi laporan bot-Python menunjukkan itu belum cukup: "bot sabar" yang menunggu durasi
+nyata lalu memalsukan payload penuh masih bisa mendarat di WPM tinggi yang mustahil-tapi-di-bawah
+plafon. Tiga lapisan tambahan menilai **bentuk** sesi, bukan hanya angka akhirnya. Semua berjalan
+di `saveResult()` **hanya untuk jalur solo**.
+
+**a. Konsistensi sebagai sinyal** (`AntiCheatService::isImpossiblyConsistent()`)
+
+UEType sudah menghitung konsistensi WPM untuk presentasi; sekarang ia juga jadi sinyal anti-cheat.
+Kurva WPM yang **rata sempurna pada kecepatan tinggi** mustahil bagi manusia — bahkan juara dunia
+berfluktuasi antar kata. Gerbang: konsistensi ≥ **97%** **dan** net WPM > **120**. Dua syarat itu
+penting bersama — konsistensi tinggi pada WPM rendah itu **wajar** bagi pemula yang mengetik
+pelan-pelan dan hati-hati, jadi lantai WPM mencegah salah-tolak mereka. Ditambahkan sebagai
+alasan `consistency_impossible` di `IMPOSSIBLE_REASONS`.
+
+**b. Analisis timing keystroke** (`KeystrokeAnalyzer`)
+
+Klien kini mengirim **array interval antar-keystroke** (`keyIntervals`) — sampel acak dibatasi
+(reservoir sampling, maks 300) supaya payload kecil dan tak bisa "diketik jujur di awal saja".
+`KeystrokeAnalyzer::analyze()` memeriksa distribusinya:
+
+| Sinyal | Aturan | Kenapa |
+|---|---|---|
+| `keystroke_timing_uniform` | koefisien variasi < **0.15** | manusia tak pernah seragam |
+| `keystroke_timing_impossible` | > **30%** interval di bawah **40 ms** | batas fisik jari |
+| `keystroke_timing_identical` | satu nilai muncul > **60%** | tanda `time.sleep(k)` tetap |
+
+Butuh minimal **20 sampel**; di bawah itu `has_data:false` dan **tak pernah menolak** —
+*fail-safe* wajib agar bundle klien lama (yang tak mengirim `keyIntervals`) tak menjatuhkan
+pemain jujur saat deploy.
+
+> **Rollout log-only.** Saat ini `KEYSTROKE_TIMING_ENFORCED = false` di `TypingEngine` — sinyal
+> yang menyala **dicatat, belum menolak**. Ini rilis pertama yang aman: kumpulkan data dulu,
+> pastikan tak ada pemain jujur tertangkap, baru naikkan ke penolakan. Detektornya sudah hidup.
+
+**c. Baseline longitudinal per-pemain** (`LongitudinalBaseline`)
+
+Keunggulan struktural UEType atas situs typing murni: **riwayat pemain** sudah tersimpan di
+`typing_results`. `reviewReasonFor()` membandingkan hasil baru dengan riwayat pemain di mode/config
+yang sama:
+
+- `longitudinal_spike` — lonjakan > **40%** di atas rata-rata (jendela **20** sesi terakhir, minimal **5** riwayat)
+- `no_history_high` — pemain tanpa riwayat langsung mencetak ≥ **150 WPM**
+
+**Ini tidak menolak** — pemain memang bisa membaik, dan menghukum peningkatan asli jauh lebih
+merusak kepercayaan daripada meloloskan satu cheater. Ia hanya **menandai untuk review manusia**.
+Hanya riwayat `clear`/`approved` yang jadi pembanding (hasil pending/rejected tak mencemari baseline).
+
+### 7.8 Antrean review admin (`review_status`)
+
+Sinyal §7.7c yang menandai membuat hasil disimpan sebagai **`pending`**, bukan ditolak. Kolom
+`review_status` di `typing_results` punya empat nilai:
+
+| Status | Arti | Di leaderboard? |
+|---|---|---|
+| `clear` | lolos otomatis (mayoritas hasil) | ✅ |
+| `pending` | ditahan untuk ditinjau manusia | ❌ (sampai di-approve) |
+| `approved` | admin menyetujui | ✅ |
+| `rejected` | admin menolak | ❌ selamanya |
+
+Admin membuka **`/review-queue`** ([`ReviewQueue`](../../app/Livewire/ReviewQueue.php)) untuk
+menilai tiap hasil pending (pemain, WPM, akurasi, alasan flag) lalu **Approve** (hasil masuk
+leaderboard, PB pemain ikut naik bila mengalahkan rekor) atau **Reject** (tetap di luar). Ini
+satu-satunya lapisan yang **tak bisa di-*pace*** — tak ada angka tetap untuk dibidik di bawahnya,
+karena manusia yang memutuskan.
+
+Akses admin-saja: route memikul `EnsureUserIsAdmin` sebagai **satu-satunya** gerbang (guest &
+non-admin sama-sama dapat **404**, tak membocorkan keberadaan panel), dan tiap aksi memeriksa
+ulang Gate `access-monitoring` di server. Filter leaderboard di
+[`leaderboard.blade.php`](../../resources/views/livewire/leaderboard.blade.php) hanya menerima
+`clear` + `approved` — diterapkan di **satu sumber `$scoped`** sehingga papan dan rank selalu setuju.
 
 ## 8. Integritas Balapan Multiplayer
 
@@ -364,7 +448,7 @@ Empat temuan (F-01…F-04) dari pentest pihak ketiga. Ringkasan status & apa yan
 | ID | Temuan | Status |
 |---|---|---|
 | F-01 | Dashboard monitoring tanpa autentikasi | **Ditutup** — §3.6 + Gate `access-monitoring` |
-| F-02 | Manipulasi skor/WPM/leaderboard | **Ditutup** — §7, diperketat lagi di §10.1 |
+| F-02 | Manipulasi skor/WPM/leaderboard | **Ditutup** — §7, diperketat di §10.1, dilapisi §7.7–§7.8 & gerbang §11 |
 | F-03 | Manipulasi poin Clan War | **Ditutup** — §9 + batas klaim per anggota |
 | F-04 | Paket monitoring insecure-by-default | **Ditutup** — §3.6 + audit dependensi di CI |
 
@@ -417,3 +501,51 @@ jadi menyamarkan di lapisan request menutup semua jalur tanpa menyentuh `vendor/
 
 > **Urutan middleware penting:** `AnonymizeClientIp` harus terdaftar **sebelum**
 > `VisitMonitoringMiddleware` di [`bootstrap/app.php`](../../bootstrap/app.php).
+
+## 11. Gerbang Kelayakan Leaderboard (`minTimeTyping`)
+
+Semua lapisan di atas menilai **apakah sebuah hasil asli**. Gerbang ini bekerja pada dimensi
+berbeda — **siapa yang boleh masuk papan** — dan berjalan **sebelum** hasil dinilai. Idenya dari
+`minTimeTyping` Monkeytype: dua analisis independen (laporan bot-Python §7.1 dan analisis
+arsitektur Monkeytype) sama-sama menempatkannya sebagai pertahanan berrasio efektivitas tertinggi.
+
+### 11.1 Masalah yang ditutup
+
+UEType punya banyak papan leaderboard yang, dengan basis pemain kecil, sebagian besar **kosong**.
+Papan kosong berarti **satu hasil apa pun langsung peringkat 1** — penyerang tak perlu WPM ekstrem
+sama sekali. Selama pintu itu terbuka, memperketat plafon WPM (§7, §10) **tidak menyentuh serangan
+ini**: peringkat 1 tersedia gratis untuk akun sekali-pakai.
+
+### 11.2 Aturan
+
+Hasil hanya muncul di leaderboard bila pemiliknya sudah mengumpulkan
+**`TypingResult::LEADERBOARD_MIN_TYPING_SECONDS` (= 1800 detik / 30 menit)** waktu mengetik,
+**diakumulasi lintas semua mode**. Difilter di satu sumber `$scoped`
+([`leaderboard.blade.php`](../../resources/views/livewire/leaderboard.blade.php)) lewat subquery
+`HAVING SUM(duration_seconds) >= ambang`, jadi **papan dan rank selalu setuju** — tanpa migrasi
+(`duration_seconds` sudah ada di tiap hasil), tanpa perubahan klien.
+
+Keunggulannya unik: gerbang ini **tidak bisa di-*pace*** (tak ada angka untuk dibidik dari bawah),
+**tidak bisa dipalsukan dengan timing lebih baik**, dan **tak bergantung data historis** lain.
+
+### 11.3 Keputusan desain
+
+- **Hanya solo.** Waktu diakumulasi dari `typing_results`, dan **hanya jalur solo**
+  (`TypingEngine::saveResult()`) yang menulis tabel itu. Waktu di race multiplayer **tidak**
+  menyumbang, dan gerbang ini **tidak** memblokir partisipasi multiplayer sama sekali — hanya
+  kemunculan di papan solo global yang tertahan.
+- **Akumulasi lintas-mode, bukan per-mode.** Pemain aktif di `time` tak perlu "magang" ulang 30
+  menit di `words`. Total effort yang dihitung.
+- **Rekor tak hilang.** Hasil pemain belum-eligible tetap tersimpan dan tampil di profil/PB; ia
+  hanya bergabung ke papan global begitu ambang tercapai (diuji eksplisit).
+- **Pesan yang jelas.** Pemain yang **sudah mengetik tapi belum cukup** melihat "ketik X menit
+  lagi untuk masuk papan" (`leaderboard.eligibility_pending`), bukan "Unranked" telanjang yang
+  seolah rekornya lenyap. Yang **belum pernah main** tetap "Unranked" biasa.
+
+### 11.4 Kalibrasi
+
+30 menit adalah interim **lembut** untuk basis pemain muda — top pemain saat ini baru ~28 menit.
+Naikkan lewat satu konstanta seiring basis tumbuh (Monkeytype memakai 2 jam). Angka final
+sebaiknya dari distribusi data nyata, bukan tebakan.
+
+Test: [`LeaderboardEligibilityTest`](../../tests/Feature/LeaderboardEligibilityTest.php).

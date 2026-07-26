@@ -152,7 +152,9 @@ Daftar lengkap ada di `app/Models/` (15 file). Yang paling sering disentuh:
   Relasi clan diakses via accessor magic `$user->clan` / `$user->clan_role`
   (bukan relasi Eloquent biasa).
 - **`Room`** / **`RoomMember`** — state live multiplayer race.
-- **`TypingResult`** — write-once, sumber data Stats & leaderboard solo.
+- **`TypingResult`** — write-once, sumber data Stats & leaderboard solo. Kolom `review_status`
+  (`clear`/`pending`/`approved`/`rejected`) menyaring hasil ber-flag anti-cheat dari papan
+  publik — lihat [anti-cheat-wpm.md](features/anti-cheat-wpm.md) §7.8.
 - **`Clan`** — sistem power/level paralel dengan `User` (`BASE_POWER = 1000`,
   `POWER_PER_LEVEL = 100`).
 - **`Message`** — helper visibilitas (`scopeVisibleTo`) yang mengecualikan pesan
@@ -183,7 +185,8 @@ Daftar lengkap ada di `app/Models/` (15 file). Yang paling sering disentuh:
 | `Settings` | `/settings` | Username, locale, hapus akun |
 | `About` | `/about` | Halaman tim statis |
 | `Terms` | `/privacy-policy` | Kebijakan privasi |
-| `leaderboard` (Volt) | `/leaderboard` | Top-10 global per mode/config/timeframe |
+| `leaderboard` (Volt) | `/leaderboard` | Top-10 global per mode/config/timeframe (gerbang kelayakan §11) |
+| `ReviewQueue` | `/review-queue` | Antrean review anti-cheat (admin-only) |
 
 **Trait bersama** (`app/Livewire/Concerns/`, 5 file) — logika yang dipakai lintas
 komponen agar tak terduplikasi: `GuardsChatAccess` (guard DM/clan + kirim, dipakai
@@ -217,6 +220,10 @@ Sumber: `routes/web.php`, `routes/auth.php`, `routes/channels.php`.
 - `GET /multiplayer` (Volt) → multiplayer-lobby
 - `GET /leaderboard` (Volt) → leaderboard
 
+**Admin-only (`EnsureUserIsAdmin`, guest/non-admin → 404):**
+- `GET /review-queue` → `ReviewQueue` (antrean review anti-cheat, lihat [anti-cheat-wpm.md](features/anti-cheat-wpm.md) §7.8)
+- `GET /user-monitoring/*` → dashboard monitoring (lihat [monitoring.md](features/monitoring.md))
+
 **Autentikasi:**
 - `POST /locale` → ganti bahasa UI
 - `GET /auth/google`, `GET /auth/google/callback` → OAuth Google
@@ -236,10 +243,14 @@ Livewire/Volt, jadi tak ada lagi controller kosong yang menyesatkan.
 
 ## 8. Services & Events
 
-### Services (`app/Services/`, 9 file)
+### Services (`app/Services/`, 13 file)
 | Service | Peran |
 |---|---|
 | `AntiCheatService` | Hitung ulang & validasi WPM/akurasi server-side — trust boundary utama |
+| `SoloSessionGuard` | Acuan sesi solo di server (mode/panjang teks/waktu mulai); plafon karakter & anti-replay — lihat [anti-cheat-wpm.md](features/anti-cheat-wpm.md) §7 |
+| `KeystrokeAnalyzer` | Analisis distribusi timing antar-keystroke (deteksi bot) — §7.7b |
+| `LongitudinalBaseline` | Bandingkan hasil vs riwayat pemain; tandai lonjakan untuk review — §7.7c |
+| `RoomMembershipService` | Keanggotaan room multiplayer (keluar, sapu offline, pindah host) |
 | `AchievementService` | Evaluasi & catat unlock achievement |
 | `GhostResolver` | Turunkan lawan ghost dari identitas (type + refId), WPM selalu di-fetch ulang dari DB — satu sumber kebenaran (dipakai `GhostPicker` & `TypingEngine`) |
 | `TextGeneratorService` | Rakit teks latihan dari wordlist JSON — satu sumber untuk solo **dan** multiplayer (menggantikan tabel `texts`) |
