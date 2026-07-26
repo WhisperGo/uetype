@@ -160,8 +160,12 @@ it('rejects an out of range value from the query string', function () {
 });
 
 it('shows every earned achievement and hides the locked ones', function () {
-    $user = User::factory()->create(['highest_wpm' => 100]); // buka 'Speed Demon'
-    makeResult($user, ['correct_chars' => 50_000]);          // buka 'Word Smith'
+    $user = User::factory()->create();
+
+    // Satu baris ini membuka DUA achievement sekaligus: net_wpm 100 -> 'Speed Demon'
+    // (rekor diturunkan dari typing_results, bukan dari kolom users.highest_wpm),
+    // dan 50.000 karakter benar -> 'Word Smith'.
+    makeResult($user, ['correct_chars' => 50_000]);
 
     $component = Livewire::actingAs($user)->test(Stats::class);
 
@@ -183,7 +187,13 @@ it('shows an empty state when nothing is unlocked yet', function () {
 });
 
 it('reports how many achievements are unlocked out of the total', function () {
-    $user = User::factory()->create(['highest_wpm' => 100]);
+    $user = User::factory()->create();
+
+    // Rekor WPM diturunkan dari typing_results, bukan dari users.highest_wpm -- menyetel
+    // kolomnya saja tak lagi membuka apa pun, dan memang itu maksudnya: kolom itu hanya
+    // pernah naik, jadi ia bisa menjamin baris yang sudah dihapus. makeResult() memberi
+    // 100 net_wpm, cukup untuk 'Speed Demon' dan tak lebih.
+    makeResult($user);
 
     // Totalnya tetap disebut walau yang terkunci tak ditampilkan.
     Livewire::actingAs($user)->test(Stats::class)

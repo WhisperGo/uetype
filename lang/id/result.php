@@ -19,6 +19,10 @@ return [
     'vs_ghost' => 'vs :label (:wpm wpm)',
     'afk_not_recorded' => 'Kamu meninggalkan tes ini cukup lama, jadi hasilnya tidak disimpan ke riwayat maupun statistikmu.',
 
+    // Judul toast. Tetap wajar untuk satu maupun beberapa unlock -- namanya menyusul sebagai
+    // daftar, jadi tak perlu bentuk jamak terpisah. Tautan "lihat" toast memakai notif.view.
+    'achievement_unlocked' => 'Achievement terbuka',
+
     'stat' => [
         'avg_wpm' => 'rata-rata wpm',
         'accuracy' => 'akurasi',

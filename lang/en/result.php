@@ -19,6 +19,10 @@ return [
     'vs_ghost' => 'vs :label (:wpm wpm)',
     'afk_not_recorded' => 'You were away for a long stretch of this test, so it was not saved to your history or stats.',
 
+    // Toast heading. Reads correctly for one unlock or several -- the names follow it as a
+    // list, so no pluralised string is needed. The toast's own "view" link is notif.view.
+    'achievement_unlocked' => 'Achievement unlocked',
+
     'stat' => [
         'avg_wpm' => 'avg wpm',
         'accuracy' => 'accuracy',

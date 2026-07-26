@@ -17,9 +17,12 @@ return [
     ],
 
     'defs' => [
-        'speed_demon' => ['title' => 'Speed Demon', 'description' => 'Capai 100 WPM'],
-        'supersonic' => ['title' => 'Supersonic', 'description' => 'Capai 150 WPM'],
-        'untouchable' => ['title' => 'Untouchable', 'description' => 'Capai 200 WPM'],
+        // Rekor WPM adalah hasil terbaik di luar survival, jadi bisa datang dari config
+        // Time atau Words mana pun -- lebih baik disebutkan daripada dibiarkan ditebak.
+        // Anggaran: <= 35 karakter, yaitu dua baris pada kartu tersempit (4 kolom).
+        'speed_demon' => ['title' => 'Speed Demon', 'description' => 'Capai 100 WPM di Time/Words'],
+        'supersonic' => ['title' => 'Supersonic', 'description' => 'Capai 150 WPM di Time/Words'],
+        'untouchable' => ['title' => 'Untouchable', 'description' => 'Capai 200 WPM di Time/Words'],
         'century' => ['title' => 'Century', 'description' => 'Selesaikan 100 tes'],
         'dedicated' => ['title' => 'Dedicated', 'description' => 'Selesaikan 500 tes'],
         'veteran' => ['title' => 'Veteran', 'description' => 'Selesaikan 1.000 tes'],

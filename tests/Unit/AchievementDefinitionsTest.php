@@ -33,9 +33,12 @@ function definition(string $key): array
     throw new InvalidArgumentException("Unknown achievement: {$key}");
 }
 
+// Judul & deskripsi SENGAJA tak ada di sini -- keduanya hanya hidup di file lang,
+// karena itulah satu-satunya tempat yang dibaca view. Kelengkapannya dijaga
+// AchievementsPageTest, yang bisa membaca lang (test Unit tak punya aplikasi Laravel).
 it('memberi tiap definisi field wajib dan check yang bisa dipanggil', function () {
     foreach (AchievementDefinitions::all() as $def) {
-        expect($def)->toHaveKeys(['key', 'title', 'description', 'category', 'icon_value', 'icon_unit', 'check'])
+        expect($def)->toHaveKeys(['key', 'category', 'icon_value', 'icon_unit', 'check'])
             ->and($def['check'])->toBeCallable();
     }
 });

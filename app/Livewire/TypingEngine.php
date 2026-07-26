@@ -656,6 +656,9 @@ class TypingEngine extends Component
         $xpEarned = 0;
         $survivalPreviousBest = null;
         $isSurvivalPersonalBest = false;
+        // Initialised here, not inside the auth gate: the session payload below is built for
+        // guests and abandoned runs too, and both must carry an empty list rather than nothing.
+        $newlyUnlocked = [];
 
         if (Auth::check() && $isAfk) {
             // Nothing is written for an abandoned run, but the result screen still renders
@@ -723,7 +726,11 @@ class TypingEngine extends Component
             // Recording used to piggyback on rendering the Stats/Achievements page, so a
             // player who never opened it was never recorded, and a GET page ended up with
             // a write side effect.
-            app(AchievementService::class)->syncUnlocks($user);
+            //
+            // The return value is what the result screen announces. It is exactly the set
+            // that crossed its threshold on THIS session -- syncUnlocks only inserts rows
+            // that don't exist yet -- so the banner can never repeat itself.
+            $newlyUnlocked = app(AchievementService::class)->syncUnlocks($user);
         }
 
         $ghostResult = $this->buildGhostResult(
@@ -770,6 +777,9 @@ class TypingEngine extends Component
             // was not recorded. Silently redirecting (the anti-cheat reject path) would
             // read as the app eating the session.
             'afk' => $isAfk,
+            // Achievement KEYS only, never titles: those live solely in the lang files, and
+            // carrying a copy here would rebuild the duplication that was just removed.
+            'newAchievements' => $newlyUnlocked,
             // Compact by design: indices only. The result page reconstructs words from
             // textToType (already above) rather than us storing the string twice.
             'errorEvents' => $errorEvents,

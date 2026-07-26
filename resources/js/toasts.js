@@ -28,11 +28,34 @@ export default function toastStack(config) {
         _dismissTimer: null,
 
         init() {
+            // Server-rendered pages queue toasts here. Registered BEFORE the Echo guard
+            // below on purpose: these toasts have nothing to do with websockets, and
+            // returning early would silently disable them wherever Echo is unavailable.
+            this.drainQueue();
+            window.addEventListener('uetype-toast', () => this.drainQueue());
+
             if (!window.Echo) return; // Echo is loaded via app.js
 
             this.listenFriends();
             this.listenClan();
             this.listenChat();
+        },
+
+        /**
+         * Take everything a page left in `window.__uetypeToasts` and show it.
+         *
+         * A QUEUE rather than a plain event, because this component is mounted after the
+         * page slot in app.blade.php: a page dispatching an event while it initialises
+         * would fire before this listener exists and nobody would hear it. Pages push to
+         * the queue at parse time instead; whichever happens second -- the page's push or
+         * this component mounting -- the toast still gets shown, and never twice, because
+         * draining empties the queue.
+         */
+        drainQueue() {
+            const queued = window.__uetypeToasts || [];
+            window.__uetypeToasts = [];
+
+            queued.forEach((toast) => this.push(toast));
         },
 
         // ---- SUBSCRIPTIONS ----

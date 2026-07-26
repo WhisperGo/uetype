@@ -5,6 +5,8 @@ namespace App\Livewire\Concerns;
 use App\Models\MultiplayerMatchHistory;
 use App\Models\Room;
 use App\Models\RoomMember;
+use App\Models\User;
+use App\Services\AchievementService;
 use App\Services\AntiCheatService;
 use Illuminate\Support\Facades\DB;
 
@@ -36,14 +38,36 @@ trait FinalizesRace
      */
     public function finalizeRace(string $roomId): void
     {
-        DB::transaction(fn () => $this->writeFinalStandings($roomId));
+        $awarded = DB::transaction(fn () => $this->writeFinalStandings($roomId));
+
+        // Achievements are recorded here too -- a race grants EXP exactly like a solo run,
+        // so a player could cross a level threshold mid-race and never have it written down.
+        // Their badge then showed up on /achievements with no date, and only after they
+        // happened to play solo again.
+        //
+        // OUTSIDE the transaction, deliberately. syncUnlocks() costs ~2 reads per player,
+        // and the finalization transaction already writes place, xp, total_xp and a history
+        // row for each of up to eight racers -- the hottest path in multiplayer. Achievements
+        // are derived and idempotent, so a failure here heals itself on the next call; they
+        // don't need to be atomic with the race result, and holding the transaction open for
+        // them would only make the race slower for everyone.
+        //
+        // Note a race writes no typing_results row, so the only thing it can newly unlock is
+        // a LEVEL achievement. syncUnlocks() is still called whole rather than checking levels
+        // directly, so the rules stay in one place if the definitions ever grow.
+        foreach ($awarded as $user) {
+            app(AchievementService::class)->syncUnlocks($user);
+        }
 
         // place/xp/result_recorded just changed -> snapshot & view must re-read. OUTSIDE
         // the transaction: this drops the in-memory cache, it doesn't write to the DB.
         $this->forgetRoomCache();
     }
 
-    private function writeFinalStandings(string $roomId): void
+    /**
+     * @return array<int, User> the players who actually received EXP on this call
+     */
+    private function writeFinalStandings(string $roomId): array
     {
         $room = Room::find($roomId);
         $textLength = $room ? mb_strlen($room->text_to_type) : 0;
@@ -84,6 +108,10 @@ trait FinalizesRace
         $validCount = count(array_filter($validity));
         $place = 0;
 
+        // Collected inside the idempotency guard below, so a second finalizeRace call
+        // returns an empty list -- achievements are then synced exactly once per race.
+        $awarded = [];
+
         foreach ($members as $member) {
             $isValid = $validity[$member->id];
 
@@ -111,6 +139,7 @@ trait FinalizesRace
                 if ($isValid) {
                     $xp = $member->user->addExp($correctChars, (float) $member->accuracy);
                     $updateData['xp_earned'] = $xp;
+                    $awarded[] = $member->user;
 
                     MultiplayerMatchHistory::create([
                         'user_id' => $member->user_id,
@@ -137,6 +166,8 @@ trait FinalizesRace
 
             $member->update($updateData);
         }
+
+        return $awarded;
     }
 
     /**

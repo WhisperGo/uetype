@@ -17,9 +17,12 @@ return [
     ],
 
     'defs' => [
-        'speed_demon' => ['title' => 'Speed Demon', 'description' => 'Reach 100 WPM'],
-        'supersonic' => ['title' => 'Supersonic', 'description' => 'Reach 150 WPM'],
-        'untouchable' => ['title' => 'Untouchable', 'description' => 'Reach 200 WPM'],
+        // The WPM record is the best non-survival result, so it can come from any Time
+        // or Words config -- saying so beats letting players guess. Budget: <= 35 chars,
+        // which is two lines in the card at its narrowest (4 columns).
+        'speed_demon' => ['title' => 'Speed Demon', 'description' => 'Reach 100 WPM (Time or Words)'],
+        'supersonic' => ['title' => 'Supersonic', 'description' => 'Reach 150 WPM (Time or Words)'],
+        'untouchable' => ['title' => 'Untouchable', 'description' => 'Reach 200 WPM (Time or Words)'],
         'century' => ['title' => 'Century', 'description' => 'Complete 100 tests'],
         'dedicated' => ['title' => 'Dedicated', 'description' => 'Complete 500 tests'],
         'veteran' => ['title' => 'Veteran', 'description' => 'Complete 1,000 tests'],

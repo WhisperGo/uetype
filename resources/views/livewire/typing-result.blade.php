@@ -55,6 +55,40 @@
             </div>
         @endif
 
+        {{-- Achievements this session unlocked are announced as a TOAST, handed to the global
+             stack in app.blade.php rather than drawn here.
+
+             Queued on window instead of dispatched as an event: <x-toast-stack /> is mounted
+             AFTER the page slot, so an event fired while this page initialises would have no
+             listener yet. The queue works whichever order the two arrive in.
+
+             ALL of them go in ONE toast: push() shows a single toast at a time (a new one
+             replaces the old), so sending two would silently drop the first. Titles are
+             resolved here from the lang files -- their only home -- and the separator comes
+             from there too rather than being hardcoded in JavaScript.
+
+             Nothing is queued for an abandoned run or a guest: neither records anything, so
+             the list is empty and this block never renders.
+
+             Runs exactly once because this screen never re-renders in place -- its only
+             action, retry(), always ends in a full redirect. An action that re-rendered
+             instead would queue the same toast again. --}}
+        @if (! empty($newAchievements))
+            <script>
+                window.__uetypeToasts = window.__uetypeToasts || [];
+                window.__uetypeToasts.push({
+                    icon: 'star',
+                    tone: 'gold',
+                    title: @js(__('result.achievement_unlocked')),
+                    message: @js(collect($newAchievements)->map(fn ($key) => __('achievements.defs.'.$key.'.title'))->join(__('common.list_separator'))),
+                    href: @js(route('achievements.index')),
+                });
+                // Nudges the stack in case it is already alive (it drains the queue itself
+                // on mount, so this can never show the same toast twice).
+                window.dispatchEvent(new CustomEvent('uetype-toast'));
+            </script>
+        @endif
+
         @if ($isSurvival)
             <div x-data="{
                     duration: 0,

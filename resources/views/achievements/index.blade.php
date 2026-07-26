@@ -75,23 +75,41 @@
                             </span>
                         </div>
 
-                        <!-- Text -->
-                        <div class="min-w-0">
-                            <h3 class="font-mono text-sm font-bold text-foreground truncate">{{ __('achievements.defs.'.$a['key'].'.title') }}</h3>
-                            <p class="mt-0.5 font-mono text-xs text-muted truncate">{{ __('achievements.defs.'.$a['key'].'.description') }}</p>
-                            @if ($a['earned'])
-                                <p class="mt-1 flex items-center gap-1 font-mono text-[0.7rem] text-gold">
-                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    {{ __('achievements.earned') }}
+                        {{-- Text.
+
+                             Tinggi DIPESAN, bukan lebar diperlebar. Pada grid 4 kolom ruang teks
+                             hanya 127px, sementara deskripsi terpanjang butuh 158px (Indonesia:
+                             173px). `truncate` dulu memotongnya permanen -- dan halaman ini tak
+                             punya tooltip, jadi teksnya benar-benar tak bisa dibaca. Sekarang
+                             teks boleh memakai dua baris, dan KEDUA blok memesan tinggi dua
+                             baris supaya semua kartu tetap setinggi sama apa pun isinya:
+                             sebelumnya kartu "Earned" satu baris lebih tinggi, dan CSS grid
+                             meregangkan seluruh sel sebaris ikut naik. `leading-4` dipasang
+                             eksplisit agar dua baris jatuh tepat di 2rem. --}}
+                        <div class="min-w-0 flex-1">
+                            <h3 class="font-mono text-sm font-bold leading-5 text-foreground truncate"
+                                title="{{ __('achievements.defs.'.$a['key'].'.title') }}">{{ __('achievements.defs.'.$a['key'].'.title') }}</h3>
+
+                            <p class="mt-0.5 min-h-[2rem] font-mono text-xs leading-4 text-muted">{{ __('achievements.defs.'.$a['key'].'.description') }}</p>
+
+                            <div class="mt-1 min-h-[2rem] font-mono text-[0.7rem] leading-4">
+                                @if ($a['earned'])
+                                    <p class="flex items-center gap-1 text-gold">
+                                        <svg class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        {{ __('achievements.earned') }}
+                                    </p>
+                                    {{-- Tanggal berdiri di barisnya sendiri DENGAN SENGAJA: digabung
+                                         dengan "Earned" ia butuh 147px di ruang 127px, dan patahannya
+                                         jatuh di tengah tanggal ("· 25 Jul" / "2026"). --}}
                                     @if ($a['unlocked_at'])
-                                        <span class="text-muted/70">· @localtime($a['unlocked_at'], 'd M Y')</span>
+                                        <p class="text-muted/70">@localtime($a['unlocked_at'], 'd M Y')</p>
                                     @endif
-                                </p>
-                            @else
-                                <p class="mt-1 font-mono text-[0.7rem] text-muted/60">{{ __('achievements.locked') }}</p>
-                            @endif
+                                @else
+                                    <p class="text-muted/60">{{ __('achievements.locked') }}</p>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 @endforeach

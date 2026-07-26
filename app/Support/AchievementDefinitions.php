@@ -3,8 +3,14 @@
 namespace App\Support;
 
 /**
- * Source of truth for achievement definitions (in code, not the DB). Each `check`
+ * Source of truth for achievement RULES (in code, not the DB). Each `check`
  * is a closure(array $stats): bool, evaluated from data derived in AchievementService.
+ *
+ * Deliberately holds no title or description. Both views render them through
+ * `__('achievements.defs.<key>.title')`, so a copy kept here would never reach a
+ * screen -- it used to, and editing it silently changed nothing. The lang files are
+ * the only place that text lives; AchievementsPageTest guards that every key here
+ * has an entry in en AND id.
  */
 class AchievementDefinitions
 {
@@ -12,18 +18,15 @@ class AchievementDefinitions
      * All achievement definitions.
      *
      * @return array<int, array{
-     *   key:string, title:string, description:string, category:string,
-     *   icon_value:string, icon_unit:string, check:callable
+     *   key:string, category:string, icon_value:string, icon_unit:string, check:callable
      * }>
      */
     public static function all(): array
     {
+        // ===== WPM (MAX net_wpm over non-survival typing_results) =====
         return [
-            // ===== WPM (from users.highest_wpm) =====
             [
                 'key' => 'speed_demon',
-                'title' => 'Speed Demon',
-                'description' => 'Reach 100 WPM',
                 'category' => 'wpm',
                 'icon_value' => '100',
                 'icon_unit' => 'WPM',
@@ -31,8 +34,6 @@ class AchievementDefinitions
             ],
             [
                 'key' => 'supersonic',
-                'title' => 'Supersonic',
-                'description' => 'Reach 150 WPM',
                 'category' => 'wpm',
                 'icon_value' => '150',
                 'icon_unit' => 'WPM',
@@ -40,8 +41,6 @@ class AchievementDefinitions
             ],
             [
                 'key' => 'untouchable',
-                'title' => 'Untouchable',
-                'description' => 'Reach 200 WPM',
                 'category' => 'wpm',
                 'icon_value' => '200',
                 'icon_unit' => 'WPM',
@@ -51,8 +50,6 @@ class AchievementDefinitions
             // ===== TESTS (COUNT of typing_results rows) =====
             [
                 'key' => 'century',
-                'title' => 'Century',
-                'description' => 'Complete 100 tests',
                 'category' => 'tests',
                 'icon_value' => '100',
                 'icon_unit' => 'TESTS',
@@ -60,8 +57,6 @@ class AchievementDefinitions
             ],
             [
                 'key' => 'dedicated',
-                'title' => 'Dedicated',
-                'description' => 'Complete 500 tests',
                 'category' => 'tests',
                 'icon_value' => '500',
                 'icon_unit' => 'TESTS',
@@ -69,8 +64,6 @@ class AchievementDefinitions
             ],
             [
                 'key' => 'veteran',
-                'title' => 'Veteran',
-                'description' => 'Complete 1,000 tests',
                 'category' => 'tests',
                 'icon_value' => '1K',
                 'icon_unit' => 'TESTS',
@@ -80,8 +73,6 @@ class AchievementDefinitions
             // ===== LEVEL (derived from users.total_xp) =====
             [
                 'key' => 'rising_star',
-                'title' => 'Rising Star',
-                'description' => 'Reach Level 10',
                 'category' => 'level',
                 'icon_value' => '10',
                 'icon_unit' => 'LEVEL',
@@ -89,8 +80,6 @@ class AchievementDefinitions
             ],
             [
                 'key' => 'elite',
-                'title' => 'Elite',
-                'description' => 'Reach Level 25',
                 'category' => 'level',
                 'icon_value' => '25',
                 'icon_unit' => 'LEVEL',
@@ -98,8 +87,6 @@ class AchievementDefinitions
             ],
             [
                 'key' => 'legend',
-                'title' => 'Legend',
-                'description' => 'Reach Level 50',
                 'category' => 'level',
                 'icon_value' => '50',
                 'icon_unit' => 'LEVEL',
@@ -109,8 +96,6 @@ class AchievementDefinitions
             // ===== ACCURACY (from accuracy in typing_results) =====
             [
                 'key' => 'perfectionist',
-                'title' => 'Perfectionist',
-                'description' => 'Get 100% accuracy',
                 'category' => 'accuracy',
                 'icon_value' => '100%',
                 'icon_unit' => 'ACC',
@@ -118,8 +103,6 @@ class AchievementDefinitions
             ],
             [
                 'key' => 'flawless',
-                'title' => 'Flawless',
-                'description' => '100% acc 10 times',
                 'category' => 'accuracy',
                 'icon_value' => '100%',
                 'icon_unit' => 'x10',
@@ -127,8 +110,6 @@ class AchievementDefinitions
             ],
             [
                 'key' => 'robot',
-                'title' => 'Robot',
-                'description' => '100% acc 50 times',
                 'category' => 'accuracy',
                 'icon_value' => '100%',
                 'icon_unit' => 'x50',
@@ -138,8 +119,6 @@ class AchievementDefinitions
             // ===== CHARACTERS (SUM correct_chars) =====
             [
                 'key' => 'word_smith',
-                'title' => 'Word Smith',
-                'description' => 'Type 50,000 characters',
                 'category' => 'characters',
                 'icon_value' => '50K',
                 'icon_unit' => 'CHARS',
@@ -147,8 +126,6 @@ class AchievementDefinitions
             ],
             [
                 'key' => 'marathon',
-                'title' => 'Marathon',
-                'description' => 'Type 200,000 chars',
                 'category' => 'characters',
                 'icon_value' => '200K',
                 'icon_unit' => 'CHARS',
@@ -156,8 +133,6 @@ class AchievementDefinitions
             ],
             [
                 'key' => 'unstoppable',
-                'title' => 'Unstoppable',
-                'description' => 'Type 1,000,000 chars',
                 'category' => 'characters',
                 'icon_value' => '1M',
                 'icon_unit' => 'CHARS',
