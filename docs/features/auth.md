@@ -1,16 +1,16 @@
 # Fitur 11 — Autentikasi (Google + Pilih Username)
 
 **Controller:** [`GoogleAuthController`](../../app/Http/Controllers/GoogleAuthController.php)
-**Breeze:** login/register email standar di [`routes/auth.php`](../../routes/auth.php)
-**Route:** `/auth/google`, `/auth/google/callback`, `/auth/google/username`
+**Route:** `/login`, `/auth/google`, `/auth/google/callback`, `/auth/google/username`, `/logout` (semua di [`routes/web.php`](../../routes/web.php))
 
 ---
 
 ## 1. Apa Ini
 
-Autentikasi via **Google OAuth** (Laravel Socialite) di samping login email/password bawaan Breeze.
-Karena game butuh **username unik** (untuk profil publik, leaderboard, mention), pendaftar Google
-diarahkan memilih username sebelum akunnya dibuat.
+Autentikasi **hanya via Google OAuth** (Laravel Socialite) — tak ada login/register email-password
+(scaffold auth Breeze sudah dilepas; paketnya masih terpasang, tapi rute email/registrasinya tidak
+dipakai). Karena game butuh **username unik** (untuk profil publik, leaderboard, mention), pendaftar
+Google diarahkan memilih username sebelum akunnya dibuat.
 
 ## 2. Alur Google Auth
 

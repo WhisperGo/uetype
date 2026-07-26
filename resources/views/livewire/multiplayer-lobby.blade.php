@@ -436,6 +436,7 @@
                 raceStartsInMs: @js($this->raceStartsInMs),
                 suddenDeathActive: @js($this->suddenDeathActive),
                 suddenDeathRemaining: @js($this->suddenDeathRemaining),
+                resumeProgress: @js($this->myResumeProgress),
             })"
             @keydown.tab.prevent="if (raceStarted && !isFinished && !lockedByTimeout) $refs.typeInput?.focus()">
 
@@ -632,12 +633,9 @@
 
             @if (! $isSpectator && ! $hasGivenUp && ! $hasFinished)
                 <!-- MAIN TEXT CONTAINER (HIGH-RESPONSIVE TYPERACER-STYLE VISUAL) -->
-                <div class="border bg-surface/40 border-border/40 rounded-3xl shadow-xl {{ $dense ? 'p-5 space-y-4' : 'p-8 space-y-6' }}"
-                    {{-- Shakes on a typo AND on a space refused by word-lock. The second case
-                         needs its own flag: `hasError` is false whenever the typed text is a
-                         correct PREFIX ("the" for "then"), which is exactly when a refused
-                         space is most confusing. --}}
-                    :class="{ 'race-typo': hasError || justBlocked }">
+                {{-- No shake on a typo/refused space: the red highlight on the active word and
+                     the input (driven by hasError || justBlocked below) is the sole cue. --}}
+                <div class="border bg-surface/40 border-border/40 rounded-3xl shadow-xl {{ $dense ? 'p-5 space-y-4' : 'p-8 space-y-6' }}">
                     <!-- PARAGRAPH DRAFT BLOCK WITH TYPERACER COLOR INDICATORS -->
                     <div
                         class="font-mono text-xl leading-relaxed tracking-wide select-none p-5 bg-background/30 rounded-xl border border-border/20 flex flex-wrap gap-x-2 gap-y-1">

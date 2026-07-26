@@ -102,11 +102,23 @@ spam sebagai strategi optimal. Ia **bukan** batas keamanan: penegakannya di clie
 palsu tetap mungkin dan tetap ditahan gerbang server yang sudah ada (`MAX_RACE_WPM`, cross-check
 akurasi/progres, progres monoton, gerbang countdown, rate limit) — lihat §3.6.
 
-Konsekuensi UX yang disengaja: kata yang salah **tidak menjebak** — pemain tinggal backspace dan
-memperbaikinya, dan biayanya hanya waktu. Spasi yang ditolak diberi sinyal lewat flag
-`justBlocked` (getaran `race-typo` + baris `multiplayer.word_must_match`). Flag terpisah ini
-**wajib**: `hasError` bernilai `false` selama ketikan masih **prefiks yang benar** — ketik
-`"the"` untuk `"then"` dan layar tampak baik-baik saja, padahal spasinya ditolak.
+**Penolakan karakter saat diketik (lapisan lebih ketat).** Di atas word-lock tingkat-spasi,
+`checkInput()` kini **menolak setiap karakter salah pada saat diketik**: begitu `typedText`
+berhenti menjadi prefiks kata target, karakter pelanggar itu **langsung dibuang** dari field
+(`typedText.slice(0, prevTypedLength)`) dan `nudgeBlocked()` dipicu. Artinya kata yang sedang
+diketik **tak pernah bisa menampung huruf salah** sama sekali — satu-satunya jalan maju adalah
+mengetik prefiks yang persis benar. Backspace tetap bebas (memperpendek `typedText` selalu valid),
+dan **akurasi tetap jujur**: percobaan yang ditolak tetap dihitung `totalMistakes`, jadi angka
+akurasi tak melonjak palsu ke 100%.
+
+Konsekuensi UX yang disengaja: kata yang salah **tidak menjebak** — huruf salah cukup diabaikan
+(tak masuk), dan biayanya hanya waktu. Penolakan (huruf salah maupun spasi yang belum sah) diberi
+sinyal lewat flag `justBlocked`: **warna merah** pada kata aktif & input, plus baris
+`multiplayer.word_must_match`. (Efek getar `race-typo` sebelumnya **sudah dilepas** — warna merah
+jadi satu-satunya isyarat.) Karena karakter salah tak pernah masuk lagi, `hasError` praktis selalu
+`false`; `justBlocked` yang menjadi pemicu utama warna merah, termasuk saat spasi ditolak padahal
+ketikan masih prefiks benar (ketik `"the"` untuk `"then"` lalu spasi — layar tetap memberi sinyal
+ditahan).
 
 ### 3.3 Countdown sinkron pakai durasi RELATIF, bukan jam server absolut
 
@@ -312,9 +324,9 @@ agar keanggotaan konsisten dengan ekspektasi pemain:
 
 | # | Perilaku | Mekanisme |
 |---|----------|-----------|
-| **Restore** | Buka/refresh `/multiplayer` saat masih anggota → **langsung masuk room** (tanpa kode) | `mount()` mencari `RoomMember` milik user, meng-set `$roomCode`/`$step` dari `room.status` (waiting/racing/finished→result), menurunkan `hasFinished`/`hasGivenUp` dari DB untuk refresh mid-race, dan `dispatch('subscribe-room')`. |
+| **Restore** | Buka/refresh `/multiplayer` saat masih anggota → **langsung masuk room** (tanpa kode); refresh **mid-race lanjut dari progress terakhir**, bukan mulai dari kata pertama | `mount()` mencari `RoomMember` milik user, meng-set `$roomCode`/`$step` dari `room.status` (waiting/racing/finished→result), menurunkan `hasFinished`/`hasGivenUp` dari DB untuk refresh mid-race, dan `dispatch('subscribe-room')`. Untuk racer aktif, `myResumeProgress` (= `progress_percent` tersimpan) diteruskan ke `raceArena`, yang di `init()` memanggil `restoreProgress()` untuk merekonstruksi `currentWordIndex` dari persen itu (server hanya menyimpan persen, bukan indeks kata). Word-lock lalu membiarkan pemain melanjutkan kata yang belum selesai. |
 | **Auto-leave not-ready** | Member **not-ready non-host** yang meninggalkan halaman tanpa konfirmasi (tutup/refresh tab) → **keluar room** | Beacon `pagehide`/`beforeunload` ([`multiplayer-nav.js`](../../resources/js/multiplayer-nav.js)) → `POST /multiplayer/leave-beacon`. Server memutuskan: hanya not-ready non-host (& spectator) yang di-leave; **ready/host di-skip** agar row-nya bertahan untuk restore. Hanya saat `waiting`. |
-| **Leave-confirm (overlay)** | **Semua** member (ready maupun tidak) klik nav ke halaman lain → **overlay konfirmasi** | Interceptor klik fase-capture: kalau `data-mp-in-room="1"` dan tujuan bukan `/multiplayer`, cegah navigasi, simpan tujuan, dan buka overlay `<x-modal name="confirm-leave-room">` lewat event `open-modal`. Tombol **Keluar** → `window.__mpConfirmLeave()` → `POST /multiplayer/leave-confirm` (host: leave + reassign) lalu navigasi. **Tetap** → overlay tutup, tetap di room. |
+| **Leave-confirm (overlay)** | **Semua** member (ready maupun tidak) klik nav ke halaman lain → **overlay konfirmasi** | Interceptor klik fase-capture: kalau `data-mp-in-room="1"` dan tujuan bukan `/multiplayer`, cegah navigasi, simpan tujuan, dan buka overlay `<x-modal name="confirm-leave-room">` lewat event `open-modal`. Tombol **Keluar** → `window.__mpConfirmLeave()` → `POST /multiplayer/leave-confirm` (host: leave + reassign) lalu navigasi. **Tetap** → overlay tutup, tetap di room. **Berlaku di semua status termasuk `racing`**: menekan Keluar adalah pilihan sengaja, jadi pemain benar-benar keluar (row dihapus) walau di tengah race — berbeda dari beacon (reload) yang justru **menahan** row mid-race untuk restore. |
 
 **Overlay, bukan `confirm()` browser:** konfirmasi memakai komponen [`x-modal`](../../resources/views/components/modal.blade.php)
 yang sama dengan sign-out — bukan dialog `confirm()` bawaan. Modal ada **di dalam** view lobby
@@ -333,8 +345,17 @@ settle room (hapus kalau kosong / reassign host), broadcast `RoomPresenceChanged
 
 **Keputusan disederhanakan:** refresh not-ready **juga** ikut leave (tanpa grace-window/kolom
 DB/cron — proyek tak punya scheduler). Konsekuensinya kecil (not-ready yang refresh join ulang);
-ready/host tak tersentuh beacon jadi restore mereka selalu jalan. Mid-race dilindungi (guard
-`status='waiting'`, sama seperti kick).
+ready/host tak tersentuh beacon jadi restore mereka selalu jalan.
+
+**Beacon vs confirm saat `racing`** — dua jalur leave sengaja dibedakan berdasarkan **niat**:
+
+- **Beacon** (`leave-beacon`, dipicu `pagehide`/`beforeunload`) mid-race **tak menyentuh** row: sebuah
+  unload saat race adalah **reload**, dan row harus bertahan agar `mount()` bisa me-restore pemain
+  di progress terakhirnya. (Beacon hanya me-leave saat `waiting`, itu pun hanya not-ready non-host.)
+- **Confirm** (`leave-confirm`, dipicu tombol **Keluar** di overlay) mid-race **menghapus** row:
+  menekan Keluar adalah pilihan **eksplisit**, jadi pemain benar-benar keluar apa pun statusnya.
+  Placement pemain yang tersisa aman — `writeFinalStandings` hanya menghitung member yang **masih
+  ada** saat finalisasi, jadi member yang lenyap tak mengganggu urutan.
 
 **Celah yang tersisa — member "nyangkut":** beacon sengaja **menahan** ready/host agar bisa
 di-restore. Tapi kalau mereka **tutup tab / koneksi putus / pergi** tanpa kembali, baris mereka

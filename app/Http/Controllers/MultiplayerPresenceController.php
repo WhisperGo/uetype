@@ -24,7 +24,10 @@ class MultiplayerPresenceController extends Controller
      * (their row survives so mount() can restore them when they return). Spectators (never
      * ready) are removed too -- they hold a spectator slot.
      *
-     * Only while the room is 'waiting': pulling someone mid-race would corrupt placement.
+     * Only while the room is 'waiting'. A page-unload during 'racing' is treated as a
+     * RELOAD, not a departure: the row is kept untouched so mount() restores the player
+     * into the arena at their saved progress. Pulling them out here would also corrupt
+     * placement. (An intentional leave is a separate, explicit action.)
      */
     public function leaveOnLeave(RoomMembershipService $memberships): JsonResponse
     {
@@ -43,11 +46,17 @@ class MultiplayerPresenceController extends Controller
     }
 
     /**
-     * Ready-player confirmation (#3): the user confirmed they want to leave the page while
-     * ready (or as host). Either way they're leaving, so we perform a full leave -- host
-     * handoff included via the service -- rather than merely un-readying.
+     * Confirmed leave (#3): the user pressed "Leave" on the nav-away overlay -- an EXPLICIT
+     * choice to leave the room, so we perform a full leave (host handoff included) whatever
+     * the room status.
      *
-     * Only while 'waiting' (same mid-race guard).
+     * This is the key difference from the leave-beacon (#2): that fires on any page-unload
+     * (refresh / tab close), which mid-race is a reload we must NOT act on -- the row has to
+     * survive so mount() restores the racer at their progress. A confirmed nav is the
+     * opposite: the player deliberately chose to leave, so a mid-race departure removes them
+     * outright. The remaining racers simply finalize among themselves (a vanished member
+     * isn't in the standings); their placement isn't corrupted because places are only
+     * counted for members still present at finalization.
      */
     public function leaveOrUnready(RoomMembershipService $memberships): JsonResponse
     {
@@ -56,7 +65,7 @@ class MultiplayerPresenceController extends Controller
         if ($member) {
             $room = Room::find($member->room_id);
 
-            if ($room && $room->status === 'waiting') {
+            if ($room) {
                 $memberships->depart(Auth::id());
             }
         }

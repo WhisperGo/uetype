@@ -232,7 +232,7 @@ Sumber: `routes/web.php`, `routes/auth.php`, `routes/channels.php`.
 
 **Lokal saja** (`app()->environment('local')`):
 - `/style-guide` — referensi design system hidup
-- `/dev-login`, `/dev-login2` — login instan sebagai user dummy dari seeder
+- `/dev-login` (opsional `?email=...`) — login instan sebagai user dummy dari seeder
 
 **Catatan controller:** hanya 7 controller yang tersisa (`AchievementController`,
 `ChatController`, `GoogleAuthController`, `LocaleController`, `PresenceController`,

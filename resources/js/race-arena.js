@@ -153,6 +153,8 @@ const registerRaceArena = (Alpine) => {
         // null = race not scheduled yet.
         raceStartsInMs: config.raceStartsInMs ?? null,
         _countdownInterval: null,
+        // Saved race progress (0-100) for a mid-race reload; 0 = fresh start / spectator.
+        resumeProgress: config.resumeProgress ?? 0,
         words: [],
         currentWordIndex: 0,
         typedText: '',
@@ -194,6 +196,15 @@ const registerRaceArena = (Alpine) => {
 
         init() {
             this.words = this.textToType.split(' ');
+
+            // Resume a mid-race reload where the player left off. The server persists only a
+            // percentage, so rebuild the word position from it: advance over whole words that
+            // fit inside the correct-character count, landing at the START of the first
+            // unfinished word (word-lock then lets them keep typing it). A spectator or a
+            // fresh racer has resumeProgress 0 and skips this entirely.
+            if (!this.isSpectator && this.resumeProgress > 0) {
+                this.restoreProgress();
+            }
 
             // Clear positions ONLY when entering a different race. If this component is
             // re-init'd for the same race (Livewire morph, sudden death), each mascot's
@@ -366,12 +377,12 @@ const registerRaceArena = (Alpine) => {
         },
 
         /**
-         * Signal a refused space, and make sure it signals AGAIN on every repeat.
+         * Signal a refused key/space, and make sure it signals AGAIN on every repeat.
          *
-         * Re-adding a CSS class that is already applied does not restart its animation, so a
-         * burst of rejected spaces used to shake exactly once and then sit silent -- which
+         * justBlocked drives the red highlight on the active word and input. Left simply set
+         * to true, a burst of refusals wouldn't visibly re-signal (it's already true) -- which
          * reads as "nothing is stopping me" precisely when the player is leaning on the key
-         * hardest. Dropping the flag for one frame restarts it every time.
+         * hardest. Dropping the flag for one frame re-asserts the cue every time.
          */
         nudgeBlocked() {
             if (this._blockedFrame) cancelAnimationFrame(this._blockedFrame);
@@ -401,15 +412,34 @@ const registerRaceArena = (Alpine) => {
 
             let targetWord = this.words[this.currentWordIndex];
 
-            if (this.typedText.length > 0) {
-                this.hasError = !targetWord.startsWith(this.typedText);
-            } else {
+            const isNewChar = this.typedText.length > this.prevTypedLength;
+            const isWrong = this.typedText.length > 0 && !targetWord.startsWith(this.typedText);
+
+            // Reject a wrong character AS IT IS TYPED: the only way forward through a word is to
+            // type its exact prefix, so a mistyped key never enters the field at all. This is
+            // stricter than the space-level word-lock (which only blocks the jump BETWEEN words)
+            // -- here the current word can never even hold a wrong letter.
+            //
+            // Backspace is always allowed: it shortens typedText, so isNewChar is false and this
+            // branch is skipped (a shorter prefix of a valid prefix is still valid).
+            if (isNewChar && isWrong) {
+                // Still count the attempt so accuracy stays honest -- the keystroke happened,
+                // it was just refused. Without this, accuracy would read a false 100%.
+                this.totalKeystrokes++;
+                this.totalMistakes++;
+
+                // Drop the offending character; the field reverts to the last correct prefix.
+                this.typedText = this.typedText.slice(0, this.prevTypedLength);
                 this.hasError = false;
+                this.nudgeBlocked();
+
+                return;
             }
 
-            if (this.typedText.length > this.prevTypedLength) {
+            this.hasError = false;
+
+            if (isNewChar) {
                 this.totalKeystrokes++;
-                if (this.hasError) this.totalMistakes++;
             }
             this.prevTypedLength = this.typedText.length;
 
@@ -525,6 +555,42 @@ const registerRaceArena = (Alpine) => {
                     accuracy,
                 );
             }, delay);
+        },
+
+        /**
+         * Rebuild the word position from a saved progress percentage (mid-race reload).
+         *
+         * The server stores only progress_percent, so convert it back to a correct-character
+         * count and consume whole "word + space" spans until the next word wouldn't fit. The
+         * cursor lands at the START of the first unfinished word: past words count toward
+         * progress (correctCharsFromPastWords) and typedText is empty, so the player simply
+         * carries on. We never restore a PARTIAL word -- word-lock only credits whole words,
+         * so a partial prefix was never part of the saved progress anyway.
+         */
+        restoreProgress() {
+            const totalChars = this.textToType.length;
+            const targetCorrect = Math.round((this.resumeProgress / 100) * totalChars);
+
+            let consumed = 0;
+            let index = 0;
+
+            while (index < this.words.length) {
+                // Each completed word contributes its length + 1 for the trailing space
+                // (matches handleSpace: correctCharsFromPastWords += targetWord.length + 1).
+                const span = this.words[index].length + 1;
+
+                if (consumed + span > targetCorrect) break;
+
+                consumed += span;
+                index++;
+            }
+
+            // Clamp to the last valid index so words[currentWordIndex] is never undefined.
+            // Landing on the last word is fine and never auto-finishes: typedText is empty and
+            // finishing still requires an exact match / space the player has to type.
+            this.currentWordIndex = Math.min(index, this.words.length - 1);
+            this.correctCharsFromPastWords = consumed;
+            this.progressPercent = Math.floor((consumed / totalChars) * 100);
         },
 
         /**

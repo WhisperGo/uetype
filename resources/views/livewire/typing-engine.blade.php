@@ -295,8 +295,56 @@
                 </div>
             </div>
 
+            {{-- ===== SOFT-KEYBOARD INPUT (perangkat sentuh) =====
+
+                 Mesin ketik membaca tuts fisik dari `@keydown.window` di atas dan sengaja tak
+                 memegang elemen fokusable apa pun (typing-engine.md §3.7). Di HP itu berarti
+                 tak ada yang bisa disentuh untuk memunculkan keyboard layar -- tesnya benar-benar
+                 tak bisa dimainkan, bukan cuma sulit.
+
+                 Input ini yang memunculkan keyboard, dan ia DIBENTANGKAN MENUTUPI area teks
+                 supaya menjadi target sentuhnya sendiri. Itu keputusan yang menentukan: sentuhan
+                 mendarat langsung di sebuah <input>, jadi browser membuka keyboard secara NATIVE
+                 -- tak bergantung pada JavaScript sama sekali. Versi pertama memakai
+                 `pointer-events-none` dan menyerahkan tap ke kontainer teks yang memanggil
+                 focusTypingInput(); itu membuat keyboard bergantung pada satu panggilan JS, dan
+                 diam total kalau bundle-nya gagal/basi. Sekaligus menghapus urusan "focus() harus
+                 di dalam gestur" milik iOS, karena tak ada focus() terprogram yang terlibat.
+
+                 TRANSPARAN, bukan `opacity-0`. Elemen ber-opacity 0 dianggap tak terlihat oleh
+                 sebagian browser mobile, yang lalu menolak membuka keyboard untuknya. Dengan
+                 `text-transparent` + `bg-transparent` + `caret-transparent` elemennya benar-benar
+                 terrender dan sah difokus, tapi tak menampilkan apa pun. (Nilainya selalu
+                 dikuras, jadi tak ada teks yang bisa muncul di atas paragraf.) Yang jelas TIDAK
+                 boleh: `hidden`/`display:none` -- itu tak bisa difokus sama sekali.
+
+                 `text-base` (16px) menahan iOS Safari MEMPERBESAR halaman saat input difokus;
+                 zoom itu akan menggeser seluruh area teks beserta caretnya.
+
+                 Empat atribut koreksi teks dimatikan: autocorrect/kapitalisasi/ejaan akan
+                 menyunting apa yang diketik pemain, dan di tes mengetik itu berarti mengubah
+                 hasil yang sedang diukur.
+
+                 tabindex="-1" menjauhkannya dari urutan Tab: Tab sudah punya arti sendiri di
+                 halaman ini (fokus ke tombol restart), dan pemain desktop tak pernah butuh
+                 input ini. --}}
+            <input x-ref="typingInput" type="text" tabindex="-1"
+                autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                inputmode="text" enterkeyhint="done"
+                aria-label="{{ __('typing.input_aria') }}"
+                @keydown="onTypingInputKeydown($event)"
+                @beforeinput="onTypingBeforeInput($event)"
+                @input="onTypingInput($event)"
+                class="absolute inset-0 z-30 w-full h-full p-0 m-0 text-base bg-transparent text-transparent caret-transparent border-0 appearance-none rounded-none cursor-text focus:outline-none focus:ring-0">
+
             <!-- Kontainer 3 Baris -->
+            {{-- @click memegang tap-nya (bukan inputnya, yang pointer-events-none) supaya
+                 focusTypingInput() berjalan di dalam gestur. Tak berefek di desktop: tak ada
+                 yang perlu diklik di sini, dan begitu input ini difokus, penjaga `editing` pada
+                 @keydown.window otomatis menyerahkan kendali ke jalur input -- jadi tak ada
+                 keystroke yang terhitung dua kali. --}}
             <div class="relative overflow-hidden text-fluid-type tracking-tight select-none outline-none"
+                @click="focusTypingInput()"
                 style="max-height: 4.875em;">
 
                 <!-- SINGLE SMOOTH CURSOR -->
@@ -383,6 +431,30 @@
                         </div>
                     @endforeach
                 </div>
+            </div>
+
+            {{-- Petunjuk tap, HANYA di perangkat sentuh (`.touch-only` memakai
+                 `pointer: coarse`, bukan lebar layar -- jendela desktop yang sempit tetap
+                 punya keyboard fisik dan tak butuh petunjuk ini).
+
+                 Tanpa ini tak ada apa pun di layar yang memberi tahu bahwa area teks harus
+                 disentuh lebih dulu: caret berkedip seperti sudah siap menerima ketikan,
+                 padahal keyboardnya belum terbuka.
+
+                 x-show boleh berdampingan dengan .touch-only: saat kondisinya benar Alpine
+                 MENGHAPUS `display:none` inline-nya, sehingga media query yang menentukan. --}}
+            <div x-show="!isStarted && !isFinished" x-cloak class="touch-only justify-center mt-4">
+                {{-- Sebuah <button> asli, bukan div ber-@click: iOS Safari tak selalu memicu
+                     `click` pada elemen yang tak interaktif, dan tombol juga sudah benar secara
+                     semantik. Ia hanya jalur cadangan -- sentuhan pada paragrafnya sendiri sudah
+                     mendarat di input dan membuka keyboard tanpa JS. --}}
+                <button type="button" @click="focusTypingInput()"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-surface/60 text-small font-mono text-muted">
+                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                    {{ __('typing.tap_to_type') }}
+                </button>
             </div>
             </div>
 
