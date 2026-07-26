@@ -431,6 +431,92 @@ terlihat tapi disabled, yang sudah di room ditandai "Di ruang") → klik Undang 
 | **Anti-spam** | Rate-limit **10/menit per pengundang** (server) + cooldown **5 dtk per teman** (klien) | Undangan bisa jadi vektor spam toast. Cooldown klien: setelah mengundang, tombol teman itu menghitung mundur lalu bisa lagi — **tanpa refresh**. Rate-limit server = backstop sebenarnya. |
 | **Penjaga** | Hanya room `waiting`, hanya **teman Accepted** (bukan ID acak), bukan yang sudah di room, bukan diri sendiri | Otorisasi di server, bukan sekadar menyembunyikan tombol. |
 
+### 3.16 Mengetik lewat keyboard layar (HP)
+
+**JS:** [`race-arena.js`](../../resources/js/race-arena.js) (`handleSpace`, `advanceWord`,
+`checkInput`) · **Test:** [`RaceMobileInputTest`](../../tests/Feature/RaceMobileInputTest.php)
+
+Sampai 2026-07-26 balapan praktis **tak bisa dimainkan di HP**, karena dua sebab yang berdiri
+sendiri — dan keduanya gagal **tanpa suara**, sehingga terbaca sebagai "HP-ku lemot" alih-alih
+fitur rusak:
+
+1. **Input tak mematikan autocapitalize.** Huruf pertama tiap kata dikapitalisasi otomatis,
+   gagal cek prefiks, lalu dibuang oleh penolakan karakter di `checkInput()`. Pemain menekan
+   huruf dan tak terjadi apa-apa.
+2. **Kata hanya bisa maju lewat `@keydown.space`.** Gboard melaporkan `keydown` sebagai
+   `Unidentified`/keyCode 229 selagi menyusun kata, jadi handler itu tak menyala; spasinya
+   mendarat sebagai karakter biasa, dan karena `"the "` bukan prefiks dari `"the"` ia ikut
+   dibuang. Pemain terkunci selamanya di kata pertama.
+
+Fakta soal Gboard bukan hal baru bagi proyek ini — sudah didokumentasikan untuk mode solo di
+[typing-engine.md](typing-engine.md) §3.7.a. Yang terjadi: pelajarannya tak ikut ke multiplayer.
+
+#### Kenapa pola Solo TIDAK bisa disalin
+
+Solo membatalkan `beforeinput` dan **selalu mengosongkan field** — inputnya cuma pemanggil
+keyboard, seluruh state ada di mesin. Race sebaliknya: `x-model="typedText"` berarti **field itu
+sendiri adalah state** kata yang sedang diketik dan harus mempertahankan nilainya. Menyalin pola
+solo berarti menulis ulang seluruh lapisan input (backspace, caret, composition) tanpa satu pun
+test JS yang bisa menangkap kesalahannya.
+
+Yang dipakai: **deteksi spasi dari nilai field, bukan dari event keydown.**
+
+#### Kenapa kedua jalur tak pernah dobel-hitung
+
+```
+Desktop : keydown.space → preventDefault → spasi TAK PERNAH masuk field → jalur nilai buta
+Gboard  : keydown tak cocok → tak ada preventDefault → spasi masuk field → jalur nilai jalan
+```
+
+Yang menegakkan ini adalah `preventDefault()` pada **fase keydown**: ia membatalkan default
+action, sehingga `beforeinput` / penyisipan / `input` tak pernah terjadi. Karena itu ia
+**wajib tak bisa dilewati** — dulu sebuah `return` mendahuluinya, dan itu tak berbahaya hanya
+karena input kebetulan di-`:disabled` dengan kondisi yang sama persis. Kalau kelak seseorang
+memindahkan penanganannya ke `@beforeinput`, seluruh argumen ini runtuh diam-diam.
+Dijaga test "membatalkan spasi desktop sebelum return mana pun bisa membocorkannya".
+
+#### Tiga aturan yang jangan "diperbaiki"
+
+**1. Potong di spasi PERTAMA, buang sisanya — bukan "hapus semua spasi".** Menghapus semua
+spasi membuat `"th e"` lolos sebagai `"the"` yang "diketik persis benar", jadi aturan word-lock
+berubah diam-diam. Membuang sisa juga membatasi **maksimum satu kata maju per event**: swipe dan
+paste mengirim beberapa kata sekaligus, dan me-loop-nya akan menyelesaikan balapan dalam
+segelintir gestur — karena juara ditentukan **waktu selesai**, itu langsung jadi strategi
+optimal, persis bug yang word-lock diciptakan untuk membunuh (§3.2).
+
+**2. `return` segera setelah `advanceWord()`.** `checkInput()` memegang `targetWord` dari
+**sebelum** kata maju, jadi jatuh terus akan menilai cabang kata terakhir dengan target basi dan
+mengirim `emitProgress` kedua.
+
+**3. Kata yang mendarat utuh tetap dihitung keystroke-nya.** Swipe/autocorrect mengirim `"the "`
+dalam satu event, jadi karakternya tak pernah melewati penghitung per-karakter. Tanpa credit itu
+pemain swipe selalu tampil akurasi 100% sementara pemain desktop membayar tiap typo. Credit-nya
+**hanya di cabang yang `return`** — kalau ditaruh sebelum percabangan, `if (isNewChar)` di bawah
+menghitungnya dua kali.
+
+#### Paste ditutup secara sengaja
+
+Hari ini paragraf yang di-paste tertolak hanya karena ia bukan prefiks kata target — perlindungan
+**tak disengaja**, dan jalur nilai melemahkannya (kata pertamanya kini valid). `@paste.prevent`
+dan `@drop.prevent` menutupnya secara eksplisit. Biayanya: paste satu kata yang benar berhenti
+bekerja di desktop. Itu memang yang diinginkan.
+
+#### Enter = maju kata
+
+`@keydown.enter` diikat ke `handleSpace` yang sama, sehingga `enterkeyhint="next"` jadi janji
+yang ditepati. Sengaja **bukan** `"done"` seperti solo: di tengah balapan itu menutup keyboard
+dan memaksa satu sentuhan lagi untuk melanjutkan. Ia juga jaring pengaman kedua kalau perilaku
+spasi sebuah keyboard bermasalah.
+
+#### Batas yang jujur
+
+Semua test di atas adalah **kontrak markup & modul, bukan bukti perilaku** — proyek ini tak
+mengeksekusi JavaScript di test sama sekali. Dua hal yang **tak bisa** ditutup dari HTML dan
+harus diverifikasi di perangkat: sesi *composition* IME yang masih berjalan saat `advanceWord()`
+mengosongkan field, dan fitur Gboard "dobel spasi jadi titik" (rancangan di atas menolaknya
+dengan sopan, tapi tak bisa mematikannya). Checklistnya di
+[`../mobile-test-checklist.md`](../mobile-test-checklist.md).
+
 ## 4. Batasan Saat Ini
 
 - WPM/place tersimpan di `room_members` tidak melalui jalur PB/leaderboard global — race adalah

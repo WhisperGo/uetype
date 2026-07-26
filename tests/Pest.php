@@ -73,6 +73,33 @@ function arenaSourceAll(): string
 }
 
 /**
+ * Badan SATU metode komponen raceArena, dipotong pada penutup metode berikutnya.
+ *
+ * Pendahulunya (handleSpaceSource di RaceProgressIntegrityTest) memotong dari nama metode
+ * sampai AKHIR FILE, jadi ia sebetulnya menguji "ada di suatu tempat di bawah sini" -- sebuah
+ * assertion urutan di dalamnya bisa hijau karena kode di metode yang sama sekali lain. Lebih
+ * halus lagi: ia memakai kemunculan PERTAMA nama itu, sehingga sebuah komentar yang menyebut
+ * nama metode menggeser jendela pemeriksaan tanpa satu pun test berubah warna.
+ *
+ * $signature ditulis lengkap dengan tanda kurungnya (mis. 'checkInput()', 'handleSpace(e)')
+ * supaya ia tak cocok dengan pemanggilan `this.checkInput()` di tempat lain.
+ */
+function raceMethodSource(string $signature): string
+{
+    $js = file_get_contents(resource_path('js/race-arena.js'));
+    $start = strpos($js, "\n        {$signature} {");
+
+    expect($start)->not->toBeFalse("Metode `{$signature}` tak ditemukan di race-arena.js");
+
+    // Setiap metode komponen ditutup oleh `},` pada indentasi 8 spasi.
+    $end = strpos($js, "\n        },", $start);
+
+    expect($end)->not->toBeFalse("Penutup metode `{$signature}` tak ditemukan.");
+
+    return substr($js, $start, $end - $start);
+}
+
+/**
  * Markup Blade tanpa blok komentar `{{-- ... --}}`.
  *
  * Konvensi proyek ini menyuruh komentar menjelaskan ALASAN sebuah keputusan, yang berarti
@@ -83,6 +110,21 @@ function arenaSourceAll(): string
 function tanpaKomentarBlade(string $markup): string
 {
     return preg_replace('/\{\{--.*?--\}\}/s', '', $markup);
+}
+
+/**
+ * Sumber JavaScript tanpa komentar satu baris maupun komentar blok.
+ *
+ * Padanan tanpaKomentarBlade() untuk berkas JS, dan ada karena alasan yang sama: komentar di
+ * proyek ini menjelaskan ALASAN, jadi ia sering menyebut justru pola yang sedang dilarang
+ * ("sebuah `return` di atas baris ini akan membocorkan spasinya"). Assertion yang memeriksa
+ * URUTAN dua string akan menemukan kata itu di dalam prosa lebih dulu dan gagal dengan alasan
+ * yang sepenuhnya salah. Wajib dipakai sebelum membandingkan posisi (strpos), tak perlu untuk
+ * sekadar memeriksa keberadaan.
+ */
+function tanpaKomentarJs(string $source): string
+{
+    return preg_replace(['#/\*.*?\*/#s', '#^\s*//.*$#m'], '', $source);
 }
 
 function countQueries(Closure $callback): int

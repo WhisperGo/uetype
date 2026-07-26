@@ -412,6 +412,51 @@ const registerRaceArena = (Alpine) => {
 
             let targetWord = this.words[this.currentWordIndex];
 
+            // ===== THE TYPED-SPACE PATH (soft keyboards) =====
+            //
+            // A space that reached the field means handleSpace never fired -- Gboard reports
+            // keydown as 'Unidentified'/229 while composing, so the desktop path is silent on
+            // most phones. Without this branch the space is simply not a valid prefix, gets
+            // dropped by the rejection below, and the player is stuck on word one forever with
+            // nothing on screen explaining why.
+            //
+            // Cut at the FIRST space and DISCARD the rest. Two independent reasons, both
+            // load-bearing:
+            //
+            //  1. Stripping every space instead would let "th e" pass as an exact "the",
+            //     silently rewriting the word-lock rule.
+            //  2. Dropping the remainder caps this at ONE word per event. Swipe typing and
+            //     paste deliver several words at once; looping over them would finish the race
+            //     in a handful of gestures, and since placement is ranked by finish TIME that
+            //     is instantly the optimal strategy -- the exact bug word-lock exists to kill.
+            const spaceAt = this.typedText.indexOf(' ');
+
+            if (spaceAt !== -1) {
+                const candidate = this.typedText.slice(0, spaceAt);
+
+                this.typedText = candidate;
+
+                if (candidate === targetWord) {
+                    // A word that landed whole never passed the per-character counter below, so
+                    // credit it here or a swipe typist reads a free 100% accuracy while a
+                    // desktop player pays for every typo. Only in this branch: placing it above
+                    // the split would double-count against `if (isNewChar)` further down.
+                    this.totalKeystrokes += Math.max(0, candidate.length - this.prevTypedLength);
+                    this.prevTypedLength = candidate.length;
+
+                    this.advanceWord();
+
+                    // MUST return: targetWord above is now stale (advanceWord moved the index),
+                    // so falling through would test the final-word branch against the previous
+                    // word and emit a second progress update.
+                    return;
+                }
+
+                // Refused. The stray space is gone; let the ordinary prefix rules below judge
+                // what is left, exactly as if it had been typed key by key.
+                this.nudgeBlocked();
+            }
+
             const isNewChar = this.typedText.length > this.prevTypedLength;
             const isWrong = this.typedText.length > 0 && !targetWord.startsWith(this.typedText);
 
@@ -576,7 +621,7 @@ const registerRaceArena = (Alpine) => {
 
             while (index < this.words.length) {
                 // Each completed word contributes its length + 1 for the trailing space
-                // (matches handleSpace: correctCharsFromPastWords += targetWord.length + 1).
+                // (matches advanceWord: correctCharsFromPastWords += targetWord.length + 1).
                 const span = this.words[index].length + 1;
 
                 if (consumed + span > targetCorrect) break;
@@ -591,6 +636,29 @@ const registerRaceArena = (Alpine) => {
             this.currentWordIndex = Math.min(index, this.words.length - 1);
             this.correctCharsFromPastWords = consumed;
             this.progressPercent = Math.floor((consumed / totalChars) * 100);
+        },
+
+        /**
+         * The DESKTOP space path: a physical spacebar asking to pass the current word.
+         *
+         * Soft keyboards do not reliably reach here -- Gboard reports keydown as
+         * 'Unidentified'/229 while composing a word -- so the same request also arrives as a
+         * space inside the field, handled by checkInput(). Both end in advanceWord(), which
+         * owns the rule.
+         */
+        handleSpace(e) {
+            // preventDefault() FIRST, and unreachable by any early return. This is what makes
+            // the two space paths mutually exclusive: cancelling on the KEYDOWN phase kills the
+            // default action, so beforeinput/insertion/input never happen and the space never
+            // reaches the field -- leaving checkInput()'s value path blind to it. A `return`
+            // placed above this line leaks the space into the field and both paths would run.
+            // (It used to sit below the guard; that was harmless only because the input happens
+            // to be :disabled on the very same condition -- an accident nobody was guarding.)
+            e.preventDefault();
+
+            if (this.lockedByTimeout || this.isFinished || !this.raceStarted) return;
+
+            this.advanceWord();
         },
 
         /**
@@ -609,13 +677,16 @@ const registerRaceArena = (Alpine) => {
          * Deliberately stricter than Solo, which stays permissive: a solo player who skips
          * letters only lowers their own WPM, whereas a racer was beating honest opponents.
          * A mistake is never punished beyond the time it costs -- backspace, fix it, move on.
+         *
+         * THE single definition of "a word may pass", reached from both space paths
+         * (handleSpace for a physical spacebar, checkInput for a space that arrived as text).
+         * Copying the rule into the second caller would give the anti-cheat gate two versions
+         * that can drift apart -- and there is no server-side check to catch it if they do.
+         * It is also the only `+=` writer of correctCharsFromPastWords; the sole other write
+         * is restoreProgress(), which re-derives it from the server's stored percentage.
          */
-        handleSpace(e) {
-            if (this.lockedByTimeout || this.isFinished || !this.raceStarted) return;
-
+        advanceWord() {
             const targetWord = this.words[this.currentWordIndex];
-
-            e.preventDefault();
 
             // Covers an untouched word too (an empty string never equals a target word), so
             // space-spam is refused by this same gate rather than a separate check.

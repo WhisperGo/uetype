@@ -19,34 +19,55 @@
  * manual di browser.
  */
 
-/** Isi handleSpace() saja, supaya urutan penjaga di dalamnya bisa diperiksa. */
-function handleSpaceSource(): string
-{
-    $arena = file_get_contents(resource_path('js/race-arena.js'));
-    $start = strpos($arena, 'handleSpace(');
-
-    expect($start)->not->toBeFalse('handleSpace() tidak ditemukan di race-arena.js');
-
-    return substr($arena, $start);
-}
-
+/**
+ * Gerbangnya kini tinggal di advanceWord(), dipakai bersama oleh KEDUA jalur spasi: spasi
+ * fisik lewat handleSpace(), dan spasi yang mendarat sebagai teks (keyboard layar) lewat
+ * checkInput(). Lihat docs/features/multiplayer-race.md §3.16.
+ *
+ * Berkas ini dulu memotong sumbernya sendiri lewat handleSpaceSource(), yang mengambil dari
+ * nama metode sampai AKHIR FILE -- jadi ia sebenarnya menguji "ada di suatu tempat di bawah
+ * sini", dan setelah gerbangnya pindah ke metode lain kedua test di bawah tetap hijau tanpa
+ * benar-benar memeriksa apa pun. Digantikan raceMethodSource() di tests/Pest.php, yang
+ * memotong tepat satu metode.
+ */
 it('refuses to advance a word that was not typed exactly', function () {
-    $handleSpace = handleSpaceSource();
-
     // Gerbangnya harus membandingkan ketikan dengan kata target, lalu keluar.
-    expect($handleSpace)->toContain('this.typedText !== targetWord');
+    expect(raceMethodSource('advanceWord()'))->toContain('this.typedText !== targetWord');
 });
 
 it('never credits progress before the exact-match gate has passed', function () {
-    $handleSpace = handleSpaceSource();
+    $advanceWord = tanpaKomentarJs(raceMethodSource('advanceWord()'));
 
-    $gate = strpos($handleSpace, 'this.typedText !== targetWord');
-    $credit = strpos($handleSpace, 'this.correctCharsFromPastWords +=');
+    $gate = strpos($advanceWord, 'this.typedText !== targetWord');
+    $credit = strpos($advanceWord, 'this.correctCharsFromPastWords +=');
 
     expect($gate)->not->toBeFalse()
         ->and($credit)->not->toBeFalse()
         // Kalau akumulator naik lebih dulu, gerbangnya tak menjaga apa pun.
         ->and($gate)->toBeLessThan($credit);
+});
+
+/**
+ * Tripwire: progres balapan hanya boleh ditulis dari dua tempat, dan keduanya sah.
+ *
+ * Ini yang menjaga jalur spasi kedua (checkInput) tak pernah "membantu" dengan menambah
+ * progres sendiri. Kalau ia melakukannya, gerbang exact-match bisa dilewati sepenuhnya --
+ * dan server tak punya cara mendeteksinya, karena ia menurunkan WPM dari progress% dan tak
+ * pernah melihat teks yang diketik.
+ */
+it('keeps advanceWord the only writer of race progress', function () {
+    $arena = file_get_contents(resource_path('js/race-arena.js'));
+
+    // `+=` di advanceWord() (menambah setelah gerbang) dan `=` di restoreProgress()
+    // (menurunkan ulang dari persen yang disimpan server). Tak ada yang lain.
+    // Pola '...Words =' tak cocok dengan '...Words +=' karena ada '+' di antaranya.
+    expect(substr_count($arena, 'this.correctCharsFromPastWords +='))->toBe(1)
+        ->and(substr_count($arena, 'this.correctCharsFromPastWords ='))->toBe(1);
+});
+
+it('never lets the typed-value path bypass the exact-match gate', function () {
+    // checkInput() boleh MEMANGGIL advanceWord(), tapi tak boleh menyentuh akumulatornya.
+    expect(raceMethodSource('checkInput()'))->not->toContain('correctCharsFromPastWords');
 });
 
 it('no longer inflates keystrokes for characters that were never typed', function () {

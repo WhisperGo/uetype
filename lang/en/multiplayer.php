@@ -62,6 +62,8 @@ return [
     'input_finished' => 'You finished the race!',
     'input_type' => 'Type the current word here...',
     'input_wait' => 'Wait for countdown...',
+    // A real label: the placeholder above disappears the moment the field has content.
+    'input_aria' => 'Type the current word of the race',
     'word_must_match' => 'Finish the word exactly before pressing space.',
     'give_up' => 'Give Up',
     'gave_up_title' => 'You Gave Up',

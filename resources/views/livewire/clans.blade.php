@@ -507,7 +507,12 @@
                     <p class="font-mono text-xs text-muted mt-2">{{ __('clan.modal.disband_body') }}</p>
 
                     <label class="block font-mono text-xs text-muted mt-4 mb-1.5">{{ __('clan.modal.disband_prompt', ['name' => $this->myClan->name]) }}</label>
+                    {{-- The name is compared EXACTLY server-side (Clans::disbandClan). A phone
+                         capitalises the first letter by default, so without these attributes the
+                         correct name never matches and the leader simply cannot disband from a
+                         phone -- the guard stops being a confirmation and becomes a wall. --}}
                     <input type="text" wire:model="confirmDisbandName"
+                        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                         class="w-full px-4 py-2.5 bg-surface/40 border border-white/10 rounded-xl font-mono text-sm text-foreground placeholder-muted focus:border-danger/50 focus:ring-0 transition">
                     @error('disband')<p class="font-mono text-xs text-danger mt-2">{{ $message }}</p>@enderror
 

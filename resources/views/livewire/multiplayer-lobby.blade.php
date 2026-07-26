@@ -680,8 +680,33 @@
 
                     <!-- SINGLE-WORD INPUT FIELD WITH DYNAMIC ERROR HIGHLIGHTING -->
                     <div class="relative">
+                        {{-- ===== TOUCH DEVICES =====
+
+                             The four text-correcting attributes are OFF for the same reason as
+                             the solo engine, but the consequence here is harsher. Word-lock
+                             refuses any character that is not an exact prefix, so a single
+                             auto-capitalised letter from a phone keyboard means the word can
+                             never even be started -- and it fails silently, which reads as a
+                             slow phone rather than a broken feature.
+
+                             `enterkeyhint="next"` is backed by the Enter binding below, so the
+                             action key actually does what it says. Deliberately NOT "done" like
+                             solo: mid-race that would close the keyboard and cost a tap to
+                             resume. It doubles as a second way forward if a keyboard's space
+                             behaves oddly.
+
+                             Paste and drop are refused ON PURPOSE. Today a pasted passage is
+                             rejected only because it is not a prefix of the target word -- an
+                             accident, and one the typed-space path below weakens (its first
+                             word IS valid). Losing paste of a single correct word is the
+                             intended cost. --}}
                         <input type="text" x-ref="typeInput" x-model="typedText" @input="checkInput()"
-                            @keydown.space="handleSpace($event)" :disabled="!raceStarted || isFinished || lockedByTimeout"
+                            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                            inputmode="text" enterkeyhint="next"
+                            aria-label="{{ __('multiplayer.input_aria') }}"
+                            @paste.prevent @drop.prevent
+                            @keydown.space="handleSpace($event)"
+                            @keydown.enter="handleSpace($event)" :disabled="!raceStarted || isFinished || lockedByTimeout"
                             :placeholder="lockedByTimeout ? @js(__('multiplayer.input_locked')) : (isFinished ? @js(__('multiplayer.input_finished')) : (raceStarted ? @js(__('multiplayer.input_type')) :
                                 @js(__('multiplayer.input_wait'))))"
                             {{-- Danger styling covers the refused space too, so the field the

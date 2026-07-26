@@ -62,6 +62,8 @@ return [
     'input_finished' => 'Kamu menyelesaikan balapan!',
     'input_type' => 'Ketik kata ini di sini...',
     'input_wait' => 'Tunggu hitung mundur...',
+    // A real label: the placeholder above disappears the moment the field has content.
+    'input_aria' => 'Ketik kata balapan yang sedang berjalan',
     'word_must_match' => 'Selesaikan katanya dengan benar sebelum menekan spasi.',
     'give_up' => 'Give Up',
     'gave_up_title' => 'Kamu Menyerah',

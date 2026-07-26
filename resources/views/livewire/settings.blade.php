@@ -137,7 +137,12 @@
                 @else
                     <p class="mt-3 font-mono text-sm text-muted">{{ __('settings.danger.confirm_body') }}</p>
 
+                    {{-- Compared EXACTLY server-side (Settings::deleteAccount). A phone
+                         capitalises the first letter by default, so without these attributes the
+                         correct username never matches and the owner cannot delete their own
+                         account from a phone. --}}
                     <input type="text" wire:model="confirmUsername" x-model="typed"
+                        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                         placeholder="{{ __('settings.danger.confirm_placeholder') }}"
                         class="w-full px-4 py-2.5 mt-5 font-mono text-sm rounded-xl bg-background border border-white/10 text-foreground focus:border-danger focus:ring-1 focus:ring-danger focus:outline-none">
                     @error('confirmUsername')

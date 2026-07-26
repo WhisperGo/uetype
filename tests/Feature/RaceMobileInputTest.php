@@ -1,0 +1,263 @@
+<?php
+
+use App\Livewire\MultiplayerLobby;
+use App\Models\Room;
+use App\Models\RoomMember;
+use App\Models\User;
+use Livewire\Livewire;
+
+/**
+ * ===== MENGETIK DI BALAPAN LEWAT KEYBOARD LAYAR =====
+ *
+ * Mode solo sudah digarap untuk perangkat sentuh (typing-engine.md §3.7.a, dikunci
+ * MobileTypingInputTest). Pelajarannya tak pernah ikut ke multiplayer, dan akibatnya balapan
+ * praktis tak bisa dimainkan di HP karena DUA sebab yang berdiri sendiri:
+ *
+ *  1. Input balapan tak mematikan autocapitalize. Huruf pertama tiap kata dikapitalisasi
+ *     otomatis, gagal cek prefiks, lalu DIBUANG oleh word-lock di checkInput(). Pemain
+ *     menekan huruf dan tak terjadi apa-apa.
+ *
+ *  2. Kata hanya bisa maju lewat `@keydown.space`. Gboard melaporkan `keydown` sebagai
+ *     'Unidentified'/keyCode 229 selagi menyusun kata, jadi handler itu tak menyala; spasinya
+ *     lalu mendarat sebagai karakter biasa, dan karena "the " bukan prefiks dari "the" ia ikut
+ *     dibuang. Pemain terkunci selamanya di kata pertama, tanpa satu pun pesan error.
+ *
+ * Keduanya gagal TANPA SUARA -- word-lock memang menolak input diam-diam -- sehingga bagi
+ * pemain ini tak terbaca sebagai kerusakan, melainkan "HP-ku lemot".
+ *
+ * CATATAN PENTING soal cakupan: proyek ini tak punya test yang mengeksekusi JavaScript (lihat
+ * RaceAssetTest). Jadi berkas ini KONTRAK MARKUP & MODUL -- ia mengunci keberadaan jalurnya,
+ * bukan membuktikan keyboardnya benar-benar bekerja. Perilaku wajib diverifikasi manual di
+ * Android dan iOS; checklistnya di docs/mobile-test-checklist.md.
+ */
+
+/**
+ * Tag <input> milik arena balapan, atau string kosong kalau tak ada.
+ *
+ * Sengaja BUKAN null: `expect(null)->toContain(...)` membuat Pest memformat diff atas seluruh
+ * HTML halaman dan menghabiskan memori PHP sebelum pesan gagalnya sempat tampil. Alasan yang
+ * sama didokumentasikan di MobileTypingInputTest.
+ */
+function raceInputTag(string $html): string
+{
+    return preg_match('/<input\b[^>]*x-model="typedText"[^>]*>/s', $html, $m) ? $m[0] : '';
+}
+
+/** Arena balapan yang benar-benar terender, dengan satu pemain (bukan penonton). */
+function raceArenaHtml(): string
+{
+    $user = User::factory()->create();
+
+    $room = Room::create([
+        'code' => 'MOB123',
+        'host_id' => $user->id,
+        'status' => 'racing',
+        'text_to_type' => 'the quick brown fox',
+        'race_starts_at' => now()->subSeconds(5),
+    ]);
+
+    RoomMember::create([
+        'room_id' => $room->id,
+        'user_id' => $user->id,
+        'is_ready' => true,
+        'progress_percent' => 0,
+    ]);
+
+    return Livewire::actingAs($user)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'MOB123')
+        ->set('step', 'racing')
+        ->html();
+}
+
+/** Tag <input> yang membawa atribut `wire:model` tertentu, dari sebuah berkas Blade. */
+function inputTagWithWireModel(string $view, string $model): string
+{
+    $markup = tanpaKomentarBlade(file_get_contents(resource_path("views/livewire/{$view}.blade.php")));
+
+    return preg_match('/<input\b[^>]*wire:model="'.preg_quote($model, '/').'"[^>]*>/s', $markup, $m)
+        ? $m[0]
+        : '';
+}
+
+// ===== 1. Atribut platform =====
+
+/**
+ * Autocorrect, kapitalisasi otomatis, dan pemeriksa ejaan menyunting justru apa yang sedang
+ * diukur. Di balapan akibatnya lebih keras daripada di solo: word-lock menolak karakter yang
+ * tak persis cocok, jadi satu huruf kapital dari keyboard membuat kata tak pernah bisa dimulai.
+ */
+it('mematikan seluruh fitur koreksi teks di input balapan', function () {
+    $tag = raceInputTag(raceArenaHtml());
+
+    expect($tag)->not->toBe('', 'Input balapan (x-model="typedText") tak ditemukan di arena.')
+        ->and($tag)->toContain('autocomplete="off"')
+        ->and($tag)->toContain('autocorrect="off"')
+        ->and($tag)->toContain('autocapitalize="off"')
+        ->and($tag)->toContain('spellcheck="false"')
+        ->and($tag)->toContain('inputmode="text"');
+});
+
+/**
+ * iOS Safari MEMPERBESAR halaman saat input ber-font-size < 16px difokus. Di tengah balapan
+ * zoom itu menggeser paragraf dan lintasan sekaligus. `text-base` = 16px menahannya.
+ *
+ * Sudah benar sebelum perubahan ini -- dipasang sebagai kunci supaya tak hilang saat kelak
+ * seseorang merapikan kelas input.
+ */
+it('menahan input balapan di 16px agar iOS tak zoom saat difokus', function () {
+    expect(raceInputTag(raceArenaHtml()))->toContain('text-base');
+});
+
+/**
+ * `:placeholder` bukan label yang sah bagi pembaca layar -- ia hilang begitu ada isinya.
+ * Input solo sudah punya aria-label; balapan tertinggal.
+ */
+it('memberi input balapan label yang terbaca pembaca layar', function () {
+    expect(raceInputTag(raceArenaHtml()))->toContain('aria-label=');
+});
+
+/**
+ * Tuts aksi keyboard layar (pojok kanan bawah) diberi label "next" DAN benar-benar memajukan
+ * kata. Solo memakai "done" -- di tengah balapan itu keliru, karena "done" menutup keyboard
+ * dan pemain harus menyentuh layar lagi untuk melanjutkan.
+ *
+ * Ini juga jaring pengaman kedua: kalau jalur spasi bermasalah di keyboard tertentu, Enter
+ * tetap memajukan kata lewat handler yang sama.
+ */
+it('menjadikan tuts Enter jalur maju kata yang sah, bukan label kosong', function () {
+    $tag = raceInputTag(raceArenaHtml());
+
+    expect($tag)->toContain('enterkeyhint="next"')
+        ->and($tag)->toContain('handleSpace($event)');
+});
+
+// ===== 2. Jalur spasi =====
+
+/**
+ * Inti perbaikannya: spasi harus diterima meski datang sebagai TEKS, bukan cuma sebagai
+ * keydown. Solo tak bisa ditiru mentah-mentah -- ia membatalkan `beforeinput` dan selalu
+ * mengosongkan field, sedangkan di sini `x-model="typedText"` berarti field ITU state kata
+ * yang sedang diketik.
+ */
+it('menerima spasi yang datang sebagai teks, bukan cuma sebagai keydown', function () {
+    $checkInput = raceMethodSource('checkInput()');
+
+    expect($checkInput)->toContain("indexOf(' ')")
+        ->and($checkInput)->toContain('this.advanceWord()');
+});
+
+/**
+ * Satu definisi "kata boleh lewat", dipakai kedua jalur. Kalau logikanya disalin ke
+ * checkInput(), aturan word-lock akan punya dua salinan yang bisa menyimpang -- dan yang
+ * menyimpang diam-diam di sini adalah gerbang anti-cheat.
+ */
+it('menyalurkan spasi keydown dan spasi ketikan ke advanceWord yang sama', function () {
+    $handleSpace = raceMethodSource('handleSpace(e)');
+
+    expect($handleSpace)->toContain('this.advanceWord()')
+        // Aturannya pindah ke advanceWord(); handleSpace tak boleh menyimpan salinannya.
+        ->and($handleSpace)->not->toContain('correctCharsFromPastWords')
+        ->and($handleSpace)->not->toContain('typedText !== targetWord');
+});
+
+/**
+ * Yang membuat kedua jalur SALING EKSKLUSIF adalah preventDefault() pada fase keydown: ia
+ * membatalkan default action, sehingga beforeinput/penyisipan/input tak pernah terjadi dan
+ * spasi tak pernah masuk ke field.
+ *
+ * Karena itu ia tak boleh bisa dilewati. Sebelumnya sebuah `return` mendahuluinya: kalau
+ * guard menyala, spasi bocor ke field dan KEDUA jalur jalan. Itu tak berbahaya hanya karena
+ * input kebetulan di-`:disabled` dengan kondisi yang sama persis -- kebetulan yang tak dijaga
+ * siapa pun.
+ */
+it('membatalkan spasi desktop sebelum return mana pun bisa membocorkannya', function () {
+    // Komentar dibuang dulu: prosa di metode ini menyebut kata "return" saat menjelaskan
+    // justru larangan yang sedang diuji, dan strpos() akan menemukannya lebih dulu.
+    $handleSpace = tanpaKomentarJs(raceMethodSource('handleSpace(e)'));
+
+    $cancel = strpos($handleSpace, 'e.preventDefault()');
+    $return = strpos($handleSpace, 'return');
+
+    expect($cancel)->not->toBeFalse('handleSpace tak memanggil e.preventDefault().')
+        ->and($return)->not->toBeFalse()
+        ->and($cancel)->toBeLessThan($return);
+});
+
+/**
+ * Satu event input = MAKSIMUM satu kata maju.
+ *
+ * Swipe-typing dan paste mengirim beberapa kata sekaligus. Kalau sisanya disimpan atau
+ * di-loop, pemain bisa menyelesaikan balapan dengan segelintir gestur -- dan karena juara
+ * ditentukan WAKTU SELESAI, itu langsung jadi strategi optimal. Persis kelas bug yang
+ * word-lock diciptakan untuk membunuh (multiplayer-race.md §3.2).
+ *
+ * `return` setelah advance juga wajib demi alasan kedua: checkInput() memegang targetWord
+ * dari SEBELUM kata maju, jadi jatuh terus akan menilai kata terakhir dengan target basi.
+ */
+it('tak pernah memajukan lebih dari satu kata per event input', function () {
+    // Tanpa komentar: `return` yang diuji di sini didahului prosa yang menjelaskan kenapa ia
+    // wajib ada, dan prosa itu memisahkan kedua baris yang harus bersebelahan.
+    $checkInput = tanpaKomentarJs(raceMethodSource('checkInput()'));
+
+    expect($checkInput)->toMatch('/slice\(0,\s*spaceAt\)/')
+        ->and($checkInput)->toMatch('/this\.advanceWord\(\);\s*return;/');
+});
+
+/**
+ * Paste ditutup SECARA SENGAJA. Hari ini sebuah paragraf yang di-paste tertolak hanya karena
+ * ia bukan prefiks kata target -- perlindungan yang tak disengaja, dan jalur nilai yang baru
+ * melemahkannya (kata pertamanya kini valid). Efek sampingnya di desktop: paste satu kata yang
+ * benar berhenti bekerja. Itu memang yang diinginkan.
+ */
+it('menolak paste agar satu paragraf tak bisa dijatuhkan ke field', function () {
+    $tag = raceInputTag(raceArenaHtml());
+
+    expect($tag)->toContain('@paste.prevent')
+        ->and($tag)->toContain('@drop.prevent');
+});
+
+/**
+ * Kata yang mendarat utuh dalam satu event (swipe/autocorrect) tak pernah melewati penghitung
+ * per-karakter. Tanpa credit ini pemain swipe selalu tampil akurasi 100% sementara pemain
+ * desktop membayar tiap typo.
+ */
+it('menghitung kata hasil swipe agar akurasi bukan 100% gratis', function () {
+    expect(raceMethodSource('checkInput()'))
+        ->toMatch('/totalKeystrokes \+= Math\.max\(0, candidate\.length/');
+});
+
+/**
+ * Seluruh rancangan bersandar pada `typedText` yang selalu mutakhir saat checkInput() membacanya.
+ * Modifier `.lazy`/`.debounce`/`.throttle` akan membuatnya membaca nilai basi -- spasi bisa
+ * terlewat atau terbaca dua kali.
+ */
+it('menjaga x-model bebas modifier yang membuat nilai ketikan basi', function () {
+    $tag = raceInputTag(raceArenaHtml());
+
+    expect($tag)->toContain('x-model="typedText"')
+        ->and($tag)->not->toMatch('/x-model\.(lazy|debounce|throttle)/');
+});
+
+// ===== 3. Konfirmasi exact-match =====
+
+/**
+ * Dua aksi paling tak bisa dibatalkan di aplikasi ini dijaga dengan "ketik ulang namanya",
+ * dan keduanya dibandingkan KETAT di server (Clans::disbandClan, Settings::deleteAccount).
+ *
+ * Di HP, autocapitalize mengubah huruf pertama menjadi kapital -- sehingga nama yang benar
+ * pun tak akan pernah cocok, dan pemilik akun tak bisa menghapus akunnya sendiri maupun
+ * membubarkan clan-nya dari HP. Bukan ketidaknyamanan: fiturnya mustahil diselesaikan.
+ */
+it('membiarkan konfirmasi bubarkan clan dan hapus akun diketik dari HP', function () {
+    $cases = [
+        'konfirmasi bubarkan clan' => inputTagWithWireModel('clans', 'confirmDisbandName'),
+        'konfirmasi hapus akun' => inputTagWithWireModel('settings', 'confirmUsername'),
+    ];
+
+    foreach ($cases as $label => $tag) {
+        // toContain() menerima BANYAK needle sebagai varargs -- argumen kedua akan diperiksa
+        // sebagai string yang harus ada, bukan sebagai pesan gagal. Label dibawa lewat toBe().
+        expect($tag)->not->toBe('', "Input {$label} tak ditemukan.")
+            ->and($tag)->toContain('autocapitalize="off"', 'autocorrect="off"', 'spellcheck="false"');
+    }
+});
