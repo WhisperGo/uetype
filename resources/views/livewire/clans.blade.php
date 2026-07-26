@@ -21,30 +21,28 @@
          focusable and clickable, and was announced by screen readers as an unnamed button.
          A clan member was left with a bar holding nothing but that empty button.
 
-         Structure mirrors the Friends page: the wrapper carries the full-width rule and the
-         nav is pulled down by -mb-px so the active tab's border-b-2 sits ON that rule rather
-         than floating above it. gap-6 keeps the two labels from reading as one phrase. --}}
+         Styled as chips, matching the category filters on the Achievements page: a filled
+         pill for the active choice, an outlined one for the rest. The previous underline tabs
+         carried no gap and only px-1, so "Browse Clans" ended at the exact pixel where
+         "Create Clan" began and the pair read as a single run of text. A chip's own border
+         and padding make each target legible on its own, and gap-2 separates them.
+
+         aria-label lives on the nav, and aria-current marks the active chip -- the underline
+         version conveyed the selection through colour alone. --}}
     @unless ($this->myClan)
-        <div class="border-b border-white/10 mb-6">
-            <nav class="flex gap-6 -mb-px font-mono text-sm" aria-label="{{ __('clan.tab.aria') }}">
-                <button wire:click="setTab('browse')"
+        <nav class="flex flex-wrap gap-2 mb-6" aria-label="{{ __('clan.tab.aria') }}">
+            @foreach (['browse', 'create'] as $tabKey)
+                <button type="button" wire:click="setTab('{{ $tabKey }}')"
+                    @if ($tab === $tabKey) aria-current="page" @endif
                     @class([
-                        'px-1 py-3 border-b-2 transition-colors whitespace-nowrap',
-                        'border-gold text-foreground font-semibold' => $tab === 'browse',
-                        'border-transparent text-muted hover:text-foreground' => $tab !== 'browse',
+                        'px-4 py-1.5 rounded-lg border font-mono text-xs font-semibold transition-colors',
+                        'bg-brand-bright text-background border-brand-bright' => $tab === $tabKey,
+                        'bg-surface/60 text-muted border-white/10 hover:text-foreground hover:border-white/20' => $tab !== $tabKey,
                     ])>
-                    {{ __('clan.tab.browse') }}
+                    {{ __('clan.tab.'.$tabKey) }}
                 </button>
-                <button wire:click="setTab('create')"
-                    @class([
-                        'px-1 py-3 border-b-2 transition-colors whitespace-nowrap',
-                        'border-gold text-foreground font-semibold' => $tab === 'create',
-                        'border-transparent text-muted hover:text-foreground' => $tab !== 'create',
-                    ])>
-                    {{ __('clan.tab.create') }}
-                </button>
-            </nav>
-        </div>
+            @endforeach
+        </nav>
     @endunless
 
     {{-- TAB: MY CLAN --}}
