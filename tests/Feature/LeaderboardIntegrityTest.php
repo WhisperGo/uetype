@@ -4,9 +4,36 @@ use App\Models\TypingResult;
 use App\Models\User;
 use Livewire\Volt\Volt;
 
+/**
+ * Give a user enough accumulated typing time to clear the leaderboard eligibility gate
+ * (TypingResult::LEADERBOARD_MIN_TYPING_SECONDS). One neutral warm-up row per user is added
+ * the first time they record a result, so these ranking tests represent players who have
+ * actually earned a board spot -- without touching the score/duration of the row under test.
+ */
+function makeEligible(User $user): void
+{
+    if (TypingResult::where('user_id', $user->id)->exists()) {
+        return;
+    }
+
+    TypingResult::create([
+        'user_id' => $user->id,
+        'mode' => 'time',
+        'mode_config' => '60',
+        'net_wpm' => 40,
+        'raw_wpm' => 45,
+        'accuracy' => 95,
+        'correct_chars' => 200,
+        'incorrect_chars' => 10,
+        'duration_seconds' => TypingResult::LEADERBOARD_MIN_TYPING_SECONDS,
+    ]);
+}
+
 /** Helper: satu baris hasil ketik dengan angka yang masuk akal. */
 function result(User $user, string $mode, string $config, float $wpm, float $accuracy = 95, ?float $duration = null): TypingResult
 {
+    makeEligible($user);
+
     return TypingResult::create([
         'user_id' => $user->id,
         'mode' => $mode,

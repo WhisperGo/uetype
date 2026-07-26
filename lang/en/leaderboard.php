@@ -20,6 +20,7 @@ return [
 
     'your_rank' => 'Your Rank:',
     'unranked' => 'Unranked',
+    'eligibility_pending' => 'Type :minutes more min to rank',
 
     'player' => 'Player',
     'wpm' => 'Speed (WPM)',

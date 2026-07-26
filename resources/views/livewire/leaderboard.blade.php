@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\FriendshipStatus;
 use App\Events\FriendshipUpdated;
 use App\Models\Friendship;
 use App\Models\TypingResult;
@@ -72,7 +71,15 @@ $scoped = function (string $tab, string $config, string $timeframe, string $lang
         // Only publicly-cleared results reach the board (anti-cheat §7.6): a run held for
         // review (`pending`) or declined (`rejected`) never appears until a human clears it.
         // Applied in the single scoped source so BOTH the board and the rank agree.
-        ->whereIn('review_status', [\App\Models\TypingResult::REVIEW_CLEAR, \App\Models\TypingResult::REVIEW_APPROVED]);
+        ->whereIn('review_status', [TypingResult::REVIEW_CLEAR, TypingResult::REVIEW_APPROVED])
+        // Leaderboard eligibility gate (Monkeytype's minTimeTyping): only players whose
+        // accumulated typing time (all modes) clears the threshold appear. Kills the
+        // throwaway-account-then-script attack before scoring; a real player crosses it
+        // naturally. Applied here in the single scoped source so board AND rank agree.
+        ->whereIn('user_id', TypingResult::query()
+            ->select('user_id')
+            ->groupBy('user_id')
+            ->havingRaw('SUM(duration_seconds) >= ?', [TypingResult::LEADERBOARD_MIN_TYPING_SECONDS]));
 
     if ($timeframe === 'daily') {
         $q->where('created_at', '>=', now()->startOfDay());
@@ -137,12 +144,26 @@ $userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
 
     $metric = $metricFor($this->currentTab);
 
-    // MY record in this mode/config. Never played -> unranked.
+    // MY record in this mode/config. Never played -> unranked. `$scoped` already applies the
+    // eligibility gate, so a player under the typing-time threshold reads as $myBest === null
+    // here just like someone who never played -- the two cases are told apart below.
     $myBest = $scoped($this->currentTab, $this->currentConfig, $this->timeframe, $this->currentLang)
         ->where('user_id', Auth::id())
         ->max($metric);
 
     if ($myBest === null) {
+        // Distinguish "typed but not yet eligible" from "never played". A player who HAS
+        // typed but is still short of the gate gets a "keep typing" message, not a bare
+        // "unranked" that reads like their record vanished. Someone with no results at all
+        // (typedSeconds === 0) is genuinely unranked -- the ordinary empty state.
+        $typedSeconds = (int) TypingResult::where('user_id', Auth::id())->sum('duration_seconds');
+
+        if ($typedSeconds > 0 && $typedSeconds < TypingResult::LEADERBOARD_MIN_TYPING_SECONDS) {
+            $remaining = (int) ceil((TypingResult::LEADERBOARD_MIN_TYPING_SECONDS - $typedSeconds) / 60);
+
+            return __('leaderboard.eligibility_pending', ['minutes' => $remaining]);
+        }
+
         return __('leaderboard.unranked');
     }
 

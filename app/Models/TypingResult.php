@@ -40,6 +40,22 @@ class TypingResult extends Model
 
     public const REVIEW_REJECTED = 'rejected';
 
+    /**
+     * Minimum accumulated typing time (seconds, across all modes) before a player's results
+     * are eligible for the public leaderboard -- Monkeytype's `minTimeTyping` gate.
+     *
+     * This closes the "make account -> run a script -> take rank 1" attack at the door,
+     * BEFORE any result is scored: a throwaway account can never reach it, while a real
+     * player crosses it naturally. Unlike a WPM ceiling it cannot be paced (there is no
+     * number to land just under) and needs no client change -- duration_seconds is already
+     * stored on every result. A held-back player's records are NOT lost; they still show on
+     * the profile/PB and simply join the global board once the threshold is met.
+     *
+     * 30 minutes is a deliberately gentle interim for a young player base (raise it as the
+     * base grows); it still forces a bot to invest real, validated typing time per account.
+     */
+    public const LEADERBOARD_MIN_TYPING_SECONDS = 1800;
+
     protected $casts = [
         'mode' => TypingMode::class,
         'net_wpm' => 'decimal:2',
