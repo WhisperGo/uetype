@@ -17,8 +17,9 @@ use Livewire\Livewire;
  *
  * The sweep uses the site-wide presence heartbeat as its signal: a member whose user is
  * offline (last_seen_at stale past the 60s threshold, or null) is the one actually gone.
- * It runs lazily on lobby load, scoped to 'waiting' rooms only (a 'racing' room is settled
- * by the race itself).
+ * It runs lazily on lobby load. A 'waiting' room is reaped member by member; a 'racing' room
+ * is all-or-nothing -- one live racer protects everyone (removing a competitor mid-race would
+ * corrupt placement), but a race every member abandoned can never close itself, so it goes.
  *
  * NOTE: User::factory() defaults to PRESENT (last_seen_at = now(), isOnline() true). A
  * user who has "gone stuck" is built with ->offline() (last_seen_at null) or by stamping a
@@ -120,7 +121,7 @@ it('deletes a room whose every member has gone stale', function () {
     $this->assertDatabaseMissing('rooms', ['id' => $room->id]);
 });
 
-it('never sweeps a racing room (settled by the race, not by presence)', function () {
+it('never pulls an individual member out of a live race', function () {
     $host = User::factory()->create();
     $ghost = User::factory()->offline()->create(); // offline
     $room = sweepRoom('SWP007', 'racing', $host);
@@ -129,8 +130,61 @@ it('never sweeps a racing room (settled by the race, not by presence)', function
 
     sweep();
 
-    // Even though the ghost is offline, mid-race removal would corrupt placement.
+    // Someone is still racing here, so the race settles itself (finish / sudden death).
+    // Removing the offline one mid-race would corrupt placement -- an all-or-nothing rule.
+    $this->assertDatabaseHas('rooms', ['id' => $room->id]);
     $this->assertDatabaseHas('room_members', ['room_id' => $room->id, 'user_id' => $ghost->id]);
+});
+
+/**
+ * The hole this closes: checkSuddenDeath() is only ever TRIGGERED by a client (lockRace()
+ * in race-arena.js); the server is its gate, never its trigger. So if every tab in a race
+ * closes, nothing finishes it -- the room sits in 'racing' forever, and the 'waiting'-only
+ * sweep above never looks at it. Nobody was there to finish, so there is no result worth
+ * keeping: the room simply goes, matching the rule that a DNF is never recorded either.
+ */
+it('deletes a racing room every single member has abandoned', function () {
+    $host = User::factory()->offline()->create();
+    $other = User::factory()->offline()->create();
+    $room = sweepRoom('SWP010', 'racing', $host);
+    RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+    RoomMember::create(['room_id' => $room->id, 'user_id' => $other->id, 'role' => 'player', 'is_ready' => true]);
+
+    sweep();
+
+    $this->assertDatabaseMissing('rooms', ['id' => $room->id]);
+    $this->assertDatabaseMissing('room_members', ['room_id' => $room->id]);
+});
+
+it('leaves an abandoned race alone while the caller is still one of its members', function () {
+    // exceptUserId is the person whose page just loaded: provably present, but their own
+    // heartbeat may not have landed yet on a fresh load. They must not sweep their own race.
+    $caller = User::factory()->offline()->create();
+    $gone = User::factory()->offline()->create();
+    $room = sweepRoom('SWP011', 'racing', $caller);
+    RoomMember::create(['room_id' => $room->id, 'user_id' => $caller->id, 'role' => 'player', 'is_ready' => true]);
+    RoomMember::create(['room_id' => $room->id, 'user_id' => $gone->id, 'role' => 'player', 'is_ready' => true]);
+
+    sweep(exceptUserId: $caller->id);
+
+    $this->assertDatabaseHas('rooms', ['id' => $room->id]);
+});
+
+it('writes no history and awards no xp for a race nobody finished', function () {
+    $host = User::factory()->offline()->create();
+    $room = sweepRoom('SWP012', 'racing', $host);
+    RoomMember::create([
+        'room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player',
+        'is_ready' => true, 'progress_percent' => 60, 'wpm' => 55,
+    ]);
+
+    sweep();
+
+    // Deliberately NOT finalized: a race nobody completed produces no standings, so a
+    // half-typed run must not land in the permanent average as a real result.
+    $this->assertDatabaseMissing('rooms', ['id' => $room->id]);
+    $this->assertDatabaseCount('multiplayer_match_history', 0);
+    expect((int) $host->fresh()->total_xp)->toBe(0);
 });
 
 it('never sweeps the excepted caller even if their heartbeat has not landed yet', function () {

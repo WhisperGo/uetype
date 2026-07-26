@@ -738,8 +738,19 @@ class MultiplayerLobby extends Component
         $durationSeconds = max(0.0, (float) $raceStart->diffInSeconds(now(), true));
 
         // Net WPM formula is identical to solo mode (one source of truth).
-        // totalChars = correctChars: progress only rises from correct characters, so net
-        // WPM can't be pumped by typing garbage.
+        //
+        // totalChars = correctChars because progress only rises from correct characters --
+        // an invariant ENFORCED BY THE CLIENT (race-arena.js word-lock: a word never passes
+        // until typed exactly). The server can't verify it: it derives correct chars from
+        // progress and never sees the typed text. So this is a game rule, not a security
+        // boundary. A forged payload is still bounded by the gates below and around this
+        // method (MAX_RACE_WPM, the progress/accuracy cross-check, monotonic progress, the
+        // countdown gate and the rate limit).
+        //
+        // When space DID advance a word regardless of what was typed, this comment was
+        // simply false: typing part of each word inflated progress, and with it this
+        // "recomputed" number -- while finishing sooner in real time, which is what decides
+        // the winner. See docs/features/multiplayer-race.md §3.2.
         $antiCheat = app(AntiCheatService::class);
         $wpmCheck = $antiCheat->check($correctChars, $correctChars, $durationSeconds);
 
@@ -833,6 +844,12 @@ class MultiplayerLobby extends Component
         if ($suddenDeathJustStarted) {
             SafeBroadcast::run(fn () => broadcast(new SuddenDeathTriggered(
                 $this->roomCode,
+                // Time LEFT, not an end timestamp: a client comparing an absolute time to its
+                // own Date.now() reads its clock skew as elapsed time -- a clock running fast
+                // computed "0 left" and locked the player out of a race they had a full
+                // window to finish. Reuses the same accessor the initial render uses, so the
+                // two can never drift apart.
+                $this->suddenDeathRemaining,
                 $room->countdown_started_at->copy()->addSeconds(self::SUDDEN_DEATH_SECONDS)->toIso8601String(),
             )));
         }

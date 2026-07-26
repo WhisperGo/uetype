@@ -107,6 +107,20 @@ Net WPM diturunkan dari **progress% × panjang teks** (karena `room_members` tak
 karakter benar). Karena progres hanya naik dari karakter benar, `totalChars = correctChars`,
 sehingga WPM otomatis "net" dan tak bisa dipompa dengan ketik ngasal.
 
+> **Invarian ini ditegakkan CLIENT, bukan server.** Server menurunkan `correctChars` dari progres
+> dan **tak pernah melihat teks yang diketik**, jadi ia tak punya cara memverifikasinya. Yang
+> menegakkannya adalah **word-lock** di `handleSpace()` ([`race-arena.js`](../../resources/js/race-arena.js)):
+> kata tak pernah lewat sampai diketik persis benar.
+>
+> Sampai 2026-07-26 invarian ini cuma **asumsi** — spasi memajukan kata apa pun yang diketik,
+> sehingga mengetik ~60% tiap kata menyelesaikan race **1,5x lebih cepat** dengan akurasi 60%,
+> lolos setiap gerbang di halaman ini, dan tercatat permanen sebagai kemenangan sah. Bukan celah
+> payload melainkan **cacat aturan main**: client-nya jujur, aturannya yang salah. Riwayatnya di
+> [multiplayer-race.md §3.2](multiplayer-race.md).
+>
+> Karena penegakannya di client, word-lock **bukan** batas keamanan — payload palsu tetap
+> mungkin, dan yang menahannya tetap gerbang di bawah ini.
+
 Di sini **hanya sinyal mustahil** (`isCheating()`) yang membuat WPM di-nol-kan. `throughput_too_low`
 / durasi pendek **tidak** menolak, karena di awal race atau untuk pemain lambat, WPM kecil itu
 **wajar, bukan curang**:
@@ -144,6 +158,22 @@ berdampingan dengan akurasi sangat rendah itu kontradiktif** dan menandai manipu
 serangan *fast-garbage* (mis. **200 WPM dengan akurasi 3%**). Ambangnya: progress ≥ 50% **dan**
 akurasi < 50%. Di bawah 50% progress, akurasi rendah itu upaya lemah yang **wajar**, jadi lantai
 akurasi tak diberlakukan.
+
+**Kenapa lantainya tetap 50% setelah word-lock (dan jangan diperketat).** Menaikkannya terasa
+menggoda — sekarang progres 100% memang berarti seluruh teks diketik benar, jadi akurasi tinggi
+"seharusnya" mengikuti. Dua alasan untuk tidak:
+
+1. **Pemula jujur tetap bisa berakurasi rendah.** Word-lock menuntut kata **akhirnya** benar,
+   bukan benar di percobaan pertama. Pemain yang salah lalu memperbaiki berkali-kali punya
+   akurasi keystroke rendah dengan progres 100% yang sepenuhnya sah. Lantai yang ketat menghukum
+   persis orang yang paling butuh berlatih.
+2. **Akurasi datang dari client dan tak bisa diverifikasi.** Semakin ia menentukan nasib hasil,
+   semakin besar insentif memalsukannya. Perannya cukup sebagai gerbang **validitas**, bukan
+   penentu kemenangan.
+
+Catatan sampingan: word-lock justru **menaikkan** akurasi pemain jujur, karena penalti lama yang
+menambah keystroke *dan* kesalahan sekaligus untuk sisa kata yang dilewati sudah tak terjangkau.
+Jadi risiko *false positive* di lantai ini menurun, bukan naik.
 
 **Yang tetap dicatat (sengaja):** finisher **lambat** (WPM rendah nyata tapi benar-benar selesai)
 dan pemain **progress rendah** dengan akurasi rendah yang **menyelesaikan** (upaya lemah, bukan

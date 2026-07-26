@@ -1,7 +1,9 @@
 # Fitur 4 — Multiplayer Race (Real-time)
 
 **Komponen:** [`App\Livewire\MultiplayerLobby`](../../app/Livewire/MultiplayerLobby.php)
-(Volt route `multiplayer-lobby`)
+(didaftarkan lewat `Volt::route('/multiplayer', 'multiplayer-lobby')`, tapi
+[`multiplayer-lobby.blade.php`](../../resources/views/livewire/multiplayer-lobby.blade.php)
+adalah **view biasa** yang di-*backing* kelas di atas — bukan komponen Volt fungsional)
 **Model:** [`Room`](../../app/Models/Room.php), [`RoomMember`](../../app/Models/RoomMember.php)
 **Events:** `RoomUpdated`, `RaceProgressUpdated`, `SuddenDeathTriggered`,
 [`RoomMessageSent`](../../app/Events/RoomMessageSent.php),
@@ -57,9 +59,54 @@ $wpmCheck = app(AntiCheatService::class)->check($correctChars, $correctChars, $d
 ```
 
 **Justifikasi:** menyelaraskan multiplayer dengan mode solo — WPM tak bisa dipompa dengan ketik
-ngasal. Progres hanya naik dari karakter benar, jadi angkanya otomatis "net". `$liveWpm` tetap
-diterima di signature hanya demi kompatibilitas payload client lama. Lihat
-[anti-cheat-wpm.md](anti-cheat-wpm.md) dan [`../wpm-accuracy-integrity.md`](../wpm-accuracy-integrity.md).
+ngasal. `$liveWpm` tetap diterima di signature hanya demi kompatibilitas payload client lama.
+Lihat [anti-cheat-wpm.md](anti-cheat-wpm.md) dan
+[`../wpm-accuracy-integrity.md`](../wpm-accuracy-integrity.md).
+
+#### Word-lock: apa yang membuat "progress = karakter benar" benar-benar berlaku
+
+Rumus di atas berdiri di atas satu invarian: **progres hanya naik dari karakter benar.** Server
+tak bisa memverifikasinya sendiri — ia menurunkan `correctChars` dari progres dan **tak pernah
+melihat teks yang diketik**. Jadi invarian itu harus ditegakkan di client, dan itulah tugas
+**word-lock** di [`handleSpace()`](../../resources/js/race-arena.js):
+
+```js
+// Kata tidak pernah lewat sampai diketik PERSIS benar.
+if (this.typedText !== targetWord) {
+    this.justBlocked = true;
+
+    return;
+}
+```
+
+**Kenapa ini perlu (bug yang ditutup, 2026-07-26):** dulu spasi memajukan kata **apa pun yang
+diketik** — `correctCharsFromPastWords` bertambah sepanjang kata target tanpa memeriksa
+kecocokan. Akibatnya berantai: progres melebih-lebihkan karakter benar → Net WPM "hasil hitung
+ulang server" ikut salah → dan karena juara ditentukan **waktu selesai** (§3.5), mengetik
+sebagian tiap kata **menyelesaikan balapan lebih cepat**. Untuk teks 45 kata bahasa Indonesia
+(±286 karakter), pemain yang mengetik ~60% tiap kata selesai **1,5x lebih cepat** dengan akurasi
+60% — masih di atas lantai `RACE_MIN_ACCURACY_AT_PROGRESS`, jadi hasilnya **lolos validasi** dan
+tercatat permanen sebagai kemenangan sah 105 WPM. Spam mustahil (akurasi 0%) memang sudah
+tertutup lantai itu; yang bocor justru pita 50–99% yang tak terlihat seperti kecurangan.
+
+Tiga hal yang **sengaja tidak** diubah untuk memperbaikinya:
+
+| Yang tidak diubah | Alasan |
+|---|---|
+| Urutan podium (§3.5) | Meranking dengan progres lebih dulu berarti yang menyentuh garis duluan bisa kalah — itu membunuh makna maskot & sudden death |
+| Lantai akurasi (50%) | Menjadikan akurasi penentu kemenangan justru menciptakan insentif baru memalsukannya; ia tetap sekadar gerbang validitas |
+| Sifat permisif mode solo | Di solo, melewati huruf hanya menurunkan WPM sendiri; di race ia mengalahkan lawan yang jujur. Beda taruhan, beda aturan |
+
+**Batas yang jujur:** word-lock menutup **bug aturan main** — pemain jujur tak lagi menemukan
+spam sebagai strategi optimal. Ia **bukan** batas keamanan: penegakannya di client, jadi payload
+palsu tetap mungkin dan tetap ditahan gerbang server yang sudah ada (`MAX_RACE_WPM`, cross-check
+akurasi/progres, progres monoton, gerbang countdown, rate limit) — lihat §3.6.
+
+Konsekuensi UX yang disengaja: kata yang salah **tidak menjebak** — pemain tinggal backspace dan
+memperbaikinya, dan biayanya hanya waktu. Spasi yang ditolak diberi sinyal lewat flag
+`justBlocked` (getaran `race-typo` + baris `multiplayer.word_must_match`). Flag terpisah ini
+**wajib**: `hasError` bernilai `false` selama ketikan masih **prefiks yang benar** — ketik
+`"the"` untuk `"then"` dan layar tampak baik-baik saja, padahal spasinya ditolak.
 
 ### 3.3 Countdown sinkron pakai durasi RELATIF, bukan jam server absolut
 
@@ -80,9 +127,21 @@ Saat pemain pertama menyentuh 100% **dengan hasil yang valid**, `countdown_start
 `SuddenDeathTriggered` disiarkan dengan **timestamp akhir yang sama** ke semua klien.
 
 **Justifikasi:** race tak boleh menggantung menunggu pemain lambat/AFK selamanya. Sudden death
-memberi jendela adil (15 detik) bagi yang tersisa untuk menyelesaikan, lalu race ditutup. Timestamp
-akhir yang seragam menjaga countdown mundur sinkron di semua layar; server tetap gerbang final
-lewat `checkSuddenDeath()` (idempoten meski dipicu beberapa klien).
+memberi jendela adil (15 detik) bagi yang tersisa untuk menyelesaikan, lalu race ditutup.
+
+**Yang disiarkan adalah SISA DETIK, bukan timestamp akhir.** Ini pelajaran yang sama dengan §3.3,
+dan sempat tidak diterapkan di sini: klien dulu menghitung `new Date(endTimeIso) - Date.now()`,
+sehingga **selisih jam klien terbaca sebagai selisih waktu**. Jam yang cepat ≥15 detik
+menghasilkan sisa `0` → `lockRace()` → pemain **langsung dibekukan** dari balapan yang jatahnya
+masih penuh; jam yang lambat justru memberi jendela jauh lebih panjang. `SuddenDeathTriggered`
+kini membawa `remainingSeconds` (dihitung dengan accessor yang **sama** dengan render awal,
+`getSuddenDeathRemainingProperty()`), dan `endTimeIso` hanya tersisa sebagai *fallback* untuk
+bundle klien yang masih ter-cache — boleh dibuang setelah semua klien berganti.
+
+**Server adalah gerbang, bukan pemicu.** `checkSuddenDeath()` idempoten dan memvalidasi ulang
+15 detik itu server-side, tapi ia **hanya dipanggil oleh klien** (`lockRace()` di
+`race-arena.js`). Artinya kalau seluruh tab di sebuah race tertutup, tak ada yang menutup
+race-nya — celah itu ditangani sapuan room terbengkalai di §3.14.
 
 **Gerbang validitas (penting):** `updateRaceProgress()` memvalidasi finish **sebelum** ia boleh
 menyalakan sudden death atau mengambil `place`. Hasil yang akan ditolak finalisasi (fast-garbage:
@@ -322,7 +381,7 @@ menyapunya:
 |-------|-----------|-------------|
 | **Sinyal deteksi** | User **offline** menurut `last_seen_at` (basi > `ONLINE_THRESHOLD_SECONDS` = 60 dtk, atau null setelah logout) | Numpang **heartbeat presence site-wide** yang sudah ada (lihat [friends-presence.md](friends-presence.md) §3.3–3.4). Heartbeat berhenti begitu tab ditutup/hidden — penanda "benar-benar pergi". Yang **menunggu diam-diam di lobby tetap ping**, jadi tak ikut tersapu. Jauh lebih akurat daripada menebak dari `updated_at`. **Tanpa kolom/endpoint/JS baru.** |
 | **Kapan jalan** | **Lazy saat lobby di-load** (`mount()`), bukan cron | Pola sama seperti [`ClanWarResolver`](../../app/Services/ClanWarResolver.php) — proyek tak punya scheduler. Setiap ada yang membuka `/multiplayer`, room hantu ikut dibersihkan. |
-| **Cakupan** | Hanya room **`waiting`** | Room `racing` diselesaikan oleh race-nya sendiri (finish/sudden death); mencabut peserta di tengah race merusak placement. Konsisten dengan guard leave/kick. |
+| **Cakupan** | Room **`waiting`** per-member; room **`racing`** hanya kalau **seluruh** member hilang | Mencabut **satu** peserta di tengah race merusak placement, jadi satu pemain yang masih online melindungi seluruh room. Tapi kalau tak ada siapa-siapa lagi, race tak bisa menutup dirinya sendiri (§3.4: server gerbang, bukan pemicu) — room-nya **dihapus**, tanpa finalisasi, tanpa baris history, tanpa XP. Balapan yang tak diselesaikan siapa pun tak menghasilkan hasil yang layak disimpan, sejalan dengan aturan "DNF tak pernah dicatat". |
 | **Host tersapu** | **Handoff** ke member tersisa (racer diprioritaskan), atau room dihapus kalau semua tersapu | Memakai ulang `settleAbandonedRoom()`/`reassignHostIfNeeded()` yang sama dengan leave/kick — satu definisi. Sisa member disiarkan `RoomUpdated` agar slot bebas/host baru langsung ter-render. |
 | **Pemanggil dikecualikan** | `exceptUserId` = user yang halamannya baru load | Ia provably hadir; heartbeat-nya mungkin belum mendarat pada fresh load, jadi jangan sampai menyapu diri sendiri. |
 

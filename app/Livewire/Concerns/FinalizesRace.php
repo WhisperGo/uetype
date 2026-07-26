@@ -47,7 +47,7 @@ trait FinalizesRace
         //
         // OUTSIDE the transaction, deliberately. syncUnlocks() costs ~2 reads per player,
         // and the finalization transaction already writes place, xp, total_xp and a history
-        // row for each of up to eight racers -- the hottest path in multiplayer. Achievements
+        // row for each of up to MAX_PLAYERS racers -- the hottest path in multiplayer. Achievements
         // are derived and idempotent, so a failure here heals itself on the next call; they
         // don't need to be atomic with the race result, and holding the transaction open for
         // them would only make the race slower for everyone.
@@ -152,9 +152,10 @@ trait FinalizesRace
                         'accuracy' => (float) $member->accuracy,
                         // The DNF sentinel (999) MUST NOT reach permanent history: here the
                         // column means "elapsed duration", and 999 would be read as a real
-                        // duration by any stats that average it.
+                        // duration by any stats that average it. Unreachable in practice --
+                        // isValidRaceResult() already rejected every DNF above -- but kept as
+                        // the last line of defence, since this is where the value is written.
                         'finished_time_seconds' => $member->realFinishedSeconds(),
-                        'dnf' => $member->isDnf(),
                         'xp_earned' => $xp,
                     ]);
                 } else {

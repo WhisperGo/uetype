@@ -103,16 +103,78 @@ class RoomMembershipService
      * rather than inventing a new heartbeat -- an idle-but-present waiter still pings, so
      * they are never wrongly swept.
      *
-     * Scoped to 'waiting' rooms only, matching the leave endpoints: a 'racing' room is
-     * settled by the race itself (finish / sudden death), and pulling a competitor
-     * mid-race would corrupt placement. Called lazily on lobby load (no scheduler), the
-     * same pattern ClanWarResolver uses.
+     * Two passes, because a room in each status fails in a different way:
+     *
+     *  - 'waiting'  -> reap stale members INDIVIDUALLY (a live lobby carries on around them).
+     *  - 'racing'   -> never touch one competitor, since that corrupts placement; but if
+     *                  EVERY member is gone the race can no longer close itself, so the whole
+     *                  room goes. See sweepAbandonedRaces().
+     *
+     * Called lazily on lobby load (no scheduler), the same pattern ClanWarResolver uses.
      *
      * $exceptUserId is never swept even if momentarily stale -- the caller (the person
      * whose page just loaded) is provably present, and their own heartbeat may not have
      * landed yet on a fresh load.
      */
     public function sweepOfflineMembers(?int $exceptUserId = null): void
+    {
+        $this->sweepStaleWaitingMembers($exceptUserId);
+        $this->sweepAbandonedRaces($exceptUserId);
+    }
+
+    /**
+     * Delete races that every single member has walked away from.
+     *
+     * checkSuddenDeath() is only ever TRIGGERED by a client (lockRace() in race-arena.js);
+     * the server is its gate, never its trigger. So when the last tab in a race closes,
+     * nothing is left to close the race -- the room sits in 'racing' forever, out of reach
+     * of the waiting-only sweep above, holding rows no one can ever clear.
+     *
+     * ALL-OR-NOTHING on purpose: a room keeps every member as long as ONE of them is still
+     * present, because pulling an individual racer out mid-race would corrupt the finish
+     * and placement accounting -- the same reason leave and kick are blocked once racing
+     * starts. Once nobody is left, there is no placement left to corrupt.
+     *
+     * Deleted rather than finalized: nobody completed the race, so there are no standings
+     * worth writing. Recording half-typed runs would drag real averages down, exactly the
+     * reason a DNF never enters permanent history either.
+     *
+     * No broadcast: every member is gone by definition, and the caller is excluded below,
+     * so there is nobody subscribed to tell.
+     */
+    private function sweepAbandonedRaces(?int $exceptUserId = null): void
+    {
+        $cutoff = now()->subSeconds(User::ONLINE_THRESHOLD_SECONDS);
+
+        $abandoned = Room::query()
+            ->where('status', 'racing')
+            // "Has no member who is still here". A room with no members at all also matches,
+            // which is correct -- that is orphan data with nothing left to protect.
+            ->whereDoesntHave('members', function ($member) use ($cutoff, $exceptUserId) {
+                $member->whereHas('user', function ($user) use ($cutoff, $exceptUserId) {
+                    $user->where(function ($present) use ($cutoff, $exceptUserId) {
+                        $present->where('last_seen_at', '>=', $cutoff);
+
+                        // The caller's page is loading right now, so they are provably here
+                        // even if their first heartbeat hasn't landed. Never sweep their race.
+                        if ($exceptUserId) {
+                            $present->orWhere('id', $exceptUserId);
+                        }
+                    });
+                });
+            })
+            ->get();
+
+        if ($abandoned->isEmpty()) {
+            return;
+        }
+
+        // room_members cascades on the foreign key, so deleting the room clears its rows.
+        DB::transaction(fn () => Room::whereIn('id', $abandoned->pluck('id'))->delete());
+    }
+
+    /** Reap stale members from WAITING rooms; see sweepOfflineMembers() for the rationale. */
+    private function sweepStaleWaitingMembers(?int $exceptUserId = null): void
     {
         $cutoff = now()->subSeconds(User::ONLINE_THRESHOLD_SECONDS);
 
