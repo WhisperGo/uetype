@@ -183,16 +183,87 @@ hasilnya tanpa menulis ke DB.
 
 ### 3.7 Input ditangkap global, tapi tak "bocor" dari field lain
 
-Ketikan ditangkap lewat listener global `@keydown.window` (bukan input tersembunyi) supaya
-pemain bisa langsung mengetik tanpa harus klik area teks dulu. Konsekuensinya: listener ini
-menyala untuk **setiap** keystroke di halaman — termasuk saat fokus ada di field lain seperti
-**input chat overlay**.
+Ketikan **tuts fisik** ditangkap lewat listener global `@keydown.window` supaya pemain desktop
+bisa langsung mengetik tanpa harus klik area teks dulu. Konsekuensinya: listener ini menyala
+untuk **setiap** keystroke di halaman — termasuk saat fokus ada di field lain seperti **input
+chat overlay**.
 
 **Justifikasi guard:** sebelum memanggil `handleInput()`, dicek `document.activeElement`. Kalau
 fokus sedang di `INPUT` / `TEXTAREA` / elemen `contenteditable`, keystroke **dilewati** — biar
 masuk ke field itu saja dan tak ikut men-trigger tes ketik di belakang. Tanpa guard ini,
 mengetik pesan di overlay chat akan sekaligus memulai & mengisi paragraf typing. Lihat
 [chat.md](chat.md#47-sembunyi-saat-sesi-testbalapan-aktif).
+
+### 3.7.a Perangkat sentuh: keyboard layar butuh elemen fokusable
+
+Dokumen ini dulu menyatakan input ditangkap global **"bukan input tersembunyi"**. Itu benar
+untuk desktop, tapi berarti halaman ini **tak punya satu pun elemen fokusable** — dan setiap
+tombol mode malah memanggil `$el.blur()` agar tak ada yang memegang fokus. Di HP akibatnya
+bukan sekadar kurang nyaman: tak ada yang bisa disentuh untuk memunculkan keyboard layar dan
+tak ada keyboard fisik yang mengirim `keydown`, jadi **tes mengetik sama sekali tak bisa
+dimainkan**. Sekarang ada input tersembunyi (`x-ref="typingInput"`), khusus untuk itu.
+
+**Semua input sentuh disintesis ke `handleInput()` yang sama.** Ini batasan terpentingnya:
+`handleInput()` adalah satu-satunya penulis `missedChars`, `errorEvents`, penghitung keystroke,
+dan `trackIdle()`. Jalur kedua yang menulis state sendiri akan memecah invarian
+`Σ titik grafik === Σ missedChars` (§3.x) dan mencemari plafon karakter
+[`SoloSessionGuard`](anti-cheat-wpm.md). Karena itu `feedKey()` membentuk objek yang persis
+dibaca `handleInput()` — `key` + `ctrlKey`/`metaKey` + `preventDefault()` — dan tak menyentuh
+apa pun selain memanggilnya.
+
+**Kenapa `keydown` BUKAN jalur mobile.** Dua alasan yang berdiri sendiri:
+
+1. **Gboard Android tak mengirim karakternya.** Selagi menyusun kata ia melaporkan
+   `key: 'Unidentified'` (`keyCode` 229), jadi `handleInput()` tak pernah menerima huruf apa
+   pun. Karakter harus diambil dari `beforeinput`/`input`.
+2. **Kalau keduanya jalan, tiap keystroke dihitung dua kali.** Dengan input yang difokus,
+   satu tuts fisik memicu `keydown` **dan** `beforeinput`. Yang menyelamatkan ini justru guard
+   di §3.7: ia melewati listener global setiap kali sebuah `INPUT` memegang fokus, sehingga
+   kendali **berpindah otomatis** ke jalur input. Guard itu tak perlu diubah sama sekali —
+   dan **jangan** dilonggarkan untuk mengecualikan input ini, karena itulah yang mencegah
+   penghitungan ganda.
+
+**Backspace bisa dilaporkan dua kali** (sebagai `keydown` dan sebagai `beforeinput` bertipe
+`deleteContentBackward`). Flag `_softDeleteHandled` membuat yang datang belakangan berhenti.
+Keduanya tetap dipasang karena Backspace adalah satu-satunya tuts yang dilaporkan andal oleh
+keyboard layar, sementara `beforeinput` menutup kasus keyboard yang tak mengirim `keydown`.
+
+**`beforeinput` dibatalkan bila bisa; kalau tidak, `input` yang menangani.** Membatalkannya
+menjaga field tetap kosong sehingga tak ada nilai yang perlu di-diff maupun fragmen basi yang
+terkirim ulang. Tapi event composition **tak selalu cancelable** — di situ teksnya tetap
+mendarat, lalu `onTypingInput()` menguras field dan memainkannya. Tepat satu dari keduanya
+yang memproses, jadi tak ada yang ganda dan tak ada yang tertelan.
+
+**Teks masuk dimainkan per karakter.** Swipe-typing dan autocorrect mengirim satu kata utuh;
+`feedText()` memecahnya supaya mesin melihat persis seperti diketik. Plafon `MAX_CHARS_PER_SECOND`
+dan batas WPM tetap berlaku, jadi ini tak membuka celah skor.
+
+**Tiga jebakan platform yang sudah ditutup di markup:**
+
+| Hal | Kenapa |
+|---|---|
+| `opacity-0`, **bukan** `hidden`/`display:none` | elemen yang disembunyikan begitu tak bisa difokus — keyboard tak akan pernah muncul |
+| `text-base` (16px) | iOS Safari **memperbesar halaman** saat input ber-`font-size` < 16px difokus, walau inputnya tak terlihat; zoom itu menggeser area teks dan caretnya |
+| `focusTypingInput()` dipanggil dari handler `@click` | iOS hanya membuka keyboard untuk `focus()` yang dipicu **gestur pengguna**, bukan yang dipanggil kapan saja |
+
+Ditambah empat atribut koreksi teks (`autocomplete`/`autocorrect`/`autocapitalize`/`spellcheck`)
+dimatikan: di tes mengetik, autocorrect menyunting justru hal yang sedang diukur.
+
+**Petunjuk `typing.tap_to_type`** muncul lewat `.touch-only`, yang memakai media query
+`pointer: coarse` — **bukan lebar layar**, karena jendela desktop yang sempit tetap punya
+keyboard fisik. Tanpa petunjuk itu tak ada apa pun di layar yang memberi tahu bahwa teksnya
+harus disentuh dulu: caret berkedip seolah sudah siap menerima ketikan.
+
+> **Belum tertutup:** setelah restart, keyboard tertutup dan pemain harus menyentuh teksnya
+> lagi (tombol restart memanggil `$el.blur()`, dan `wire:key` me-mount ulang komponen Alpine
+> sehingga ref-nya dibuat baru). Petunjuk tap muncul kembali, jadi jalannya jelas — tapi ini
+> tetap satu sentuhan ekstra yang idealnya hilang.
+
+Perilaku ini **tak tertutup test otomatis**: proyek tak menjalankan JavaScript di test sama
+sekali (lihat `TypingEngineAssetTest`). `MobileTypingInputTest` mengunci **kontrak markup &
+modulnya** — keberadaan input, atribut platformnya, ketiga pengait event, dan bahwa jalurnya
+lewat `handleInput()`. Bahwa keyboardnya benar-benar terbuka dan karakternya benar tetap harus
+diverifikasi manual di Android dan iOS.
 
 ## 3.x Stream Error (penanda error di grafik hasil)
 

@@ -88,6 +88,11 @@ export default function typingGame(initialText) {
         totalKeystrokes: 0,
         correctKeystrokes: 0,
 
+        // Soft-keyboard Backspace can be reported twice: once as keydown, once as a
+        // `deleteContentBackward` beforeinput. Set by whichever arrives first so the other
+        // knows to stand down -- see onTypingInputKeydown / onTypingBeforeInput.
+        _softDeleteHandled: false,
+
         // AFK tracking: timestamp of the last keystroke, and the longest gap between two of
         // them. The server rejects abandoned runs from this (see TypingEngine::saveResult) --
         // the gap is what separates "walked away" from "types slowly", which no average can.
@@ -663,6 +668,99 @@ export default function typingGame(initialText) {
             this.inputResults[this.currentIndex] = null;
             this.schedulePositionUpdate();
             return true;
+        },
+
+        // ===== SOFT-KEYBOARD (TOUCH) INPUT PATH =====
+        //
+        // The engine reads physical keys from a global @keydown.window listener and owns no
+        // focusable element -- which meant a phone had nothing to tap, no way to raise the
+        // on-screen keyboard, and therefore no way to play at all.
+        //
+        // The fix is a hidden-but-focusable input whose events are SYNTHESISED into
+        // handleInput() below. Nothing here maintains state of its own: missedChars,
+        // errorEvents, the keystroke counters and trackIdle() all keep their single writer,
+        // so the invariants they feed (the anti-cheat ceilings, and
+        // `Σ chart points === Σ missedChars`) hold for touch exactly as for a keyboard.
+        //
+        // Why keydown is NOT the mobile path: Android Gboard reports composing keys as
+        // 'Unidentified' (keyCode 229), so the character never arrives. And with the input
+        // focused a physical key would fire keydown AND beforeinput for the same character --
+        // double-counting every keystroke. Exactly one path may run, which the existing
+        // `editing` guard in the Blade view already arranges: it skips the window listener
+        // whenever an INPUT holds focus, handing control here.
+
+        /** Raise the keyboard. MUST be called from inside a real gesture handler: iOS only
+         *  opens the keyboard for a focus() that a user action triggered. */
+        focusTypingInput() {
+            const el = this.$refs.typingInput;
+            if (!el) return;
+
+            el.value = '';
+            // preventScroll: the input is stretched over the text area, so letting the
+            // browser scroll it into view would jump the page mid-tap.
+            el.focus({ preventScroll: true });
+        },
+
+        /** One synthesised keystroke, shaped exactly as handleInput() reads it. */
+        feedKey(key) {
+            this.handleInput({ key, ctrlKey: false, metaKey: false, preventDefault() {} });
+        },
+
+        /** Replay inserted text character by character. Swipe typing and autocorrect deliver
+         *  a whole word at once; the engine must still see it one character at a time. */
+        feedText(text) {
+            if (!text) return;
+
+            for (const ch of text) {
+                // Newlines/tabs can arrive from a paste; they are not part of any wordlist.
+                if (ch === '\n' || ch === '\r' || ch === '\t') continue;
+                this.feedKey(ch);
+            }
+        },
+
+        onTypingInputKeydown(e) {
+            // Backspace only -- the one key soft keyboards report reliably. Characters are
+            // left to beforeinput/input so they cannot be counted twice.
+            if (e.key !== 'Backspace') return;
+
+            this._softDeleteHandled = true;
+            this.feedKey('Backspace');
+        },
+
+        onTypingBeforeInput(e) {
+            // Cancelling keeps the field empty, so there is never a value to diff or a stale
+            // fragment to replay. Composition events are not always cancelable, though --
+            // then the text does land, and onTypingInput() below picks it up instead.
+            const cancelled = e.cancelable;
+            if (cancelled) e.preventDefault();
+
+            if (e.inputType && e.inputType.startsWith('delete')) {
+                // Skip when keydown already reported this Backspace; act only when it didn't.
+                if (this._softDeleteHandled) {
+                    this._softDeleteHandled = false;
+
+                    return;
+                }
+
+                this.feedKey('Backspace');
+
+                return;
+            }
+
+            this._softDeleteHandled = false;
+
+            if (cancelled) this.feedText(e.data);
+        },
+
+        onTypingInput(e) {
+            // Only reached when beforeinput could not be cancelled. Drain the field so the
+            // same text is not replayed on the next event, then feed what actually landed.
+            const value = e.target.value;
+            e.target.value = '';
+
+            if (e.inputType && !e.inputType.startsWith('insert')) return;
+
+            this.feedText(value);
         },
 
         handleInput(e) {
