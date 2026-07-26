@@ -111,7 +111,7 @@ menyeberangi ambang level di tengah balapan. Selama ini `syncUnlocks()` hanya di
 tanpa tanggal, dan baru tercatat kalau pemain kebetulan main solo lagi.
 
 `FinalizesRace` kini ikut memanggilnya, **di luar transaksi finalisasi**. Transaksi itu menulis
-place, xp, total_xp, dan satu baris riwayat untuk sampai delapan pemain — jalur terpanas di
+place, xp, total_xp, dan satu baris riwayat untuk sampai `MAX_PLAYERS` pemain — jalur terpanas di
 multiplayer — sedangkan `syncUnlocks()` menambah ~2 query per pemain. Karena achievement
 diturunkan dan idempoten, kegagalannya sembuh sendiri pada panggilan berikutnya, jadi ia tak perlu
 atomik bersama hasil balapan. Ini prinsip yang sama dengan broadcast: bagian sekunder tak boleh

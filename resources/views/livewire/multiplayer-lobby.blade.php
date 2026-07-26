@@ -633,16 +633,21 @@
             @if (! $isSpectator && ! $hasGivenUp && ! $hasFinished)
                 <!-- MAIN TEXT CONTAINER (HIGH-RESPONSIVE TYPERACER-STYLE VISUAL) -->
                 <div class="border bg-surface/40 border-border/40 rounded-3xl shadow-xl {{ $dense ? 'p-5 space-y-4' : 'p-8 space-y-6' }}"
-                    :class="{ 'race-typo': hasError }">
+                    {{-- Shakes on a typo AND on a space refused by word-lock. The second case
+                         needs its own flag: `hasError` is false whenever the typed text is a
+                         correct PREFIX ("the" for "then"), which is exactly when a refused
+                         space is most confusing. --}}
+                    :class="{ 'race-typo': hasError || justBlocked }">
                     <!-- PARAGRAPH DRAFT BLOCK WITH TYPERACER COLOR INDICATORS -->
                     <div
                         class="font-mono text-xl leading-relaxed tracking-wide select-none p-5 bg-background/30 rounded-xl border border-border/20 flex flex-wrap gap-x-2 gap-y-1">
                         <template x-for="(word, wIdx) in words" :key="wIdx">
                             <span
+                                {{-- No "passed with an error" state exists any more: word-lock
+                                     means a word behind the cursor was necessarily typed
+                                     exactly, so every one of them is simply correct. --}}
                                 :class="{
-                                    'text-active': wIdx < currentWordIndex && !wordHadError[wIdx],
-                                    'text-gold/80 underline underline-offset-4 decoration-2 decoration-gold/50': wIdx <
-                                        currentWordIndex && wordHadError[wIdx],
+                                    'text-active': wIdx < currentWordIndex,
                                     'text-danger bg-danger/15 ring-1 ring-danger/40 px-1 rounded underline underline-offset-4 decoration-2': wIdx ===
                                         currentWordIndex && hasError,
                                     'text-foreground font-bold ring-1 ring-border/50 bg-foreground/5 px-1 rounded': wIdx ===
@@ -682,6 +687,18 @@
                                     hasError
                             }"
                             class="w-full px-5 py-4 bg-background border rounded-xl font-mono text-base transition-all duration-200 placeholder-muted/60 disabled:opacity-40 disabled:cursor-not-allowed" />
+
+                        {{-- The word-lock rule, surfaced only at the moment the player hits it.
+                             Teaching a rule where it bites beats a permanent instruction nobody
+                             reads -- and this is the ONLY cue when the typed text is still a
+                             correct prefix, because then nothing on screen has turned red. --}}
+                        <p x-show="justBlocked" x-cloak
+                            x-transition:enter="transition ease-out duration-150"
+                            x-transition:enter-start="opacity-0 -translate-y-1"
+                            x-transition:enter-end="opacity-100 translate-y-0"
+                            class="mt-2 font-mono text-xs text-danger">
+                            {{ __('multiplayer.word_must_match') }}
+                        </p>
                     </div>
 
                     <div class="pt-4 flex justify-end">

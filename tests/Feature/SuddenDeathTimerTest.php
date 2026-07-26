@@ -143,6 +143,56 @@ test('pemain kedua yang finish tidak me-reset timer sudden death', function () {
     expect($room->fresh()->countdown_started_at->timestamp)->toBe($mulaiTimer->timestamp);
 });
 
+/**
+ * Sisa waktu dikirim sebagai DURASI, bukan timestamp akhir.
+ *
+ * Ini pelajaran yang sudah dipetik untuk countdown 3-2-1 (lihat multiplayer-race.md §3.3)
+ * tapi belum diterapkan ke sudden death: klien dulu menghitung
+ * `new Date(endTimeIso) - Date.now()`, yang menjadikan SELISIH JAM klien sebagai selisih
+ * waktu. Jam klien yang cepat >= 15 detik menghasilkan sisa 0 -> lockRace() -> pemain
+ * langsung dibekukan dari balapan padahal jatahnya masih penuh; jam yang lambat memberinya
+ * jendela yang jauh lebih panjang. Dengan durasi relatif, jam klien tak lagi relevan.
+ */
+test('broadcasts the remaining seconds, not just an absolute end timestamp', function () {
+    $racer = User::factory()->create();
+    $lain = User::factory()->create();
+
+    $room = Room::create([
+        'code' => 'SD0006',
+        'host_id' => $racer->id,
+        'status' => 'racing',
+        'text_to_type' => 'the quick brown fox jumps over the lazy dog',
+        'race_starts_at' => now()->subSeconds(10),
+    ]);
+    RoomMember::create(['room_id' => $room->id, 'user_id' => $racer->id, 'is_ready' => true]);
+    RoomMember::create(['room_id' => $room->id, 'user_id' => $lain->id, 'is_ready' => true]);
+
+    Livewire::actingAs($racer)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'SD0006')
+        ->set('step', 'racing')
+        ->call('updateRaceProgress', 100, 80, 100);
+
+    Event::assertDispatched(
+        SuddenDeathTriggered::class,
+        // Timer baru saja menyala, jadi sisanya jendela penuh.
+        fn (SuddenDeathTriggered $e) => $e->remainingSeconds === 15
+    );
+});
+
+test('the client prefers the relative duration over the client clock', function () {
+    $echo = file_get_contents(resource_path('js/race-echo.js'));
+
+    // Diuji lewat EKSPRESI-nya, bukan posisi kata: komentar di modul itu justru menyebut
+    // pola lama yang sedang dipensiunkan (konvensi "komentar menjelaskan alasan"), jadi
+    // assertion berbasis urutan teks akan menuduh prosanya sendiri.
+    expect($echo)
+        // Durasi dari server dipakai kalau ada...
+        ->toContain("typeof e.remainingSeconds === 'number'")
+        // ...dan perhitungan berbasis jam klien hanya cabang cadangan untuk bundle lama.
+        ->and(strpos($echo, 'e.remainingSeconds'))
+        ->toBeLessThan(strpos($echo, 'new Date(e.endTimeIso)'));
+});
+
 /** Setelah timer habis, race HARUS ditutup dan yang belum selesai ditandai DNF. */
 test('checkSuddenDeath menutup race setelah 15 detik', function () {
     $pemenang = User::factory()->create();

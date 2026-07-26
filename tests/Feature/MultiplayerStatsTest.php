@@ -6,6 +6,7 @@ use App\Models\MultiplayerMatchHistory;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Models\User;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 
 /**
@@ -136,6 +137,17 @@ it('does not record a DNF / gave-up result to history (protecting the wpm averag
 
     expect(MultiplayerMatchHistory::where('user_id', $quitter->id)->exists())->toBeFalse()
         ->and(RoomMember::where('user_id', $quitter->id)->first()->result_recorded)->toBeFalse();
+});
+
+/**
+ * The `dnf` column outlived its purpose. It was added when a DNF that had typed something
+ * was still recorded; since isValidRaceResult() started rejecting EVERY DNF, a history row
+ * is only ever written for a genuine finisher -- so the column could only hold false, and
+ * nothing ever read it (Stats aggregates place/wpm/accuracy only). A column that can carry
+ * exactly one value is a trap for the next reader, who will assume it means something.
+ */
+it('keeps no dead did-not-finish flag on the permanent history', function () {
+    expect(Schema::hasColumn('multiplayer_match_history', 'dnf'))->toBeFalse();
 });
 
 it('aggregates multiplayer stats from match history', function () {

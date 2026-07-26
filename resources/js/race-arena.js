@@ -163,8 +163,16 @@ const registerRaceArena = (Alpine) => {
         totalKeystrokes: 0,
         totalMistakes: 0,
         prevTypedLength: 0,
-        // true if the word was passed wrong/incomplete (space without an exact match) - for the per-word error-history highlight.
-        wordHadError: [],
+
+        /**
+         * A space that was refused because the word isn't finished yet.
+         *
+         * Needed because `hasError` answers a DIFFERENT question: it is true only when the
+         * typed text is not a PREFIX of the target. Type "the" for "then" and the screen
+         * looks perfectly fine -- yet the space is refused, so without this flag the player
+         * just sees a dead spacebar. Cleared on the next keystroke by checkInput().
+         */
+        justBlocked: false,
 
         // Local player's progress & WPM, reactive, read by the own mascot lane in the view. Updated each checkInput().
         progressPercent: 0,
@@ -355,6 +363,9 @@ const registerRaceArena = (Alpine) => {
         checkInput() {
             if (this.lockedByTimeout || this.isFinished || !this.raceStarted) return;
 
+            // Any keystroke means the player is acting on the refused space, so drop the hint.
+            this.justBlocked = false;
+
             let targetWord = this.words[this.currentWordIndex];
 
             if (this.typedText.length > 0) {
@@ -483,29 +494,36 @@ const registerRaceArena = (Alpine) => {
             }, delay);
         },
 
-        // Permissive like Solo: space always advances the word (never locks); wrong/skipped
-        // letters are recorded as mistakes but progress keeps going.
+        /**
+         * Word-lock: a word never passes until it is typed EXACTLY.
+         *
+         * This is the one thing that makes "progress == correct characters" an INVARIANT
+         * rather than an assumption. The server derives correct chars from
+         * progress% x text length and never sees the typed text, so it cannot check this
+         * itself (see the note in MultiplayerLobby::updateRaceProgress).
+         *
+         * Space used to advance the word whatever was typed, which meant typing only part
+         * of each word reached the finish line with far less effort -- and since placement
+         * is ranked by finish TIME, that was the winning strategy. It also inflated the
+         * server's "recomputed" Net WPM, because that number is derived from progress.
+         *
+         * Deliberately stricter than Solo, which stays permissive: a solo player who skips
+         * letters only lowers their own WPM, whereas a racer was beating honest opponents.
+         * A mistake is never punished beyond the time it costs -- backspace, fix it, move on.
+         */
         handleSpace(e) {
             if (this.lockedByTimeout || this.isFinished || !this.raceStarted) return;
 
-            let targetWord = this.words[this.currentWordIndex];
-
-            // Prevent space-spam on an empty word (can't "skip" a word without typing anything).
-            if (this.typedText.length === 0) {
-                e.preventDefault();
-                return;
-            }
+            const targetWord = this.words[this.currentWordIndex];
 
             e.preventDefault();
 
-            const isExactMatch = this.typedText === targetWord;
-            this.wordHadError[this.currentWordIndex] = !isExactMatch;
+            // Covers an untouched word too (an empty string never equals a target word), so
+            // space-spam is refused by this same gate rather than a separate check.
+            if (this.typedText !== targetWord) {
+                this.justBlocked = true;
 
-            if (!isExactMatch) {
-                // Only the trailing letters not yet typed; those already typed are counted in checkInput().
-                const missingCount = Math.max(0, targetWord.length - this.typedText.length);
-                this.totalKeystrokes += missingCount;
-                this.totalMistakes += missingCount;
+                return;
             }
 
             this.correctCharsFromPastWords += targetWord.length + 1;

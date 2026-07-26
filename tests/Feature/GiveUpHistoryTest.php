@@ -83,7 +83,7 @@ test('an AFK player timed out at sudden death is not recorded to history', funct
     expect(MultiplayerMatchHistory::where('user_id', $active->id)->exists())->toBeTrue();
 });
 
-test('pemain yang benar-benar finish mencatat durasi asli dan dnf false', function () {
+test('pemain yang benar-benar finish mencatat durasi aslinya', function () {
     $penyelesai = User::factory()->create();
 
     $room = Room::create([
@@ -106,21 +106,29 @@ test('pemain yang benar-benar finish mencatat durasi asli dan dnf false', functi
 
     $riwayat = MultiplayerMatchHistory::where('user_id', $penyelesai->id)->first();
 
-    expect($riwayat->finished_time_seconds)->toBe(12)
-        ->and($riwayat->dnf)->toBeFalse();
+    // Durasi asli, bukan sentinel 999. Tak ada lagi penanda `dnf` untuk diperiksa: sejak
+    // setiap DNF ditolak, hanya finisher sungguhan yang sampai ke tabel ini, sehingga kolom
+    // itu cuma bisa bernilai false dan sudah dibuang.
+    expect($riwayat->finished_time_seconds)->toBe(12);
 });
 
-/** Rata-rata waktu finish tak boleh tercemar oleh sentinel (NULL diabaikan SQL). */
-test('durasi DNF tidak mencemari rata-rata waktu finish', function () {
+/**
+ * Rata-rata waktu finish tak boleh tercemar sentinel 999 (NULL diabaikan SQL).
+ *
+ * Baris berdurasi null tak bisa lagi dibuat lewat jalur normal -- DNF tak pernah dicatat --
+ * tapi baris lama hasil migrasi 2026_07_14 masih menyimpannya, jadi agregatnya tetap wajib
+ * tahan terhadap null.
+ */
+test('durasi kosong tidak mencemari rata-rata waktu finish', function () {
     $user = User::factory()->create();
 
     MultiplayerMatchHistory::create([
         'user_id' => $user->id, 'room_code' => 'AAA111', 'place' => 1, 'player_count' => 2,
-        'wpm' => 80, 'accuracy' => 96, 'finished_time_seconds' => 20, 'dnf' => false, 'xp_earned' => 10,
+        'wpm' => 80, 'accuracy' => 96, 'finished_time_seconds' => 20, 'xp_earned' => 10,
     ]);
     MultiplayerMatchHistory::create([
         'user_id' => $user->id, 'room_code' => 'BBB222', 'place' => 2, 'player_count' => 2,
-        'wpm' => 0, 'accuracy' => 90, 'finished_time_seconds' => null, 'dnf' => true, 'xp_earned' => 0,
+        'wpm' => 0, 'accuracy' => 90, 'finished_time_seconds' => null, 'xp_earned' => 0,
     ]);
 
     $rata = MultiplayerMatchHistory::where('user_id', $user->id)->avg('finished_time_seconds');

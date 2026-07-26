@@ -62,6 +62,7 @@ return [
     'input_finished' => 'You finished the race!',
     'input_type' => 'Type the current word here...',
     'input_wait' => 'Wait for countdown...',
+    'word_must_match' => 'Finish the word exactly before pressing space.',
     'give_up' => 'Give Up',
     'gave_up_title' => 'You Gave Up',
     'gave_up_waiting' => 'Waiting for other players to finish the race...',

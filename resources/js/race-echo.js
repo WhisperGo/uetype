@@ -121,9 +121,18 @@ document.addEventListener('livewire:init', () => {
                 }
             })
             .listen('.race.sudden_death', (e) => {
-                // Every client computes the remaining time from the same server end timestamp -> in sync.
-                const endMs = new Date(e.endTimeIso).getTime();
-                const remaining = Math.max(0, Math.ceil((endMs - Date.now()) / 1000));
+                // The server sends the time LEFT, so the client's own clock never enters the
+                // calculation. Deriving it from an absolute end timestamp instead counted any
+                // clock skew as elapsed time: a browser running 15+ seconds fast read "0 left"
+                // and locked the player out of a race they still had a full window to finish.
+                // Same reason the 3-2-1 countdown sends a relative duration.
+                //
+                // The endTimeIso branch only serves client bundles cached from before this
+                // change; it can go once those have rolled over.
+                const remaining = typeof e.remainingSeconds === 'number'
+                    ? Math.max(0, e.remainingSeconds)
+                    : Math.max(0, Math.ceil((new Date(e.endTimeIso).getTime() - Date.now()) / 1000));
+
                 window.dispatchEvent(new CustomEvent('race-sudden-death', {
                     detail: { remaining }
                 }));

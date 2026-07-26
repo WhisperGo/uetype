@@ -62,6 +62,7 @@ return [
     'input_finished' => 'Kamu menyelesaikan balapan!',
     'input_type' => 'Ketik kata ini di sini...',
     'input_wait' => 'Tunggu hitung mundur...',
+    'word_must_match' => 'Selesaikan katanya dengan benar sebelum menekan spasi.',
     'give_up' => 'Give Up',
     'gave_up_title' => 'Kamu Menyerah',
     'gave_up_waiting' => 'Menunggu pemain lain menyelesaikan balapan...',
