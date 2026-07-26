@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Papan Peringkat',
+    'title' => 'PAPAN PERINGKAT',
     'all_time' => 'Sepanjang Masa',
     'daily' => 'Harian',
     'language' => 'Bahasa',

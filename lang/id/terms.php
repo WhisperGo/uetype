@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'Syarat & Ketentuan',
+    'title' => 'SYARAT & KETENTUAN',
     'last_updated' => 'Terakhir diperbarui Juli 2026',
 
     'sections' => [

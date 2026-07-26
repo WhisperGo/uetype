@@ -7,7 +7,9 @@
 
     <!-- ===== TABS ===== -->
     {{-- <div class="border-b border-white/10 mb-6">
-        <nav class="flex gap-6 -mb-px font-mono text-sm" aria-label="{{ __('clan.tab.aria') }}">
+        {{-- mb-8: gap between the tab underline and the content below (the wrapper div that
+             once carried the shared border-b is commented out, so -mb-px is no longer needed). --}}
+        <nav class="flex mb-4 font-mono text-sm" aria-label="{{ __('clan.tab.aria') }}">
             <button wire:click="setTab('my-clan')"
                 @class([
                     'px-1 py-3 border-b-2 transition-colors whitespace-nowrap',

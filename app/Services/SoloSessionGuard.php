@@ -31,8 +31,13 @@ class SoloSessionGuard
      * text is ~130 characters and 150+ keystrokes is a normal result for it. The factor
      * is deliberately generous -- this cap exists to stop fabricated counts (thousands of
      * characters against a 130-character text), not to police sloppy typing.
+     *
+     * Tightened 3.0 -> 2.5 (§7.3): 2.5x still permits heavy typo/backspace correction (a
+     * ~130-char text allows ~375 keystrokes) but narrows the room a short-duration `words`
+     * claim had to inflate WPM arithmetically. Conservative on purpose -- see the caveat on
+     * MAX_CHARS_PER_SECOND about calibrating from real data before tightening further.
      */
-    private const TEXT_LENGTH_TOLERANCE_FACTOR = 3.0;
+    private const TEXT_LENGTH_TOLERANCE_FACTOR = 2.5;
 
     /** Flat allowance on top of the factor, so very short texts aren't over-constrained. */
     private const CHAR_TOLERANCE = 50;
@@ -40,10 +45,18 @@ class SoloSessionGuard
     /**
      * Peak human typing speed in characters per second, used as the physical ceiling for
      * "how many characters could possibly have been typed in this many seconds".
-     * ~15 cps ≈ 180 WPM sustained, comfortably above any real player while still
-     * rejecting the fabricated numbers this guard exists to catch.
+     *
+     * Tightened 15 -> 13 cps (§7.3). 13 cps ≈ 156 WPM SUSTAINED over a full test, still
+     * above any honest run (the typing world record ~210-230 WPM is a peak, not a sustained
+     * average, and near-nobody sustains even 156), while shrinking the window a "patient bot"
+     * (one that sleeps out the real duration, then forges a full-length payload) used to reach
+     * ~180-200 WPM through.
+     *
+     * CAVEAT (from the report): the ideal value comes from THIS install's own net_wpm
+     * distribution, not a document. 13 is a conservative interim -- when real play data
+     * exists, query the p99.9 of net_wpm and re-tune so no honest player is ever clipped.
      */
-    private const MAX_CHARS_PER_SECOND = 15.0;
+    private const MAX_CHARS_PER_SECOND = 13.0;
 
     /**
      * Slack (seconds) allowed between the server's own elapsed clock and the duration a

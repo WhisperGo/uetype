@@ -89,10 +89,15 @@ it('only calls it a personal best when it beats the record for that same config'
 it('recognises a genuine personal best in the same config', function () {
     $user = User::factory()->create();
 
-    bestScoreRow($user, 'time', '30', 40);
+    // Established history around 150 WPM so a new best reads as real progress, not an
+    // anomaly the longitudinal review (§7.5) would hold pending.
+    for ($i = 0; $i < 6; $i++) {
+        bestScoreRow($user, 'time', '30', 150);
+    }
 
-    // 500 karakter / 30 detik = 200 WPM, di atas rekor 40 untuk config yang sama.
-    playBestScore($user, 'time', '30', 30000, 500);
+    // ~172 WPM (430 chars / 30s, within the 13 cps = 440-char ceiling), a plausible step
+    // over the 150 history.
+    playBestScore($user, 'time', '30', 30000, 430);
 
     expect(session('typing_result')['isPersonalBest'])->toBeTrue();
 });
@@ -113,10 +118,16 @@ it('still tracks the career best across modes', function () {
 
     expect((float) $user->fresh()->highest_wpm)->toBe(100.0);
 
-    // Sesi yang benar-benar melampaui rekor karier tetap menaikkannya.
-    playBestScore($user, 'time', '30', 30000, 500); // 200 WPM
+    // Established ~150 history in time 30 so the career-best bump is genuine progress, not an
+    // anomaly the longitudinal review would hold pending (which withholds the PB).
+    for ($i = 0; $i < 6; $i++) {
+        bestScoreRow($user, 'time', '30', 150);
+    }
 
-    expect((float) $user->fresh()->highest_wpm)->toBe(200.0);
+    // ~170 WPM (425 chars / 30s), a plausible step over 150 that beats the 100 career best.
+    playBestScore($user, 'time', '30', 30000, 425);
+
+    expect((float) $user->fresh()->highest_wpm)->toBe(170.0);
 });
 
 /**

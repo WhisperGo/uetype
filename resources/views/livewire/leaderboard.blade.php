@@ -68,7 +68,11 @@ $metricFor = fn (string $tab) => $tab === 'survival' ? 'duration_seconds' : 'net
 $scoped = function (string $tab, string $config, string $timeframe, string $language) {
     $q = TypingResult::where('mode', $tab)
         ->where('mode_config', $config)
-        ->where('language', $language);
+        ->where('language', $language)
+        // Only publicly-cleared results reach the board (anti-cheat §7.6): a run held for
+        // review (`pending`) or declined (`rejected`) never appears until a human clears it.
+        // Applied in the single scoped source so BOTH the board and the rank agree.
+        ->whereIn('review_status', [\App\Models\TypingResult::REVIEW_CLEAR, \App\Models\TypingResult::REVIEW_APPROVED]);
 
     if ($timeframe === 'daily') {
         $q->where('created_at', '>=', now()->startOfDay());
@@ -166,13 +170,7 @@ $userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
     <x-page-container width="max-w-4xl">
 
         <div class="flex flex-wrap items-center justify-between gap-4 mb-10">
-            <h1 class="text-fluid-title font-bold tracking-widest uppercase text-foreground flex items-center gap-3">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
-                </svg>
-                {{ __('leaderboard.title') }}
-            </h1>
+            <h1 class="font-display text-fluid-title tracking-wide text-foreground">{{ __('leaderboard.title') }}</h1>
 
             <div class="flex flex-wrap items-center gap-2">
                 <div class="flex gap-1 bg-surface border border-border p-1 rounded-xl text-xs">

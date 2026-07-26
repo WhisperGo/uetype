@@ -4,7 +4,7 @@
 
         {{-- Header --}}
         <div class="mb-6">
-            <h1 class="text-fluid-title font-mono font-bold text-foreground mb-1">{{ __('terms.title') }}</h1>
+            <h1 class="font-display text-fluid-title tracking-wide text-foreground mb-1">{{ __('terms.title') }}</h1>
             <p class="font-mono text-x-small text-muted">{{ __('terms.last_updated') }}</p>
         </div>
 

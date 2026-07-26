@@ -48,8 +48,13 @@ Dibangun dengan **Laravel 12 + Livewire 4 + Alpine.js + Tailwind CSS**, dengan
 - **Sudden death** (masa tenggang setelah pemenang pertama finis).
 - **Mode penonton (spectator)**: masuk untuk menonton tanpa membalap; luapan otomatis
   jadi penonton saat slot pemain penuh, dan bisa tukar peran saat menunggu.
+- **Undang teman**: klik slot kosong untuk mengundang teman; mereka menerima notifikasi
+  Accept/Decline non-blocking dan langsung bergabung.
+- **Pilih bahasa teks** (EN/ID) di dalam room — hanya host yang bisa mengubahnya.
 - **Chat ruang**: ngobrol sambil menunggu di lobby & di layar hasil (untuk ngajak main
   lagi), plus **notifikasi saat ada yang masuk/keluar** ruang.
+- **Auto-bersih room "hantu"**: member yang menutup tab tanpa keluar disapu otomatis saat
+  ada yang membuka lobby (host di-oper ke pemain lain, atau room dihapus jika kosong).
 - Riwayat pertandingan permanen + statistik (win rate, placement, dsb).
 
 ### Sosial
@@ -238,11 +243,13 @@ npm run dev
 Di environment `local`, tersedia jalur login instan tanpa password (butuh seeder sudah
 dijalankan — sudah termasuk di `php artisan migrate --seed`):
 
-- `http://127.0.0.1:8000/dev-login` — login sebagai user dummy utama.
-- `http://127.0.0.1:8000/dev-login2` — login sebagai user dummy kedua (berguna untuk
-  menguji chat/multiplayer dua akun sekaligus di dua browser/incognito).
+- `http://127.0.0.1:8000/dev-login` — login sebagai user dummy utama (`dummy@uetype.test`).
+- `http://127.0.0.1:8000/dev-login?email=test@example.com` — login sebagai akun **admin**
+  bawaan seeder (berguna untuk membuka panel monitoring, lihat di bawah).
 
-Akun dummy: `dummy@uetype.test`.
+Parameter `?email=` menerima email user mana pun yang sudah ada, jadi untuk menguji
+chat/multiplayer dua akun sekaligus, buka satu di browser biasa dan satu lagi (dengan
+`?email=` berbeda) di jendela incognito.
 
 ---
 
@@ -256,7 +263,9 @@ Dashboard monitoring aktivitas, **khusus admin** (`is_admin = true`):
 - `/user-monitoring/authentications-monitoring` — riwayat login/logout.
 
 Guest maupun user biasa mendapat **404** di ketiga URL itu, jadi keberadaan panelnya tak
-bocor. Semua akun default-nya bukan admin — angkat satu lebih dulu:
+bocor. Seeder sudah membuat satu akun admin bawaan (`test@example.com`) — di environment
+`local` cukup login lewat `/dev-login?email=test@example.com`. Untuk mengangkat/mencabut
+admin akun lain:
 
 ```bash
 php artisan user:admin email@kamu.com            # jadikan admin

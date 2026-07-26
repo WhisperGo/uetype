@@ -25,7 +25,25 @@ class AntiCheatService
         'char_count_inconsistent',
         'accuracy_impossible',
         'accuracy_progress_inconsistent',
+        'consistency_impossible',
+        'keystroke_timing_uniform',
+        'keystroke_timing_impossible',
+        'keystroke_timing_identical',
     ];
+
+    /**
+     * Consistency (0-100, from TypingEngine::computeConsistency: 100 = perfectly even
+     * per-second WPM) at or above which a HIGH-WPM run is not humanly plausible. Even
+     * world-champion typists fluctuate between words, so a near-flat curve at speed is the
+     * signature of a scripted/replayed run (e.g. a bot posting an identical WPM each second).
+     */
+    private const IMPOSSIBLE_CONSISTENCY = 97;
+
+    /**
+     * The consistency floor only bites ABOVE this net WPM. High consistency at low speed is
+     * normal -- a careful beginner typing slowly and evenly -- so it must never be flagged.
+     */
+    private const CONSISTENCY_CHECK_WPM = 120.0;
 
     /** Empty session: not a real session, not worth saving (but not "cheating" either). */
     private const EMPTY_SESSION_REASONS = [
@@ -70,6 +88,23 @@ class AntiCheatService
     public function isCheating(array $reasons): bool
     {
         return ! empty(array_intersect($reasons, self::IMPOSSIBLE_REASONS));
+    }
+
+    /**
+     * Is this run impossibly steady for its speed? A near-flat per-second WPM curve (>=
+     * IMPOSSIBLE_CONSISTENCY) at a high net WPM (> CONSISTENCY_CHECK_WPM) is something no
+     * human produces -- it is the fingerprint of a bot posting a fixed WPM each tick, the
+     * "perfect 185 for 120s" case in the anti-cheat report. Low WPM is exempt: a slow,
+     * careful beginner can legitimately be very consistent.
+     *
+     * $consistency is nullable because computeConsistency() returns null for runs too short
+     * to score (< 2 samples); a null is never flagged.
+     */
+    public function isImpossiblyConsistent(?int $consistency, float $netWpm): bool
+    {
+        return $consistency !== null
+            && $consistency >= self::IMPOSSIBLE_CONSISTENCY
+            && $netWpm > self::CONSISTENCY_CHECK_WPM;
     }
 
     /**

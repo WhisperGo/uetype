@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'title' => 'About UeType',
+    'title' => 'ABOUT UETYPE',
     'tagline' => 'A gamified typing speed app - race, level up, and sharpen your keystrokes.',
 
     'what_is' => 'What is UeType',

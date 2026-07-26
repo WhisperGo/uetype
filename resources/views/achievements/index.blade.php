@@ -30,7 +30,7 @@
             <!-- Heading + progress -->
             <div class="space-y-3">
                 <div>
-                    <h1 class="font-mono text-fluid-title font-bold text-foreground">{{ __('achievements.header') }}</h1>
+                    <h1 class="font-display text-fluid-title tracking-wide text-foreground">{{ __('achievements.header') }}</h1>
                     <p class="mt-1 font-mono text-sm text-muted">
                         {{ __('achievements.unlocked_count', ['count' => $earnedCount, 'total' => $total]) }}
                     </p>

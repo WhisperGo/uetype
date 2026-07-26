@@ -42,7 +42,9 @@ class AuditTypingResults extends Command
             $suspicious->map(fn (TypingResult $r) => [
                 $r->id,
                 $r->user?->username ?? '(deleted)',
-                $r->mode.' '.$r->mode_config,
+                // `mode` is cast to the TypingMode enum, which has no __toString -- use its
+                // backing value so the concatenation doesn't throw.
+                $r->mode->value.' '.$r->mode_config,
                 $r->net_wpm,
                 $r->accuracy.'%',
                 $r->correct_chars,

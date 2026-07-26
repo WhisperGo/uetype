@@ -34,6 +34,11 @@ const SURVIVAL_PRESETS = {
 // 500 errors in one test ≈ below 50% accuracy in time 120 -- that's mashing.
 const MAX_ERROR_EVENTS = 500;
 
+// Cap on keystroke intervals sent to the server for timing analysis (anti-cheat, §7.1).
+// A random reservoir sample of this size keeps the payload small AND representative -- a
+// cheat can't just "type honestly for the first N keys" to seed a human-looking prefix.
+const MAX_KEY_INTERVALS = 300;
+
 function survivalConfig(difficulty) {
     return SURVIVAL_PRESETS[difficulty] || SURVIVAL_PRESETS.medium;
 }
@@ -88,6 +93,11 @@ export default function typingGame(initialText) {
         // the gap is what separates "walked away" from "types slowly", which no average can.
         lastKeyTime: null,
         maxIdleMs: 0,
+        // Inter-keystroke intervals (ms) for server-side timing analysis (§7.1). A reservoir
+        // sample bounded to MAX_KEY_INTERVALS; keyStrokeCount tracks the true total so the
+        // sampler weights every keystroke equally, not just the first MAX_KEY_INTERVALS.
+        keyIntervals: [],
+        keyStrokeCount: 0,
         wpmHistory: [],
         rawHistory: [],
         missedChars: {},
@@ -217,6 +227,8 @@ export default function typingGame(initialText) {
             this.correctKeystrokes = 0;
             this.lastKeyTime = null;
             this.maxIdleMs = 0;
+            this.keyIntervals = [];
+            this.keyStrokeCount = 0;
             this.wpmHistory = [];
             this.rawHistory = [];
             this.missedChars = {};
@@ -297,6 +309,18 @@ export default function typingGame(initialText) {
             if (this.lastKeyTime !== null) {
                 const gap = now - this.lastKeyTime;
                 if (gap > this.maxIdleMs) this.maxIdleMs = gap;
+
+                // Reservoir-sample the interval so the server sees a representative slice of
+                // the WHOLE run, not just the opening (§7.1). Fill first, then each later
+                // interval replaces a random slot with probability MAX/count -- uniform over
+                // the session, so a bot can't seed a human-looking prefix and forge the rest.
+                this.keyStrokeCount++;
+                if (this.keyIntervals.length < MAX_KEY_INTERVALS) {
+                    this.keyIntervals.push(gap);
+                } else {
+                    const j = Math.floor(Math.random() * this.keyStrokeCount);
+                    if (j < MAX_KEY_INTERVALS) this.keyIntervals[j] = gap;
+                }
             }
 
             this.lastKeyTime = now;
@@ -883,6 +907,8 @@ export default function typingGame(initialText) {
                 ghostCharsAtFinish: ghostCharsArg,
                 errorEvents: this.errorEvents,
                 maxIdleMs: this.maxIdleMs,
+                keyIntervals: this.keyIntervals,
+                keyStrokeCount: this.keyStrokeCount,
             });
         }
     }
