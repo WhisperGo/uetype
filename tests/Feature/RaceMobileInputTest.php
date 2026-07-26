@@ -341,8 +341,9 @@ it('membatasi paragraf balapan jadi jendela tiga baris yang menggeser sendiri', 
  * `position: relative`. Metrik kotak tiap kata konstan (diuji di test markup) supaya baris tak
  * pernah ter-rewrap saat cursor pindah.
  *
- * Dan ia wajib dipanggil di dua tempat: setiap kali kata maju, serta saat init -- karena
- * reload di tengah balapan mendarat di kata yang bisa jauh di bawah.
+ * Recompute-nya lewat requestAnimationFrame (scheduleWordScroll) SETELAH layout -- persis pola
+ * schedulePositionUpdate mesin solo -- supaya offsetTop dibaca pasca-reflow, bukan sebelum. Itu
+ * yang membuat gerak scroll-nya sama seperti solo, bukan telat satu frame.
  */
 it('meniru aturan scroll solo: geser di baris ketiga, tahan kata aktif di baris tengah', function () {
     $sync = raceMethodSource('syncWordScroll()');
@@ -355,10 +356,18 @@ it('meniru aturan scroll solo: geser di baris ketiga, tahan kata aktif di baris 
         ->and($sync)->toContain('lineHeight * 2')
         ->and($sync)->toContain('currentTop - lineHeight');
 
+    // Recompute dijadwalkan lewat rAF (seperti schedulePositionUpdate solo), dibaca pasca-layout.
+    $schedule = raceMethodSource('scheduleWordScroll()');
+    expect($schedule)->toContain('requestAnimationFrame')
+        ->and($schedule)->toContain('this.syncWordScroll()');
+
     $arena = tanpaKomentarJs(file_get_contents(resource_path('js/race-arena.js')));
 
-    // Dipanggil dari advanceWord() (kata maju) dan init() (reload di tengah balapan).
-    expect(substr_count($arena, 'this.syncWordScroll()'))->toBe(2);
+    // syncWordScroll dipanggil TEPAT sekali di kode (dari dalam rAF scheduleWordScroll); titik
+    // pemicunya (init, advanceWord, resize) semua lewat scheduleWordScroll.
+    expect(substr_count($arena, 'this.syncWordScroll()'))->toBe(1);
+    // Dipicu dari init (reload di tengah balapan), advanceWord (kata maju), dan resize (re-wrap).
+    expect(substr_count($arena, 'this.scheduleWordScroll()'))->toBeGreaterThanOrEqual(3);
 });
 
 // ===== 4. Konfirmasi exact-match =====

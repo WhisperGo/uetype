@@ -160,6 +160,10 @@ const registerRaceArena = (Alpine) => {
         // Pixels the paragraph is slid up by, so the word being typed stays inside the
         // three-line window. Written only by syncWordScroll().
         wordScrollOffset: 0,
+        // rAF guard so syncWordScroll runs at most once per frame, AFTER the browser has laid
+        // out -- mirrors the solo engine's schedulePositionUpdate/positionFrame exactly, which
+        // is what makes the two scrolls feel identical (offsetTop read post-reflow, not pre).
+        _scrollFrame: null,
         typedText: '',
         startTime: null,
         isFinished: false,
@@ -211,8 +215,9 @@ const registerRaceArena = (Alpine) => {
 
             // A mid-race reload lands on a word that may be far down the paragraph, so the
             // window has to be positioned before the player sees it. Runs for a fresh racer
-            // too, where it settles on 0 -- one call rather than a branch.
-            this.$nextTick(() => this.syncWordScroll());
+            // too, where it settles on 0 -- one call rather than a branch. $nextTick waits for
+            // Alpine to render the words, then scheduleWordScroll's rAF waits for layout.
+            this.$nextTick(() => this.scheduleWordScroll());
 
             // Clear positions ONLY when entering a different race. If this component is
             // re-init'd for the same race (Livewire morph, sudden death), each mascot's
@@ -246,6 +251,14 @@ const registerRaceArena = (Alpine) => {
             // Bridge the .race.sudden_death event -> this component's countdown. Stored so it can be removed on destroy.
             this._onSuddenDeath = (ev) => this.syncSuddenDeath(ev.detail.remaining);
             window.addEventListener('race-sudden-death', this._onSuddenDeath);
+
+            // Re-sync the window on resize/orientation change: a new width re-wraps the paragraph,
+            // so the active word's line (and therefore its offsetTop) changes. Solo self-corrects
+            // because it recomputes on every keystroke; the race only recomputes on word-advance,
+            // so without this a rotate/resize mid-word would leave the window on a stale line.
+            // rAF-coalesced via scheduleWordScroll, so a burst of resize events costs one read.
+            this._onResize = () => this.scheduleWordScroll();
+            window.addEventListener('resize', this._onResize);
         },
 
         // One race's identity: room + start time. A rematch in the same room uses a new
@@ -313,6 +326,14 @@ const registerRaceArena = (Alpine) => {
             if (this._onSuddenDeath) {
                 window.removeEventListener('race-sudden-death', this._onSuddenDeath);
                 this._onSuddenDeath = null;
+            }
+            if (this._onResize) {
+                window.removeEventListener('resize', this._onResize);
+                this._onResize = null;
+            }
+            if (this._scrollFrame) {
+                cancelAnimationFrame(this._scrollFrame);
+                this._scrollFrame = null;
             }
             if (this._countdownInterval) {
                 clearInterval(this._countdownInterval);
@@ -635,6 +656,19 @@ const registerRaceArena = (Alpine) => {
          * Silent when the ref is missing -- spectators and the finished/gave-up screens render
          * no paragraph at all.
          */
+        // Coalesce scroll updates to one per animation frame, run AFTER layout -- the exact
+        // shape of the solo engine's schedulePositionUpdate(). Reading offsetTop inside rAF (not
+        // synchronously / in $nextTick) guarantees the paragraph has already re-laid-out, so the
+        // window lands on the settled position instead of a pre-reflow one. That post-layout
+        // timing is what makes the race scroll move like solo rather than a frame behind.
+        scheduleWordScroll() {
+            if (this._scrollFrame) return;
+            this._scrollFrame = requestAnimationFrame(() => {
+                this._scrollFrame = null;
+                this.syncWordScroll();
+            });
+        },
+
         syncWordScroll() {
             const track = this.$refs.wordsTrack;
             if (!track) return;
@@ -761,10 +795,9 @@ const registerRaceArena = (Alpine) => {
             this.hasError = false;
             this.prevTypedLength = 0;
 
-            // After the DOM has re-rendered: the active word gains padding when it becomes
-            // active, which can reflow the line it sits on, so offsetTop is only trustworthy
-            // once Alpine has applied the new classes.
-            this.$nextTick(() => this.syncWordScroll());
+            // Re-evaluate the window after the index moved. $nextTick lets Alpine apply the new
+            // active-word classes, then scheduleWordScroll's rAF reads offsetTop post-layout.
+            this.$nextTick(() => this.scheduleWordScroll());
 
             // The last word can also finish via space (not only via an exact match in checkInput()).
             if (this.currentWordIndex >= this.words.length) {
