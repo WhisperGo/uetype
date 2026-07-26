@@ -56,17 +56,45 @@ it('keeps the typing input at 16px so iOS does not zoom on focus', function () {
 });
 
 /**
- * Inputnya tak boleh menelan sentuhan (ia menutupi seluruh area teks), jadi yang memegang
- * tap adalah kontainer teksnya lalu memanggil focus() -- dan itu HARUS terjadi di dalam
- * handler gestur: iOS hanya membuka keyboard untuk focus() yang dipicu gestur pengguna.
+ * Inputnya HARUS jadi target sentuhnya sendiri -- dibentangkan menutupi area teks dan
+ * menerima pointer event.
+ *
+ * Versi pertama justru sebaliknya: `pointer-events-none`, dan tap diserahkan ke kontainer
+ * teks yang memanggil focusTypingInput(). Itu membuat kemunculan keyboard bergantung pada
+ * satu panggilan JS -- diam total kalau bundle-nya gagal atau masih basi di perangkat -- dan
+ * ikut menyeret aturan iOS bahwa focus() hanya membuka keyboard di dalam gestur. Dengan
+ * sentuhan mendarat langsung di <input>, browser membuka keyboard secara NATIVE, tanpa
+ * JavaScript sama sekali.
+ *
+ * focusTypingInput() tetap ada sebagai jalur cadangan untuk tombol petunjuk di bawah teks.
  */
-it('focuses the input from a tap on the text area', function () {
+it('makes the input itself the tap target', function () {
     $user = User::factory()->create();
 
     $html = $this->actingAs($user)->get(route('typing'))->getContent();
+    $tag = typingInputTag($html);
 
-    expect($html)->toContain('focusTypingInput()')
-        ->and(typingInputTag($html))->toContain('pointer-events-none');
+    expect($tag)->not->toContain('pointer-events-none')
+        ->and($tag)->toContain('absolute inset-0')
+        ->and($html)->toContain('focusTypingInput()');
+});
+
+/**
+ * Transparan, BUKAN `opacity-0`: elemen ber-opacity 0 dianggap tak terlihat oleh sebagian
+ * browser mobile, yang lalu menolak membuka keyboard untuknya. Warna transparan membuat
+ * elemennya benar-benar terrender dan sah difokus tanpa menampilkan apa pun.
+ *
+ * `hidden`/`display:none` bahkan tak bisa difokus sama sekali -- itu yang paling fatal.
+ */
+it('hides the input with transparency rather than opacity or display', function () {
+    $tag = typingInputTag(
+        $this->actingAs(User::factory()->create())->get(route('typing'))->getContent()
+    );
+
+    expect($tag)->toContain('text-transparent')
+        ->and($tag)->toContain('caret-transparent')
+        ->and($tag)->not->toContain('opacity-0')
+        ->and($tag)->not->toContain('hidden');
 });
 
 /**

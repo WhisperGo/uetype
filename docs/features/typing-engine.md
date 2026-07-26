@@ -238,13 +238,32 @@ yang memproses, jadi tak ada yang ganda dan tak ada yang tertelan.
 `feedText()` memecahnya supaya mesin melihat persis seperti diketik. Plafon `MAX_CHARS_PER_SECOND`
 dan batas WPM tetap berlaku, jadi ini tak membuka celah skor.
 
-**Tiga jebakan platform yang sudah ditutup di markup:**
+### Input adalah target sentuhnya sendiri (percobaan pertama gagal di HP)
+
+Versi pertama memberi input `pointer-events-none` dan menyerahkan tap ke kontainer teks yang
+memanggil `focusTypingInput()`. **Di HP nyata itu tak berhasil sama sekali** — disentuh, tak
+ada apa pun yang terjadi. Dua sebabnya, dan keduanya berdiri sendiri:
+
+1. **Keyboard jadi bergantung pada satu panggilan JS.** Kalau bundle-nya gagal, masih basi di
+   perangkat, atau `focusTypingInput()` tak terjangkau dari scope-nya, hasilnya diam total —
+   tanpa gejala apa pun selain "tak bisa diklik".
+2. **`opacity-0` membuat sebagian browser mobile menganggapnya tak terlihat** dan menolak
+   membuka keyboard untuk elemen itu.
+
+Sekarang input **dibentangkan menutupi area teks dan menerima pointer event**, jadi sentuhan
+mendarat langsung di sebuah `<input>` dan browser membuka keyboard **secara native — tanpa
+JavaScript sama sekali**. Ini sekaligus menghapus urusan "focus() harus di dalam gestur" milik
+iOS, karena tak ada `focus()` terprogram yang terlibat di jalur utama. `focusTypingInput()`
+tetap ada, tapi hanya untuk tombol petunjuk di bawah paragraf.
+
+**Empat jebakan platform yang ditutup di markup:**
 
 | Hal | Kenapa |
 |---|---|
-| `opacity-0`, **bukan** `hidden`/`display:none` | elemen yang disembunyikan begitu tak bisa difokus — keyboard tak akan pernah muncul |
-| `text-base` (16px) | iOS Safari **memperbesar halaman** saat input ber-`font-size` < 16px difokus, walau inputnya tak terlihat; zoom itu menggeser area teks dan caretnya |
-| `focusTypingInput()` dipanggil dari handler `@click` | iOS hanya membuka keyboard untuk `focus()` yang dipicu **gestur pengguna**, bukan yang dipanggil kapan saja |
+| Input menerima pointer event (**bukan** `pointer-events-none`) | sentuhan mendarat di `<input>` → keyboard native, tak bergantung JS |
+| **Transparan** (`text-transparent`/`bg-transparent`/`caret-transparent`), bukan `opacity-0` | elemen ber-opacity 0 dianggap tak terlihat oleh sebagian browser mobile, yang lalu menolak membuka keyboard. `hidden`/`display:none` lebih buruk lagi: tak bisa difokus sama sekali |
+| `text-base` (16px) | iOS Safari **memperbesar halaman** saat input ber-`font-size` < 16px difokus; zoom itu menggeser area teks dan caretnya |
+| Petunjuk tap adalah `<button>`, bukan `div` ber-`@click` | iOS Safari tak selalu memicu `click` pada elemen yang tak interaktif |
 
 Ditambah empat atribut koreksi teks (`autocomplete`/`autocorrect`/`autocapitalize`/`spellcheck`)
 dimatikan: di tes mengetik, autocorrect menyunting justru hal yang sedang diukur.

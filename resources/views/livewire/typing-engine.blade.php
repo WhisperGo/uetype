@@ -302,18 +302,24 @@
                  tak ada yang bisa disentuh untuk memunculkan keyboard layar -- tesnya benar-benar
                  tak bisa dimainkan, bukan cuma sulit.
 
-                 Input ini yang memunculkan keyboard. Ia dibentangkan menutupi area teks supaya
-                 fokusnya tak pernah menggulirkan halaman ke tempat lain, tapi `pointer-events-none`
-                 membuatnya tak menelan sentuhan -- yang memegang tap adalah kontainer teks di
-                 bawah, yang memanggil focusTypingInput() DI DALAM handler gestur (iOS hanya
-                 membuka keyboard untuk focus() yang dipicu aksi pengguna).
+                 Input ini yang memunculkan keyboard, dan ia DIBENTANGKAN MENUTUPI area teks
+                 supaya menjadi target sentuhnya sendiri. Itu keputusan yang menentukan: sentuhan
+                 mendarat langsung di sebuah <input>, jadi browser membuka keyboard secara NATIVE
+                 -- tak bergantung pada JavaScript sama sekali. Versi pertama memakai
+                 `pointer-events-none` dan menyerahkan tap ke kontainer teks yang memanggil
+                 focusTypingInput(); itu membuat keyboard bergantung pada satu panggilan JS, dan
+                 diam total kalau bundle-nya gagal/basi. Sekaligus menghapus urusan "focus() harus
+                 di dalam gestur" milik iOS, karena tak ada focus() terprogram yang terlibat.
 
-                 `opacity-0` bukan `hidden`/`display:none`: elemen yang disembunyikan begitu tak
-                 bisa difokus, jadi keyboardnya tak akan pernah muncul.
+                 TRANSPARAN, bukan `opacity-0`. Elemen ber-opacity 0 dianggap tak terlihat oleh
+                 sebagian browser mobile, yang lalu menolak membuka keyboard untuknya. Dengan
+                 `text-transparent` + `bg-transparent` + `caret-transparent` elemennya benar-benar
+                 terrender dan sah difokus, tapi tak menampilkan apa pun. (Nilainya selalu
+                 dikuras, jadi tak ada teks yang bisa muncul di atas paragraf.) Yang jelas TIDAK
+                 boleh: `hidden`/`display:none` -- itu tak bisa difokus sama sekali.
 
-                 `text-base` (16px) menahan iOS Safari MEMPERBESAR halaman saat input difokus --
-                 zoom itu terjadi walau inputnya tak terlihat, dan akan menggeser seluruh area
-                 teks beserta caretnya.
+                 `text-base` (16px) menahan iOS Safari MEMPERBESAR halaman saat input difokus;
+                 zoom itu akan menggeser seluruh area teks beserta caretnya.
 
                  Empat atribut koreksi teks dimatikan: autocorrect/kapitalisasi/ejaan akan
                  menyunting apa yang diketik pemain, dan di tes mengetik itu berarti mengubah
@@ -329,7 +335,7 @@
                 @keydown="onTypingInputKeydown($event)"
                 @beforeinput="onTypingBeforeInput($event)"
                 @input="onTypingInput($event)"
-                class="absolute inset-0 z-30 w-full h-full p-0 m-0 text-base bg-transparent border-0 opacity-0 pointer-events-none resize-none caret-transparent focus:outline-none focus:ring-0">
+                class="absolute inset-0 z-30 w-full h-full p-0 m-0 text-base bg-transparent text-transparent caret-transparent border-0 appearance-none rounded-none cursor-text focus:outline-none focus:ring-0">
 
             <!-- Kontainer 3 Baris -->
             {{-- @click memegang tap-nya (bukan inputnya, yang pointer-events-none) supaya
@@ -437,15 +443,18 @@
 
                  x-show boleh berdampingan dengan .touch-only: saat kondisinya benar Alpine
                  MENGHAPUS `display:none` inline-nya, sehingga media query yang menentukan. --}}
-            <div x-show="!isStarted && !isFinished" x-cloak
-                @click="focusTypingInput()"
-                class="touch-only justify-center mt-4">
-                <span class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-surface/60 text-small font-mono text-muted">
+            <div x-show="!isStarted && !isFinished" x-cloak class="touch-only justify-center mt-4">
+                {{-- Sebuah <button> asli, bukan div ber-@click: iOS Safari tak selalu memicu
+                     `click` pada elemen yang tak interaktif, dan tombol juga sudah benar secara
+                     semantik. Ia hanya jalur cadangan -- sentuhan pada paragrafnya sendiri sudah
+                     mendarat di input dan membuka keyboard tanpa JS. --}}
+                <button type="button" @click="focusTypingInput()"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-surface/60 text-small font-mono text-muted">
                     <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                     </svg>
                     {{ __('typing.tap_to_type') }}
-                </span>
+                </button>
             </div>
             </div>
 
