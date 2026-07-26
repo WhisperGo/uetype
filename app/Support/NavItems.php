@@ -61,17 +61,20 @@ class NavItems
     /**
      * Account menu (desktop dropdown / mobile bottom block).
      *
-     * @return list<array{key:string, label:string, href:string, active:bool}>
+     * @return list<array{key:string, label:string, href:string, active:bool, icon:string}>
      */
     public static function account(): array
     {
+        // [label key, route name, icon component] -- the icon travels with the item so the
+        // desktop dropdown and the mobile menu can never disagree about which glyph goes
+        // where. Components live in resources/views/components/icon-*.blade.php.
         $routes = [
-            'profile' => ['nav.profile', 'profile.me'],
-            'achievements' => ['nav.achievements', 'achievements.index'],
-            'stats' => ['nav.user_stats', 'stats'],
-            'friends' => ['nav.friends', 'friends.index'],
-            'chat' => ['nav.chat', 'chat.index'],
-            'settings' => ['nav.settings', 'settings'],
+            'profile' => ['nav.profile', 'profile.me', 'icon-profile'],
+            'achievements' => ['nav.achievements', 'achievements.index', 'icon-achievement'],
+            'stats' => ['nav.user_stats', 'stats', 'icon-stats'],
+            'friends' => ['nav.friends', 'friends.index', 'icon-friends'],
+            'chat' => ['nav.chat', 'chat.index', 'icon-chat'],
+            'settings' => ['nav.settings', 'settings', 'icon-settings'],
         ];
 
         $items = collect($routes)
@@ -80,6 +83,7 @@ class NavItems
                 'label' => $item[0],
                 'href' => route($item[1]),
                 'active' => request()->routeIs($item[1]),
+                'icon' => $item[2],
             ])
             ->values()
             ->all();
@@ -94,6 +98,7 @@ class NavItems
                 'href' => route('user-monitoring.visits-monitoring'),
                 // Any of the three dashboard tabs lights up this one item.
                 'active' => request()->routeIs('user-monitoring.*'),
+                'icon' => 'icon-stats',
             ];
         }
 

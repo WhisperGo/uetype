@@ -108,26 +108,27 @@
                         @auth
                             @foreach ($navAccount as $item)
                                 <x-dropdown-link :href="$item['href']">
-                                    <span class="inline-flex items-center gap-2">
-                                        {{ __($item['label']) }}
-                                        {{-- Same gold friend-request dot next to the Friends item. --}}
-                                        @if ($item['key'] === 'friends')
-                                            <span x-show="friendRequests > 0" x-cloak
-                                                class="w-2 h-2 rounded-full bg-gold shrink-0"></span>
-                                        @endif
-                                    </span>
+                                    <x-dynamic-component :component="$item['icon']"
+                                        class="h-4 w-4 shrink-0 text-muted/70 transition group-hover:text-gold" />
+                                    {{ __($item['label']) }}
+                                    {{-- Same gold friend-request dot next to the Friends item. --}}
+                                    @if ($item['key'] === 'friends')
+                                        <span x-show="friendRequests > 0" x-cloak
+                                            class="w-2 h-2 rounded-full bg-gold shrink-0"></span>
+                                    @endif
                                 </x-dropdown-link>
                             @endforeach
 
                             <div class="my-1 border-t border-white/5"></div>
 
+                            {{-- Sign Out turns danger-red on hover -- label and glyph together.
+                                 Colouring only the 16px icon left the larger, faster-read label
+                                 saying the opposite (`hover:text-foreground`), and a lone hue on a
+                                 glyph that small is easy to miss under red-green colour deficiency. --}}
                             <button type="button"
                                 x-on:click="$dispatch('open-modal', 'confirm-sign-out')"
-                                class="group flex w-full items-center gap-2 px-4 py-2 text-start text-sm leading-5 text-muted transition duration-150 ease-in-out hover:bg-elevated hover:text-foreground focus:bg-elevated focus:text-foreground focus:outline-none">
-                                <svg class="h-4 w-4 text-muted/70 transition group-hover:text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                                </svg>
+                                class="group flex w-full items-center gap-2 px-4 py-2 text-start text-sm leading-5 text-muted transition duration-150 ease-in-out hover:bg-elevated hover:text-danger focus:bg-elevated focus:text-danger focus:outline-none">
+                                <x-icon-logout class="h-4 w-4 shrink-0 text-muted/70 transition group-hover:text-danger group-focus:text-danger" />
                                 <span>{{ __('nav.logout') }}</span>
                             </button>
                         @else
@@ -199,6 +200,10 @@
                     @foreach ($navAccount as $item)
                         <x-responsive-nav-link :href="$item['href']" :active="$item['active']">
                             <span class="inline-flex items-center gap-2">
+                                {{-- On an active row the icon inherits brand-bright from the link
+                                     itself, so only the resting/hover colours are stated here. --}}
+                                <x-dynamic-component :component="$item['icon']"
+                                    class="h-4 w-4 shrink-0 transition {{ $item['active'] ? '' : 'text-muted/70 group-hover:text-gold' }}" />
                                 {{ __($item['label']) }}
                                 @if ($item['key'] === 'friends')
                                     <span x-show="friendRequests > 0" x-cloak
@@ -209,11 +214,8 @@
                     @endforeach
                     <button type="button"
                         x-on:click="$dispatch('open-modal', 'confirm-sign-out'); open = false"
-                        class="group flex w-full items-center gap-2 border-l-4 border-transparent py-2 ps-3 pe-4 text-start text-base font-medium text-muted transition duration-150 ease-in-out hover:border-white/20 hover:bg-surface hover:text-foreground focus:border-white/20 focus:bg-surface focus:text-foreground focus:outline-none">
-                        <svg class="h-4 w-4 text-muted/70 transition group-hover:text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                        </svg>
+                        class="group flex w-full items-center gap-2 border-l-4 border-transparent py-2 ps-3 pe-4 text-start text-base font-medium text-muted transition duration-150 ease-in-out hover:border-white/20 hover:bg-surface hover:text-danger focus:border-white/20 focus:bg-surface focus:text-danger focus:outline-none">
+                        <x-icon-logout class="h-4 w-4 shrink-0 text-muted/70 transition group-hover:text-danger group-focus:text-danger" />
                         <span>{{ __('nav.logout') }}</span>
                     </button>
                 </div>
