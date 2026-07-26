@@ -298,15 +298,24 @@ it('membatasi paragraf balapan jadi jendela tiga baris yang menggeser sendiri', 
         // Dipotong, dan TIDAK boleh jadi area gulir kedua yang harus digeser tangan.
         ->toContain('class="overflow-hidden" style="max-height: 4.875em;"')
         ->toContain('x-ref="wordsTrack"')
+        // Jendela klip yang STASIONER -- syncWordScroll() mengukur kata aktif terhadapnya
+        // (bukan offsetTop, yang menabrak offsetParent tak-terduga dan menggeser paragraf
+        // keluar layar di HP).
+        ->toContain('x-ref="wordsWindow"')
         ->toContain('translateY(-${wordScrollOffset}px)')
         // Penanda yang dipakai syncWordScroll() untuk menemukan kata aktif.
         ->toContain(':data-word-index="wIdx"');
 });
 
 /**
- * Jendelanya harus digeser dari posisi NYATA kata aktif (offsetTop), bukan dari jumlah baris
- * yang dihitung sendiri: kata membungkus berbeda di tiap lebar layar, jadi hitungan JS akan
- * berbeda dari yang benar-benar dilay-out browser.
+ * Jendelanya harus digeser dari posisi NYATA kata aktif yang dilay-out browser, bukan dari
+ * jumlah baris yang dihitung sendiri: kata membungkus berbeda di tiap lebar layar, jadi
+ * hitungan JS akan berbeda dari yang benar-benar dilay-out.
+ *
+ * Diukur lewat getBoundingClientRect() terhadap jendela klip yang STASIONER -- BUKAN offsetTop.
+ * offsetTop diukur dari offsetParent (leluhur ber-`position`), dan track/pembungkusnya tak
+ * ada yang `relative`, jadi offsetParent menabrak kartu jauh di atas paragraf -- posisinya ikut
+ * masuk ke offset, menggeser paragraf keluar jendela sehingga di HP kata aktif tak terlihat.
  *
  * Dan ia wajib dipanggil di dua tempat: setiap kali kata maju, serta saat init -- karena
  * reload di tengah balapan mendarat di kata yang bisa jauh di bawah.
@@ -315,7 +324,12 @@ it('menggeser jendela paragraf dari posisi nyata kata aktif', function () {
     $sync = raceMethodSource('syncWordScroll()');
 
     expect($sync)->toContain('data-word-index')
-        ->and($sync)->toContain('active.offsetTop');
+        // Pengukuran yang benar: rect kata aktif vs rect jendela stasioner, bukan panggilan
+        // `active.offsetTop` yang lama (kata "offsetTop" masih boleh muncul di komentar yang
+        // menjelaskan bug lamanya -- yang dilarang adalah pemakaian nyatanya).
+        ->and($sync)->toContain('getBoundingClientRect')
+        ->and($sync)->toContain('wordsWindow')
+        ->and($sync)->not->toContain('active.offsetTop');
 
     $arena = tanpaKomentarJs(file_get_contents(resource_path('js/race-arena.js')));
 

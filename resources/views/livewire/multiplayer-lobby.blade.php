@@ -675,7 +675,7 @@
                       {{-- The clipping window. Three lines at leading-relaxed (1.625) = 4.875em,
                            the same figure the solo engine uses, so it follows the line-height
                            instead of a pixel guess that breaks when the type scale changes. --}}
-                      <div class="overflow-hidden" style="max-height: 4.875em;">
+                      <div x-ref="wordsWindow" class="overflow-hidden" style="max-height: 4.875em;">
                       <div x-ref="wordsTrack"
                         class="flex flex-wrap gap-x-2 gap-y-1 transition-transform duration-150 ease-out"
                         :style="`transform: translateY(-${wordScrollOffset}px)`">

@@ -637,12 +637,29 @@ const registerRaceArena = (Alpine) => {
          */
         syncWordScroll() {
             const track = this.$refs.wordsTrack;
-            if (!track) return;
+            const windowEl = this.$refs.wordsWindow;
+            if (!track || !windowEl) return;
 
             const active = track.querySelector(`[data-word-index="${this.currentWordIndex}"]`);
             if (!active) return;
 
-            this.wordScrollOffset = active.offsetTop;
+            // Measure the active word against the STATIONARY clipping window, not via offsetTop.
+            //
+            // The old code read the active word's `offsetTop`, which is measured from the nearest
+            // POSITIONED ancestor (offsetParent). Neither the track nor its wrappers are `relative`,
+            // so offsetParent walked up to a card far above the paragraph -- baking that card's own
+            // page position into the offset. The paragraph then slid up out of the clipping window
+            // once the player advanced, so they saw only words already passed (all green) or an
+            // empty box, never the active word. That is the "next word not rendering on mobile" bug.
+            //
+            // getBoundingClientRect() is viewport-relative and layout-context independent. The
+            // window element does NOT move (only the track inside it is translated), so the gap
+            // between the active word's top and the window's top -- ADDED to the offset already
+            // applied -- lands the active line exactly at the window's top edge. Line one gives a
+            // zero gap, so nothing moves until the player reaches line two, preserving lookahead.
+            const gap = active.getBoundingClientRect().top - windowEl.getBoundingClientRect().top;
+
+            this.wordScrollOffset = Math.max(0, this.wordScrollOffset + gap);
         },
 
         restoreProgress() {
