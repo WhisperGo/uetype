@@ -248,18 +248,35 @@ it('renders no tab bar at all for a user who already has a clan', function () {
 });
 
 /**
- * Deretan tab memakai pola bersama yang sama dengan halaman Friends: wrapper memikul garis
- * selebar halaman, dan nav ditarik `-mb-px` supaya `border-b-2` tab aktif duduk DI ATAS
- * garis itu. Tanpa wrappernya, garis tab aktif melayang sendirian dan terbaca lebih lebar
- * dari teksnya; tanpa `gap-6`, kedua tab berdempetan 8px dan terbaca sebagai satu frasa.
+ * Deretan tab memakai pola chip yang sama dengan filter kategori di halaman Achievements:
+ * pil terisi untuk pilihan aktif, pil bergaris untuk sisanya.
+ *
+ * Versi underline sebelumnya tak punya gap dan hanya `px-1`, jadi "Browse Clans" berakhir
+ * tepat di piksel tempat "Create Clan" dimulai -- keduanya terbaca sebagai satu frasa.
+ * Border dan padding milik chip membuat tiap target terbaca sendiri, dan `gap-2`
+ * memisahkannya. `aria-current` menandai pilihan aktif; versi lama hanya mengandalkan warna.
  */
-it('keeps the clan tab bar on the shared tab pattern', function () {
+it('keeps the clan tab bar on the shared chip pattern', function () {
     $view = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/clans.blade.php')));
 
-    expect($view)->toContain('border-b border-white/10 mb-6')
-        ->and($view)->toContain('flex gap-6 -mb-px font-mono text-sm')
+    expect($view)->toContain('flex flex-wrap gap-2 mb-6')
+        ->and($view)->toContain('px-4 py-1.5 rounded-lg border font-mono text-xs font-semibold')
+        ->and($view)->toContain('aria-current="page"')
         // Tombol yang labelnya dikomentari tak boleh kembali.
         ->and($view)->not->toContain("setTab('my-clan')");
+});
+
+/**
+ * Label tab tak mengulang kata "Clan": judul halaman, item nav, dan judul browser sudah
+ * menyebutnya. Pengulangannya membuat kedua chip cukup panjang untuk berdempetan.
+ */
+it('labels the clan tabs without repeating the page name', function () {
+    foreach (['en', 'id'] as $locale) {
+        app()->setLocale($locale);
+
+        expect(__('clan.tab.browse'))->not->toContain('Clan')
+            ->and(__('clan.tab.create'))->not->toContain('Clan');
+    }
 });
 
 /**

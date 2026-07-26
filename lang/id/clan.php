@@ -21,8 +21,11 @@ return [
     'tab' => [
         // Tanpa kunci 'my_clan': tab itu tak punya tombol. Begitu kamu punya clan, halaman
         // ini ADALAH clanmu -- tak ada yang perlu dipindah, jadi baris tabnya tak dirender.
-        'browse' => 'Jelajahi Clan',
-        'create' => 'Buat Clan',
+        //
+        // Label tak memuat "Clan": judul halaman, item nav, dan judul browser sudah
+        // menyebutnya, dan pengulangannya membuat kedua chip cukup panjang untuk berdempetan.
+        'browse' => 'Jelajahi',
+        'create' => 'Buat',
         'aria' => 'Tab clan',
     ],
 

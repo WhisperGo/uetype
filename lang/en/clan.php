@@ -21,8 +21,11 @@ return [
     'tab' => [
         // No 'my_clan' key: that tab has no button. Once you are in a clan the page IS your
         // clan, so there is nothing to switch between and the whole bar is not rendered.
-        'browse' => 'Browse Clans',
-        'create' => 'Create Clan',
+        //
+        // The labels carry no "Clan" either: the page title, the nav item and the browser
+        // title all say it already, and repeating it made both chips long enough to collide.
+        'browse' => 'Browse',
+        'create' => 'Create',
         'aria' => 'Clan tabs',
     ],
 
