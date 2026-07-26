@@ -201,3 +201,77 @@ it('reports a full-clan approval error on its own key, not the create-form field
 it('requires authentication to view the clans page', function () {
     $this->get(route('clans.index'))->assertRedirect(route('login'));
 });
+
+// ---- Kontrak markup: deretan tab ----
+
+/**
+ * Tab "My Clan" dulu dihapus dengan MENGOMENTARI labelnya, tapi elemen <button>-nya
+ * dibiarkan hidup. Yang tersisa adalah tombol kosong selebar 8px (px-1 kiri+kanan) yang:
+ *
+ *  - mendorong seluruh deretan tab 12px ke kanan, sehingga tak lagi sejajar dengan judul
+ *    halaman maupun kartu di bawahnya (inilah "tidak rapi" yang terlihat di layar);
+ *  - tetap bisa di-Tab dan diklik -- pengguna keyboard mendarat di tombol tanpa nama, dan
+ *    menekannya memindahkan tab tanpa penjelasan apa pun;
+ *  - diumumkan pembaca layar sebagai "button" tanpa nama, di dalam <nav> yang justru sudah
+ *    diberi aria-label.
+ *
+ * Diuji pada HTML TERENDER, bukan berkas Blade: yang salah bukan satu string tertentu,
+ * melainkan kelasnya -- kontrol tanpa nama yang bisa difokus.
+ */
+it('renders no unlabelled button in the clan tab bar', function () {
+    $user = User::factory()->create();
+
+    $html = $this->actingAs($user)->get(route('clans.index'))->assertOk()->getContent();
+
+    expect(clanTabButtonLabels($html))->not->toBeEmpty()
+        ->and(array_filter(clanTabButtonLabels($html), fn (string $label) => $label === ''))->toBeEmpty();
+});
+
+/**
+ * Anggota clan tak punya tab untuk berpindah (Browse & Create disembunyikan), jadi seluruh
+ * baris tab -- termasuk garis bawahnya -- tak boleh ikut dirender. Sebelumnya tombol kosong
+ * itu membuat <nav> tetap ada, menyisakan baris kosong setinggi py-3 tanpa sebab.
+ */
+it('renders no tab bar at all for a user who already has a clan', function () {
+    $leader = User::factory()->create();
+    $clan = Clan::create(['name' => 'Tab Bar Clan', 'leader_id' => $leader->id, 'power' => 1000]);
+    ClanMember::create([
+        'clan_id' => $clan->id,
+        'user_id' => $leader->id,
+        'role' => ClanRole::Leader,
+        'status' => ClanMemberStatus::Active,
+    ]);
+
+    $html = $this->actingAs($leader)->get(route('clans.index'))->assertOk()->getContent();
+
+    expect($html)->not->toContain(__('clan.tab.aria'));
+});
+
+/**
+ * Deretan tab memakai pola bersama yang sama dengan halaman Friends: wrapper memikul garis
+ * selebar halaman, dan nav ditarik `-mb-px` supaya `border-b-2` tab aktif duduk DI ATAS
+ * garis itu. Tanpa wrappernya, garis tab aktif melayang sendirian dan terbaca lebih lebar
+ * dari teksnya; tanpa `gap-6`, kedua tab berdempetan 8px dan terbaca sebagai satu frasa.
+ */
+it('keeps the clan tab bar on the shared tab pattern', function () {
+    $view = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/clans.blade.php')));
+
+    expect($view)->toContain('border-b border-white/10 mb-6')
+        ->and($view)->toContain('flex gap-6 -mb-px font-mono text-sm')
+        // Tombol yang labelnya dikomentari tak boleh kembali.
+        ->and($view)->not->toContain("setTab('my-clan')");
+});
+
+/**
+ * @return list<string> teks tiap <button> di dalam nav tab clan, tag dibuang & dipangkas
+ */
+function clanTabButtonLabels(string $html): array
+{
+    if (! preg_match('/<nav\b[^>]*aria-label="'.preg_quote(__('clan.tab.aria'), '/').'"[^>]*>(.*?)<\/nav>/s', $html, $nav)) {
+        return [];
+    }
+
+    preg_match_all('/<button\b[^>]*>(.*?)<\/button>/s', $nav[1], $buttons);
+
+    return array_map(fn (string $inner) => trim(strip_tags($inner)), $buttons[1]);
+}

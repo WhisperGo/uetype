@@ -19,7 +19,8 @@ return [
     'power_inline' => 'power :value',
 
     'tab' => [
-        'my_clan' => 'Clan Saya',
+        // Tanpa kunci 'my_clan': tab itu tak punya tombol. Begitu kamu punya clan, halaman
+        // ini ADALAH clanmu -- tak ada yang perlu dipindah, jadi baris tabnya tak dirender.
         'browse' => 'Jelajahi Clan',
         'create' => 'Buat Clan',
         'aria' => 'Tab clan',

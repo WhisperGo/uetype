@@ -19,7 +19,8 @@ return [
     'power_inline' => 'power :value',
 
     'tab' => [
-        'my_clan' => 'My Clan',
+        // No 'my_clan' key: that tab has no button. Once you are in a clan the page IS your
+        // clan, so there is nothing to switch between and the whole bar is not rendered.
         'browse' => 'Browse Clans',
         'create' => 'Create Clan',
         'aria' => 'Clan tabs',

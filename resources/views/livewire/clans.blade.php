@@ -1,27 +1,32 @@
-{{-- Clans page: tabbed as My Clan (hero card, join requests, roster), Browse (search
-     and join), and Create (new clan form). Real-time updates via the global toast subscriber. --}}
+{{-- Clans page. Two tabs for someone without a clan -- Browse (search and join) and Create
+     (new clan form) -- and no tabs at all once you are in one, where the page is simply your
+     clan: hero card, join requests, roster.
+
+     'my-clan' is still a real tab STATE even though nothing navigates to it by hand:
+     resetToMyClan() switches to it after you create or join a clan. Only its button is gone.
+
+     Real-time updates via the global toast subscriber. --}}
 <div class="py-10">
     <x-page-container>
 
     <h1 class="font-display text-fluid-title tracking-wide text-foreground mb-4">{{ __('clan.title') }}</h1>
 
-    <!-- ===== TABS ===== -->
-    {{-- <div class="border-b border-white/10 mb-6">
-        {{-- mb-8: gap between the tab underline and the content below (the wrapper div that
-             once carried the shared border-b is commented out, so -mb-px is no longer needed). --}}
-        <nav class="flex mb-4 font-mono text-sm" aria-label="{{ __('clan.tab.aria') }}">
-            <button wire:click="setTab('my-clan')"
-                @class([
-                    'px-1 py-3 border-b-2 transition-colors whitespace-nowrap',
-                    'border-gold text-foreground font-semibold' => $tab === 'my-clan',
-                    'border-transparent text-muted hover:text-foreground' => $tab !== 'my-clan',
-                ])>
-                {{-- {{ __('clan.tab.my_clan') }} --}}
-                {{-- @if ($this->pendingRequests->count() > 0)
-                    <span class="ml-1 px-1.5 py-0.5 rounded bg-gold/20 text-gold text-[0.65rem]">{{ $this->pendingRequests->count() }}</span>
-                @endif --}}
-            </button>
-            @unless ($this->myClan)
+    {{-- ===== TABS =====
+
+         Rendered only when there is something to switch BETWEEN. A member of a clan has no
+         Browse/Create tabs, so the whole bar -- rule included -- stays out of the document.
+         The "My Clan" tab was previously removed by commenting out its LABEL while leaving
+         the <button> itself alive: an 8px-wide (px-1 either side) unlabelled control that
+         pushed the whole row 12px right of the page title and the cards below it, stayed
+         focusable and clickable, and was announced by screen readers as an unnamed button.
+         A clan member was left with a bar holding nothing but that empty button.
+
+         Structure mirrors the Friends page: the wrapper carries the full-width rule and the
+         nav is pulled down by -mb-px so the active tab's border-b-2 sits ON that rule rather
+         than floating above it. gap-6 keeps the two labels from reading as one phrase. --}}
+    @unless ($this->myClan)
+        <div class="border-b border-white/10 mb-6">
+            <nav class="flex gap-6 -mb-px font-mono text-sm" aria-label="{{ __('clan.tab.aria') }}">
                 <button wire:click="setTab('browse')"
                     @class([
                         'px-1 py-3 border-b-2 transition-colors whitespace-nowrap',
@@ -38,9 +43,9 @@
                     ])>
                     {{ __('clan.tab.create') }}
                 </button>
-            @endunless
-        </nav>
-    {{-- </div> --}}
+            </nav>
+        </div>
+    @endunless
 
     {{-- TAB: MY CLAN --}}
     @if ($tab === 'my-clan')
