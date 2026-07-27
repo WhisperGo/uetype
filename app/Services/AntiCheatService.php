@@ -36,8 +36,26 @@ class AntiCheatService
      * per-second WPM) at or above which a HIGH-WPM run is not humanly plausible. Even
      * world-champion typists fluctuate between words, so a near-flat curve at speed is the
      * signature of a scripted/replayed run (e.g. a bot posting an identical WPM each second).
+     *
+     * Raised 97 -> 99 (2026-07-27), measured rather than guessed. At 97 the floor rejected
+     * plausible humans: on a full 120-second run, a curve varying by less than +/-4 WPM
+     * scores 97-99 and was refused. "Holds pace within 4 WPM" describes a good typist, not a
+     * script. The band 97-99 is inhabited by people, so the floor did not belong there.
+     *
+     * 99 is chosen from what the ACTUAL cheat looks like: a bot posting a fixed WPM each
+     * tick produces an identical curve, which scores exactly 100 and is still rejected (see
+     * the 185-for-120s test). The gap this gives up -- a forgery deliberately dithered to
+     * land at 99 -- is one the other guards still bound, and it is a far better trade than
+     * refusing honest players.
+     *
+     * Pairs with TypingEngine::MIN_CONSISTENCY_SAMPLES, which stops this floor being applied
+     * to samples too small to mean anything. Both were part of the same false-positive bug;
+     * neither fixes it alone.
+     *
+     * Re-tune from this install's own consistency distribution when play data exists -- not
+     * from intuition, which is what put it at 97.
      */
-    private const IMPOSSIBLE_CONSISTENCY = 97;
+    private const IMPOSSIBLE_CONSISTENCY = 99;
 
     /**
      * The consistency floor only bites ABOVE this net WPM. High consistency at low speed is

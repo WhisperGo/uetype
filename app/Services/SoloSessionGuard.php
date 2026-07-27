@@ -17,11 +17,36 @@ namespace App\Services;
  * has its character count bounded by what the issued text could physically produce. A
  * submission that no longer matches the issued session, or that blows past the character
  * ceiling, is refused rather than quietly clamped.
+ *
+ * PER TAB, not per browser. Every method takes a $tabKey identifying one open component
+ * instance (TypingEngine::$tabKey, server-assigned and #[Locked]). It used to be a single
+ * record for the whole session, which meant opening a second tab destroyed the first tab's
+ * issued text and its honest result was refused as "implausible" -- one of the false
+ * rejections behind the 2026-07-27 anti-cheat fixes. The keying costs nothing in strictness:
+ * clear() still consumes the submitted session, so one issued text still buys one result.
  */
 class SoloSessionGuard
 {
-    /** Session key holding the active session's server-side facts. */
+    /** Session key holding the server-side facts of every open tab's session. */
     private const SESSION_KEY = 'solo_session_guard';
+
+    /**
+     * How many concurrent tab sessions to remember.
+     *
+     * This used to be ONE session for the whole browser, which meant a second tab silently
+     * destroyed the first tab's record: the first tab then failed matchesIssuedSession() and
+     * an entirely honest run was refused as "implausible". Leaving a test open in a background
+     * tab and starting another is ordinary browsing, not an attack.
+     *
+     * Bounded rather than unlimited because this lives in the session payload and a client can
+     * open tabs all day; without a cap that is unbounded growth in the session store. Eight is
+     * far more than anyone types in at once, and the eviction is oldest-first, so the honest
+     * worst case is a player with nine tabs losing the one they opened first.
+     *
+     * The cap is NOT a security control -- replay protection comes from clear() removing the
+     * session on submit, per tab, exactly as before.
+     */
+    private const MAX_TRACKED_SESSIONS = 8;
 
     /**
      * How far total keystrokes may exceed the issued text length, as a multiplier.
@@ -92,21 +117,47 @@ class SoloSessionGuard
      */
     private const SLACK_FRACTION = 0.35;
 
-    /** Remember that a session just started, with the text the server actually issued. */
-    public function start(string $mode, string $subMode, string $text): void
+    /**
+     * Remember that a session just started, with the text the server actually issued.
+     *
+     * $tabKey scopes the record to ONE open tab (see MAX_TRACKED_SESSIONS). It is a
+     * server-assigned identifier, never a client-supplied one: a client that could choose
+     * its own key could point a forged submission at whichever issued session suited it,
+     * which is precisely the check this class exists to make.
+     */
+    public function start(string $mode, string $subMode, string $text, string $tabKey = 'default'): void
     {
-        session()->put(self::SESSION_KEY, [
+        $sessions = $this->all();
+
+        $sessions[$tabKey] = [
             'mode' => $mode,
             'sub_mode' => $subMode,
             'text_length' => mb_strlen($text),
             'started_at' => microtime(true),
-        ]);
+        ];
+
+        // Oldest-first eviction once past the cap. Sorting by started_at rather than trusting
+        // insertion order, because a tab that merely restarts rewrites its own entry in place.
+        if (count($sessions) > self::MAX_TRACKED_SESSIONS) {
+            uasort($sessions, fn ($a, $b) => $a['started_at'] <=> $b['started_at']);
+            $sessions = array_slice($sessions, -self::MAX_TRACKED_SESSIONS, null, true);
+        }
+
+        session()->put(self::SESSION_KEY, $sessions);
     }
 
-    /** The active session's facts, or null when none was ever started. */
-    public function current(): ?array
+    /** Every tracked tab session, normalised to an array. */
+    private function all(): array
     {
         $data = session()->get(self::SESSION_KEY);
+
+        return is_array($data) ? $data : [];
+    }
+
+    /** This tab's session facts, or null when none was ever started. */
+    public function current(string $tabKey = 'default'): ?array
+    {
+        $data = $this->all()[$tabKey] ?? null;
 
         return is_array($data) && isset($data['started_at']) ? $data : null;
     }
@@ -119,22 +170,42 @@ class SoloSessionGuard
      * immediately, which otherwise looks exactly like an automated forgery. This lets a
      * test simulate the time a human would really have spent.
      */
-    public function backdate(float $seconds): void
+    public function backdate(float $seconds, ?string $tabKey = null): void
     {
-        $session = $this->current();
+        $sessions = $this->all();
 
-        if ($session === null) {
+        // No key given: backdate every tracked tab. Tests call this without knowing the key
+        // the component generated, and a test that opened two tabs means both of them.
+        $keys = $tabKey === null ? array_keys($sessions) : [$tabKey];
+
+        foreach ($keys as $key) {
+            if (isset($sessions[$key]['started_at'])) {
+                $sessions[$key]['started_at'] -= $seconds;
+            }
+        }
+
+        session()->put(self::SESSION_KEY, $sessions);
+    }
+
+    /**
+     * Drop THIS TAB's session so one issued text can only be submitted once (no replay).
+     *
+     * Scoped to the tab on purpose: clearing every session here would re-introduce the bug
+     * this keying fixes, with one tab's submission invalidating another tab's open test.
+     */
+    public function clear(string $tabKey = 'default'): void
+    {
+        $sessions = $this->all();
+
+        unset($sessions[$tabKey]);
+
+        if ($sessions === []) {
+            session()->forget(self::SESSION_KEY);
+
             return;
         }
 
-        $session['started_at'] -= $seconds;
-        session()->put(self::SESSION_KEY, $session);
-    }
-
-    /** Drop the session so one issued text can only be submitted once (no replay). */
-    public function clear(): void
-    {
-        session()->forget(self::SESSION_KEY);
+        session()->put(self::SESSION_KEY, $sessions);
     }
 
     /**
@@ -175,9 +246,9 @@ class SoloSessionGuard
      * the instant it opened would allow 1800 characters "typed" in no real time at all --
      * exactly 150 WPM, which is the ratio that maxes out a Clan War point ceiling.
      */
-    public function maxPlausibleChars(string $mode, float $durationSeconds): ?int
+    public function maxPlausibleChars(string $mode, float $durationSeconds, string $tabKey = 'default'): ?int
     {
-        $session = $this->current();
+        $session = $this->current($tabKey);
 
         if ($session === null) {
             return null;
@@ -189,7 +260,7 @@ class SoloSessionGuard
         // but it is capped at a FRACTION of the session: a flat 30 seconds is most of a
         // 30-second test, which left ~500 characters claimable and a forged 200 WPM
         // reachable. Proportional slack keeps short sessions tight and long ones forgiving.
-        $elapsed = $this->elapsedSeconds();
+        $elapsed = $this->elapsedSeconds($tabKey);
         $slack = min(self::DURATION_SLACK_SECONDS, $durationSeconds * self::SLACK_FRACTION);
 
         $realSeconds = $elapsed === null
@@ -217,9 +288,9 @@ class SoloSessionGuard
      * ceiling. Bounding the claim by the server's own clock removes that payoff without
      * touching honest sessions, which can only ever claim LESS time than has elapsed.
      */
-    public function claimsMoreTimeThanElapsed(float $claimedSeconds): bool
+    public function claimsMoreTimeThanElapsed(float $claimedSeconds, string $tabKey = 'default'): bool
     {
-        $elapsed = $this->elapsedSeconds();
+        $elapsed = $this->elapsedSeconds($tabKey);
 
         if ($elapsed === null) {
             return false;
@@ -229,9 +300,9 @@ class SoloSessionGuard
     }
 
     /** Seconds the server has actually held this session open, or null if none is active. */
-    public function elapsedSeconds(): ?float
+    public function elapsedSeconds(string $tabKey = 'default'): ?float
     {
-        $session = $this->current();
+        $session = $this->current($tabKey);
 
         if ($session === null) {
             return null;
@@ -246,9 +317,9 @@ class SoloSessionGuard
      * Guards against a client that switches mode/sub-mode after receiving the text (for
      * instance taking an easy 15-second test and submitting it as a 120-second result).
      */
-    public function matchesIssuedSession(string $mode, string $subMode): bool
+    public function matchesIssuedSession(string $mode, string $subMode, string $tabKey = 'default'): bool
     {
-        $session = $this->current();
+        $session = $this->current($tabKey);
 
         if ($session === null) {
             return false;

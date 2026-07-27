@@ -32,7 +32,13 @@ return [
     'tap_to_type' => 'Ketuk untuk mulai mengetik',
     'input_aria' => 'Input tes mengetik',
 
+    // Cadangan umum: khusus untuk hasil yang benar-benar dinilai mustahil oleh server. Dua
+    // pesan di bawah ada karena pesan ini dulu dipakai untuk SEMUA jalur penolakan, termasuk
+    // yang bukan salah siapa pun -- memberi tahu pemain jujur bahwa hasilnya "tidak masuk
+    // akal" padahal ia hanya menyelesaikan tes dengan cepat adalah bug tersendiri.
     'result_rejected' => 'Hasil sesi ini ditolak oleh validasi server (tidak masuk akal) dan tidak disimpan.',
+    'result_rate_limited' => 'Terlalu banyak hasil dikirim dalam waktu singkat. Tunggu sebentar sebelum menyelesaikan tes berikutnya.',
+    'result_session_expired' => 'Sesi tes ini kedaluwarsa atau dimulai di tab lain, sehingga hasilnya tidak dapat disimpan. Silakan jalankan tesnya lagi.',
 
     'aria' => [
         'pick_main_mode' => 'Pilih mode utama',
