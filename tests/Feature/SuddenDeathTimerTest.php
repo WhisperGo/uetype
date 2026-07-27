@@ -194,6 +194,56 @@ test('the client prefers the relative duration over the client clock', function 
 });
 
 /** Setelah timer habis, race HARUS ditutup dan yang belum selesai ditandai DNF. */
+/**
+ * ===== KONTRAK TAMPILAN SUDDEN DEATH (markup) =====
+ *
+ * Keputusan: sudden death + timernya muncul di SATU tempat saja -- banner in-flow tepat di
+ * atas kotak input. Badge yang dulu ada di header (di atas LIVE STANDINGS) dihapus, termasuk
+ * di tampilan spectator (satu header yang sama).
+ *
+ * Bug yang diperbaiki sekaligus: timer bawah tak bergerak. Ia ada di dalam kontainer
+ * mengetik yang di-morph Livewire ~8x/detik (emit progres), dan server merender counter itu
+ * TANPA teks (nilainya klien-only via x-text). Tanpa wire:ignore tiap morph menghapus angka
+ * yang sudah dirender Alpine, dan Alpine baru menuliskannya lagi di tick 1 detik berikutnya
+ * -- angkanya beku di antara tick. Persis kelas bug transform paragraf (RaceMobileInputTest).
+ */
+test('badge sudden death di header dihapus; SD tampil in-flow, satu per penonton', function () {
+    $markup = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php')));
+
+    // Dua tampilan in-flow yang SALING EKSKLUSIF per viewer: banner di atas kotak input
+    // (racer) dan banner di layar tunggu (spectator/selesai/menyerah). Tak ada viewer yang
+    // pernah melihatnya dua kali; badge di header (di atas LIVE STANDINGS) sudah tak ada.
+    expect(substr_count($markup, 'multiplayer.sudden_death'))->toBe(2);
+
+    // Badge header lama (x-text mentah) hilang; kedua banner in-flow pakai varian `+ 's'`.
+    expect($markup)->not->toContain('x-text="suddenDeathRemaining"');
+});
+
+test('banner sudden death racer kebal morph lewat wire:ignore', function () {
+    $markup = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php')));
+
+    // Banner di atas kotak input harus wire:ignore supaya morph ~8x/detik tak menghapus
+    // x-text-nya dan membekukan angkanya.
+    expect($markup)->toContain('wire:ignore x-show="suddenDeathActive && raceStarted && !isFinished"');
+});
+
+test('penonton (spectator/selesai/menyerah) tetap melihat countdown sudden death', function () {
+    $markup = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php')));
+
+    // Layar tunggu tak punya kotak input, jadi butuh banner SD-nya sendiri -- juga wire:ignore
+    // agar tak dibekukan morph. x-show="suddenDeathActive" (tanpa !isFinished) supaya pemain
+    // yang sudah selesai/menyerah pun tetap melihat sisa waktu race yang masih berjalan.
+    expect($markup)->toContain('wire:ignore x-show="suddenDeathActive"');
+});
+
+test('menghapus badge header tak mematikan start clock sudden death (hook sync tetap ada)', function () {
+    $markup = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php')));
+
+    // Hook x-init server-authoritative tetap ada (kini tak terlihat), jadi countdown tetap
+    // menyala persis seperti sebelumnya saat server mengonfirmasi sudden death.
+    expect($markup)->toContain('syncSuddenDeath(');
+});
+
 test('checkSuddenDeath menutup race setelah 15 detik', function () {
     $pemenang = User::factory()->create();
     $tertinggal = User::factory()->create();

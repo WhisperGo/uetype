@@ -482,17 +482,17 @@
             })"
             @keydown.tab.prevent="if (raceStarted && !isFinished && !lockedByTimeout) $refs.typeInput?.focus()">
 
-            <!-- THIN HEADER: ROOM CODE (RIGHT) + INLINE SUDDEN DEATH (LEFT WHEN ACTIVE) -->
+            <!-- THIN HEADER: ROOM CODE (RIGHT). The sudden-death badge that used to sit on the
+                 left was removed: sudden death now shows in ONE place only -- the in-flow banner
+                 right above the typing box (below). Same header for racers and spectators, so it
+                 is gone for both. -->
             <div class="flex items-center justify-between gap-4">
-                @if ($this->suddenDeathActive)
-                    <span x-init="syncSuddenDeath(@js($this->suddenDeathRemaining))"
-                        class="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-danger font-bold">
-                        <span class="w-1.5 h-1.5 rounded-full bg-danger animate-pulse"></span>
-                        {{ __('multiplayer.sudden_death') }} <span class="text-foreground">- <span x-text="suddenDeathRemaining"></span>s</span>
-                    </span>
-                @else
-                    <span></span>
-                @endif
+                {{-- Empty left slot keeps the room code right-aligned under justify-between. The
+                     hidden hook is NOT a display -- it only seeds/starts the client sudden-death
+                     clock from the server's authoritative remaining the moment the server
+                     confirms SD, exactly what the old visible badge's x-init did. Kept so
+                     removing the badge does not change WHEN the countdown starts. --}}
+                <span>@if ($this->suddenDeathActive)<span x-init="syncSuddenDeath(@js($this->suddenDeathRemaining))" class="hidden"></span>@endif</span>
                 <span class="flex items-center gap-3 shrink-0">
                     @if ($this->spectatorCount > 0)
                         <span class="flex items-center gap-1.5 font-mono text-[11px] text-muted">
@@ -813,12 +813,19 @@
                       </div>{{-- /clipping window --}}
                     </div>{{-- /paragraph card --}}
 
-                    {{-- SUDDEN-DEATH COUNTDOWN, right above the input where the player is
-                         looking. Bound to the Alpine state so it appears the instant the
-                         WebSocket fires. The remaining seconds turn urgent (bigger, brighter)
-                         under 5s. This sits IN FLOW above the box; the fixed banner higher up
-                         stays as a secondary always-visible cue when scrolled. --}}
-                    <div x-show="suddenDeathActive && raceStarted && !isFinished" x-cloak
+                    {{-- SUDDEN-DEATH COUNTDOWN, right above the input where the player is looking.
+                         This is now the ONLY place sudden death is shown (the header badge above
+                         LIVE STANDINGS was removed). Bound to the Alpine clock so it counts down
+                         live; the remaining seconds turn urgent (bigger, brighter) under 5s.
+
+                         `wire:ignore` is load-bearing, for the SAME reason as the paragraph card
+                         above: checkInput() morphs this whole subtree ~8x/second, and the server
+                         renders this counter with NO text (its value is client-only, via x-text).
+                         Without wire:ignore each morph strips the Alpine-rendered seconds and
+                         Alpine only rewrites them on the next 1s tick -- so the number visibly
+                         FROZE between ticks. wire:ignore blocks morphing, not Alpine, so the
+                         countdown updates every second untouched. --}}
+                    <div wire:ignore x-show="suddenDeathActive && raceStarted && !isFinished" x-cloak
                         x-transition:enter="transition ease-out duration-200"
                         x-transition:enter-start="opacity-0 -translate-y-1"
                         x-transition:enter-end="opacity-100 translate-y-0"
@@ -905,6 +912,28 @@
                     <p class="text-sm font-mono text-muted max-w-sm">
                         {{ $watchDesc }}
                     </p>
+
+                    {{-- Sudden-death countdown for WATCHERS: spectators (no typing box of their
+                         own) plus players who have finished or given up. They lost the racer's
+                         banner along with the header badge, so this is where they see the race's
+                         sudden-death clock tick down.
+
+                         `x-show="suddenDeathActive"` WITHOUT `!isFinished`: the point here is the
+                         race's remaining time, which is exactly what a finished/given-up player is
+                         waiting on -- so it shows regardless of the viewer's own finished state.
+
+                         `wire:ignore` for the same reason as the racer's banner: the value is
+                         client-only (x-text) and a Livewire morph (a RoomUpdated re-render) would
+                         otherwise strip the seconds and freeze the number between 1s ticks. --}}
+                    <div wire:ignore x-show="suddenDeathActive" x-cloak
+                        class="flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-danger/10 border border-danger/40">
+                        <span class="w-2 h-2 rounded-full bg-danger animate-pulse"></span>
+                        <span class="font-mono text-xs font-bold uppercase tracking-widest text-danger">{{ __('multiplayer.sudden_death') }}</span>
+                        <span class="font-mono font-black tabular-nums text-danger transition-all duration-200"
+                            :class="suddenDeathRemaining <= 5 ? 'text-2xl' : 'text-lg'"
+                            x-text="suddenDeathRemaining + 's'"></span>
+                    </div>
+
                     <button wire:click="leaveRoom"
                         class="mt-2 px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition">
                         {{ __('multiplayer.leave_room') }}
