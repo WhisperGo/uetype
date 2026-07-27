@@ -944,7 +944,7 @@
                 return $place . (app()->getLocale() === 'en' ? $suffix : '');
             };
         @endphp
-        <div class="space-y-12 animate-fade-in py-4 select-none">
+        <div class="space-y-8 sm:space-y-12 animate-fade-in py-4 select-none">
 
             <!-- MATCH RESULT HEADER -->
             <div class="flex flex-col space-y-1">
@@ -1077,9 +1077,9 @@
                                     class="transition duration-150 {{ $isMe ? 'bg-brand/25 text-foreground font-bold' : 'text-muted hover:bg-foreground/[0.02]' }} {{ $hasLeft ? 'opacity-50' : '' }}">
                                     <td class="py-4 px-3 sm:px-5 font-bold text-foreground">{{ $rankLabel($rank->place) }}
                                     </td>
-                                    <td class="py-4 px-5">
-                                        <div class="flex items-center gap-2">
-                                            <span title="{{ $hasLeft ? __('multiplayer.left_room') : '' }}">{{ $rank->username }}</span>
+                                    <td class="py-4 px-3 sm:px-5">
+                                        <div class="flex items-center gap-2 min-w-0">
+                                            <span title="{{ $hasLeft ? __('multiplayer.left_room') : '' }}" class="truncate max-w-[90px] sm:max-w-none">{{ $rank->username }}</span>
                                             @if ($isMe)
                                                 <span
                                                     class="bg-brand-bright text-background text-[9px] font-black px-1 py-0.1 rounded uppercase tracking-wide">{{ __('multiplayer.you') }}</span>
@@ -1092,9 +1092,9 @@
                                             @endif
                                         </div>
                                     </td>
-                                    <td class="py-4 px-3 sm:px-5 text-gold font-bold">{{ $rank->wpm }} wpm</td>
-                                    <td class="py-4 px-5">{{ $rank->accuracy ?? 97.0 }}%</td>
-                                    <td class="py-4 px-5">
+                                    <td class="py-4 px-3 sm:px-5 text-gold font-bold">{{ $rank->wpm }}</td>
+                                    <td class="py-4 px-3 sm:px-5">{{ $rank->accuracy ?? 97.0 }}%</td>
+                                    <td class="py-4 px-3 sm:px-5">
                                         @if ($rank->finished_time_seconds && $rank->finished_time_seconds != \App\Models\RoomMember::DNF_SENTINEL_SECONDS)
                                             {{ sprintf('%02d:%02d', floor($rank->finished_time_seconds / 60), $rank->finished_time_seconds % 60) }}
                                         @else
@@ -1129,15 +1129,16 @@
             </div>
 
             <!-- BOTTOM MENU ACTION BUTTONS -->
-            <div class="pt-2 flex flex-wrap gap-3 sm:gap-4">
+            {{-- Stack full-width on a phone (no ragged wrap), inline row from sm up. --}}
+            <div class="pt-2 flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4">
                 @if ($this->isHost)
                     <button wire:click="playAgain"
-                        class="px-6 py-3 bg-gold hover:bg-secondary-7 text-background font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 shadow-md">
+                        class="w-full sm:w-auto px-6 py-3 bg-gold hover:bg-secondary-7 text-background font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 shadow-md">
                         {{ __('multiplayer.play_again') }}
                     </button>
                 @endif
                 <button wire:click="leaveRoom"
-                    class="px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition">
+                    class="w-full sm:w-auto px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition">
                     {{ __('multiplayer.leave_room') }}
                 </button>
             </div>
