@@ -72,7 +72,10 @@
 @endphp
 
 <div class="flex {{ $mine ? 'justify-end' : 'justify-start' }} group/msg" wire:key="{{ $keyPrefix }}-{{ $message->id }}">
-    <div class="{{ $t['wrap'] }} {{ $mine ? '' : 'flex flex-col items-start' }}">
+    {{-- min-w-0: a flex item's default `min-width:auto` equals its longest word and OVERRIDES
+         the max-w cap (min-width beats max-width), so a long no-space string blew the bubble
+         past the panel. min-w-0 lets max-w win; break-words on the bubble then wraps the word. --}}
+    <div class="{{ $t['wrap'] }} min-w-0 {{ $mine ? '' : 'flex flex-col items-start' }}">
         @if ($activeMode === 'clan' && ! $mine)
             <p class="font-mono {{ $t['name'] }} text-muted px-1">{{ $message->sender->username }}</p>
         @endif
@@ -96,7 +99,9 @@
             </form>
         @else
             <div class="flex items-end {{ $t['row'] }} {{ $mine ? 'flex-row-reverse' : '' }}">
-                <div class="{{ $t['bubble'] }} font-mono break-words
+                {{-- min-w-0 again: the bubble is itself a flex item next to the action-menu
+                     trigger, so it needs to be allowed to shrink for break-words to wrap. --}}
+                <div class="{{ $t['bubble'] }} font-mono break-words min-w-0
                     {{ $mine ? 'bg-gold text-background rounded-br-md' : 'bg-white/5 text-foreground rounded-bl-md' }}
                     {{ $deleted ? 'opacity-60 italic' : '' }}">
                     {{-- Quote of the replied-to message (when this is a reply and the original still exists). --}}

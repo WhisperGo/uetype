@@ -54,7 +54,11 @@
                 {{-- Regular message. --}}
                 <template x-if="!msg.system">
                     <div class="flex" :class="msg.mine ? 'justify-end' : 'justify-start'">
-                        <div class="max-w-[75%]" :class="msg.mine ? '' : 'flex flex-col items-start'">
+                        {{-- min-w-0: a flex item's default `min-width:auto` equals its longest
+                             word and OVERRIDES max-w-[75%] (min-width beats max-width in CSS), so a
+                             long no-space string used to blow the bubble past the panel. min-w-0
+                             lets max-w win, and break-words below then wraps the word. --}}
+                        <div class="max-w-[75%] min-w-0" :class="msg.mine ? '' : 'flex flex-col items-start'">
                             <p x-show="!msg.mine" class="font-mono text-[0.65rem] mb-1 text-muted px-1" x-text="msg.username"></p>
                             <div class="px-4 py-2.5 rounded-2xl text-sm font-mono break-words"
                                 :class="msg.mine ? 'bg-gold text-background rounded-br-md' : 'bg-white/5 text-foreground rounded-bl-md'"
