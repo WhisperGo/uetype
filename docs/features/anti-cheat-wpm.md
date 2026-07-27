@@ -229,7 +229,7 @@ Saat hasil dikirim, empat pemeriksaan berjalan:
 |---|---|
 | **Kecocokan sesi** | mode+sub-mode saat submit harus sama dengan yang diterbitkan; kalau tidak → tolak |
 | **Durasi mode `time`** | diambil dari **sub-mode** (30 = 30 detik), payload diabaikan |
-| **Plafon karakter** | melebihi batas fisik (durasi × 13 cps) atau panjang teks × 2.5 → **tolak** |
+| **Plafon karakter** | melebihi batas fisik (durasi × 20 cps = 240 WPM) atau panjang teks × 2.5 → **tolak** |
 | **Anti-replay** | satu teks terbit = satu kiriman; sesi dihapus setelah dipakai |
 
 `textToType` juga diberi `#[Locked]` supaya client tak bisa menukarnya dengan teks panjang.
@@ -258,12 +258,40 @@ menambah keystroke nyata. Teks 25 kata (~130 karakter) wajar menghasilkan 150+ k
 jadi plafon tekstual memakai **faktor 2.5× + 50** — longgar terhadap pengetik berantakan,
 tetap rapat terhadap angka fabrikasi (ribuan karakter atas teks 130 karakter).
 
-> **Diperketat dari 15→13 cps dan 3×→2.5×** (mengikuti rekomendasi laporan bot-Python §7.3/§7.4).
-> 13 cps ≈ 156 WPM **berkelanjutan** — masih di atas run jujur mana pun (rekor dunia 210–230 WPM
-> adalah puncak, bukan rata-rata berkelanjutan), sekaligus mempersempit ruang yang dulu dipakai
-> "bot sabar" (yang menunggu durasi nyata lalu memalsukan payload penuh) untuk menembus ~180–200
-> WPM. Angka ini **interim konservatif**: nilai final sebaiknya diambil dari distribusi `net_wpm`
-> install ini sendiri (p99.9), bukan dari dokumen.
+> **Riwayat plafon: 15 → 13 → 20 cps.**
+>
+> Diperketat ke 13 cps mengikuti laporan bot-Python §7.3/§7.4, dengan alasan tertulis "13 cps ≈
+> 156 WPM berkelanjutan — masih di atas run jujur mana pun". **Alasan itu salah**, dan
+> kesalahannya baru terlihat dari laporan pemain, bukan dari test: seorang pemain ~185 WPM
+> dengan akurasi 98% ditolak berulang kali dengan pesan *"session was rejected by server
+> validation (implausible)"*. 185 WPM = 15,4 cps — jujur, dan di atas plafon.
+>
+> **Dinaikkan ke 20 cps (240 WPM) pada 2026-07-27**, disamakan dengan
+> `AntiCheatService::MAX_RACE_WPM` supaya ada **satu** definisi "di luar batas manusia": pemain
+> yang diterima di balapan tak boleh ditolak untuk kecepatan identik di solo.
+
+#### Kenapa bug ini sulit terlihat
+
+`CHAR_TOLERANCE` (+50 karakter) menutupi tes **pendek**, jadi pemain yang sama lolos di 10 dan
+25 kata lalu ditolak di tes 30 detik. Bukan kecepatannya yang menentukan, melainkan **panjang
+tesnya** — sehingga gejalanya terbaca seperti undian, bukan seperti batas kecepatan. Regression
+test-nya karena itu menguji **beberapa panjang tes**, bukan satu.
+
+#### Konsekuensi yang dibayar, dan siapa yang menanggungnya
+
+Payload §4.1 (500 karakter / 30 detik = 200 WPM) kini **lolos plafon**. Ia tidak lolos begitu
+saja: ia jatuh ke lapisan kedua (§7.5) — run ≥150 WPM tanpa riwayat, atau >40% di atas rata-rata
+pemain sendiri, **ditahan untuk review**. Baris `pending` tetap tersimpan tapi tak pernah masuk
+leaderboard publik dan tak menaikkan `highest_wpm`.
+
+Jadi yang berubah bukan "bot menang", melainkan **siapa yang menangkapnya**: dulu plafon menolak
+di depan, sekarang review menahan di belakang. Trade ini disengaja — menolak pemain jujur lebih
+mahal daripada menahan bot satu lapis lebih dalam, karena **pemain jujur tak punya jalan banding**
+sementara bot tak mendapat apa-apa dari baris yang tak pernah publik.
+
+> **Jangan perketat lagi berdasarkan intuisi** — itu persis yang melahirkan bug di atas. Nilai
+> final harus diambil dari distribusi `net_wpm` install ini sendiri (p99.9). Caveat itu sudah ada
+> sejak 13 cps dan tetap belum dikerjakan; sekarang ia sudah lewat tenggat.
 
 ### 7.6 Data lama
 

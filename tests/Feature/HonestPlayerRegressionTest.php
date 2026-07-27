@@ -94,6 +94,54 @@ it('saves a fast-but-human typist at ~140 WPM (uneven curve, right under the cei
         ->and((float) $user->fresh()->highest_wpm)->toBe(140.0);
 });
 
+/*
+|--------------------------------------------------------------------------
+| Plafon karakter/detik (MAX_CHARS_PER_SECOND)
+|--------------------------------------------------------------------------
+| Dilaporkan pemain sungguhan: ~185 WPM, akurasi 98%, ditolak berulang kali dengan
+| "This session was rejected by server validation (implausible)".
+|
+| Plafonnya dulu 13 cps = 156 WPM, dan komentar yang membenarkannya berbunyi
+| "near-nobody sustains even 156" -- asumsi, bukan data. 185 WPM = 15,4 cps.
+|
+| Yang membuatnya sulit dilacak: CHAR_TOLERANCE (+50) menutupi tes PENDEK, jadi
+| pemain yang sama lolos di 10 dan 25 kata lalu ditolak di tes 30 detik. Terbaca
+| seperti undian, bukan seperti batas kecepatan. Karena itu test di bawah menguji
+| BEBERAPA panjang tes, bukan satu.
+*/
+it('saves an elite typist at ~185 WPM across every test length', function () {
+    // 20 cps = 240 WPM, plafon yang sama dengan MAX_RACE_WPM. Pemain yang diterima di
+    // balapan tak boleh ditolak untuk kecepatan identik di solo.
+    $guard = app(SoloSessionGuard::class);
+
+    // Tes pendek dulu lolos (tertolong +50), tes panjang tidak. Keduanya harus lolos.
+    foreach ([15, 30, 60, 120] as $seconds) {
+        $chars = (int) round((185 * 5 / 60) * $seconds);
+
+        $guard->start('time', (string) $seconds, str_repeat('a ', $chars));
+        $guard->backdate($seconds);
+
+        expect($guard->maxPlausibleChars('time', (float) $seconds))
+            ->toBeGreaterThanOrEqual($chars);
+    }
+});
+
+it('still refuses a payload no human pace could produce', function () {
+    // Plafonnya dinaikkan, bukan dibuang. Batasnya tetap mengikat waktu yang BENAR-BENAR
+    // berlalu di server, jadi "patient bot" -- tidur sepanjang durasi lalu mengirim payload
+    // penuh -- tetap terkunci di 240 WPM, bukan bebas.
+    $guard = app(SoloSessionGuard::class);
+    $guard->start('time', '60', str_repeat('a ', 2000));
+    $guard->backdate(60);
+
+    $cap = $guard->maxPlausibleChars('time', 60.0);
+
+    // 300 WPM selama 60 detik = 1500 karakter: masih di atas plafon.
+    expect($cap)->toBeLessThan(1500)
+        // ...tapi 240 WPM (1200 karakter) tetap muat, kalau tidak plafonnya terlalu ketat lagi.
+        ->and($cap)->toBeGreaterThanOrEqual(1200);
+});
+
 it('saves a steady improver: each session a small step over the last', function () {
     $user = User::factory()->create();
 
