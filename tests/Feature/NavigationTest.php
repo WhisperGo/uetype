@@ -35,16 +35,35 @@ it('lights the clan menu when on the clan war page', function () {
     expect(collect(NavItems::main())->firstWhere('key', 'klan')['active'])->toBeTrue();
 });
 
-it('renders every destination on desktop AND mobile', function () {
+it('renders every destination regardless of screen size', function () {
     $user = User::factory()->create();
 
     $html = $this->actingAs($user)->get(route('typing'))->assertOk()->getContent();
 
-    // Two occurrences = one for the desktop bar, one for the mobile menu.
+    // Yang dijaga: tiap tujuan akun BISA DICAPAI. Dulu test ini menuntut DUA kemunculan --
+    // satu di bar desktop, satu di panel mobile -- karena nav memang punya dua salinan
+    // daftar akun.
+    //
+    // Sekarang tidak lagi: dropdown akun tampil di SEMUA ukuran layar dan merangkap pemicu
+    // menu akun di mobile, sementara panel hamburger hanya membawa link nav utama. Satu
+    // salinan itu justru yang diinginkan -- dua daftar akun berarti dua tempat yang bisa
+    // saling menyimpang, persis kelas masalah yang dijaga SharedComponentsTest.
+    //
+    // Jadi yang diperiksa keberadaannya, bukan jumlahnya. Menuntut >= 2 lagi akan memaksa
+    // markup kembali ke bentuk lama demi memuaskan test, bukan demi pengguna.
+    // Catatan: toContain() memperlakukan argumen kedua sebagai NILAI yang harus ada, bukan
+    // pesan kegagalan -- jadi konteksnya ditaruh di variabel, bukan di argumen kedua.
+    $tidakTercapai = [];
+
     foreach (NavItems::account() as $item) {
-        expect(substr_count($html, 'href="'.$item['href'].'"'))
-            ->toBeGreaterThanOrEqual(2, "Menu {$item['key']} doesn't appear on both sides");
+        if (! str_contains($html, 'href="'.$item['href'].'"')) {
+            $tidakTercapai[] = $item['key'];
+        }
     }
+
+    expect($tidakTercapai)->toBeEmpty(
+        'Menu akun ini tak bisa dicapai dari nav: '.implode(', ', $tidakTercapai)
+    );
 });
 
 it('uses the same href for leaderboard on both sides', function () {

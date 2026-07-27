@@ -63,6 +63,41 @@ ngasal. `$liveWpm` tetap diterima di signature hanya demi kompatibilitas payload
 Lihat [anti-cheat-wpm.md](anti-cheat-wpm.md) dan
 [`../wpm-accuracy-integrity.md`](../wpm-accuracy-integrity.md).
 
+#### Presisi durasi: kenapa pemain jujur pernah ditolak (bug yang ditutup, 2026-07-27)
+
+`finished_time_seconds` adalah kolom **integer**, ditulis `round($elapsed)`. Nilai tersimpan
+karena itu bisa sampai **setengah detik lebih kecil** dari durasi asli — dan angka bulat itulah
+yang jadi pembagi saat `isValidRaceResult()` menghitung ulang WPM.
+
+Setengah detik tak berarti apa-apa di balapan 20 detik, dan menentukan di balapan 2 detik. Teks
+10 kata (49 karakter) diselesaikan dalam **2,2 detik** tersimpan sebagai **2**: run yang
+sebenarnya 267 WPM dinilai server **294 WPM**, melewati `MAX_RACE_WPM`, dan pemainnya diberi
+tahu kecepatannya tidak manusiawi.
+
+Yang paling menyesatkan, hasilnya **tidak monoton**: finis 2,6s (tersimpan 3) lolos sementara
+finis 2,2s yang **lebih cepat** (tersimpan 2) ditolak. Pemain yang sama, pace yang sama,
+verdict berbeda tergantung di sisi mana setengah detik itu jatuh — persis seperti undian.
+
+**Perbaikannya** (`AntiCheatService::FINISH_DURATION_ROUNDING_SLACK`): penilaian kecepatan
+memakai `durasi + 0.5`, yaitu durasi **paling lambat** yang mungkin, sehingga keraguan akibat
+pembulatan kita sendiri berpihak ke pemain. Ambang efektif jadi ≥245 WPM asli di setiap panjang
+teks — di atas rekor dunia berkelanjutan, jadi tak ada pengetik jujur yang tersentuh, sementara
+pace palsu (600 karakter dalam 10 detik = 720 WPM) tetap ditolak telak.
+
+Dua batasan yang perlu diketahui:
+
+| Hal | Catatan |
+|---|---|
+| Slack **tidak** dipakai di jalur live (`exceedsRaceSpeed`) | Jalur itu menerima float sungguhan (`race_starts_at` → `now()`), jadi tak ada pembulatan untuk dikompensasi. Menambahkannya hanya melebarkan celah sembunyi payload palsu |
+| Slack hanya menyentuh penilaian **kecepatan** | `no_input`, `char_count_inconsistent`, cross-check progres/akurasi, dan `duration_too_short` tetap membaca nilai tersimpan apa adanya |
+
+> **Utang yang diketahui:** ini **kompensasi** presisi yang hilang, bukan pelonggaran ambang.
+> WPM yang **ditampilkan** ke pemain masih diturunkan dari detik bulat, jadi angkanya masih bisa
+> meleset pada balapan pendek — hanya penolakannya yang berhenti salah. Perbaikan sesungguhnya
+> adalah menyimpan durasi dengan presisi sub-detik, yang menyentuh kolom `integer`, sentinel DNF
+> `999`, urutan peringkat, tampilan `mm:ss`, dan riwayat permanen — pekerjaan tersendiri, bukan
+> tempelan pada perbaikan bug. Kalau itu mendarat, konstanta slack-nya ikut dibuang.
+
 #### Word-lock: apa yang membuat "progress = karakter benar" benar-benar berlaku
 
 Rumus di atas berdiri di atas satu invarian: **progres hanya naik dari karakter benar.** Server
