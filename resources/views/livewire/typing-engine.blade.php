@@ -29,7 +29,12 @@
                 wire:key="ghost-picker-{{ $mainMode }}-{{ $subMode }}" />
         @endauth
 
-        <div x-cloak aria-hidden="true"
+        {{-- Survival "danger vignette". Gated with x-show so it is display:none (out of the
+             paint tree entirely) in time/words mode -- a fullscreen radial-gradient is an
+             expensive paint, especially under software rendering, and there is no reason to keep
+             it composited when not in survival. Within survival its opacity is still driven
+             reactively below. See docs/review-performance-2026-07-27.md (Temuan 8). --}}
+        <div x-cloak aria-hidden="true" x-show="currentMain === 'survival'"
             class="fixed inset-0 z-40 pointer-events-none transition-opacity duration-300 [will-change:opacity]"
             style="background: radial-gradient(ellipse at center, transparent 55%, rgb(var(--color-danger) / 0.55) 100%);"
             :style="`opacity: ${
@@ -277,17 +282,26 @@
                 <template x-if="currentMain === 'survival'">
                     <div class="h-[28px] mt-2 flex items-center gap-3">
                         <span class="font-display text-[0.55rem] uppercase tracking-[0.15em] text-muted shrink-0">{{ __('typing.stamina') }}</span>
-                        <div class="relative flex-1 flex gap-[3px] p-[3px] bg-surface/80 border border-border/60"
+                        {{-- PERF (Temuan 6, docs/review-performance-2026-07-27.md): the bar used to be
+                             16 cells rendered via x-for, each with its OWN reactive `:style` reading
+                             staminaPct -> 16 style re-evaluations on every drain tick/keystroke. Now
+                             it is ONE fill element: a single reactive `:style` sets its width and
+                             colour, and a static repeating-linear-gradient overlay draws the segment
+                             gaps so the 16-segment look is preserved. The width snaps to the same 16
+                             discrete steps as before (Math.ceil over staminaCells.length), so a lit
+                             segment reads identically -- one binding instead of sixteen. --}}
+                        <div class="relative flex-1 h-[20px] p-[3px] bg-surface/80 border border-border/60"
                             :class="(staminaPct < 25 && isStarted && !isFinished) ? 'animate-[pulse_0.7s_ease-in-out_infinite]' : ''">
-                            <template x-for="cell in staminaCells" :key="cell">
-                                <div class="h-[14px] flex-1 transition-colors duration-150"
-                                    :style="`background-color: ${
-                                        cell <= Math.ceil(staminaPct / 100 * staminaCells.length)
-                                            ? (staminaPct > 50 ? 'rgb(var(--color-brand))' : (staminaPct > 25 ? 'rgb(var(--color-gold))' : 'rgb(var(--color-danger))'))
-                                            : 'rgb(var(--color-border) / 0.35)'
-                                    };`">
-                                </div>
-                            </template>
+                            <div class="relative w-full h-full overflow-hidden">
+                                {{-- empty track --}}
+                                <div class="absolute inset-0" style="background-color: rgb(var(--color-border) / 0.35);"></div>
+                                {{-- single fill: width snapped to 16 steps + threshold colour (the one reactive binding) --}}
+                                <div class="absolute inset-y-0 left-0 transition-all duration-150"
+                                    :style="`width: ${Math.ceil(staminaPct / 100 * staminaCells.length) / staminaCells.length * 100}%; background-color: ${staminaPct > 50 ? 'rgb(var(--color-brand))' : (staminaPct > 25 ? 'rgb(var(--color-gold))' : 'rgb(var(--color-danger))')};`"></div>
+                                {{-- 16-segment gaps drawn over the fill in the track's surface colour --}}
+                                <div class="absolute inset-0 pointer-events-none"
+                                    style="background: repeating-linear-gradient(to right, transparent 0 calc(6.25% - 3px), rgb(var(--color-surface) / 0.8) calc(6.25% - 3px) 6.25%);"></div>
+                            </div>
                             <div class="absolute inset-0 pointer-events-none transition-opacity duration-150 bg-danger/70"
                                 :class="drainFlash ? 'opacity-100' : 'opacity-0'"></div>
                         </div>
@@ -363,7 +377,7 @@
 
                 <!-- SINGLE SMOOTH CURSOR -->
                 <div x-ref="caret" x-show="!isFinished" wire:ignore
-                    class="absolute top-0 left-0 w-[0.1em] h-[1.2em] z-20 rounded [transform-origin:top_left] [will-change:transform]"
+                    class="absolute top-0 left-0 w-[0.1em] h-[1.2em] z-20 rounded [transform-origin:top_left]"
                     {{-- The caret position is bound REACTIVELY via transform (not imperative el.style.transform).
                          Why: moveCaret() used to set transform directly on the DOM. Each time Livewire re-rendered
                          then morphed, morphdom STRIPPED that inline style (the server HTML has no transform) ->
@@ -385,8 +399,13 @@
                          reset, mode/language change) there is NO transition -> reactive transform changes are
                          INSTANT, with no "gliding up" when switching Standard -> Survival. resetProgress sets
                          isTyping=false, so every reset is guaranteed instant. --}}
+                    {{-- `will-change:transform` promotes the caret to its own compositing layer.
+                         Applied ONLY while typing (when the transform actually animates) instead
+                         of permanently: a permanent promotion adds memory/compositing overhead on
+                         Linux without GPU accel for no benefit while the caret is idle. See
+                         docs/review-performance-2026-07-27.md (Temuan 7). --}}
                     :class="isTyping
-                        ? '[transition:transform_100ms_linear,background-color_150ms_ease-out]'
+                        ? '[transition:transform_100ms_linear,background-color_150ms_ease-out] [will-change:transform]'
                         : 'animate-[caret-flash-smooth_1s_infinite]'">
                 </div>
 
@@ -405,17 +424,35 @@
                     @php
                         $words = explode(' ', $textToType);
                         $charPointer = 0;
+                        // Compact fingerprint of the whole text: changing the text changes this
+                        // key -> Livewire remounts the words (which is the point of the key),
+                        // WITHOUT embedding the entire ~600-char paragraph into every word's key.
+                        // See docs/review-performance-2026-07-27.md (F-3).
+                        $textKey = crc32($textToType);
                     @endphp
 
+                    {{-- PERF (Temuan 1 / F-4, docs/review-performance-2026-07-27.md): the per-character
+                         `:class` below is bound ONLY to `inputResults[i]`, deliberately NOT to
+                         `currentIndex`. `currentIndex` changes on EVERY keystroke, and any span that
+                         reads it must be re-evaluated on every keystroke -> O(n) style recalc + paint
+                         over the whole paragraph per key (the root of the typing lag, worst on Linux).
+
+                         Dropping it is provably equivalent: the engine only ever writes inputResults
+                         at `currentIndex` and then advances, so a character can NEVER hold a
+                         true/false value while sitting at index >= currentIndex. Hence
+                         `i < currentIndex` was always implied by `inputResults[i] === true/false`
+                         and is pure redundancy. Now each span depends only on its own index, so a
+                         keystroke re-evaluates just the one span that changed (Alpine array-index
+                         reactivity), not all of them. DO NOT reintroduce a `currentIndex` read here. --}}
                     @foreach ($words as $word)
-                        <div class="flex" wire:key="word-{{ $loop->index }}-{{ $textToType }}">
+                        <div class="flex" wire:key="word-{{ $loop->index }}-{{ $textKey }}">
                             @foreach (str_split($word) as $char)
                                 <span id="char-{{ $charPointer }}" class="char-element relative inline-block"
                                     :class="{
-                                        'text-foreground': {{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === true,
-                                        'text-danger': {{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === false,
-                                        'text-muted': {{ $charPointer }} >= currentIndex || ({{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === 'skipped'),
-                                        'border-b-2 border-danger': {{ $charPointer }} < currentIndex && inputResults[{{ $charPointer }}] === 'skipped'
+                                        'text-foreground': inputResults[{{ $charPointer }}] === true,
+                                        'text-danger': inputResults[{{ $charPointer }}] === false,
+                                        'text-muted': inputResults[{{ $charPointer }}] !== true && inputResults[{{ $charPointer }}] !== false,
+                                        'border-b-2 border-danger': inputResults[{{ $charPointer }}] === 'skipped'
                                     }">
                                     {{ $char }}
                                 </span>

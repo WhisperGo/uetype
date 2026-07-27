@@ -1,6 +1,5 @@
 import './bootstrap';
 
-import Chart from 'chart.js/auto';
 import toastStack from './toasts';
 import navBadges from './nav-badges';
 import typingGame from './typing-game';
@@ -10,7 +9,25 @@ import { registerMultiplayerNav } from './multiplayer-nav';
 import './race-arena';
 import './race-echo';
 
-window.Chart = Chart;
+// Chart.js is the single biggest dependency and is used on only TWO pages (stats, result).
+// Load it ON DEMAND instead of shipping it in the bundle that EVERY page -- including /typing,
+// which must stay responsive -- has to download, parse and compile. The dynamic import() makes
+// Vite emit Chart.js as its own chunk fetched only when a chart is actually drawn; it is still
+// bundled (not a runtime CDN), so there is no supply-chain surface, IP leak, or offline break
+// (see tests/Feature/NoExternalCdnTest.php). Consumers call `await window.ensureChart()` from
+// their @script blocks (resources/views/livewire/stats.blade.php & typing-result.blade.php).
+// See docs/review-performance-2026-07-27.md (Temuan 4 / F-2).
+let chartPromise = null;
+window.ensureChart = () => {
+    if (! chartPromise) {
+        chartPromise = import('chart.js/auto').then((module) => {
+            window.Chart = module.default; // kept available globally for any late reader
+            return module.default;
+        });
+    }
+
+    return chartPromise;
+};
 
 // Expose the globals that Alpine x-data expressions depend on BEFORE running any feature
 // setup that might throw. typing-engine's x-data spreads `...typingGame(...)`; if that

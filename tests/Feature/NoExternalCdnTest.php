@@ -57,9 +57,13 @@ it('tidak memuat aset dari CDN eksternal di view maupun modul js', function () u
     );
 });
 
-it('menyediakan Chart secara global dari bundle', function () {
-    // Dasar yang membuat fallback CDN tak diperlukan: app.js mengekspos window.Chart.
+it('memuat Chart lewat bundle Vite (dynamic import), bukan CDN', function () {
+    // Chart.js dipisah ke chunk yang dimuat on-demand lewat dynamic import -- tetap lewat
+    // bundle Vite, bukan CDN runtime. Dasar yang sama membuat fallback CDN tak diperlukan:
+    // aset di-review, tak ada IP pengguna bocor ke host luar, dan tetap jalan offline.
+    // Halaman yang butuh memanggil window.ensureChart() (lihat stats & typing-result).
     $appJs = file_get_contents(resource_path('js/app.js'));
 
-    expect($appJs)->toContain('window.Chart');
+    expect($appJs)->toContain("import('chart.js/auto')")
+        ->and($appJs)->toContain('window.ensureChart');
 });

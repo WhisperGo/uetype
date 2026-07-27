@@ -330,10 +330,13 @@
                     length: wpmData.length
                 }, (_, i) => i + 1);
 
-                const renderChart = () => {
+                const renderChart = async () => {
                     const canvas = document.getElementById('wpmChart');
                     if (!canvas) return;
 
+                    // Chart.js is loaded on demand (its own Vite chunk), not shipped in the main
+                    // bundle -- see app.js window.ensureChart & docs/review-performance-2026-07-27.md.
+                    const Chart = await window.ensureChart();
                     const ctx = canvas.getContext('2d');
                     if (window.myWpmChart) {
                         window.myWpmChart.destroy();
@@ -491,7 +494,7 @@
                     });
                 };
 
-                // Chart comes from the Vite bundle (window.Chart in app.js), not a runtime CDN.
+                // Chart comes from a lazily-loaded Vite chunk (window.ensureChart in app.js), not a CDN.
                 renderChart();
             </script>
         @endscript

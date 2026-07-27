@@ -30,6 +30,20 @@ const SURVIVAL_PRESETS = {
     hard:   { sMax: 85,  sStart: 70,  graceSec: 0, dStart: 5.5, dAccel: 0.40, refill: 1.3, penalty: 16 },
 };
 
+// Survival "burst shield" (Temuan 3, docs/review-performance-2026-07-27.md).
+// The problem: drain is TIME-based but refill is PER-CHARACTER, so a fast burst followed by a
+// natural pause to breathe used to bleed stamina -- typing fast was not consistently safer.
+// Each correct character now banks a little shield TIME (capped); while shield remains, drain
+// is reduced, so a burst buys a soft landing for the short pause right after it.
+// Why this can't be exploited into infinite survival: shield only ACCRUES from typing, always
+// decays by real elapsed time each tick, and the reduction factor is > 0 -- so as the drain
+// acceleration ramps up, net stamina still trends down and the run always ends. A fast typist
+// simply lasts LONGER. Numbers are gameplay-tunable; there is no automated test for stamina
+// balance, so verify the feel by playtest.
+const SHIELD_PER_CHAR_MS = 140;   // shield time banked per correct character
+const SHIELD_MAX_MS = 1400;       // cap so one burst can't bank unlimited safety (~1.4s)
+const SHIELD_DRAIN_FACTOR = 0.35; // drain multiplier while shield is active
+
 // Cap on error events sent to the server. A normal practice session is well below this;
 // 500 errors in one test ≈ below 50% accuracy in time 120 -- that's mashing.
 const MAX_ERROR_EVENTS = 500;
@@ -81,6 +95,12 @@ export default function typingGame(initialText) {
         ghostFinishTime: null,
         _ghostRafId: null,
 
+        // Cache of every character's DOM position, built ONCE per layout so the ghost rAF loop
+        // (~60fps) reads from memory instead of forcing a reflow (offsetLeft/offsetTop) up to 3x
+        // per frame. Invalidated on reset (new text) and on window resize (re-wrap).
+        _charPosCache: null,
+        _onGhostResize: null,
+
         capsLockOn: false,
 
         isTyping: false,
@@ -118,6 +138,7 @@ export default function typingGame(initialText) {
         survivalCfg: null,    // active parameter preset (see SURVIVAL_PRESETS)
         staminaInterval: null,// drain tick loop (smooth, ~100ms)
         lastTickTime: 0,      // last tick timestamp (for a precise Δt)
+        shieldMs: 0,          // burst shield: banked drain-reduction time (see SHIELD_* consts)
         currentWordDirty: false, // whether the word being typed has already errored
         committedWordResults: {}, // {wordIndex: 'clean'|'dirty'} — words already scored (idempotent)
 
@@ -147,6 +168,12 @@ export default function typingGame(initialText) {
                 this.resetForNewText(payload.text ?? '');
             });
             this.modeChangedCleanup = typeof cleanup === 'function' ? cleanup : null;
+
+            // A window resize re-wraps the text, so the cached character positions are stale.
+            // Drop them; the ghost loop rebuilds lazily. The real caret is unaffected -- it
+            // re-reads the active character's offset live on every keystroke.
+            this._onGhostResize = () => { this._charPosCache = null; };
+            window.addEventListener('resize', this._onGhostResize);
         },
 
         // Ghost is only valid in time/words. If global state lingers from a previous mode
@@ -220,6 +247,7 @@ export default function typingGame(initialText) {
             this.stamina = this.survivalCfg.sStart;
             this.staminaPct = Math.round((this.stamina / this.staminaMax) * 100);
             this.lastTickTime = 0;
+            this.shieldMs = 0;
             this.currentWordDirty = false;
             this.committedWordResults = {};
             this.drainEventCount = 0;
@@ -243,6 +271,8 @@ export default function typingGame(initialText) {
             this.ghostFinishTime = null;
             this.ghostCursorLeft = 0;
             this.ghostCursorTop = 0;
+            // New text -> the old character-position cache no longer maps anything.
+            this._charPosCache = null;
 
             let start = 0;
             let wordIdx = 0;
@@ -386,10 +416,12 @@ export default function typingGame(initialText) {
             }
         },
 
-        // Refill stamina on each correct character (capped at staminaMax).
+        // Refill stamina on each correct character (capped at staminaMax), and bank a little
+        // burst-shield time (capped) so a fast run earns a soft landing for the pause after it.
         refillStamina() {
             if (this.currentMain !== 'survival' || this.isFinished) return;
             this.stamina = Math.min(this.staminaMax, this.stamina + this.survivalCfg.refill);
+            this.shieldMs = Math.min(SHIELD_MAX_MS, this.shieldMs + SHIELD_PER_CHAR_MS);
             this.syncStaminaPct();
         },
 
@@ -398,7 +430,14 @@ export default function typingGame(initialText) {
             if (this.currentMain !== 'survival' || this.isFinished || !this.startTime) return;
 
             const now = Date.now();
-            const dt = this.lastTickTime ? (now - this.lastTickTime) / 1000 : 0;
+            // Clamp Δt: setInterval does NOT guarantee 100ms. When the main thread is busy
+            // (heavy paint from the reactive text, GC, tab throttling) a tick is delayed, and
+            // an unclamped Δt would drain the whole delayed gap in ONE tick -- stamina jumps
+            // to 0 and the run ends abruptly, which reads on screen as the timer "freezing"
+            // (finish() stops timerInterval). Capping Δt keeps a late tick from draining more
+            // than a normal one; the loss of the missed interval's drain is negligible and far
+            // better than a false game-over. See docs/review-performance-2026-07-27.md (Temuan 2).
+            const dt = this.lastTickTime ? Math.min((now - this.lastTickTime) / 1000, 0.25) : 0;
             this.lastTickTime = now;
             if (dt <= 0) return;
 
@@ -408,7 +447,15 @@ export default function typingGame(initialText) {
             const graceFactor = elapsed < cfg.graceSec ? (elapsed / cfg.graceSec) : 1;
 
             // D = D_start + D_accel * elapsed
-            const drainPerSec = (cfg.dStart + cfg.dAccel * elapsed) * graceFactor;
+            let drainPerSec = (cfg.dStart + cfg.dAccel * elapsed) * graceFactor;
+
+            // Burst shield: while banked shield time remains, drain is reduced, and the shield
+            // is spent by this tick's real elapsed time. The factor is > 0 so the acceleration
+            // ramp still wins eventually -- shield delays the game over, never prevents it.
+            if (this.shieldMs > 0) {
+                drainPerSec *= SHIELD_DRAIN_FACTOR;
+                this.shieldMs = Math.max(0, this.shieldMs - dt * 1000);
+            }
 
             this.stamina = Math.max(0, this.stamina - drainPerSec * dt);
             this.syncStaminaPct();
@@ -438,6 +485,10 @@ export default function typingGame(initialText) {
             if (this.modeChangedCleanup) {
                 this.modeChangedCleanup();
                 this.modeChangedCleanup = null;
+            }
+            if (this._onGhostResize) {
+                window.removeEventListener('resize', this._onGhostResize);
+                this._onGhostResize = null;
             }
             this.stopRuntime();
         },
@@ -484,6 +535,40 @@ export default function typingGame(initialText) {
             };
         },
 
+        // Build the character-position cache from the laid-out DOM. One pass of offsetLeft/
+        // offsetTop reads (a single forced reflow) replaces the up-to-3 reads-per-frame the
+        // ghost loop would otherwise do at ~60fps. Rebuilt lazily whenever _charPosCache is
+        // null (invalidated on reset & resize). Returns null until char-0 exists.
+        buildCharPositionCache() {
+            const cache = [];
+            let i = 0;
+            let el = document.getElementById('char-0');
+            while (el) {
+                cache[i] = { left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth };
+                i++;
+                el = document.getElementById('char-' + i);
+            }
+            this._charPosCache = cache.length ? cache : null;
+
+            return this._charPosCache;
+        },
+
+        // Ghost position lookup from the cache; mirrors getCharPosition's end-fallback (an
+        // index past the last character -> right edge of the last one). Falls back to a live
+        // DOM read only while the cache isn't ready yet.
+        cachedCharPosition(index) {
+            const cache = this._charPosCache || this.buildCharPositionCache();
+            if (!cache) return this.getCharPosition(index);
+
+            const at = cache[index];
+            if (at) return { left: at.left, top: at.top };
+
+            const prev = cache[index - 1];
+            if (prev) return { left: prev.left + prev.width, top: prev.top };
+
+            return null;
+        },
+
         // Ghost position from time progress (linear pacing); called per-frame via rAF.
         // ghostCharIndex (integer) decides win/lose at finish(); the visual position is
         // computed from the fractional value so the cursor glides smoothly across each character.
@@ -504,7 +589,7 @@ export default function typingGame(initialText) {
                     this.ghostFinished = true;
                     this.ghostFinishTime = Date.now() - this.startTime;
                 }
-                const pos = this.getCharPosition(this.targetArray.length);
+                const pos = this.cachedCharPosition(this.targetArray.length);
                 if (pos) {
                     this.ghostCursorLeft = pos.left;
                     this.ghostCursorTop = pos.top;
@@ -514,10 +599,10 @@ export default function typingGame(initialText) {
 
             // Pixel interpolation between characters; only when both are on the same line (on a wrap, jump directly).
             const fraction = fractionalChars - flooredIndex;
-            const currentPos = this.getCharPosition(flooredIndex);
+            const currentPos = this.cachedCharPosition(flooredIndex);
             if (!currentPos) return;
 
-            const nextPos = this.getCharPosition(flooredIndex + 1);
+            const nextPos = this.cachedCharPosition(flooredIndex + 1);
 
             if (nextPos && nextPos.top === currentPos.top) {
                 this.ghostCursorLeft = currentPos.left + (nextPos.left - currentPos.left) * fraction;

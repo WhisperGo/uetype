@@ -456,7 +456,10 @@
             pointBackgroundColor: color,
         });
 
-        const draw = () => {
+        const draw = async () => {
+            // Chart.js is loaded on demand (its own Vite chunk) rather than shipped in the main
+            // bundle -- see app.js window.ensureChart & docs/review-performance-2026-07-27.md (F-2).
+            const Chart = await window.ensureChart();
             const series = @js($series);
 
             const wpmEl = document.getElementById('statsWpmChart');
@@ -482,7 +485,7 @@
             }
         };
 
-        // Chart comes from the Vite bundle (window.Chart via app.js), not a CDN runtime.
+        // Chart comes from a lazily-loaded Vite chunk (window.ensureChart in app.js), not a CDN.
         draw();
 
         // Change the day range -> Livewire re-renders -> redraw the charts.
