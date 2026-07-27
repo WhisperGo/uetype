@@ -45,7 +45,7 @@ it('keeps a high-speed run that has a natural, uneven WPM curve', function () {
     $c = playConsistency($user, '120');
     app(SoloSessionGuard::class)->backdate(120);
 
-    // ~150 net WPM (1500 chars / 120s = 12.5 cps, within the 13 cps char ceiling), still
+    // ~150 net WPM (1500 chars / 120s = 12.5 cps, within the 20 cps char ceiling), still
     // above the consistency speed gate (120). The per-second curve fluctuates like real
     // typing -> consistency drops below the floor, so it's a legit elite result, not a bot.
     $wobbly = [];

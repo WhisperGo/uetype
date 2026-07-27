@@ -46,17 +46,31 @@ class SoloSessionGuard
      * Peak human typing speed in characters per second, used as the physical ceiling for
      * "how many characters could possibly have been typed in this many seconds".
      *
-     * Tightened 15 -> 13 cps (§7.3). 13 cps ≈ 156 WPM SUSTAINED over a full test, still
-     * above any honest run (the typing world record ~210-230 WPM is a peak, not a sustained
-     * average, and near-nobody sustains even 156), while shrinking the window a "patient bot"
-     * (one that sleeps out the real duration, then forges a full-length payload) used to reach
-     * ~180-200 WPM through.
+     * 20 cps = 240 WPM sustained, the SAME ceiling AntiCheatService::MAX_RACE_WPM applies to
+     * races. One definition of "beyond human" across the app: a player who is accepted in a
+     * race must not be refused for the identical pace in solo.
      *
-     * CAVEAT (from the report): the ideal value comes from THIS install's own net_wpm
-     * distribution, not a document. 13 is a conservative interim -- when real play data
-     * exists, query the p99.9 of net_wpm and re-tune so no honest player is ever clipped.
+     * Raised 13 -> 20 cps (2026-07-27), on evidence. 13 cps is 156 WPM, and the previous note
+     * here justified it with "near-nobody sustains even 156" -- an assumption, not data. A
+     * real player reported repeated rejections at ~185 WPM with 98% accuracy, which lands at
+     * 15.4 cps: honest typing, refused, and told the session was "implausible".
+     *
+     * The failure was also invisible in the obvious place. CHAR_TOLERANCE (+50) covers short
+     * tests, so 10- and 25-word runs slipped through and only the LONGER ones were rejected:
+     * same player, same speed, accepted at 25 words and refused on a 30s test. That is why it
+     * read as random rather than as a speed limit.
+     *
+     * What the ceiling still stops: this bounds characters by ELAPSED SERVER TIME, so a
+     * "patient bot" (sleep out the duration, then post a full-length payload) is capped at
+     * 240 WPM instead of anything it likes. The forged-payload defence is intact; only the
+     * band between honest-elite and impossible moved.
+     *
+     * CAVEAT (unchanged, and now overdue): the right value comes from THIS install's own
+     * net_wpm distribution, not from a document or an estimate. When real play data exists,
+     * query the p99.9 of net_wpm and re-tune. Do NOT tighten this again on intuition -- that
+     * is exactly what produced the bug above.
      */
-    private const MAX_CHARS_PER_SECOND = 13.0;
+    private const MAX_CHARS_PER_SECOND = 20.0;
 
     /**
      * Slack (seconds) allowed between the server's own elapsed clock and the duration a

@@ -95,7 +95,7 @@ it('recognises a genuine personal best in the same config', function () {
         bestScoreRow($user, 'time', '30', 150);
     }
 
-    // ~172 WPM (430 chars / 30s, within the 13 cps = 440-char ceiling), a plausible step
+    // ~172 WPM (430 chars / 30s, within the 20 cps = 650-char ceiling), a plausible step
     // over the 150 history.
     playBestScore($user, 'time', '30', 30000, 430);
 
