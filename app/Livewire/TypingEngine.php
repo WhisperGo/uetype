@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -50,11 +51,37 @@ class TypingEngine extends Component
     ];
 
     /**
-     * Result submissions allowed per minute. The shortest test is 15 seconds, so even
-     * back-to-back honest play stays well under this; the limit exists to stop a script
-     * from sweeping payloads until one clears the anti-cheat checks.
+     * Result submissions allowed per minute.
+     *
+     * The limit exists to stop a script from sweeping payloads until one clears the
+     * anti-cheat checks -- not to pace honest practice.
+     *
+     * Raised 10 -> 30 (2026-07-27). The old value came with the note "the shortest test is
+     * 15 seconds, so even back-to-back honest play stays well under this". That was simply
+     * untrue: `words/10` is the shortest test, and a fast player finishes one in under four
+     * seconds. Measured against a realistic practice cycle (~4s typing + tab/enter + reading
+     * the next text) that is ~11 runs per minute -- over the limit -- so a player drilling
+     * short tests got rejected for their ELEVENTH honest run and was told it was implausible.
+     *
+     * 30 sits above any human practice rate (a 2s cycle sustained for a full minute) while
+     * still bounding a scripted sweep to something a rate-limited attacker cannot brute-force
+     * a payload with. As with every other threshold here: re-tune from real logs, not
+     * intuition -- and the rejection log now records this reason so that is possible.
      */
-    private const MAX_RESULTS_PER_MINUTE = 10;
+    private const MAX_RESULTS_PER_MINUTE = 30;
+
+    /**
+     * Player-facing message per rejection reason, keyed by the reason passed to
+     * rejectSubmission(). Anything not listed falls back to the generic "implausible" text.
+     *
+     * Split because one message for every gate actively misinformed people: hitting a rate
+     * limit or returning to a lapsed session is not cheating, and telling an honest player
+     * their result was implausible sent them hunting for a problem with their typing.
+     */
+    private const REJECTION_MESSAGES = [
+        'rate_limited' => 'typing.result_rate_limited',
+        'session_mismatch' => 'typing.result_session_expired',
+    ];
 
     /**
      * Whether keystroke-timing flags REJECT a run, or are only logged (§7.1). Kept false for
@@ -94,6 +121,21 @@ class TypingEngine extends Component
 
     public int $typingSessionKey = 0;
 
+    /**
+     * Identifies THIS component instance -- effectively, this browser tab -- so the session
+     * guard can hold one issued-text record per open tab (see SoloSessionGuard).
+     *
+     * #[Locked] is the whole point. Livewire round-trips public properties through the
+     * client, so without it a forged payload could name whichever issued session it liked
+     * and submit against a text it never received. Locked means the server assigns it once
+     * in mount() and refuses any client attempt to change it.
+     *
+     * Not persisted anywhere else: a new tab mounts a new component and gets a new key, which
+     * is exactly the granularity wanted.
+     */
+    #[Locked]
+    public string $tabKey = '';
+
     // Active-ghost flag; server is the source of truth. Ghost is valid only for
     // time/words -- switching to survival forces false (an invariant, not just a client event).
     public bool $ghostActive = false;
@@ -120,6 +162,10 @@ class TypingEngine extends Component
 
     public function mount()
     {
+        // One key per mounted component = one per open tab, assigned server-side so the
+        // guard can keep this tab's issued text separate from any other tab's.
+        $this->tabKey = (string) Str::uuid();
+
         // War-lock is checked first: valid -> mode is forced to the claim; invalid ->
         // reset to null and behave as a normal solo session (fail-safe).
         $claim = $this->resolveWarClaim();
@@ -491,7 +537,8 @@ class TypingEngine extends Component
         app(SoloSessionGuard::class)->start(
             $this->mainMode,
             (string) $this->subMode,
-            (string) $this->textToType
+            (string) $this->textToType,
+            $this->tabKey
         );
     }
 
@@ -555,7 +602,7 @@ class TypingEngine extends Component
         $rateKey = 'save-result:'.(Auth::id() ?? request()->ip());
 
         if (RateLimiter::tooManyAttempts($rateKey, self::MAX_RESULTS_PER_MINUTE)) {
-            return $this->rejectSubmission();
+            return $this->rejectSubmission('rate_limited');
         }
 
         RateLimiter::hit($rateKey, 60);
@@ -569,10 +616,19 @@ class TypingEngine extends Component
         // A submission whose mode no longer matches the issued text (e.g. take a 15s test,
         // report it as 120s) has no honest reading; there is also nothing to submit when no
         // text was ever issued. Both are refused outright.
-        if (! $guard->matchesIssuedSession($this->mainMode, (string) $this->subMode)) {
-            $guard->clear();
+        if (! $guard->matchesIssuedSession($this->mainMode, (string) $this->subMode, $this->tabKey)) {
+            // Read BEFORE clear(): "no session at all" (expired) and "a session for a different
+            // mode" are different failures, and only the latter is suspicious. After clear()
+            // both look identical, which is what made this gate unreadable.
+            $issued = $guard->current($this->tabKey);
 
-            return $this->rejectSubmission();
+            $guard->clear($this->tabKey);
+
+            return $this->rejectSubmission('session_mismatch', [
+                'had_session' => $issued !== null,
+                'issued_mode' => $issued['mode'] ?? null,
+                'issued_sub_mode' => $issued['sub_mode'] ?? null,
+            ]);
         }
 
         $claimedDuration = max(0.0, $session->durationMs / 1000);
@@ -585,10 +641,15 @@ class TypingEngine extends Component
         // "I survived 9999 seconds" would otherwise buy the full 150-point ceiling outright.
         // Elsewhere a long duration only lowers WPM, which is why the claim is not policed
         // in the other direction.
-        if ($this->mainMode !== 'time' && $guard->claimsMoreTimeThanElapsed($claimedDuration)) {
-            $guard->clear();
+        if ($this->mainMode !== 'time' && $guard->claimsMoreTimeThanElapsed($claimedDuration, $this->tabKey)) {
+            $elapsed = $guard->elapsedSeconds($this->tabKey);
 
-            return $this->rejectSubmission();
+            $guard->clear($this->tabKey);
+
+            return $this->rejectSubmission('duration_over_elapsed', [
+                'claimed_seconds' => round($claimedDuration, 2),
+                'elapsed_seconds' => $elapsed === null ? null : round($elapsed, 2),
+            ]);
         }
 
         // Duration comes from the SERVER, not the payload. In `time` mode the sub-mode
@@ -601,15 +662,24 @@ class TypingEngine extends Component
 
         // Character counts are bounded by what the issued text could physically produce in
         // that time, so an inflated count can no longer buy WPM, XP or a leaderboard slot.
-        $maxChars = $guard->maxPlausibleChars($this->mainMode, $duration);
+        $maxChars = $guard->maxPlausibleChars($this->mainMode, $duration, $this->tabKey);
 
         if ($maxChars !== null && $totalKeystrokes > $maxChars) {
             // A payload this far past the physical ceiling is fabricated, not merely noisy.
             // Silently clamping it would still hand the sender a valid result; refuse it
             // instead, the same way an impossible WPM is refused below.
-            $guard->clear();
+            $elapsed = $guard->elapsedSeconds($this->tabKey);
 
-            return $this->rejectSubmission();
+            $guard->clear($this->tabKey);
+
+            // The three numbers that decide this gate, so a false positive here can be
+            // diagnosed from the log instead of by re-deriving the ceiling by hand.
+            return $this->rejectSubmission('char_ceiling_exceeded', [
+                'total_keystrokes' => $totalKeystrokes,
+                'max_chars' => $maxChars,
+                'duration_seconds' => round($duration, 2),
+                'elapsed_seconds' => $elapsed === null ? null : round($elapsed, 2),
+            ]);
         }
 
         // Correct can never exceed total; clamp so the pair stays coherent.
@@ -617,8 +687,9 @@ class TypingEngine extends Component
         $incorrectKeystrokes = max(0, $totalKeystrokes - $correctKeystrokes);
 
         // One issued text = one submission. Without this, the same finished session could
-        // be replayed to farm XP and records.
-        $guard->clear();
+        // be replayed to farm XP and records. Scoped to THIS tab: another tab's open test is
+        // a separate session and must survive this one being submitted.
+        $guard->clear($this->tabKey);
 
         // Survival: the leaderboard metric is duration_seconds, not score. The score column
         // becomes a side stat (correct chars while surviving); other modes don't use it.
@@ -640,14 +711,21 @@ class TypingEngine extends Component
         $finalRawWpm = $check['raw_wpm'];
         $finalAccuracy = $check['accuracy'];
 
-        // Consistency as an anti-cheat signal (not just a display stat): a near-flat
-        // per-second WPM curve at high speed is a bot posting a fixed WPM each tick -- no
-        // human is that even. Computed server-side from the reported wpmHistory, then folded
-        // into the reason list so the shared gate below rejects it. Low-WPM runs are exempt
-        // inside isImpossiblyConsistent() (a slow, careful beginner is legitimately steady).
+        // Consistency serves two masters, and they need different standards of proof.
+        //
+        // For DISPLAY, any run with 2+ samples gets a number -- it is a stat, not a verdict.
+        // For REJECTING, the sample must be large enough that steadiness is actually what is
+        // being measured; on a 4-second `words/10` run it is not (see MIN_CONSISTENCY_SAMPLES),
+        // and using the display figure there is what rejected honest ~174 WPM players as bots.
+        //
+        // Low-WPM runs stay exempt inside isImpossiblyConsistent(): a slow, careful beginner
+        // is legitimately steady.
         $consistency = $this->computeConsistency($session->wpmHistory);
 
-        if ($antiCheat->isImpossiblyConsistent($consistency, $finalNetWpm)) {
+        if ($antiCheat->isImpossiblyConsistent(
+            $this->consistencyForAntiCheat($session->wpmHistory),
+            $finalNetWpm
+        )) {
             $check['reasons'][] = 'consistency_impossible';
         }
 
@@ -677,7 +755,17 @@ class TypingEngine extends Component
         // SLOW-TYPER results -- low throughput is slow, not cheating, and in time/words the
         // duration can't be pumped for any advantage.
         if ($antiCheat->rejectsSoloResult($check['reasons'], $this->mainMode)) {
-            return $this->rejectSubmission();
+            // The recomputed numbers alongside the verdict: this is the gate that rejected a
+            // genuine ~174 WPM run, and without net_wpm/consistency/sample size in the log
+            // there was no way to tell an honest elite player from a bot after the fact.
+            return $this->rejectSubmission('anti_cheat', [
+                'reasons' => $check['reasons'],
+                'net_wpm' => $finalNetWpm,
+                'accuracy' => $finalAccuracy,
+                'consistency' => $consistency,
+                'wpm_samples' => count($session->wpmHistory),
+                'duration_seconds' => round($duration, 2),
+            ]);
         }
 
         // AFK: a session the player walked away from is not an attempt at typing. In `time`
@@ -860,16 +948,37 @@ class TypingEngine extends Component
      * longer than the session was open, an impossible character count, and the anti-cheat
      * verdict -- and each used to repeat the same flash-and-redirect pair.
      *
+     * $reason names WHICH gate fired. It exists because the single shared message made this
+     * path undebuggable: a real ~174 WPM player was rejected by the consistency gate, and
+     * from the outside that was indistinguishable from a rate limit or an expired session.
+     * Every constant in this file is meant to be calibrated from real play, and none of that
+     * is possible while the logs cannot say which check did the rejecting. Do not add a new
+     * rejection path without a reason string.
+     *
+     * The reason also picks the player-facing message. Only genuine manipulation gets told
+     * its result was "implausible"; a rate limit or a lapsed session is not cheating and
+     * accusing an honest player of it is its own bug (see lang/en/typing.php).
+     *
      * Full page load, WITHOUT navigate:true, on purpose: leaving /typing through the SPA
      * makes the Back button restore the typing-engine snapshot (@entangle undefined, stale
      * $wire -> can't type, empty stats, finish hangs). A full load makes Back reload cleanly.
      *
      * Clearing the session guard is deliberately left to the caller: only the gates that
      * have already consumed the issued text need it.
+     *
+     * @param  string  $reason  Machine-readable gate name, for the log.
+     * @param  array<string, mixed>  $context  Extra numbers worth having when tuning.
      */
-    private function rejectSubmission()
+    private function rejectSubmission(string $reason, array $context = [])
     {
-        session()->flash('result_rejected', __('typing.result_rejected'));
+        Log::warning('Solo result rejected', array_merge([
+            'reason' => $reason,
+            'user_id' => Auth::id(),
+            'mode' => $this->mainMode,
+            'sub_mode' => (string) $this->subMode,
+        ], $context));
+
+        session()->flash('result_rejected', __(self::REJECTION_MESSAGES[$reason] ?? 'typing.result_rejected'));
 
         return $this->redirect(route('typing'));
     }
@@ -967,8 +1076,9 @@ class TypingEngine extends Component
     }
 
     // Consistency: how steady WPM was across the session (from per-second wpmHistory).
-    // 100% = perfectly even speed. Shown to the player AND used as an anti-cheat signal
-    // (see AntiCheatService::isImpossiblyConsistent). Needs >= 2 samples & mean > 0.
+    // 100% = perfectly even speed. This is the DISPLAY figure: 2 samples is enough to show
+    // a player a number, but nowhere near enough to accuse them with one -- for that see
+    // consistencyForAntiCheat() below.
     private function computeConsistency(array $history): ?int
     {
         $values = array_values(array_filter($history, fn ($v) => is_numeric($v)));
@@ -986,6 +1096,40 @@ class TypingEngine extends Component
         $sd = sqrt($variance);
 
         return (int) round(max(0, 1 - $sd / $mean) * 100);
+    }
+
+    /**
+     * Minimum per-second WPM samples before consistency may REJECT a run.
+     *
+     * wpmHistory is sampled once per second, so the sample size is just the session length:
+     * a `words/10` test at 174 WPM finishes in under four seconds and yields THREE samples.
+     * Over three samples `1 - sd/mean` is not a measure of evenness, it is a measure of how
+     * few samples there are -- a completely normal human curve of 170/174/176 scores 99, and
+     * 168/173/175/176 scores 98. Both clear the 97 floor, so genuine fast players on short
+     * tests were rejected as bots. That is the bug behind the reported 174 WPM rejection.
+     *
+     * 10 samples keeps the signal on runs long enough for the statistic to mean something
+     * (time/15 and up, longer word tests) and gives up on the rest. Giving up is correct: a
+     * three-second run cannot be told apart from a bot by steadiness alone, and the other
+     * guards -- the character ceiling, the WPM ceiling, keystroke timing -- still cover it.
+     */
+    private const MIN_CONSISTENCY_SAMPLES = 10;
+
+    /**
+     * Consistency, but only when there are enough samples for it to be evidence.
+     *
+     * Returns null below MIN_CONSISTENCY_SAMPLES, and null is never flagged by
+     * isImpossiblyConsistent(). Deliberately separate from computeConsistency() so the
+     * player still SEES their consistency on a short run -- a noisy display stat is fine,
+     * a noisy rejection is not.
+     */
+    private function consistencyForAntiCheat(array $history): ?int
+    {
+        $usable = count(array_filter($history, fn ($v) => is_numeric($v)));
+
+        return $usable >= self::MIN_CONSISTENCY_SAMPLES
+            ? $this->computeConsistency($history)
+            : null;
     }
 
     public function render()

@@ -32,7 +32,13 @@ return [
     'tap_to_type' => 'Tap to start typing',
     'input_aria' => 'Typing test input',
 
+    // Generic fallback: reserved for results the server judged genuinely impossible. The two
+    // messages below exist because this one used to cover every rejection path, including
+    // ones that are nobody's fault -- telling an honest player their run was "implausible"
+    // when they had merely finished tests quickly is a bug in its own right.
     'result_rejected' => 'This session was rejected by server validation (implausible) and was not saved.',
+    'result_rate_limited' => 'Too many results submitted in a short time. Wait a moment before finishing the next test.',
+    'result_session_expired' => 'This test session expired or was started in another tab, so the result could not be saved. Please run the test again.',
 
     'aria' => [
         'pick_main_mode' => 'Pick main mode',

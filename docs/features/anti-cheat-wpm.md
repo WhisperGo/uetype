@@ -230,11 +230,32 @@ Saat hasil dikirim, empat pemeriksaan berjalan:
 | **Kecocokan sesi** | mode+sub-mode saat submit harus sama dengan yang diterbitkan; kalau tidak → tolak |
 | **Durasi mode `time`** | diambil dari **sub-mode** (30 = 30 detik), payload diabaikan |
 | **Plafon karakter** | melebihi batas fisik (durasi × 20 cps = 240 WPM) atau panjang teks × 2.5 → **tolak** |
-| **Anti-replay** | satu teks terbit = satu kiriman; sesi dihapus setelah dipakai |
+| **Anti-replay** | satu teks terbit = satu kiriman; sesi **tab itu** dihapus setelah dipakai |
 
 `textToType` juga diberi `#[Locked]` supaya client tak bisa menukarnya dengan teks panjang.
 `mainMode`/`subMode` **tak** bisa di-`Locked` (view memakai `@entangle`), jadi penukaran mode
 ditangkap oleh pemeriksaan kecocokan sesi.
+
+**Acuan disimpan per-tab, bukan per-browser.** Setiap metode guard menerima `$tabKey` dari
+`TypingEngine::$tabKey` — UUID yang diberikan server di `mount()` dan diberi `#[Locked]`.
+
+> **Diperbaiki 2026-07-27.** Sebelumnya acuan disimpan di **satu** kunci session global, jadi
+> membuka **tab kedua** menimpa catatan tab pertama. Tab pertama lalu gagal di pemeriksaan
+> kecocokan sesi, dan hasil ketik yang **sepenuhnya jujur** ditolak sebagai "tidak masuk akal".
+> Membiarkan tes terbuka di tab lain lalu membuka tab baru adalah perilaku browsing biasa,
+> bukan serangan. Terkonfirmasi lewat test, bukan dugaan: lihat `MultiTabSessionTest`.
+>
+> Cakupannya spesifik — tab kedua dengan mode **berbeda** yang merusak; restart mode sama
+> tetap aman. Itu sebabnya bug ini terasa acak dan tak pernah tertangkap test.
+>
+> **`#[Locked]` pada `tabKey` itu wajib, bukan hiasan.** `tabKey` menentukan sesi terbit mana
+> yang dipakai memvalidasi kiriman; client yang bisa memilihnya sendiri berarti bisa
+> mengarahkan payload palsu ke sesi yang tak pernah ia terima — membuat guard ini sekadar
+> formalitas. Ada test khusus yang gagal bila atribut itu hilang.
+>
+> Jumlah sesi dibatasi **8 tab** (`MAX_TRACKED_SESSIONS`, eviksi tertua-dulu) karena data ini
+> hidup di payload session dan client bisa membuka tab tanpa henti. Batas ini **bukan** kontrol
+> keamanan — anti-replay tetap berasal dari `clear()` yang menghapus sesi per-tab saat submit.
 
 ### 7.3 Kenapa menolak, bukan memotong diam-diam
 
@@ -315,10 +336,33 @@ di `saveResult()` **hanya untuk jalur solo**.
 
 UEType sudah menghitung konsistensi WPM untuk presentasi; sekarang ia juga jadi sinyal anti-cheat.
 Kurva WPM yang **rata sempurna pada kecepatan tinggi** mustahil bagi manusia — bahkan juara dunia
-berfluktuasi antar kata. Gerbang: konsistensi ≥ **97%** **dan** net WPM > **120**. Dua syarat itu
-penting bersama — konsistensi tinggi pada WPM rendah itu **wajar** bagi pemula yang mengetik
-pelan-pelan dan hati-hati, jadi lantai WPM mencegah salah-tolak mereka. Ditambahkan sebagai
-alasan `consistency_impossible` di `IMPOSSIBLE_REASONS`.
+berfluktuasi antar kata. Gerbang: konsistensi ≥ **99%** **dan** net WPM > **120**, **dan** minimal
+**10 sampel** per-detik. Ketiganya perlu bersama — konsistensi tinggi pada WPM rendah itu **wajar**
+bagi pemula yang mengetik pelan-pelan dan hati-hati, jadi lantai WPM mencegah salah-tolak mereka.
+Ditambahkan sebagai alasan `consistency_impossible` di `IMPOSSIBLE_REASONS`.
+
+> **Diperbaiki 2026-07-27 — dua salah-tolak, satu akar yang sama.** Gerbang ini dulu berbunyi
+> "konsistensi ≥ 97%" tanpa syarat jumlah sampel, dan menolak pemain jujur lewat **dua** jalur:
+>
+> 1. **Sesi pendek.** `wpmHistory` diambil sekali per detik, jadi tes `words/10` pada ~174 WPM
+>    selesai dalam <4 detik dan hanya menghasilkan **3 sampel**. Pada 3 sampel, `1 - sd/mean`
+>    bukan mengukur kerataan melainkan ukuran sampel: kurva manusia biasa 170/174/176 bernilai
+>    **99** dan langsung ditolak. Inilah kasus yang dilaporkan pemain.
+> 2. **Sesi panjang.** Bahkan dengan 120 sampel, pengetik yang menjaga tempo dalam rentang
+>    **±4 WPM** bernilai 97–99 — juga ditolak. "Stabil dalam 4 WPM" itu ciri pengetik bagus,
+>    bukan skrip.
+>
+> Perbaikannya dua bagian, dan **keduanya perlu**: `TypingEngine::MIN_CONSISTENCY_SAMPLES = 10`
+> menutup jalur (1), dan `IMPOSSIBLE_CONSISTENCY` 97 → **99** menutup jalur (2). Nilai 99 dipilih
+> dari bentuk kecurangan yang sebenarnya — bot ber-WPM tetap menghasilkan kurva identik yang
+> bernilai **100** dan tetap ditolak (lihat test 185-for-120s).
+>
+> Konsistensi **tampilan** tetap dihitung dari 2 sampel (`computeConsistency()`); yang dibatasi
+> hanya sinyal penolakan (`consistencyForAntiCheat()`). Statistik berisik boleh ditampilkan,
+> tidak boleh menuduh.
+>
+> Catatan yang sama seperti `MAX_CHARS_PER_SECOND`: setel ulang dari distribusi konsistensi
+> install ini sendiri, **bukan** dari intuisi — intuisi yang menaruhnya di 97.
 
 **b. Analisis timing keystroke** (`KeystrokeAnalyzer`)
 
@@ -503,9 +547,42 @@ Setelah keduanya: **tak ada nilai yang bisa dipalsukan**, dan kiriman instan men
 
 ### 10.2 Rate limit pengiriman hasil
 
-`saveResult` dibatasi **10 kiriman/menit** per user (`MAX_RESULTS_PER_MINUTE`). Tes terpendek
-15 detik, jadi permainan jujur tak pernah mendekati batas; ini menutup pola "sapu payload
-sampai ada yang lolos" seperti yang saya lakukan sendiri saat menguji.
+`saveResult` dibatasi **30 kiriman/menit** per user (`MAX_RESULTS_PER_MINUTE`). Ini menutup pola
+"sapu payload sampai ada yang lolos" seperti yang saya lakukan sendiri saat menguji.
+
+> **Dinaikkan 10 → 30 pada 2026-07-27.** Angka lama disertai alasan "tes terpendek 15 detik, jadi
+> permainan jujur tak pernah mendekati batas". **Alasan itu salah**: tes terpendek adalah
+> `words/10`, yang diselesaikan pengetik cepat dalam **<4 detik**. Dengan siklus latihan realistis
+> (~4 detik mengetik + `tab`/`enter` + membaca teks berikutnya ≈ 5,4 detik) itu **~11 run/menit** —
+> melewati batas 10. Pemain yang berlatih intensif ditolak pada run jujur ke-11, **dengan pesan
+> yang menuduhnya curang**. Perhatikan polanya: sama seperti `MAX_CHARS_PER_SECOND` dan
+> `IMPOSSIBLE_CONSISTENCY`, konstanta ini dikalibrasi dari asumsi tentang perilaku pemain, bukan
+> dari pengukuran.
+
+### 10.2b Log alasan penolakan solo
+
+Enam gerbang di `saveResult()` berakhir di `rejectSubmission()`, dan dulu **semuanya** memakai satu
+pesan yang sama tanpa log. Akibatnya jalur ini tak bisa didiagnosis: pemain ~174 WPM yang ditolak
+gerbang konsistensi tak bisa dibedakan dari rate limit atau sesi kedaluwarsa, dan **setiap
+penyetelan konstanta jadi tebakan**.
+
+Sekarang `rejectSubmission(string $reason, array $context)` mencatat `Log::warning` dengan alasan
+mesin dan angka yang menentukan gerbang itu:
+
+| `reason` | Kapan | Konteks yang dicatat |
+|---|---|---|
+| `rate_limited` | melewati `MAX_RESULTS_PER_MINUTE` | — |
+| `session_mismatch` | sesi hilang / mode tak cocok | `had_session`, mode terbit |
+| `duration_over_elapsed` | klaim waktu > jam server | `claimed_seconds`, `elapsed_seconds` |
+| `char_ceiling_exceeded` | melewati plafon karakter | `total_keystrokes`, `max_chars`, durasi |
+| `anti_cheat` | vonis `rejectsSoloResult()` | `reasons`, `net_wpm`, `consistency`, `wpm_samples` |
+
+Pesan ke pemain juga dipisah (`REJECTION_MESSAGES`): hanya manipulasi sungguhan yang diberi tahu
+hasilnya "tidak masuk akal". Rate limit dan sesi kedaluwarsa **bukan kecurangan**, dan menuduh
+pemain jujur atas hal itu adalah bug tersendiri.
+
+**Aturannya ke depan:** jangan tambah jalur penolakan tanpa `reason`, dan **setel ulang konstanta
+apa pun di dokumen ini dari log tersebut**, bukan dari intuisi.
 
 ### 10.3 Batas klaim slot war per anggota
 
