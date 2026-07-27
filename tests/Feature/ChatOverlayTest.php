@@ -309,6 +309,33 @@ it('tetap menghormati preferensi kurangi gerakan setelah animasi baru ditambahka
         ->and($css)->toContain('animation-duration: 0.01ms !important');
 });
 
+/**
+ * ===== POSISI FAB: SUDUT, BUKAN DIANGKAT =====
+ *
+ * FAB dulu dinaikkan (bottom-16) untuk mencoba melewati footer. Itu keliru dua arah
+ * sekaligus: di desktop terlihat mengambang lepas dari sudut, sementara di mobile footer
+ * yang lebih tinggi & rata-tengah TETAP tertutup. Satu offset tetap tak akan pernah
+ * memuaskan keduanya.
+ *
+ * Perbaikannya memisah dua urusan itu: FAB kembali ke sudut sejati (bottom-5, simetris
+ * dengan right-5), dan footer-lah yang menyediakan safe-zone-nya sendiri (padding bawah di
+ * mobile, jarak horizontal di desktop). Test ini mengunci KEDUANYA supaya kompromi lama
+ * tak menyelinap balik -- kalau salah satu hilang, footer tertutup lagi.
+ */
+it('menambatkan FAB chat ke sudut dan memberi footer jarak aman, bukan menaikkan tombolnya', function () {
+    $overlay = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/chat-overlay.blade.php')));
+    $layout = tanpaKomentarBlade(file_get_contents(resource_path('views/layouts/app.blade.php')));
+
+    // FAB di sudut, simetris dengan right-5, tidak dinaikkan ke tengah layar.
+    expect($overlay)->toContain('fixed z-[56] bottom-5 right-5')
+        ->and($overlay)->not->toContain('bottom-16');
+
+    // Footer menyediakan safe-zone-nya sendiri: ruang vertikal di mobile (di-reset di sm+
+    // begitu FAB berada di sampingnya) dan jarak horizontal di desktop.
+    expect($layout)->toContain('pb-24 sm:pb-6')
+        ->and($layout)->toContain('sm:me-20');
+});
+
 /** Drawer harus diumumkan sebagai milik tombolnya, bukan panel lepas. */
 it('menghubungkan tombol FAB dengan drawer lewat aria', function () {
     $markup = file_get_contents(resource_path('views/livewire/chat-overlay.blade.php'));

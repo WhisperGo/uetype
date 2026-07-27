@@ -39,10 +39,18 @@
             @include('layouts.sign-out-confirmation')
         @endauth
 
+        {{-- The chat FAB owns the bottom-right corner (fixed, bottom-5 right-5, ~56px, see
+             livewire/chat-overlay.blade.php). This footer reserves a matching safe-zone so its
+             links are never covered when the page is scrolled to the end -- the FAB is NOT
+             lifted to dodge them. The two viewports need different clearances: on mobile the
+             row is centred and stacks under the button, so it gets VERTICAL room (pb-24, reset
+             to pb-6 once the FAB sits beside it at sm+); on desktop the links are right-aligned
+             straight into the FAB's column, so the nav is pushed clear HORIZONTALLY (sm:me-20)
+             with no extra empty space. --}}
         <footer class="border-t border-white/5">
-            <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-x-small text-muted">
+            <div class="max-w-7xl mx-auto pt-6 pb-24 sm:pb-6 px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-x-small text-muted">
                 <span>&copy; 2026 UeType</span>
-                <nav class="flex items-center gap-6">
+                <nav class="flex items-center gap-6 sm:me-20">
                     <a href="/about" class="hover:text-foreground transition-colors">{{ __('common.footer.about') }}</a>
                     <a href="/privacy-policy" class="hover:text-foreground transition-colors">{{ __('common.footer.privacy') }}</a>
                 </nav>

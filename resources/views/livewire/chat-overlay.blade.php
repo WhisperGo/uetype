@@ -34,12 +34,15 @@
              position. The press feedback also replaces the tactile cue lost with
              `active:cursor-grabbing`. `transition` (not transition-colors) so transform and
              shadow ease too; the reduced-motion block in app.css flattens all of it. --}}
-        {{-- bottom-24 (6rem), not bottom-5: the footer sits in this bottom-right corner when
-             the page is scrolled to the end (right-aligned links on desktop, centred links on
-             mobile), so the FAB is lifted clear of the footer's ~90px band. It floats a little
-             higher than a typical corner FAB on every page as a result -- a deliberate trade so
-             the footer links are never covered. --}}
-        class="fixed z-[56] bottom-16 right-5 w-14 h-14 rounded-full bg-gold hover:bg-gold/90 text-background shadow-xl hover:shadow-2xl flex items-center justify-center transition duration-200 hover:-translate-y-0.5 active:scale-95 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        {{-- A TRUE corner FAB: bottom-5 mirrors right-5, so it reads as pinned to the
+             bottom-right corner rather than floating awkwardly above it. It is deliberately
+             NOT lifted to clear the footer -- lifting the button (it used to sit at bottom-16)
+             was the wrong tool: it looked detached from the corner on desktop yet STILL
+             overlapped the taller, centred mobile footer, because one fixed offset can't clear
+             both. The footer instead reserves its own bottom safe-zone (see
+             layouts/app.blade.php), so the corner stays clean on every page while the footer
+             links are never covered. --}}
+        class="fixed z-[56] bottom-5 right-5 w-14 h-14 rounded-full bg-gold hover:bg-gold/90 text-background shadow-xl hover:shadow-2xl flex items-center justify-center transition duration-200 hover:-translate-y-0.5 active:scale-95 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         aria-label="{{ __('chat.title') }}">
         {{-- Rotates slightly while the drawer is open: a quiet "this is the thing that is
              currently showing", not a second icon to maintain. --}}
@@ -60,8 +63,8 @@
         @endif
     </button>
 
-    {{-- Drawer: opens upward from the pinned FAB. bottom-44 (11rem) keeps the same ~20px gap
-         above the button now that it sits at bottom-24 -- 96px offset + 56px button + 20px gap.
+    {{-- Drawer: opens upward from the pinned FAB. bottom-24 (6rem) leaves a ~20px gap above
+         the button now that it sits at bottom-5 -- 20px offset + 56px button + 20px gap.
          max-h-[70vh] keeps it whole on short viewports, so no JS measuring is needed. --}}
     <div x-show="open && !hidden" x-cloak id="chat-overlay-panel"
         x-transition:enter="transition ease-out duration-200"
@@ -70,7 +73,7 @@
         x-transition:leave="transition ease-in duration-150"
         x-transition:leave-start="opacity-100 translate-y-0"
         x-transition:leave-end="opacity-0 translate-y-4"
-        class="fixed z-[55] bottom-32 right-5 w-96 max-w-[calc(100vw-2.5rem)] h-[32rem] max-h-[70vh] bg-surface border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        class="fixed z-[55] bottom-24 right-5 w-96 max-w-[calc(100vw-2.5rem)] h-[32rem] max-h-[70vh] bg-surface border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
         @if ($activeMode === null)
             {{-- PICKER --}}
