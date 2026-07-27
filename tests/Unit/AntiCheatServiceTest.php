@@ -149,3 +149,68 @@ it('still accepts a genuine elite race pace below the ceiling', function () {
     // tetap lolos supaya perbaikan tak menghukum yang jujur.
     expect($this->service->exceedsRaceSpeed(correctChars: 195, durationSeconds: 10.0))->toBeFalse();
 });
+
+/*
+|--------------------------------------------------------------------------
+| Pembulatan durasi finis (FINISH_DURATION_ROUNDING_SLACK)
+|--------------------------------------------------------------------------
+| `finished_time_seconds` kolom INTEGER, ditulis round($elapsed), jadi nilai
+| tersimpan bisa sampai setengah detik LEBIH KECIL dari durasi asli. Setengah
+| detik itu tak berarti di balapan 20 detik dan menentukan di balapan 2 detik.
+|
+| Dilaporkan pemain: hasilnya ditolak dengan pesan "WPM melebihi batas manusia"
+| padahal ia mengetik dengan kecepatan wajar. Yang paling menyesatkan, hasilnya
+| TIDAK monoton -- finis 2,6s (tersimpan 3) lolos sementara finis 2,2s yang
+| LEBIH CEPAT (tersimpan 2) ditolak. Verdict-nya terasa seperti undian.
+|
+| Slack ini KOMPENSASI presisi yang hilang, bukan pelonggaran ambang. Kalau
+| durasi suatu saat disimpan desimal, slack-nya ikut dibuang.
+*/
+it('does not reject an honest fast finish that integer rounding inflated', function () {
+    // Teks 10 kata (49 char) diselesaikan dalam 2,2 detik = 267 WPM sungguhan.
+    // Tersimpan sebagai 2 detik -> server menghitung 294 WPM -> dulu ditolak.
+    $reasons = $this->service->raceResultReasons(
+        correctChars: 49, durationSeconds: 2.0, progressPercent: 100, accuracy: 100.0
+    );
+
+    expect($reasons)->not->toContain('wpm_too_high')
+        ->and($this->service->rejectsRaceResult($reasons))->toBeFalse();
+});
+
+it('gives the same verdict to a faster finish as to a slower one', function () {
+    // Inti keluhannya: non-monotonisitas. Finis 2,2s (tersimpan 2) tak boleh
+    // dihukum sementara finis 2,6s yang lebih lambat (tersimpan 3) lolos.
+    $lebihCepat = $this->service->raceResultReasons(49, 2.0, 100, 100.0);
+    $lebihLambat = $this->service->raceResultReasons(49, 3.0, 100, 100.0);
+
+    expect($this->service->rejectsRaceResult($lebihCepat))
+        ->toBe($this->service->rejectsRaceResult($lebihLambat));
+});
+
+it('still rejects a pace no rounding error could explain', function () {
+    // 600 karakter dalam 10 detik = 720 WPM. Slack setengah detik hanya
+    // menurunkannya ke ~686 -- masih jauh di atas ambang. Payload "teleport
+    // ke 100%" tetap tertangkap.
+    $reasons = $this->service->raceResultReasons(600, 10.0, 100, 100.0);
+
+    expect($reasons)->toContain('wpm_too_high')
+        ->and($this->service->rejectsRaceResult($reasons))->toBeTrue();
+});
+
+it('does not let the slack rescue a result rejected for another reason', function () {
+    // Fast-garbage: progres 90% dengan akurasi 10%. Ditolak lewat cross-check
+    // progres/akurasi, yang sama sekali tak menyentuh durasi -- slack tak boleh
+    // diam-diam meloloskannya.
+    $reasons = $this->service->raceResultReasons(200, 60.0, 90, 10.0);
+
+    expect($reasons)->toContain('accuracy_progress_inconsistent')
+        ->and($this->service->rejectsRaceResult($reasons))->toBeTrue();
+});
+
+it('keeps the live path free of the rounding slack', function () {
+    // Jalur live menerima float sungguhan (race_starts_at -> now), jadi tak ada
+    // pembulatan untuk dikompensasi. Menambah slack di sana hanya melebarkan
+    // celah sembunyi payload palsu. 205 char / 10 detik = ~246 WPM: harus tetap
+    // ditolak, sama seperti sebelum perubahan ini.
+    expect($this->service->exceedsRaceSpeed(correctChars: 205, durationSeconds: 10.0))->toBeTrue();
+});

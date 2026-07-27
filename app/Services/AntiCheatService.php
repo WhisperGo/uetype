@@ -65,6 +65,31 @@ class AntiCheatService
     private const RACE_ACCURACY_CHECK_PROGRESS = 50;
 
     /**
+     * Seconds of slack added to a FINISHED race duration before judging its speed.
+     *
+     * `finished_time_seconds` is an integer column written as round($elapsed), so the stored
+     * value can sit up to half a second BELOW the real duration. That half second is noise on
+     * a 20-second race and decisive on a 2-second one: a 10-word text finished in 2.2s stores
+     * as 2, and the same run the server would score at 267 WPM it scores at 294 -- past the
+     * ceiling, rejected, with the player told their speed was inhuman.
+     *
+     * It also made the outcome non-monotonic, which is how it was noticed: a 2.6s finish
+     * (stores 3) passed while a faster 2.2s finish (stores 2) was rejected, so the same
+     * player got different verdicts for the same pace depending on which side of a half
+     * second they landed. That reads as random.
+     *
+     * Adding the maximum possible rounding loss makes the check use the SLOWEST duration the
+     * run could have had, so the doubt created by our own rounding goes to the player rather
+     * than against them. It costs nothing in cheat detection: a forged pace fast enough to
+     * matter clears the ceiling by far more than this.
+     *
+     * This is a COMPENSATION for lost precision, not a raised ceiling. The real fix is to
+     * store the duration with sub-second precision; see docs/features/multiplayer-race.md.
+     * If that ever lands, this constant goes away with it -- do not treat it as a tuning knob.
+     */
+    private const FINISH_DURATION_ROUNDING_SLACK = 0.5;
+
+    /**
      * Race-only WPM ceiling, tighter than MAX_HUMAN_WPM.
      *
      * In a race, progress% is client-reported, so "finishing" is a single number a
@@ -135,6 +160,11 @@ class AntiCheatService
      * assert "100%" at any moment. Rejecting the update outright stops it taking a finish
      * time and a place, which is what actually decides the winner -- scoring it as 0 WPM
      * would not, since placement is ranked by time, not speed.
+     *
+     * Deliberately does NOT apply FINISH_DURATION_ROUNDING_SLACK. That slack compensates for
+     * an integer COLUMN; this path is handed a live float (race_starts_at -> now), so there
+     * is no rounding to undo and adding slack would only widen the gap a forged payload can
+     * hide in. If this ever starts reading a stored duration, it needs the slack too.
      */
     public function exceedsRaceSpeed(int $correctChars, float $durationSeconds): bool
     {
@@ -158,9 +188,30 @@ class AntiCheatService
      */
     public function raceResultReasons(int $correctChars, float $durationSeconds, int $progressPercent, float $accuracy): array
     {
+        // Speed is judged against the duration PLUS the rounding slack (see the constant):
+        // the caller's duration comes from an integer column, so it can understate the real
+        // elapsed time by up to half a second and inflate the derived WPM.
+        //
+        // Only the SPEED judgement gets the slack. The rest of check() -- empty input,
+        // char-count consistency, impossible accuracy -- is unaffected by the denominator,
+        // and `duration_too_short` must keep seeing the value as stored or a zero-second
+        // session would start looking like a half-second one.
+        $speedDuration = $durationSeconds > 0
+            ? $durationSeconds + self::FINISH_DURATION_ROUNDING_SLACK
+            : $durationSeconds;
+
         // totalChars == correctChars: race progress only advances on correct characters.
         $check = $this->check($correctChars, $correctChars, $durationSeconds);
         $reasons = $check['reasons'];
+
+        // Recomputed on the slack-adjusted duration, then the un-adjusted verdict is dropped:
+        // check() already flagged wpm_too_high off the raw value, and that is the flag this
+        // whole change exists to stop being wrong.
+        $speedCheck = $this->check($correctChars, $correctChars, $speedDuration);
+
+        if (! in_array('wpm_too_high', $speedCheck['reasons'], true)) {
+            $reasons = array_values(array_diff($reasons, ['wpm_too_high']));
+        }
 
         if ($progressPercent >= self::RACE_ACCURACY_CHECK_PROGRESS
             && $accuracy < self::RACE_MIN_ACCURACY_AT_PROGRESS) {
@@ -169,7 +220,11 @@ class AntiCheatService
 
         // Tighter race ceiling (see MAX_RACE_WPM): catches the "teleport to 100%" payload,
         // which lands just under the general 300 limit once the race has run ~10 seconds.
-        if ($check['net_wpm'] > self::MAX_RACE_WPM && ! in_array('wpm_too_high', $reasons, true)) {
+        //
+        // Reads the slack-adjusted speed, not the raw one -- this is the gate that actually
+        // bites (240 is far below the 300 in check()), so leaving it on the raw value would
+        // make the whole rounding compensation above pointless.
+        if ($speedCheck['net_wpm'] > self::MAX_RACE_WPM && ! in_array('wpm_too_high', $reasons, true)) {
             $reasons[] = 'wpm_too_high';
         }
 
