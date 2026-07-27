@@ -263,6 +263,21 @@ const registerRaceArena = (Alpine) => {
             this._onSuddenDeath = (ev) => this.syncSuddenDeath(ev.detail.remaining);
             window.addEventListener('race-sudden-death', this._onSuddenDeath);
 
+            // Start the clock the instant suddenDeathActive flips true, WHOEVER flips it: the
+            // WebSocket event above, the server re-render's x-init hook, or a re-seed. This is
+            // the fix for "the timer only counts down after a manual refresh": before, the clock
+            // was reliably started only by init() (which runs on refresh), while the realtime
+            // paths could set the flag on one Alpine instance but call startSuddenDeathClock on a
+            // stale `this` that a Livewire morph had replaced -- so the live banner sat frozen at
+            // the full window. A reactive $watch always fires on the LIVE instance, and the flag
+            // becoming true is exactly what makes the banner appear, so the two can never
+            // disagree again. startSuddenDeathClock() is idempotent, so a redundant call is a
+            // no-op. $watch fires on CHANGE only, so "already active at mount" stays handled by
+            // the init() branch above.
+            this.$watch('suddenDeathActive', (active) => {
+                if (active) this.startSuddenDeathClock();
+            });
+
             // A word's line number is only valid for the WIDTH and FONT it was measured at, so
             // every cause of a re-wrap has to drop the snapshot and re-measure. Miss one and
             // _lineOf silently keeps scrolling to a line the word is no longer on, with no way

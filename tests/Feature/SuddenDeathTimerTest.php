@@ -244,6 +244,25 @@ test('menghapus badge header tak mematikan start clock sudden death (hook sync t
     expect($markup)->toContain('syncSuddenDeath(');
 });
 
+/**
+ * REGRESI: timer sudden death dulu baru jalan setelah user REFRESH. init() (yang dijalankan
+ * saat refresh) adalah satu-satunya jalur yang andal memanggil startSuddenDeathClock();
+ * jalur realtime (listener event & x-init hook) bisa gagal karena `this` yang di-capture jadi
+ * basi lintas morph Livewire, atau x-init pada elemen yang disisipkan morph tak selalu jalan.
+ *
+ * Kuncinya: banner MUNCUL (jadi suddenDeathActive memang jadi true di instance yang hidup),
+ * tapi clock tak menghitung mundur. Maka clock harus dinyalakan REAKTIF begitu flag jadi
+ * true di instance itu -- lewat $watch, bukan bergantung pada siapa yang men-set flag-nya.
+ */
+test('sudden death menyalakan clock secara reaktif saat flag aktif (tanpa perlu refresh)', function () {
+    $arena = file_get_contents(resource_path('js/race-arena.js'));
+
+    // $watch pada suddenDeathActive yang memanggil startSuddenDeathClock -> countdown mulai
+    // realtime di instance yang hidup, bukan hanya dari init() saat refresh.
+    expect($arena)->toContain("\$watch('suddenDeathActive'")
+        ->and($arena)->toContain('startSuddenDeathClock');
+});
+
 test('checkSuddenDeath menutup race setelah 15 detik', function () {
     $pemenang = User::factory()->create();
     $tertinggal = User::factory()->create();
