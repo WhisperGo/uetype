@@ -590,14 +590,18 @@
 
             {{-- overflow-x-auto forces overflow-y to CLIP too (per spec: overflow-y:visible
                  computes to auto once overflow-x isn't visible), so anything that spills outside
-                 the box needs explicit room here:
-                   pt-10 : the top row's tooltip (-top-10)
-                   pb-2  : the ring/outline of a selected key in the bottom row -- ring-offset-2 +
-                           ring-2 draw 4px below the key; without this the z/x row gets clipped. --}}
-            <div class="w-full overflow-x-auto pt-10 pb-2">
-            <div class="flex flex-col gap-2 md:gap-3 w-max mx-auto">
+                 the box needs explicit room here. The miss-count tips now stay WITHIN the board
+                 (each lands over an adjacent row -- see the tip's row-aware position), so only the
+                 selected-key ring needs slack: ring-offset-2 + ring-2 draw ~4px past the top and
+                 bottom rows -> pt-2 / pb-2. --}}
+            <div class="w-full overflow-x-auto pt-2 pb-2">
+            <div class="flex flex-col gap-1 sm:gap-2 md:gap-3 w-max mx-auto">
+                {{-- Staircase offset per row. Smaller on mobile (ml-3/ml-6) so the whole board
+                     fits a phone without horizontal scroll; sm+ restores the roomier ml-6/ml-12
+                     (== the old inline 1.5rem/3rem). --}}
+                @php $rowIndent = ['', 'ml-3 sm:ml-6', 'ml-6 sm:ml-12']; @endphp
                 @foreach ($keyboard as $rowIndex => $row)
-                    <div class="flex justify-center gap-2 md:gap-3" style="margin-left: {{ $rowIndex * 1.5 }}rem;">
+                    <div class="flex justify-center gap-1 sm:gap-2 md:gap-3 {{ $rowIndent[$rowIndex] ?? '' }}">
                         @foreach ($row as $key)
                             @php
                                 $missCount = $missedChars[$key] ?? 0;
@@ -613,7 +617,7 @@
                                  style below fully owns this key's background-color.
                                  Solid = the key you NEEDED; dashed = the key you PRESSED. --}}
                             <div data-key="{{ $key }}"
-                                class="w-10 h-10 md:w-12 md:h-12 rounded-lg flex items-center justify-center text-sm md:text-base font-bold transition-colors relative group"
+                                class="w-6 h-6 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded sm:rounded-lg flex items-center justify-center text-[0.6rem] sm:text-sm md:text-base font-bold transition-colors relative group"
                                 :class="{
                                     'ring-2 ring-gold ring-offset-2 ring-offset-surface': expectedKeys.includes(@js($key)),
                                     'outline outline-2 outline-dashed outline-offset-2 outline-gold/50': actualKey === @js($key),
@@ -622,8 +626,14 @@
                                 {{ strtoupper($key) }}
 
                                 @if ($missCount > 0)
+                                    {{-- Position is SIZE-RELATIVE (bottom-full/top-full), not a
+                                         fixed -top-10 that ignored the key size and clipped above
+                                         the board. Row-aware: the top row drops its tip BELOW, all
+                                         other rows above -- so every tip lands over an adjacent row,
+                                         never past the keyboard's top/bottom edge. Centered on the
+                                         key so it doesn't lean off the right edge. --}}
                                     <div
-                                        class="absolute -top-10 bg-surface text-danger px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg border border-danger/50">
+                                        class="absolute left-1/2 -translate-x-1/2 {{ $rowIndex === 0 ? 'top-full mt-2' : 'bottom-full mb-2' }} bg-surface text-danger px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20 shadow-lg border border-danger/50">
                                         {{ __('result.miss_count', ['count' => $missCount]) }}
                                     </div>
                                 @endif
