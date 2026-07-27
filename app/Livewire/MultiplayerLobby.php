@@ -705,6 +705,14 @@ class MultiplayerLobby extends Component
             return;
         }
 
+        // Sudden-death deadline, enforced on the race's HOTTEST path: a still-typing player's
+        // own progress emits (~8x/second) close the race the instant the 15s window elapses,
+        // so resolution is server-authoritative and real time -- it no longer waits on that
+        // one client's local timer to fire checkSuddenDeath(). Idempotent & race-safe.
+        if ($this->resolveSuddenDeathIfElapsed($room)) {
+            return;
+        }
+
         $member = RoomMember::where('room_id', $room->id)->where('user_id', Auth::id())->first();
 
         // A player who has already finished may no longer broadcast progress.
@@ -926,7 +934,12 @@ class MultiplayerLobby extends Component
         SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
     }
 
-    /** Poll-driven gate: once the sudden-death window elapses, force-finish the race. */
+    /**
+     * Backstop gate for a PAUSED player: when someone stops typing their progress emits
+     * stop, so the real-time path in updateRaceProgress() can't fire -- the client's local
+     * sudden-death timer then calls this once at 0 to close the race. Both paths run the
+     * same server-authoritative check, resolveSuddenDeathIfElapsed().
+     */
     public function checkSuddenDeath(): void
     {
         if (! $this->roomCode || $this->step !== 'racing') {
@@ -934,39 +947,69 @@ class MultiplayerLobby extends Component
         }
 
         $room = Room::where('code', $this->roomCode)->first();
-        if (! $room || ! $room->countdown_started_at) {
+        if (! $room) {
             return;
         }
 
-        // Seconds elapsed since sudden death began (counts up, 0 -> 15); only the
-        // auto-finish condition. For the countdown display, use getSuddenDeathRemainingProperty().
-        $secondsPassed = now()->diffInSeconds($room->countdown_started_at, true);
+        $this->resolveSuddenDeathIfElapsed($room);
+    }
 
-        if ($secondsPassed >= self::SUDDEN_DEATH_SECONDS) {
-            $room->update(['status' => 'finished']);
-
-            // Default (DNF) placement for players who didn't finish. Racers only:
-            // spectators have no finished_time_seconds and are not DNF.
-            RoomMember::where('room_id', $room->id)
-                ->where('role', RoomMember::ROLE_PLAYER)
-                ->whereNull('finished_time_seconds')
-                ->update([
-                    'finished_time_seconds' => RoomMember::DNF_SENTINEL_SECONDS,
-                ]);
-
-            $this->forgetRoomCache();
-
-            $this->finalizeRace($room->id);
-            $this->showResultModal = true;
-            $this->captureResultSnapshot();
-
-            // Lock this client's input now; the guard above keeps the method idempotent
-            // even if triggered by several clients at once.
-            $this->dispatch('force-finish');
-
-            // Broadcast to everyone (not toOthers): the triggering client also needs the final status.
-            SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
+    /**
+     * Finalize the race if the sudden-death window has elapsed. THE single place the deadline
+     * is decided, called from BOTH updateRaceProgress() (real time, driven by a still-typing
+     * player's own emits ~8x/second) and checkSuddenDeath() (a paused player's client timer).
+     *
+     * Why this exists: the race used to be closed ONLY when some client's local timer fired
+     * checkSuddenDeath() at 0. For a player who is still typing, the server therefore never
+     * enforced the deadline in real time from that player's own activity -- it sat on
+     * countdown_started_at and waited for a single client ping, which a slow server, a
+     * throttled tab, or clock skew could delay or drop. Enforcing it on the progress path
+     * makes the still-typing player's own keystrokes close the race the instant time runs out.
+     *
+     * Always measured from countdown_started_at on the SERVER clock, never a client's. Race
+     * safe: the conditional `where('status', 'racing')` update means exactly ONE caller -- of
+     * any number of concurrent progress emits and timer pings -- performs the finalize; every
+     * other no-ops. Returns true only on the call that actually closed the race.
+     */
+    private function resolveSuddenDeathIfElapsed(Room $room): bool
+    {
+        if (! $room->countdown_started_at
+            || now()->diffInSeconds($room->countdown_started_at, true) < self::SUDDEN_DEATH_SECONDS) {
+            return false;
         }
+
+        // Atomic racing -> finished: only the winner of this update runs the finalize below.
+        $claimed = Room::where('id', $room->id)
+            ->where('status', 'racing')
+            ->update(['status' => 'finished']);
+
+        if (! $claimed) {
+            return false;
+        }
+
+        // Default (DNF) placement for players who didn't finish. Racers only: spectators
+        // have no finished_time_seconds and are not DNF.
+        RoomMember::where('room_id', $room->id)
+            ->where('role', RoomMember::ROLE_PLAYER)
+            ->whereNull('finished_time_seconds')
+            ->update([
+                'finished_time_seconds' => RoomMember::DNF_SENTINEL_SECONDS,
+            ]);
+
+        $this->forgetRoomCache();
+
+        $this->finalizeRace($room->id);
+        $this->showResultModal = true;
+        $this->captureResultSnapshot();
+
+        // Lock the triggering client's input now; everyone else reacts to the RoomUpdated
+        // broadcast below (roomUpdated() flips their showResultModal from the finished status).
+        $this->dispatch('force-finish');
+
+        // Broadcast to everyone (not toOthers): the triggering client also needs the final status.
+        SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
+
+        return true;
     }
 
     /** Host-only: reset the finished room back to waiting with fresh text for a rematch. */

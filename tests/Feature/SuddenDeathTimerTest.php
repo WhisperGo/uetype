@@ -263,6 +263,48 @@ test('sudden death menyalakan clock secara reaktif saat flag aktif (tanpa perlu 
         ->and($arena)->toContain('startSuddenDeathClock');
 });
 
+/**
+ * REGRESI (server-authoritative, real time): sudden death dulu HANYA ditutup saat timer LOKAL
+ * satu klien memanggil checkSuddenDeath() di 0. Untuk pemain yang MASIH mengetik, server tak
+ * pernah menutup race secara real time dari aktivitasnya sendiri -- ia menunggu satu ping klien
+ * yang bisa telat (server lambat), ter-throttle (tab background), atau hilang. Kini
+ * updateRaceProgress() -- yang dipanggil ~8x/detik selama mengetik -- ikut menegakkan deadline:
+ * begitu jendela 15 detik lewat, emit progres berikutnya dari si pengetik menutup race saat itu.
+ */
+test('a still-typing player closes the race in real time once the window elapses', function () {
+    $finisher = User::factory()->create();
+    $stillTyping = User::factory()->create();
+
+    $room = Room::create([
+        'code' => 'SD0007',
+        'host_id' => $finisher->id,
+        'status' => 'racing',
+        'text_to_type' => 'the quick brown fox jumps over the lazy dog',
+        'race_starts_at' => now()->subSeconds(40),
+        'countdown_started_at' => now()->subSeconds(16),   // jendela 15s sudah lewat
+    ]);
+
+    RoomMember::create([
+        'room_id' => $room->id, 'user_id' => $finisher->id,
+        'is_ready' => true, 'progress_percent' => 100, 'finished_time_seconds' => 24,
+    ]);
+    $typing = RoomMember::create([
+        'room_id' => $room->id, 'user_id' => $stillTyping->id,
+        'is_ready' => true, 'progress_percent' => 40,
+    ]);
+
+    // Si pengetik hanya mengirim progres biasa (BUKAN finish). Sebelum perbaikan ini tak
+    // berpengaruh pada sudden death; kini ia menutup race di server saat itu juga.
+    Livewire::actingAs($stillTyping)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'SD0007')
+        ->set('step', 'racing')
+        ->call('updateRaceProgress', 45, 60, 100)
+        ->assertSet('showResultModal', true);
+
+    expect($room->fresh()->status)->toBe('finished')
+        ->and($typing->fresh()->finished_time_seconds)->toBe(RoomMember::DNF_SENTINEL_SECONDS);
+});
+
 test('checkSuddenDeath menutup race setelah 15 detik', function () {
     $pemenang = User::factory()->create();
     $tertinggal = User::factory()->create();
