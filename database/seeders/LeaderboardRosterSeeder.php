@@ -92,10 +92,15 @@ class LeaderboardRosterSeeder extends Seeder
 
     public function run(): void
     {
-        // Demo fixtures do not belong in production, and a seeder that silently rewrites a
-        // live leaderboard is a much worse outcome than one that refuses to run.
-        if (app()->environment('production')) {
-            $this->command->warn('LeaderboardRosterSeeder skipped: not for production.');
+        // Production is allowed, but never by accident.
+        //
+        // These accounts are indistinguishable from real players once they are on the public
+        // board -- that is the entire point of the fixture, and also its risk. Running it on a
+        // live board is a judgement call the operator has to make deliberately, so production
+        // requires an explicit confirmation (or --force for a scripted deploy) rather than
+        // inheriting the same one-liner that is harmless locally.
+        if (app()->environment('production') && ! $this->confirmedForProduction()) {
+            $this->command->warn('LeaderboardRosterSeeder cancelled.');
 
             return;
         }
@@ -117,6 +122,29 @@ class LeaderboardRosterSeeder extends Seeder
 
         $this->command->info("Leaderboard roster ready: {$created} players, {$rows} results across all tabs/configs/languages.");
         $this->command->info('Every player clears the '.(TypingResult::LEADERBOARD_MIN_TYPING_SECONDS / 60).'-minute eligibility gate, so the board is populated on every tab.');
+
+        if (app()->environment('production')) {
+            $this->command->warn('These are DEMO accounts on the live leaderboard. Remove them when the demo is over:');
+            $this->command->warn('  php artisan db:seed --class=RemoveLeaderboardRosterSeeder --force');
+        }
+    }
+
+    /**
+     * Explicit go-ahead before writing fixtures to a live board.
+     *
+     * `--force` is honoured because that is the flag Laravel already uses for "yes, in
+     * production, I mean it", and a deploy script cannot answer a prompt.
+     */
+    private function confirmedForProduction(): bool
+    {
+        if ($this->command->option('force')) {
+            return true;
+        }
+
+        $this->command->warn('You are about to add 14 FAKE players to the PRODUCTION leaderboard.');
+        $this->command->warn('They are visible to every visitor and rank alongside real players.');
+
+        return $this->command->confirm('Continue?', false);
     }
 
     /**
