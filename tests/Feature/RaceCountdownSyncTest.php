@@ -27,6 +27,12 @@ function arenaBlade(): string
     return arenaSourceAll();
 }
 
+/**
+ * Room siap-mulai. Kalau pemanggil tak menyebut peserta lain, SATU pembalap tambahan tetap
+ * dibuat: startRace() menolak room dengan kurang dari MIN_PLAYERS_TO_START pembalap, dan
+ * berkas ini menguji sinkronisasi hitung mundur -- bukan aturan mulai. Tanpa pembalap kedua
+ * tiap test gagal karena balapannya tak pernah dimulai, yang menyesatkan.
+ */
 function racingRoomFor(User $host, array $others = []): Room
 {
     $room = Room::create([
@@ -35,6 +41,10 @@ function racingRoomFor(User $host, array $others = []): Room
         'status' => 'waiting',
         'text_to_type' => 'aa bb cc',
     ]);
+
+    if ($others === []) {
+        $others = [User::factory()->create()];
+    }
 
     foreach ([$host, ...$others] as $u) {
         RoomMember::create(['room_id' => $room->id, 'user_id' => $u->id, 'is_ready' => true]);

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Livewire\MultiplayerLobby;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Services\AntiCheatService;
@@ -271,11 +272,19 @@ trait ReadsRoomState
             return false;
         }
 
+        $racers = $room->members->where('role', RoomMember::ROLE_PLAYER);
+
+        // Two racers minimum, spectators excluded however many are watching. Without this the
+        // button lit up for one racer plus any number of watchers, and the race that followed
+        // had a single competitor. The same threshold is re-checked server-side in
+        // startRace() -- this only decides whether the button looks pressable.
+        if ($racers->count() < MultiplayerLobby::MIN_PLAYERS_TO_START) {
+            return false;
+        }
+
         // Only non-host racers need to be ready. If the host is a spectator, they aren't a
         // racer, so all racers count -- every one of them must be ready.
-        $participants = $room->members
-            ->where('role', RoomMember::ROLE_PLAYER)
-            ->where('user_id', '!=', $room->host_id);
+        $participants = $racers->where('user_id', '!=', $room->host_id);
 
         return $participants->count() > 0 && $participants->where('is_ready', false)->count() === 0;
     }

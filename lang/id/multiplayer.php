@@ -98,7 +98,7 @@ return [
     'error_room_full' => 'Kamar sudah penuh! Maksimal 5 pemain dan 5 penonton.',
     'error_players_full' => 'Semua 5 slot pemain sudah terisi.',
     'error_spectators_full' => 'Semua 5 slot penonton sudah terisi.',
-    'error_no_players' => 'Butuh minimal satu pemain untuk memulai balapan.',
+    'error_not_enough_players' => 'Butuh minimal 2 pemain untuk memulai balapan. Penonton tidak dihitung.',
 
     'become_spectator' => 'Jadi Penonton',
     'become_player' => 'Jadi Pemain',
@@ -108,6 +108,7 @@ return [
     'players_full' => 'Slot pemain penuh (5/5).',
     'spectators_full' => 'Slot penonton penuh (5/5).',
     'no_players_to_start' => 'Belum ada pemain untuk memulai balapan.',
+    'need_more_players' => 'Butuh minimal 2 pemain. Penonton tidak dihitung -- minta seseorang bergabung sebagai pemain.',
     'spectating_title' => 'Kamu Sedang Menonton',
     'spectating_desc' => 'Menonton balapan secara langsung. Nikmati pertandingannya!',
     'you_spectated' => 'Kamu menonton pertandingan ini',

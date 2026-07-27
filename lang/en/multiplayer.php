@@ -98,7 +98,7 @@ return [
     'error_room_full' => 'Room is full! Maximum 5 players and 5 spectators.',
     'error_players_full' => 'All 5 player slots are taken.',
     'error_spectators_full' => 'All 5 spectator slots are taken.',
-    'error_no_players' => 'You need at least one player to start the race.',
+    'error_not_enough_players' => 'You need at least 2 players to start the race. Spectators don\'t count.',
 
     'become_spectator' => 'Spectate',
     'become_player' => 'Join as Player',
@@ -108,6 +108,7 @@ return [
     'players_full' => 'Player slots are full (5/5).',
     'spectators_full' => 'Spectator slots are full (5/5).',
     'no_players_to_start' => 'No players to start the race yet.',
+    'need_more_players' => 'At least 2 players are needed. Spectators don\'t count -- ask someone to join as a player.',
     'spectating_title' => 'You Are Spectating',
     'spectating_desc' => 'Watching the race live. Enjoy the show!',
     'you_spectated' => 'You spectated this match',

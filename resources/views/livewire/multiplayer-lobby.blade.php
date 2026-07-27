@@ -408,12 +408,25 @@
                 </div>
 
                 {{-- Status hint row: explains why "Start" isn't active yet. The neutral dot
-                     pulses so it reads as a hint, not a button. --}}
+                     pulses so it reads as a hint, not a button.
+
+                     Three distinct reasons, and they must not be collapsed: "nobody here",
+                     "not enough RACERS" and "waiting for ready" look identical from the host's
+                     side (a greyed-out button) but need different actions. The middle one is
+                     the confusing case a room full of spectators produces -- five people
+                     present, still not startable -- so it says so explicitly. --}}
                 @if ($this->isHost && !$this->allReady)
+                    @php $racerCount = $this->orderedMembers->count(); @endphp
                     <div class="flex items-center gap-2">
                         <span class="w-1.5 h-1.5 rounded-full bg-muted animate-pulse"></span>
                         <span class="text-xs font-mono text-muted">
-                            {{ $this->orderedMembers->isEmpty() ? __('multiplayer.no_players_to_start') : __('multiplayer.waiting_ready') }}
+                            @if ($racerCount === 0)
+                                {{ __('multiplayer.no_players_to_start') }}
+                            @elseif ($racerCount < \App\Livewire\MultiplayerLobby::MIN_PLAYERS_TO_START)
+                                {{ __('multiplayer.need_more_players') }}
+                            @else
+                                {{ __('multiplayer.waiting_ready') }}
+                            @endif
                         </span>
                     </div>
                 @endif
