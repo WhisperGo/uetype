@@ -15,6 +15,14 @@ use Livewire\Livewire;
  * Host tak menerima broadcast room.updated miliknya sendiri (->toOthers()), jadi
  * tak ada yang membersihkan state itu untuknya.
  */
+/**
+ * Room siap-mulai: host + SATU pembalap lain, keduanya ready.
+ *
+ * Pembalap kedua wajib ada karena startRace() menolak room dengan kurang dari
+ * MIN_PLAYERS_TO_START pembalap. Berkas ini menguji reset state, bukan aturan mulai --
+ * tanpa pembalap kedua tiap test di sini gagal karena alasan yang sama sekali lain
+ * (balapannya tak pernah dimulai) dan pesan gagalnya akan menyesatkan.
+ */
 function lobbyRoomFor(User $host, string $code): Room
 {
     $room = Room::create([
@@ -25,6 +33,11 @@ function lobbyRoomFor(User $host, string $code): Room
     ]);
 
     RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'is_ready' => true]);
+    RoomMember::create([
+        'room_id' => $room->id,
+        'user_id' => User::factory()->create()->id,
+        'is_ready' => true,
+    ]);
 
     return $room;
 }

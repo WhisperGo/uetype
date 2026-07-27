@@ -482,6 +482,107 @@ describe('multiplayer spectators', function () {
         // Room tetap waiting: tak ada pembalap untuk memulai.
         $this->assertDatabaseHas('rooms', ['code' => 'SPEC04', 'status' => 'waiting']);
     });
+
+    /**
+     * Balapan butuh minimal DUA pembalap. Penonton tak pernah dihitung, sebanyak apa pun.
+     *
+     * Aturan lama hanya menolak room tanpa pembalap sama sekali, jadi satu pembalap plus
+     * sejumlah penonton memulai "balapan" dengan satu peserta: ada hitung mundur, garis
+     * finis, dan penentuan juara untuk orang yang tak punya lawan.
+     *
+     * Dijaga di DUA tempat yang tak boleh berbeda: guard server di startRace() dan status
+     * tombol lewat allReady. Tombol itu petunjuk, bukan gerbang -- startRace() adalah metode
+     * Livewire publik yang bisa dipanggil klien mana pun, dan jumlah pembalap juga bisa turun
+     * di antara render yang menyalakan tombol dan klik yang menjalankannya.
+     */
+    it('refuses to start with one racer no matter how many spectators are watching', function () {
+        Event::fake([RoomUpdated::class]);
+
+        $host = User::factory()->create();
+        $room = Room::create([
+            'code' => 'SOLO01',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+
+        // Host menonton; satu orang membalap; tiga penonton lain. Total lima orang di room.
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'spectator', 'is_ready' => false]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => User::factory()->create()->id, 'role' => 'player', 'is_ready' => true]);
+
+        foreach (range(1, 2) as $ignored) {
+            RoomMember::create(['room_id' => $room->id, 'user_id' => User::factory()->create()->id, 'role' => 'spectator', 'is_ready' => false]);
+        }
+
+        $c = Livewire::actingAs($host)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'SOLO01')
+            ->set('step', 'waiting');
+
+        // Tombolnya mati...
+        expect($c->instance()->allReady)->toBeFalse();
+
+        // ...dan memanggil startRace() langsung tetap ditolak.
+        $c->call('startRace');
+
+        $this->assertDatabaseHas('rooms', ['code' => 'SOLO01', 'status' => 'waiting']);
+    });
+
+    it('starts with two racers even when a spectator is present', function () {
+        Event::fake([RoomUpdated::class]);
+
+        $host = User::factory()->create();
+        $room = Room::create([
+            'code' => 'DUO001',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => User::factory()->create()->id, 'role' => 'player', 'is_ready' => true]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => User::factory()->create()->id, 'role' => 'spectator', 'is_ready' => false]);
+
+        $c = Livewire::actingAs($host)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'DUO001')
+            ->set('step', 'waiting');
+
+        expect($c->instance()->allReady)->toBeTrue();
+
+        $c->call('startRace');
+
+        // Penonton tak menghalangi: dua pembalap sudah memenuhi syarat.
+        $this->assertDatabaseHas('rooms', ['code' => 'DUO001', 'status' => 'racing']);
+    });
+
+    it('blocks the start button when a second racer switches to spectator', function () {
+        // Kasus yang membuat guard server-nya perlu: room memenuhi syarat, lalu salah satu
+        // pembalap pindah jadi penonton. allReady harus ikut mati, bukan hanya guard-nya.
+        $host = User::factory()->create();
+        $other = User::factory()->create();
+        $room = Room::create([
+            'code' => 'DROP01',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+        $second = RoomMember::create(['room_id' => $room->id, 'user_id' => $other->id, 'role' => 'player', 'is_ready' => true]);
+
+        $c = Livewire::actingAs($host)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'DROP01')
+            ->set('step', 'waiting');
+
+        expect($c->instance()->allReady)->toBeTrue();
+
+        $second->update(['role' => 'spectator']);
+
+        $c2 = Livewire::actingAs($host)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'DROP01')
+            ->set('step', 'waiting');
+
+        expect($c2->instance()->allReady)->toBeFalse();
+    });
 });
 
 describe('multiplayer room chat', function () {

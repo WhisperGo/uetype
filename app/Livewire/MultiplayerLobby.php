@@ -71,6 +71,15 @@ class MultiplayerLobby extends Component
     public const MAX_SPECTATORS = 5;
 
     /**
+     * Racers required before a race may start. Spectators never count toward it, no matter
+     * how many are watching -- a race is between competitors, and one racer with an audience
+     * is not a race. Named rather than inlined because the rule is enforced in two places
+     * that must not drift: the server guard in startRace() and the button state via
+     * ReadsRoomState::getAllReadyProperty().
+     */
+    public const MIN_PLAYERS_TO_START = 2;
+
+    /**
      * Max race-progress updates accepted per second per player. The honest client emits
      * ~8/sec (120ms throttle); 20 leaves room for bursts + the trailing flush while still
      * capping a scripted flood (each accepted update also broadcasts to the whole room).
@@ -1014,10 +1023,17 @@ class MultiplayerLobby extends Component
             return;
         }
 
-        // Can't start without racers: the host may be a spectator, and if everyone is a
-        // spectator, no one is competing.
-        if ($room->players()->count() === 0) {
-            session()->flash('error', __('multiplayer.error_no_players'));
+        // A race needs at least two RACERS -- spectators never count, however many there are.
+        // The old rule only refused an empty grid, so one racer plus any number of watchers
+        // started a "race" with a single competitor: a countdown, a finish line and a
+        // placement for someone who had nobody to beat.
+        //
+        // Checked here and not only behind the button because the button is a hint, not a
+        // gate: startRace() is a public Livewire method any client can call, and the racer
+        // count can also drop between the render that enabled the button and the click that
+        // fires it (someone switches to spectator, or leaves).
+        if ($room->players()->count() < self::MIN_PLAYERS_TO_START) {
+            session()->flash('error', __('multiplayer.error_not_enough_players'));
 
             return;
         }
