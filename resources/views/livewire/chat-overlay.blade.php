@@ -14,7 +14,15 @@
          Plain @click on a native <button>, so Enter/Space work with no keyboard handler of
          our own. This is not a detail to "optimise" back into a pointer event: doing so is
          exactly what made the chat unreachable by keyboard before. --}}
-    <button x-show="!hidden" x-cloak
+    {{-- Nested x-data adds a `navMenuOpen` flag WITHOUT touching chat-dock.js: while the
+         mobile nav overlay is open, this FAB (pinned bottom-right, z-[56]) would sit on top
+         of the menu, so it hides itself. `hidden` still resolves from the parent
+         chatOverlayDock scope -- Alpine inherits parent scope into child x-data. The nav
+         broadcasts these window events from nav-badges.js. --}}
+    <button x-data="{ navMenuOpen: false }"
+        @mobile-nav-opened.window="navMenuOpen = true"
+        @mobile-nav-closed.window="navMenuOpen = false"
+        x-show="!hidden && !navMenuOpen" x-cloak
         @click="open = ! open"
         :aria-expanded="open ? 'true' : 'false'"
         aria-controls="chat-overlay-panel"

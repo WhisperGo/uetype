@@ -101,6 +101,19 @@
         }
     }
 
+    /* The mirror of .touch-only: shown only where there's a fine pointer (mouse/keyboard),
+       hidden on touch. For keyboard-only affordances -- e.g. the "tab then enter" restart
+       hint -- that are meaningless on a phone. Same pointer query, not a width query. */
+    .no-touch {
+        display: inline-flex;
+    }
+
+    @media (pointer: coarse) {
+        .no-touch {
+            display: none;
+        }
+    }
+
     /* ===== CHAT FAB: MICRO-INTERACTION =====
        The FAB used to be draggable, sold as "more feel". That put the delight budget on
        the button's POSITION -- the one property a user needs to stay predictable, and it
