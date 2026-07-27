@@ -151,6 +151,12 @@ export default function toastStack(config) {
 
                 // Toast only if the conversation with this sender isn't currently open.
                 if (e?.body && e.senderUsername && !this.isViewingDm(e.senderUsername)) {
+                    // Light the chat FAB's unread badge in real time. Same condition as the
+                    // toast (a DM not currently on screen), so the badge and toast never
+                    // disagree. The overlay only acts on this while its drawer is closed --
+                    // when open it re-renders and syncs the count from the server itself.
+                    window.dispatchEvent(new CustomEvent('chat-unread-bump'));
+
                     this.push({
                         icon: 'chat',
                         tone: 'brand',

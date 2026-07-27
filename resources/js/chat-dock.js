@@ -24,9 +24,14 @@
  * <script> in the Blade view re-runs on every component render.
  */
 
-export default function chatOverlayDock(open) {
+export default function chatOverlayDock(open, unread) {
     return {
         open,
+        // Unread DM count for the FAB badge, entangled with the server property. Seeded and
+        // reconciled by the server each render; bumped client-side (see the
+        // @chat-unread-bump.window handler in the view) while the drawer is closed, so the
+        // badge lights up in real time without a Livewire round-trip.
+        unread,
         hidden: false,
 
         init() {

@@ -7,7 +7,14 @@
      unbidden may anchor to this corner -- notifications live in `.notif-lane` on the
      opposite side (see resources/css/app.css). It used to be draggable; see the header of
      resources/js/chat-dock.js for why that was removed. --}}
-<div x-data="chatOverlayDock(@entangle('open'))" class="font-mono">
+<div x-data="chatOverlayDock(@entangle('open'), @entangle('unreadCount'))"
+    {{-- Live unread badge. toasts.js fires `chat-unread-bump` when a DM arrives that isn't the
+         conversation currently on screen (same condition as the toast). While the drawer is
+         CLOSED there is no Livewire round-trip, so we bump the count client-side to light the
+         badge in real time; when the drawer is OPEN the overlay is active and the server
+         re-renders and syncs `unreadCount` itself, so we must NOT double-count here. --}}
+    @chat-unread-bump.window="if (! open) unread++"
+    class="font-mono">
     {{-- Toggle button: hidden while a test/race session is active.
          @entangle('open') syncs the value to the server (triggering a fresh content render).
 
@@ -50,17 +57,17 @@
             fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8-1.17 0-2.29-.2-3.32-.56L3 21l1.56-4.68C3.57 15.19 3 13.65 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
-        @if ($this->unreadCount > 0)
-            {{-- wire:key carries the COUNT, so Livewire replaces this element whenever the
-                 number changes and the new node replays chat-badge-pop once. That is the
-                 whole trigger -- no JS listener, and no risk of animating on the wrong
-                 event: the count already excludes your own messages and the thread you are
-                 looking at, because it comes from the same query that renders it. --}}
-            <span wire:key="fab-unread-{{ $this->unreadCount }}"
-                class="chat-badge-pop absolute -top-1 -right-1 px-1.5 py-0.5 min-w-[1.25rem] text-center font-mono text-[0.65rem] font-bold text-white bg-danger rounded-full border-2 border-background pointer-events-none">
-                {{ $this->unreadCount > 9 ? '9+' : $this->unreadCount }}
-            </span>
-        @endif
+        {{-- Unread badge, driven by the Alpine `unread` state (entangled with the server's
+             unreadCount). x-effect replays the chat-badge-pop animation whenever the count
+             changes: it removes the class, forces a reflow ($el.offsetWidth), then re-adds it,
+             so the keyframes restart even though the node itself is never replaced. The count
+             already excludes your own messages and the thread you're looking at -- toasts.js
+             only bumps it for a DM that isn't the one on screen, and the server recomputes it
+             from the same read-state query. --}}
+        <span x-show="unread > 0" x-cloak
+            x-text="unread > 9 ? '9+' : unread"
+            x-effect="if (unread > 0) { $el.classList.remove('chat-badge-pop'); $el.offsetWidth; $el.classList.add('chat-badge-pop'); }"
+            class="absolute -top-1 -right-1 px-1.5 py-0.5 min-w-[1.25rem] text-center font-mono text-[0.65rem] font-bold text-white bg-danger rounded-full border-2 border-background pointer-events-none"></span>
     </button>
 
     {{-- Drawer: opens upward from the pinned FAB. bottom-24 (6rem) leaves a ~20px gap above

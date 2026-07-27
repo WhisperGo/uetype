@@ -33,6 +33,16 @@ class ChatOverlay extends Component
 
     public ?string $withUsername = null;
 
+    /**
+     * Unread DM count for the FAB badge. A synced PUBLIC property (not a computed prop) so it
+     * can be @entangle'd: the server recomputes it from the DB on every render (source of
+     * truth), while the client bumps it locally when a DM arrives with the drawer closed --
+     * there is no Livewire round-trip in that case (chat-runtime holds it while inactive), so
+     * without a client-side bump the badge would never light up in real time. It reconciles
+     * back to the server value on the next render (open drawer / open a DM -> mark read).
+     */
+    public int $unreadCount = 0;
+
     protected function pageSize(): int
     {
         return self::OVERLAY_PAGE_SIZE;
@@ -69,14 +79,12 @@ class ChatOverlay extends Component
         return $this->conversations;
     }
 
-    /** Unread badge count for the drawer toggle. */
-    public function getUnreadCountProperty(): int
-    {
-        return $this->totalUnread;
-    }
-
     public function render()
     {
+        // Refresh the badge from the DB on every render so the entangled property carries the
+        // authoritative count to the client (which may have bumped it locally while closed).
+        $this->unreadCount = $this->totalUnread;
+
         return view('livewire.chat-overlay');
     }
 }

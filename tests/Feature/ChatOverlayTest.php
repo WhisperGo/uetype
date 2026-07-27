@@ -266,16 +266,47 @@ it('tidak lagi menawarkan FAB yang bisa digeser', function () {
  *
  * Pengganti drag: "sensasi" dipindah dari POSISI tombol (properti yang justru harus
  * stabil, dan yang dulu memakan akses keyboard) ke REAKSI tombol.
- *
- * Badge di-key dengan jumlah unread supaya Livewire mengganti elemennya tiap kali angka
- * berubah -- node baru memutar animasinya sekali. Tanpa key, angkanya di-morph di tempat
- * dan animasi tak pernah terulang.
  */
-it('memutar ulang animasi badge tiap jumlah unread berubah', function () {
+
+/**
+ * Badge unread FAB, REALTIME. Dulu badge murni server-rendered (`wire:key="fab-unread-N"`):
+ * ia hanya menyala saat halaman di-load/navigasi, TIDAK saat DM masuk sementara drawer
+ * tertutup -- karena chat-runtime sengaja menahan round-trip Livewire saat drawer tak aktif,
+ * dan round-trip itulah yang menghitung ulang badge.
+ *
+ * Sekarang `unreadCount` di-entangle (server tetap sumber kebenaran, dihitung ulang dari DB
+ * tiap render) DAN di-bump di sisi klien saat drawer tertutup lewat event `chat-unread-bump`
+ * yang dipancarkan toasts.js dengan kondisi yang sama seperti toast (DM yang tak sedang
+ * dibuka). Badge menyala tanpa round-trip, lalu selaras lagi ke angka server saat render
+ * berikutnya (drawer dibuka / DM dibuka -> ditandai terbaca).
+ */
+it('menyalakan badge unread FAB realtime tanpa round-trip saat drawer tertutup', function () {
+    $overlay = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/chat-overlay.blade.php')));
+    $dock = file_get_contents(resource_path('js/chat-dock.js'));
+    $toasts = file_get_contents(resource_path('js/toasts.js'));
+
+    // Root menyeed & mereconcile dari server via entangle, dan menggerakkan badge lewat
+    // state Alpine `unread` -- bukan lagi @if server + wire:key.
+    expect($overlay)->toContain("@entangle('unreadCount')")
+        ->and($overlay)->toContain('x-show="unread > 0"')
+        ->and($overlay)->not->toContain('fab-unread-');
+
+    // Bump HANYA saat drawer tertutup: kalau terbuka, overlay aktif dan server yang sync.
+    expect($overlay)->toMatch('/@chat-unread-bump\.window="[^"]*!\s*open[^"]*unread\+\+/');
+
+    // Dock mengekspos state unread (di-entangle dari properti server).
+    expect($dock)->toContain('unread');
+
+    // toasts.js memancarkan event bump (dengan kondisi DM-tak-dibuka yang sama seperti toast).
+    expect($toasts)->toContain('chat-unread-bump');
+});
+
+/** Animasi pop tetap ada, kini dipicu perubahan state `unread`, bukan penggantian node. */
+it('memutar ulang animasi badge saat unread bertambah', function () {
     $markup = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/chat-overlay.blade.php')));
 
     expect($markup)->toContain('chat-badge-pop')
-        ->and($markup)->toMatch('/wire:key="fab-unread-\{\{ \$this->unreadCount \}\}"/');
+        ->and($markup)->toContain('x-effect');
 
     expect(file_get_contents(resource_path('css/app.css')))
         ->toContain('@keyframes chat-badge-pop');
