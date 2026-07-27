@@ -80,6 +80,9 @@ export default function typingGame(initialText) {
         _caretDurFrame: null,
         currentWordIndex: 0,
         wordBounds: [],
+        // Client-side render structure for the text spans (Alpine x-for), so a restart swaps
+        // text in-place instead of the server re-rendering ~600 spans. Rebuilt in resetProgress.
+        renderWords: [],
         extraChars: {},
         cursorLeft: 0,
         cursorTop: 0,
@@ -292,6 +295,20 @@ export default function typingGame(initialText) {
                 end: this.targetArray.length - 1,
                 space: null
             };
+
+            // Build the client render structure from wordBounds (restart delay, Tier 2,
+            // docs/review-performance-2026-07-27.md). One entry per word: its characters (each
+            // with its ABSOLUTE index i -- needed for the char-{i} id and inputResults[i] binding)
+            // and the trailing space index (null on the last word). The Alpine x-for in the view
+            // renders from this, so swapping text on restart never round-trips ~600 spans.
+            this.renderWords = this.wordBounds.map((b) => {
+                const chars = [];
+                for (let i = b.start; i <= b.end; i++) {
+                    chars.push({ c: this.targetArray[i], i });
+                }
+
+                return { chars, spaceIndex: b.space };
+            });
 
             this.caretInstant = true;
             this.caretDrawn = false;

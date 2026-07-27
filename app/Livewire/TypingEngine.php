@@ -119,8 +119,6 @@ class TypingEngine extends Component
 
     public string $contentLang = TypingLanguage::DEFAULT;
 
-    public int $typingSessionKey = 0;
-
     /**
      * Identifies THIS component instance -- effectively, this browser tab -- so the session
      * guard can hold one issued-text record per open tab (see SoloSessionGuard).
@@ -520,6 +518,13 @@ class TypingEngine extends Component
             main: $this->mainMode,
             sub: $this->subMode
         );
+
+        // The new text reaches the client through the 'mode-changed' event above and is applied
+        // in-place by the Alpine engine (resetForNewText -> x-for over renderWords). Restart
+        // changes nothing that is server-rendered, so skip the render entirely: no ~600-span
+        // morph over the wire. Together with the client-rendered spans and the stable wire:key,
+        // this is what makes restart fast. See docs/review-performance-2026-07-27.md (Tier 2).
+        $this->skipRender();
     }
 
     /**
@@ -529,7 +534,6 @@ class TypingEngine extends Component
      */
     public function generateText()
     {
-        $this->typingSessionKey++;
         $this->assembleText();
 
         // Every path above lands here: the guard always sees the text the player really

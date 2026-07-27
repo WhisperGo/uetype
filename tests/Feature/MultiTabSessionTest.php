@@ -94,3 +94,39 @@ it('still refuses to save the same session twice (replay)', function () {
 
     expect(TypingResult::where('user_id', $user->id)->count())->toBe(1);
 });
+
+it('survives eviction when the session store holds legacy/corrupt scalar entries', function () {
+    // Regression: a session left over from the pre-per-tab format stored a single flat record
+    // whose VALUES are scalars ('time', '30', ...). Read as the per-tab map, those scalars
+    // became entries; once the tracked count passed MAX_TRACKED_SESSIONS the oldest-first
+    // eviction did uasort(fn ($a) => $a['started_at']) and hit a string -> "Cannot access
+    // offset of type string on string", 500'ing the whole /typing page on mount. all() now
+    // filters non-array entries, so the sort only ever sees well-formed sessions.
+    $store = ['legacy_mode' => 'time', 'legacy_sub' => '30']; // scalar leftovers from the old format
+
+    // Eight valid per-tab entries, so adding one more trips the oldest-first eviction.
+    for ($i = 0; $i < 8; $i++) {
+        $store["tab-{$i}"] = [
+            'mode' => 'words',
+            'sub_mode' => '25',
+            'text_length' => 130,
+            'started_at' => microtime(true) - $i,
+        ];
+    }
+
+    session()->put('solo_session_guard', $store);
+
+    // Threw before the fix; must now start cleanly.
+    app(SoloSessionGuard::class)->start('time', '30', 'the quick brown fox jumps', 'tab-new');
+
+    $after = session()->get('solo_session_guard');
+
+    // Scalars are gone, the cap holds, and every survivor is a well-formed session.
+    expect($after)->toBeArray()
+        ->and(count($after))->toBeLessThanOrEqual(8)
+        ->and($after)->toHaveKey('tab-new');
+
+    foreach ($after as $entry) {
+        expect($entry)->toBeArray()->toHaveKey('started_at');
+    }
+});

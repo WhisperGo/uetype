@@ -1,6 +1,13 @@
 <div
     class="flex flex-col flex-1 min-h-full text-muted font-mono selection:bg-brand selection:text-foreground outline-none">
-    <div wire:key="typing-app-{{ $mainMode }}-{{ $subMode }}-{{ $typingSessionKey }}" class="flex flex-col flex-1 justify-center min-h-0" x-data="{
+    {{-- wire:key is STABLE across a restart (no $typingSessionKey): restart() only reroLLs the
+         text, and that is applied in-place via the 'mode-changed' event -> resetForNewText(),
+         NOT by tearing down and rebuilding this whole subtree. Bumping the key on every restart
+         forced a full Alpine remount (destroy/init, caret drawWhenReady retry, replacing ~600
+         spans) -- the bulk of the restart delay, worst on long texts. The key still changes on a
+         real MODE switch ({mainMode}-{subMode}) where a clean remount is wanted. See
+         docs/review-performance-2026-07-27.md (restart delay, Tier 1). --}}
+    <div wire:key="typing-app-{{ $mainMode }}-{{ $subMode }}" class="flex flex-col flex-1 justify-center min-h-0" x-data="{
         currentMain: @entangle('mainMode'),
         currentSub: @entangle('subMode'),
         ...typingGame(@js($textToType))
@@ -421,66 +428,54 @@
                         :style="`transform: translate(${ghostCursorLeft}px, ${ghostCursorTop}px); background-color: rgb(var(--color-muted));`">
                     </div>
 
-                    @php
-                        $words = explode(' ', $textToType);
-                        $charPointer = 0;
-                        // Compact fingerprint of the whole text: changing the text changes this
-                        // key -> Livewire remounts the words (which is the point of the key),
-                        // WITHOUT embedding the entire ~600-char paragraph into every word's key.
-                        // See docs/review-performance-2026-07-27.md (F-3).
-                        $textKey = crc32($textToType);
-                    @endphp
+                    {{-- PERF (restart delay Tier 2 + Temuan 1/F-4, docs/review-performance-2026-07-27.md):
+                         the text spans are rendered CLIENT-SIDE via Alpine x-for over `renderWords`
+                         (built in typing-game.js resetProgress), NOT a Blade @foreach. That is what
+                         lets a restart swap the text IN-PLACE -- the server no longer re-renders &
+                         morphs ~600 spans over the wire, which was the bulk of the restart delay
+                         (worst on long texts). setMode/setContentLang benefit too (their render no
+                         longer carries spans); restart() additionally skipRender()s entirely.
 
-                    {{-- PERF (Temuan 1 / F-4, docs/review-performance-2026-07-27.md): the per-character
-                         `:class` below is bound ONLY to `inputResults[i]`, deliberately NOT to
-                         `currentIndex`. `currentIndex` changes on EVERY keystroke, and any span that
-                         reads it must be re-evaluated on every keystroke -> O(n) style recalc + paint
-                         over the whole paragraph per key (the root of the typing lag, worst on Linux).
+                         Per-character `:class` is bound ONLY to `inputResults[ch.i]`, deliberately
+                         NOT to `currentIndex`. currentIndex changes every keystroke, so any span
+                         reading it would re-evaluate on every keystroke -> O(n) recalc + paint over
+                         the whole paragraph per key (the typing lag). Dropping it is provably
+                         equivalent: the engine only writes inputResults at currentIndex then
+                         advances, so a true/false char can never sit at index >= currentIndex.
+                         DO NOT reintroduce a currentIndex read here.
 
-                         Dropping it is provably equivalent: the engine only ever writes inputResults
-                         at `currentIndex` and then advances, so a character can NEVER hold a
-                         true/false value while sitting at index >= currentIndex. Hence
-                         `i < currentIndex` was always implied by `inputResults[i] === true/false`
-                         and is pure redundancy. Now each span depends only on its own index, so a
-                         keystroke re-evaluates just the one span that changed (Alpine array-index
-                         reactivity), not all of them. DO NOT reintroduce a `currentIndex` read here. --}}
-                    @foreach ($words as $word)
-                        <div class="flex" wire:key="word-{{ $loop->index }}-{{ $textKey }}">
-                            @foreach (str_split($word) as $char)
-                                <span id="char-{{ $charPointer }}" class="char-element relative inline-block"
+                         Every letter AND word-separator space keeps id="char-{absoluteIndex}", which
+                         updatePosition/getCharPosition/buildCharPositionCache/scroll all depend on. --}}
+                    <template x-for="(word, wIdx) in renderWords" :key="wIdx">
+                        <div class="flex">
+                            <template x-for="ch in word.chars" :key="ch.i">
+                                <span :id="'char-' + ch.i" class="char-element relative inline-block"
                                     :class="{
-                                        'text-foreground': inputResults[{{ $charPointer }}] === true,
-                                        'text-danger': inputResults[{{ $charPointer }}] === false,
-                                        'text-muted': inputResults[{{ $charPointer }}] !== true && inputResults[{{ $charPointer }}] !== false,
-                                        'border-b-2 border-danger': inputResults[{{ $charPointer }}] === 'skipped'
-                                    }">
-                                    {{ $char }}
-                                </span>
-                                @php $charPointer++; @endphp
-                            @endforeach
+                                        'text-foreground': inputResults[ch.i] === true,
+                                        'text-danger': inputResults[ch.i] === false,
+                                        'text-muted': inputResults[ch.i] !== true && inputResults[ch.i] !== false,
+                                        'border-b-2 border-danger': inputResults[ch.i] === 'skipped'
+                                    }" x-text="ch.c"></span>
+                            </template>
 
-                            <!-- EXTRA CHARACTERS -->
-                            <template
-                                x-if="extraChars[{{ $loop->index }}] && extraChars[{{ $loop->index }}].length > 0">
-                                <template x-for="(extra, idx) in extraChars[{{ $loop->index }}]"
-                                    :key="idx">
-                                    <span :id="'extra-' + {{ $loop->index }} + '-' + idx"
+                            <!-- EXTRA CHARACTERS (overtype past the word) -->
+                            <template x-if="extraChars[wIdx] && extraChars[wIdx].length > 0">
+                                <template x-for="(extra, idx) in extraChars[wIdx]" :key="idx">
+                                    <span :id="'extra-' + wIdx + '-' + idx"
                                         class="char-element relative inline-block text-danger tracking-tight opacity-90">
                                         <span x-text="extra"></span>
                                     </span>
                                 </template>
                             </template>
 
-                            @if (!$loop->last)
-                                <span id="char-{{ $charPointer }}"
+                            <!-- WORD-SEPARATOR SPACE (spaceIndex is null on the last word) -->
+                            <template x-if="word.spaceIndex !== null">
+                                <span :id="'char-' + word.spaceIndex"
                                     class="char-element relative w-[0.5em] inline-block"
-                                    :class="inputResults[{{ $charPointer }}] === false ? 'bg-danger/30' : ''">
-                                    &nbsp;
-                                </span>
-                                @php $charPointer++; @endphp
-                            @endif
+                                    :class="inputResults[word.spaceIndex] === false ? 'bg-danger/30' : ''">&nbsp;</span>
+                            </template>
                         </div>
-                    @endforeach
+                    </template>
                 </div>
             </div>
 

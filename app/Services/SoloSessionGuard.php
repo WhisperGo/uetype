@@ -146,12 +146,27 @@ class SoloSessionGuard
         session()->put(self::SESSION_KEY, $sessions);
     }
 
-    /** Every tracked tab session, normalised to an array. */
+    /** Every tracked tab session, normalised to an array of well-formed per-tab entries. */
     private function all(): array
     {
         $data = session()->get(self::SESSION_KEY);
 
-        return is_array($data) ? $data : [];
+        if (! is_array($data)) {
+            return [];
+        }
+
+        // Keep ONLY well-formed per-tab entries (an array carrying 'started_at'). This is the
+        // one place every consumer reads through, so filtering here protects all of them --
+        // in particular start()'s eviction uasort($a['started_at']), which assumed every value
+        // was an array. A leftover record from the pre-per-tab format (a single flat record
+        // keyed by 'mode'/'sub_mode'/... whose VALUES are scalars), or any corruption, would
+        // otherwise reach that sort as a string and crash with
+        // "Cannot access offset of type string on string". Dropping such garbage is correct:
+        // it isn't a valid tab session, and start() writes the cleaned map back, self-healing.
+        return array_filter(
+            $data,
+            static fn ($entry) => is_array($entry) && isset($entry['started_at']),
+        );
     }
 
     /** This tab's session facts, or null when none was ever started. */
