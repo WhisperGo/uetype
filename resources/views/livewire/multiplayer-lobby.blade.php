@@ -251,14 +251,22 @@
                                                     <span class="text-[9px] font-mono font-bold uppercase tracking-wider text-gold shrink-0">{{ __('multiplayer.host') }}</span>
                                                 @elseif ($this->isHost)
                                                     {{-- Host may also kick a spectator (they hold a slot too). Opens the overlay. --}}
+                                                    {{-- Deliberately NOT <x-icon-button>: the circled-X-in-danger-red is its
+                                                         own affordance and that component is neutral-toned by design. What is
+                                                         borrowed is the RULE -- the visible circle stays 20px, the click box is
+                                                         44px via min-w/min-h, and `-my-3` keeps the taller box from stretching
+                                                         this list row. A destructive control was the smallest target in the
+                                                         app at 20x20px. --}}
                                                     <button type="button"
                                                         x-on:click="askKick({{ $spectator->user_id }}, @js($spectator->user->username))"
                                                         title="{{ __('multiplayer.kick_player', ['name' => $spectator->user->username]) }}"
-                                                        class="ml-auto w-5 h-5 rounded-full flex items-center justify-center border border-danger/40 text-danger/70 bg-danger/5 hover:bg-danger/20 hover:text-danger transition shrink-0"
+                                                        class="ml-auto -my-3 min-w-[44px] min-h-[44px] flex items-center justify-center transition shrink-0 text-danger/70 hover:text-danger focus:outline-none focus-visible:ring-1 focus-visible:ring-danger/50 rounded-lg"
                                                         aria-label="{{ __('multiplayer.kick_player', ['name' => $spectator->user->username]) }}">
-                                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                                        </svg>
+                                                        <span class="w-5 h-5 rounded-full flex items-center justify-center border border-danger/40 bg-danger/5 hover:bg-danger/20 transition">
+                                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                            </svg>
+                                                        </span>
                                                     </button>
                                                 @endif
                                             </div>
@@ -286,14 +294,22 @@
                                 @if ($canKick)
                                     {{-- Host-only kick control: a small circled X in the card corner. --}}
                                     {{-- Opens the confirm-kick overlay (see bottom of view) instead of a browser confirm. --}}
+                                    {{-- The 24px circle stays; the CLICK BOX is 44px and is allowed to overhang the
+                                         card corner (`-top-1 -right-1`, so it extends past the rounded edge). On a
+                                         phone this card is ~160px wide in `grid-cols-2`, so a visible 44px circle
+                                         would cover a quarter of it -- but a click box may exceed what is drawn.
+                                         Shrinking the target instead was not an option: this is destructive, and at
+                                         24px it competed with the card's own tap area. --}}
                                     <button type="button"
                                         x-on:click="askKick({{ $member->user_id }}, @js($member->user->username))"
                                         title="{{ __('multiplayer.kick_player', ['name' => $member->user->username]) }}"
-                                        class="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center border border-danger/40 text-danger/70 bg-danger/5 hover:bg-danger/20 hover:text-danger hover:border-danger/60 transition focus:outline-none focus-visible:ring-1 focus-visible:ring-danger/50"
+                                        class="absolute -top-1 -right-1 min-w-[44px] min-h-[44px] flex items-center justify-center text-danger/70 hover:text-danger transition focus:outline-none focus-visible:ring-1 focus-visible:ring-danger/50 rounded-full"
                                         aria-label="{{ __('multiplayer.kick_player', ['name' => $member->user->username]) }}">
-                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
+                                        <span class="w-6 h-6 rounded-full flex items-center justify-center border border-danger/40 bg-danger/5 hover:bg-danger/20 hover:border-danger/60 transition">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </span>
                                     </button>
                                 @endif
                                 <x-friend-avatar :user="$member->user" size="w-14 h-14" shape="rounded-xl"

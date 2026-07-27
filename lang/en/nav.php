@@ -14,6 +14,7 @@ return [
     'settings' => 'Settings',
     'monitoring' => 'Monitoring',
     'soon' => 'soon',
+    'toggle_menu' => 'Toggle navigation menu',
     'login' => 'Sign In',
     'register' => 'Sign Up',
     'logout' => 'Sign Out',

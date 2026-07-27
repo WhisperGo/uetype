@@ -124,14 +124,15 @@
                     </p>
                 </div>
 
-                {{-- Dismiss (X): same as decline, for a quick brush-off without a decision. --}}
-                <button type="button" x-on:click="decline()"
-                    class="shrink-0 -mt-1 -mr-1 text-muted hover:text-foreground transition"
-                    aria-label="{{ __('multiplayer.invite_decline') }}">
+                {{-- Dismiss (X): same as decline, for a quick brush-off without a decision.
+                     `-m-3` absorbs the 44px click box so the card keeps its size -- this
+                     overlay appears unbidden, so its one dismiss control has to be easy to
+                     hit on the first try. --}}
+                <x-icon-button x-on:click="decline()" class="-m-3" :label="__('multiplayer.invite_decline')">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                </button>
+                </x-icon-button>
             </div>
 
             {{-- Accept / Decline --}}

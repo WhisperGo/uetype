@@ -8,16 +8,25 @@
         @case('self')
             @break
 
-        {{-- Already friends: show status + remove option (revealed on hover). --}}
+        {{-- Already friends: show status + remove option. --}}
         @case('friends')
-            <div class="group inline-flex items-center gap-2">
+            {{-- Remove is ALWAYS visible. It used to be `opacity-0 group-hover:opacity-100`,
+                 which on a touch screen means it never appears at all: there is no hover, so
+                 the only way to un-friend someone was to open a desktop browser. That is a
+                 whole action lost on the majority of sessions, and it looked like a working
+                 button to anyone testing with a mouse.
+
+                 Revealing on hover was not protecting anything either -- `wire:confirm` below
+                 already stands between the tap and the deletion. Hiding a destructive control
+                 buys safety only when nothing else does. --}}
+            <div class="inline-flex items-center gap-2">
                 <span class="px-4 py-2 font-mono text-xs font-bold text-gold border border-gold/40 rounded-lg inline-flex items-center gap-1.5">
                     <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
                     {{ __('friends.relation_friends') }}
                 </span>
                 <button wire:click="removeFriend"
                     wire:confirm="{{ __('friends.confirm_remove', ['name' => $target->username]) }}"
-                    class="opacity-0 group-hover:opacity-100 px-3 py-2 font-mono text-xs text-danger border border-danger/30 rounded-lg hover:bg-danger/10 transition">
+                    class="px-3 py-2 font-mono text-xs text-danger border border-danger/30 rounded-lg hover:bg-danger/10 transition">
                     {{ __('friends.remove') }}
                 </button>
             </div>

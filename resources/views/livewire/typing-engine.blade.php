@@ -223,8 +223,18 @@
             </div>
             @endif
 
+            {{-- Live stats dim to 60% while typing so they do not pull the eye off the words,
+                 and come back on hover. `hover:` is the whole recovery path, so on a touch
+                 screen -- where there is no hover -- they would simply stay dim forever. The
+                 `pointer: coarse` branch keeps them at full opacity instead: on a phone the
+                 stats are already smaller and further from the text, so the dimming solves a
+                 problem that does not exist there.
+
+                 This has to land WITH `hoverOnlyWhenSupported` (see tailwind.config.js), not
+                 after it: that flag stops `hover:` from applying on touch at all, which would
+                 turn a temporary dimming into a permanent one. --}}
             <div x-cloak class="group mb-6 transition-opacity duration-500"
-                :class="!isStarted ? 'opacity-0' : (isFinished ? 'opacity-100' : 'opacity-60 hover:opacity-100')">
+                :class="!isStarted ? 'opacity-0' : (isFinished ? 'opacity-100' : 'opacity-60 hover:opacity-100 [@media(pointer:coarse)]:opacity-100')">
                 <div class="flex items-start gap-4 sm:gap-8 lg:gap-10">
                     <div class="flex flex-col">
                         <span class="text-fluid-timer font-mono font-bold tabular-nums leading-none transition-colors duration-300"

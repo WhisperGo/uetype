@@ -20,7 +20,10 @@
             {{ $message->isDeletedForEveryone() ? __('chat.deleted_placeholder') : Str::limit($message->body, $t['limit']) }}
         </p>
     </div>
-    <button wire:click="cancelReply" class="text-muted hover:text-foreground shrink-0 p-1" aria-label="{{ __('chat.cancel_reply') }}" title="{{ __('chat.cancel_reply') }}">
+    {{-- `-my-2` so the 44px click box does not stretch this bar: it sits above the composer
+         in a drawer where vertical space is scarce, and the icon itself stays at its
+         size-dependent dimensions. --}}
+    <x-icon-button wire:click="cancelReply" class="-my-2" :label="__('chat.cancel_reply')">
         <svg class="{{ $t['icon'] }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-    </button>
+    </x-icon-button>
 </div>

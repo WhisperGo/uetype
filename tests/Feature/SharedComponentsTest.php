@@ -10,26 +10,9 @@
  *
  * Test ini bergaya grep -- ia menjaga agar pola lama tak menyelinap kembali,
  * bukan menguji tampilannya.
+ *
+ * `bladeViews()` hidup di tests/Pest.php sejak TouchTargetTest membutuhkannya juga.
  */
-function bladeViews(): array
-{
-    $paths = [];
-
-    $files = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator(resource_path('views'), FilesystemIterator::SKIP_DOTS)
-    );
-
-    foreach ($files as $file) {
-        $path = str_replace('\\', '/', $file->getPathname());
-
-        if ($file->getExtension() === 'php' && ! str_contains($path, '/views/vendor/')) {
-            $paths[] = $path;
-        }
-    }
-
-    return $paths;
-}
-
 it('tidak menyisakan markup empty-state yang ditulis tangan', function () {
     $pelanggar = [];
 

@@ -113,6 +113,36 @@ function tanpaKomentarBlade(string $markup): string
 }
 
 /**
+ * Path setiap berkas Blade milik aplikasi, untuk test bergaya grep.
+ *
+ * `views/vendor/` dikecualikan: itu markup paket pihak ketiga (dashboard monitoring), jadi
+ * konvensi kita tak berlaku di sana dan memasukkannya hanya melahirkan kegagalan atas kode
+ * yang bukan milik kita.
+ *
+ * Dulu berupa fungsi lokal di SharedComponentsTest. Dipindah ke sini saat TouchTargetTest
+ * membutuhkannya juga -- menyalinnya akan mengulangi persis kesalahan yang dijaga oleh test
+ * yang memakainya.
+ */
+function bladeViews(): array
+{
+    $paths = [];
+
+    $files = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator(resource_path('views'), FilesystemIterator::SKIP_DOTS)
+    );
+
+    foreach ($files as $file) {
+        $path = str_replace('\\', '/', $file->getPathname());
+
+        if ($file->getExtension() === 'php' && ! str_contains($path, '/views/vendor/')) {
+            $paths[] = $path;
+        }
+    }
+
+    return $paths;
+}
+
+/**
  * Sumber JavaScript tanpa komentar satu baris maupun komentar blok.
  *
  * Padanan tanpaKomentarBlade() untuk berkas JS, dan ada karena alasan yang sama: komentar di

@@ -69,7 +69,7 @@
                     <div class="flex flex-col gap-3 mt-3 sm:flex-row sm:items-start">
                         <div class="flex-1">
                             <input id="settings-username" type="text" wire:model="username"
-                                class="w-full px-4 py-2.5 font-mono text-sm rounded-xl bg-background border border-white/10 text-foreground focus:border-brand focus:ring-1 focus:ring-brand focus:outline-none">
+                                class="w-full px-4 py-2.5 font-mono text-base rounded-xl bg-background border border-white/10 text-foreground focus:border-brand focus:ring-1 focus:ring-brand focus:outline-none">
                             @error('username')
                                 <p class="mt-2 font-mono text-xs text-danger">{{ $message }}</p>
                             @enderror
@@ -142,7 +142,7 @@
                     <input type="text" wire:model="confirmUsername" x-model="typed"
                         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                         placeholder="{{ __('settings.danger.confirm_placeholder') }}"
-                        class="w-full px-4 py-2.5 mt-5 font-mono text-sm rounded-xl bg-background border border-white/10 text-foreground focus:border-danger focus:ring-1 focus:ring-danger focus:outline-none">
+                        class="w-full px-4 py-2.5 mt-5 font-mono text-base rounded-xl bg-background border border-white/10 text-foreground focus:border-danger focus:ring-1 focus:ring-danger focus:outline-none">
                     @error('confirmUsername')
                         <p class="mt-2 font-mono text-xs text-danger">{{ $message }}</p>
                     @enderror

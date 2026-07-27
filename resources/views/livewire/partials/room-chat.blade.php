@@ -71,7 +71,7 @@
     <form x-on:submit.prevent="send()" class="flex items-center gap-3 p-4 border-t border-white/5 shrink-0">
         <input type="text" x-model="draft" maxlength="500" autocomplete="off"
             placeholder="{{ __('multiplayer.chat_placeholder') }}"
-            class="flex-1 px-4 py-2.5 rounded-2xl text-sm bg-surface/40 border border-white/10 font-mono text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
+            class="flex-1 px-4 py-2.5 rounded-2xl text-base bg-surface/40 border border-white/10 font-mono text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
         <x-btn-gold type="submit" size="xl" class="disabled:opacity-40" x-bind:disabled="draft.trim() === ''">
             {{ __('multiplayer.chat_send') }}
         </x-btn-gold>

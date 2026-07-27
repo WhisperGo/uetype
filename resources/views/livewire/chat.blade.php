@@ -80,12 +80,15 @@
         {{-- ACTIVE CONVERSATION WINDOW (DM or Clan) --}}
         <div class="border bg-surface/40 border-white/5 rounded-3xl flex flex-col h-[70vh]">
             {{-- Header --}}
+            {{-- Padding stays `p-4` -- the header height is the prototype's. The 44px buttons
+                 pull their own click box back out of the flow with `-my-2`, so the row keeps
+                 the height it always had. --}}
             <div class="flex items-center gap-3 p-4 border-b border-white/5 shrink-0">
-                <button wire:click="closeConversation" class="text-muted hover:text-foreground transition shrink-0" aria-label="{{ __('chat.back_to_inbox') }}">
+                <x-icon-button wire:click="closeConversation" class="-my-2 -ms-2" :label="__('chat.back_to_inbox')">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                     </svg>
-                </button>
+                </x-icon-button>
 
                 @if ($activeMode === 'dm' && $this->activeFriend)
                     <a href="{{ route('profile.show', $this->activeFriend) }}" wire:navigate class="flex items-center gap-3 min-w-0 flex-1">
@@ -113,11 +116,12 @@
                     </div>
                 @endif
 
-                <button wire:click="openClearModal" class="text-muted hover:text-red-400 transition shrink-0 p-2" aria-label="{{ __('chat.clear_chat') }}" title="{{ __('chat.clear_chat') }}">
+                {{-- Destructive, so `tone="danger"` -- see the same pairing in the overlay header. --}}
+                <x-icon-button wire:click="openClearModal" tone="danger" class="-my-2 -me-2" :label="__('chat.clear_chat')">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
                     </svg>
-                </button>
+                </x-icon-button>
             </div>
 
             {{-- Message list --}}

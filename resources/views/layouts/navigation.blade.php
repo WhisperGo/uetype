@@ -18,26 +18,40 @@
         : 0;
 @endphp
 
-<nav x-data="navBadges({{ $pendingFriendRequests }})" class="{{ request()->is('typing') || request()->is('/') ? '' : 'sticky top-0' }} z-40 border-b border-white/5 bg-background/80 backdrop-blur-md">
+{{-- `@click.outside` sits on the <nav>, NOT on the mobile panel. The panel does not
+     contain the hamburger, so an outside-click handler placed there would fire on the very
+     tap that opens it and close it again in the same frame. The <nav> wraps both the trigger
+     and the panel, which is the same arrangement dropdown.blade.php relies on. --}}
+<nav x-data="navBadges({{ $pendingFriendRequests }})" @click.outside="open = false" class="{{ request()->is('typing') || request()->is('/') ? '' : 'sticky top-0' }} z-40 border-b border-white/5 bg-background/80 backdrop-blur-md">
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
             <div class="flex">
                 <!-- Logo / Wordmark -->
                 <div class="flex items-center shrink-0">
+                    {{-- Logo height and `gap-3` are the prototype's -- left untouched. Only the
+                         wordmark steps down below `lg`: Press Start 2P has very wide glyphs and
+                         is the biggest contributor to row width after the links, and the design
+                         system already rules that this face must not fill the screen. --}}
                     <a href="{{ route('home') }}" class="flex items-center gap-3">
                         <x-application-logo class="block w-auto h-12" />
-                        <span class="font-display text-lg text-gold leading-none pt-1">UETYPE</span>
+                        <span class="font-display text-base lg:text-lg text-gold leading-none pt-1">UETYPE</span>
                     </a>
                 </div>
 
                 {{-- Navigation Links.
-                     `sm:items-center` is load-bearing: flex items default to `stretch`, so
+                     `md:items-center` is load-bearing: flex items default to `stretch`, so
                      without it every link grows to the full 64px bar height and picks up
                      ~23px of invisible clickable space above and below its label. The old
                      `sm:-my-px` was a Breeze leftover for an active `border-b-2` that no
                      longer exists. `gap-2` moves 4px out of the links' padding (clickable)
-                     and into the gap (not clickable) -- same visual spacing, smaller targets. --}}
-                <div class="hidden sm:ms-10 sm:flex sm:items-center sm:gap-2">
+                     and into the gap (not clickable) -- same visual spacing, smaller targets.
+
+                     The threshold is `md` (768px), not `sm` (640px). At `sm` the whole desktop
+                     bar appeared at once -- logo + wordmark + every primary link + trophy +
+                     divider + avatar + username + level + chevron -- and 640px is a phone in
+                     landscape, not a desktop. That band got an overflowing bar instead of the
+                     hamburger panel that actually fits it. --}}
+                <div class="hidden md:ms-10 md:flex md:items-center md:gap-2">
                     @foreach ($navPrimary as $item)
                         <x-nav-link href="{{ $item['href'] }}" :active="$item['active']">
                             {{ __($item['label']) }}
@@ -47,7 +61,7 @@
             </div>
 
             <!-- Right side -->
-            <div class="hidden sm:flex sm:items-center sm:gap-4 sm:ms-6">
+            <div class="hidden md:flex md:items-center md:gap-4 md:ms-6">
                 @auth
                     <!-- Trophy shortcut -> Leaderboard -->
                     <a href="{{ $navLeaderboard['href'] }}" title="{{ __($navLeaderboard['label']) }}"
@@ -63,8 +77,11 @@
                     <script>window.__friendPendingCountUrl = @js(route('friends.pending-count'));</script>
                 @endauth
 
-                <!-- Settings Dropdown -->
-                <x-dropdown align="right" width="w-56">
+                {{-- Settings Dropdown. The width carries a viewport clamp because the panel is
+                     `absolute end-0` with no collision handling: on a narrow window a fixed
+                     `w-56` can reach past the edge. $width forwards unknown values as-is (see
+                     dropdown.blade.php), so a combined string needs no component change. --}}
+                <x-dropdown align="right" width="w-56 max-w-[calc(100vw-2rem)]">
                     <x-slot name="trigger">
                         <button
                             class="relative inline-flex items-center gap-2.5 px-2 py-1.5 leading-tight transition rounded-lg hover:bg-surface focus:outline-none focus-visible:ring-1 focus-visible:ring-border">
@@ -88,8 +105,19 @@
                                         :aria-label="friendRequests + ' {{ __('nav.friend_requests_pending') }}'"></span>
                                 </span>
 
-                                <span class="flex flex-col items-start font-mono">
-                                    <span class="text-sm font-bold text-foreground leading-tight">{{ Auth::user()->username }}</span>
+                                {{-- `min-w-0` + `truncate`: a flex item defaults to
+                                     `min-width: auto`, so without it a long username CANNOT
+                                     shrink and pushes the whole bar wider than the viewport.
+                                     `ch` rather than px because this is a mono face, where a
+                                     character is a stable unit. --}}
+                                <span class="flex flex-col items-start font-mono min-w-0">
+                                    <span class="text-sm font-bold text-foreground leading-tight truncate max-w-[12ch]">{{ Auth::user()->username }}</span>
+                                    {{-- NOTE: this `open` is the DROPDOWN's, not the mobile
+                                         panel's -- x-dropdown declares its own x-data, which
+                                         shadows navBadges() for everything inside it. That is
+                                         intended here: the level should glow while the account
+                                         menu is open. Moving this line out of the dropdown
+                                         would silently change what it reads. --}}
                                     <span class="text-xs leading-tight transition-colors" :class="open ? 'text-gold' : 'text-muted'">lv. {{ Auth::user()->levelData()['level'] }}</span>
                                 </span>
                             @else
@@ -154,10 +182,21 @@
                 </x-dropdown>
             </div>
 
-            <!-- Hamburger -->
-            <div class="flex items-center -me-2 sm:hidden">
-                <button @click="open = ! open"
-                    class="inline-flex items-center justify-center p-2 transition rounded-md text-muted hover:text-foreground hover:bg-surface focus:outline-none">
+            {{-- Hamburger. `type="button"` is explicit: a <button> with no type inside a form
+                 submits it. There is no parent form here today, so the old markup was safe only
+                 by accident -- and nothing guarded that accident.
+
+                 `@click.stop` keeps the tap from reaching the @click.outside handler on <nav>,
+                 which would otherwise close the panel in the same frame it opens.
+
+                 aria-expanded/aria-controls follow the shape already used by the chat overlay's
+                 FAB, so screen readers get the same contract in both places. --}}
+            <div class="flex items-center -me-2 md:hidden">
+                <button type="button" @click.stop="open = ! open"
+                    :aria-expanded="open ? 'true' : 'false'"
+                    aria-controls="mobile-nav-panel"
+                    aria-label="{{ __('nav.toggle_menu') }}"
+                    class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] transition rounded-md text-muted hover:text-foreground hover:bg-surface focus:outline-none focus-visible:ring-1 focus-visible:ring-border">
                     <svg class="w-6 h-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
                         <path :class="{ 'hidden': open, 'inline-flex': !open }" class="inline-flex"
                             stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -170,8 +209,13 @@
         </div>
     </div>
 
-    <!-- Responsive Navigation Menu -->
-    <div :class="{ 'block': open, 'hidden': !open }" class="hidden border-t sm:hidden border-white/5">
+    {{-- Responsive Navigation Menu.
+         `x-cloak` so it cannot flash open during the frame before Alpine initialises.
+         Closing is handled in three places, none of them here: the hamburger toggles it,
+         @click.outside on <nav> dismisses a tap elsewhere, and nav-badges.js handles Escape
+         plus `livewire:navigating` (which is what stops a tapped link from leaving the panel
+         sitting over the page it just loaded). --}}
+    <div x-cloak :class="{ 'block': open, 'hidden': !open }" id="mobile-nav-panel" class="hidden border-t md:hidden border-white/5">
         <div class="pt-2 pb-3 space-y-1">
             @foreach ($navPrimary as $item)
                 <x-responsive-nav-link href="{{ $item['href'] }}"
@@ -193,9 +237,11 @@
                      belongs to Settings and your own profile, not a nav panel that opens
                      over the shoulder of anyone nearby. --}}
                 <div class="px-4">
-                    <div class="flex items-center gap-2">
-                        <span class="text-base font-medium text-foreground">{{ Auth::user()->username }}</span>
-                        <span class="font-mono text-xs text-muted">lv. {{ Auth::user()->levelData()['level'] }}</span>
+                    {{-- `min-w-0` + `truncate` for the same reason as the desktop dropdown:
+                         a long username would otherwise widen the panel past the viewport. --}}
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="text-base font-medium text-foreground truncate">{{ Auth::user()->username }}</span>
+                        <span class="font-mono text-xs text-muted shrink-0">lv. {{ Auth::user()->levelData()['level'] }}</span>
                     </div>
                 </div>
                 <div class="mt-3 space-y-1">

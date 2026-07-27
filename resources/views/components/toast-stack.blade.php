@@ -98,9 +98,12 @@
                     <p class="mt-0.5 font-mono text-sm text-foreground break-words" x-text="t.message"></p>
                     <a :href="t.href" class="mt-1.5 inline-block font-mono text-xs text-brand-bright hover:underline">{{ __('notif.view') }}</a>
                 </div>
-                <button @click="dismiss(t.id)" class="text-muted hover:text-foreground shrink-0" aria-label="{{ __('notif.dismiss') }}">
+                {{-- `-my-2 -me-1` keeps the 44px click box from stretching the toast, which is
+                     sized by its text. Dismiss was previously a bare 16px icon: the one control
+                     on a notification that appears unbidden, and the hardest one to hit. --}}
+                <x-icon-button @click="dismiss(t.id)" class="-my-2 -me-1" :label="__('notif.dismiss')">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
+                </x-icon-button>
             </div>
         </template>
     </div>

@@ -84,12 +84,15 @@
                     x-init="$nextTick(() => $el.focus())"
                     @keydown.escape="$wire.cancelEdit()"
                     class="{{ $t['editInput'] }} bg-surface border border-gold/40 font-mono text-foreground focus:border-gold focus:ring-0">
-                <button type="submit" class="text-gold hover:text-gold/80 shrink-0" aria-label="{{ __('chat.edit_save') }}" title="{{ __('chat.edit_save') }}">
+                {{-- Save/cancel had no padding at all, so their click boxes were exactly the
+                     glyph (16-20px). `-my-2` keeps the 44px boxes from stretching the edit row,
+                     which sits inside a message bubble. --}}
+                <button type="submit" class="inline-flex items-center justify-center shrink-0 min-w-[44px] min-h-[44px] -my-2 rounded-lg text-gold hover:text-gold/80 transition" aria-label="{{ __('chat.edit_save') }}" title="{{ __('chat.edit_save') }}">
                     <svg class="{{ $t['editIcon'] }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
                 </button>
-                <button type="button" wire:click="cancelEdit" class="text-muted hover:text-foreground shrink-0" aria-label="{{ __('chat.edit_cancel') }}" title="{{ __('chat.edit_cancel') }}">
+                <x-icon-button wire:click="cancelEdit" class="-my-2" :label="__('chat.edit_cancel')">
                     <svg class="{{ $t['editIcon'] }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
+                </x-icon-button>
             </form>
         @else
             <div class="flex items-end {{ $t['row'] }} {{ $mine ? 'flex-row-reverse' : '' }}">
@@ -166,11 +169,18 @@
                         {{-- x-on: (not @) because the event name is interpolated by Blade. --}}
                         x-on:{{ $scrollEvent }}.window="open = false"
                         class="relative shrink-0">
+                        {{-- The pill stays small -- it sits next to every bubble, so a visible
+                             44px circle would crowd the thread -- but the CLICK BOX is 44px.
+                             This is the menu that opens reply/edit/delete for a message, and at
+                             `p-1` (24px) it was the smallest frequently-used control in chat.
+                             `-m-*` absorbs the extra box so no bubble row grows. --}}
                         <button x-ref="trigger" @click="toggle()"
-                            :class="open ? 'bg-gold text-background' : 'bg-white/10 text-foreground hover:bg-gold hover:text-background'"
-                            class="{{ $t['trigger'] }} rounded-full border border-white/10 shadow-sm transition"
+                            class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] -m-2.5 rounded-full transition"
                             aria-label="{{ __('chat.message_actions') }}">
-                            <svg class="{{ $t['triggerIcon'] }}" fill="currentColor" viewBox="0 0 20 20"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" /></svg>
+                            <span :class="open ? 'bg-gold text-background' : 'bg-white/10 text-foreground hover:bg-gold hover:text-background'"
+                                class="{{ $t['trigger'] }} inline-flex items-center justify-center rounded-full border border-white/10 shadow-sm transition">
+                                <svg class="{{ $t['triggerIcon'] }}" fill="currentColor" viewBox="0 0 20 20"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" /></svg>
+                            </span>
                         </button>
                         <div x-show="open" x-cloak x-ref="menu"
                             :style="`top: ${topPx}px`"

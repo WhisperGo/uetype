@@ -1,7 +1,10 @@
 <div class="text-muted font-mono selection:bg-brand selection:text-foreground outline-none py-16"
     x-data
     @keydown.window="if($event.key === 'Tab') { $event.preventDefault(); document.getElementById('restartButton').focus(); }">
-    <div class="max-w-6xl w-full px-4 mx-auto">
+    {{-- `sm:px-6 lg:px-8` to match every other page (see x-page-container). This was the one
+         page stuck at a flat `px-4`, so from 640px up its content sat closer to the edge than
+         the rest of the app -- visible as soon as you moved between pages. --}}
+    <div class="max-w-6xl w-full px-4 sm:px-6 lg:px-8 mx-auto">
 
         @php
             $isSurvival = $mode === 'survival';
@@ -111,7 +114,7 @@
                 x-init="animate()"
                 class="max-w-2xl mx-auto flex flex-col gap-8">
 
-                <div class="relative overflow-hidden rounded-3xl border border-border bg-surface/60 px-8 py-10 text-center">
+                <div class="relative overflow-hidden rounded-3xl border border-border bg-surface/60 px-5 xs:px-8 py-10 text-center">
                     <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-danger to-transparent opacity-70"></div>
 
                     <p class="font-mono text-xs uppercase tracking-[0.35em] text-danger/80 mb-4">{{ __('result.game_over') }}</p>
@@ -183,7 +186,7 @@
             {{-- Hero card: reuses the survival card pattern (top accent line + centered), but the
                  accent is GOLD not danger -- solo isn't "game over". The mode label plays the role
                  of the "game over" line above the hero; heroLabel ("wpm") plays the role of "survived". --}}
-            <div class="relative overflow-hidden rounded-3xl border border-border bg-surface/60 px-8 py-10 text-center">
+            <div class="relative overflow-hidden rounded-3xl border border-border bg-surface/60 px-5 xs:px-8 py-10 text-center">
                 <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-gold to-transparent opacity-70"></div>
 
                 <p class="font-mono text-xs uppercase tracking-[0.35em] text-muted mb-4">{{ $modeLabel }}</p>

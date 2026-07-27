@@ -221,7 +221,7 @@
             </svg>
             <input type="text" wire:model.live.debounce.300ms="search"
                 placeholder="{{ __('friends.search_placeholder') }}"
-                class="w-full pl-11 pr-4 py-3.5 bg-surface/40 border border-white/10 rounded-2xl font-mono text-sm text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
+                class="w-full pl-11 pr-4 py-3.5 bg-surface/40 border border-white/10 rounded-2xl font-mono text-base text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
         </div>
 
         @if (strlen(trim($search)) > 0)

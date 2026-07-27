@@ -7,6 +7,23 @@ const token = (cssVar) => `rgb(var(${cssVar}) / <alpha-value>)`;
 
 /** @type {import('tailwindcss').Config} */
 export default {
+    // `hover:` only applies where hovering actually exists (@media (hover: hover)).
+    //
+    // Without it, a tap on a touch screen leaves the element in its hover state until you
+    // tap elsewhere -- a button stays lit long after you have moved on, which reads as a
+    // stuck selection.
+    //
+    // The flag FIXES nothing by itself; it makes existing hover-dependence VISIBLE. Anything
+    // whose resting state is unusable without hover becomes permanently unusable on a phone.
+    // So it was turned on only after those were dealt with: the live-stats panel in
+    // typing-engine (dimmed to 60%, restored on hover -> now full opacity on coarse pointers)
+    // and the un-friend button (was `opacity-0 group-hover:opacity-100`, i.e. invisible on
+    // touch -> now always shown). The remaining `group-hover:` uses only enhance an element
+    // that is already legible at rest, so they degrade harmlessly.
+    future: {
+        hoverOnlyWhenSupported: true,
+    },
+
     content: [
         './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
         './storage/framework/views/*.php',
@@ -14,6 +31,28 @@ export default {
     ],
 
     theme: {
+        // `screens` is set at the top level, not inside `extend`: keys inside `extend` are
+        // appended after the defaults, so `xs` would sort AFTER `2xl` and its media query
+        // would lose to every other breakpoint. Listing the full ladder keeps ascending
+        // order, which is what mobile-first cascading depends on.
+        //
+        // `xs` exists because there was previously no way to target 360-420px at all: `sm`
+        // (640px) is already a phone in landscape, so the entire portrait-phone range --
+        // the majority of usage -- could only be reached through base classes that apply
+        // everywhere at once.
+        //
+        // 400px, not 480px: the boundary has to fall BETWEEN small phones (360/390) and
+        // large ones (414/430) so `xs:` means "past the narrowest screens". At 480px it
+        // would switch on for every phone and separate nothing.
+        screens: {
+            xs: '400px',
+            sm: '640px',
+            md: '768px',
+            lg: '1024px',
+            xl: '1280px',
+            '2xl': '1536px',
+        },
+
         extend: {
             colors: {
                 // Primitive - cerminan lengkap Figma Prototype (1–10).
@@ -73,7 +112,14 @@ export default {
                 display: ['"Press Start 2P"', ...defaultTheme.fontFamily.mono],
             },
 
-            // Skala modular (~1.2). lineHeight 1 = "100%";
+            // Skala modular (~1.2). lineHeight 1 = "100%" (mengikuti Figma).
+            //
+            // JANGAN ubah nilai-nilai ini untuk memperbaiki tinggi tombol. Konsekuensinya
+            // memang nyata -- kotak baris persis setinggi font, jadi tinggi tombol yang
+            // digerakkan padding = font-size + padding saja, dan `py-[5px] text-small`
+            // keluar ~23px -- tapi skala ini mengikuti prototype dan bukan milik kode untuk
+            // diubah. Perbaiki di tombolnya: beri ukuran eksplisit (lihat <x-icon-button>,
+            // min-h-[44px]) atau longgarkan per elemen dengan `leading-*`.
             fontSize: {
                 h1: ['47.78px', { lineHeight: '1' }],
                 h2: ['39.81px', { lineHeight: '1' }],

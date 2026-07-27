@@ -90,12 +90,16 @@
 
             {{-- Identity + XP bar --}}
             <div class="relative rounded-2xl border border-border bg-surface/60 p-5 sm:p-6">
-                <a href="{{ route('profile.me') }}" title="{{ __('stats.edit_profile') }}"
-                    class="absolute top-5 right-5 text-muted hover:text-gold transition-colors">
+                {{-- Was a bare 20px icon with a `title` but NO aria-label -- the component's
+                     required `label` prop supplies both. Kept at `top-5 right-5` (the
+                     prototype's position); `-m-3` lets the 44px click box grow outward from
+                     there without moving the icon or the card's padding. --}}
+                <x-icon-button as="a" href="{{ route('profile.me') }}"
+                    class="absolute top-5 right-5 -m-3 hover:text-gold" :label="__('stats.edit_profile')">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m16.86 4.49 2.65 2.65m-1.6-3.7a1.87 1.87 0 1 1 2.65 2.65L7.5 18.75l-3.5.75.75-3.5L17.91 3.44Z" />
                     </svg>
-                </a>
+                </x-icon-button>
 
                 <div class="flex flex-col sm:flex-row gap-5 sm:items-center">
                     @if ($user->avatar)

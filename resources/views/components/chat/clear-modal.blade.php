@@ -18,7 +18,7 @@
                 <input type="radio" wire:model="clearScope" value="days" class="accent-gold">
                 <span>{{ __('chat.clear_scope_days') }}</span>
                 <input type="number" wire:model="clearDays" min="1" max="3650"
-                    class="w-16 px-2 py-1 bg-surface/60 border border-white/10 rounded-lg font-mono text-sm text-foreground focus:border-gold/50 focus:ring-0">
+                    class="w-16 px-2 py-1 bg-surface/60 border border-white/10 rounded-lg font-mono text-base text-foreground focus:border-gold/50 focus:ring-0">
                 <span>{{ __('chat.clear_scope_days_suffix') }}</span>
             </label>
         </div>

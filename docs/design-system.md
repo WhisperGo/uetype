@@ -73,8 +73,86 @@ Tiga keluarga font, satu skala modular (~1.2):
 | Pixelify Sans | `font-pixel` | heading / aksen game (piksel mudah dibaca) |
 | Press Start 2P | `font-display` | display / judul besar — **hemat**, demi kenyamanan baca |
 
-> `lineHeight` token = `1` (sesuai Figma "100%"). Untuk paragraf panjang, longgarkan manual
-> (mis. `leading-relaxed`).
+> `lineHeight` token = `1` (sesuai Figma "100%"), mengikuti prototype. Untuk paragraf panjang,
+> longgarkan manual per elemen (mis. `leading-relaxed`).
+>
+> **Konsekuensi yang perlu diketahui:** kotak baris jadi persis setinggi font, jadi tinggi
+> elemen yang digerakkan padding = font-size + padding saja. `py-[5px]` + `text-small` keluar
+> **~23px** — di bawah target sentuh minimum. Jalan keluarnya **bukan** melonggarkan token
+> (tingginya keputusan desain, bukan keputusan kode), melainkan memberi kontrolnya ukuran
+> eksplisit — lihat [Target sentuh](#target-sentuh) di bawah.
+
+## Breakpoint
+
+Tangga lengkap ditulis di level `theme` pada `tailwind.config.js`, **bukan** di `theme.extend`.
+Key di dalam `extend` ditempel setelah default, jadi `xs` akan berurutan setelah `2xl` dan media
+query-nya kalah dari semua breakpoint lain — gagal diam-diam, tanpa satu kelas pun terlihat salah.
+
+| Prefix | Lebar | Untuk |
+|---|---|---|
+| `xs` | 400px | HP potrait besar (414/430) vs kecil (360/390) |
+| `sm` | 640px | HP lanskap / tablet kecil |
+| `md` | 768px | Tablet potrait — **ambang nav desktop** |
+| `lg` | 1024px | Tablet lanskap / laptop |
+| `xl` | 1280px | Desktop |
+| `2xl` | 1536px | Layar besar |
+
+`xs` ada karena sebelumnya tak ada cara menargetkan 360–420px sama sekali: `sm` sudah HP lanskap,
+jadi seluruh rentang HP potrait — mayoritas pemakaian — hanya bisa disentuh lewat kelas dasar yang
+berlaku di semua ukuran. 400px, bukan 480px: batasnya harus jatuh **di antara** HP kecil dan besar.
+
+Mobile-first: kelas dasar = mobile, dinaikkan lewat breakpoint.
+
+## Satuan viewport
+
+**Semua tinggi memakai `vh` (`min-h-screen`, `max-h-[70vh]`), mengikuti prototype.** Jangan tukar
+ke `dvh` tanpa keputusan desain lebih dulu — tinggi bukan keputusan kode. Dikunci
+`ViewportUnitTest` sebagai **larangan**.
+
+Dua hal yang perlu diketahui kalau suatu saat ini ditinjau ulang:
+
+- `100vh` di iOS Safari adalah tinggi viewport **tanpa** address bar, jadi `min-h-screen` selalu
+  ~60–100px lebih tinggi dari yang terlihat dan tiap halaman punya scroll palsu. Itu masalah nyata
+  yang belum ditangani, dan menanganinya butuh keputusan desain.
+- Kalaupun nanti `dvh` dipakai, ia **hanya** cocok untuk `min-height` container terluar. Pada
+  tinggi tetap elemen yang terlihat ia bikin layout berdenyut: drawer chat berisi daftar pesan yang
+  auto-scroll ke bawah, jadi tinggi yang berubah menggeser posisi scroll dan runtime chat
+  men-scroll ulang. Komentar di `chat-overlay` menyatakan `max-h-[70vh]` dipilih justru supaya
+  "no JS measuring is needed".
+
+## Target sentuh
+
+Kontrol khusus-ikon memakai [`<x-icon-button>`](../resources/views/components/icon-button.blade.php):
+**kotak klik ≥44×44px** (WCAG 2.5.5), glyph tetap kecil. `min-w`/`min-h`, bukan `w`/`h`, supaya
+konten lebih besar tak terpotong.
+
+**Aturan yang mengikat: kotak klik tak boleh mengubah tinggi barisnya.** Padding dan tinggi
+container mengikuti prototype, jadi setiap pemakaian menyerap kelebihan kotaknya dengan margin
+negatif (`-my-2`, `-my-2.5`, `-m-3`) yang sepadan dengan padding induknya. Kotak klik boleh
+melampaui yang terlihat — yang tidak boleh adalah mendorong layout.
+
+Ukurannya **tidak** dibungkus `@media (pointer: coarse)`, berbeda dari `.touch-only` di `app.css`.
+Query itu benar untuk `.touch-only` karena ia memutuskan apakah elemen **ada**. Target 44px tak
+pernah salah di mana pun: WCAG 2.5.5 bukan kriteria khusus sentuh, dan perangkat hibrida (iPad +
+trackpad) melapor `fine` padahal dipakai dengan jari. Yang menentukan: proyek ini tak mengeksekusi
+CSS di test, jadi cabang media query akan lolos tanpa penjaga.
+
+Kalau sebuah kontrol punya affordance visual sendiri (mis. lingkaran-X merah untuk kick), jangan
+paksa ke komponen — pinjam **aturannya**: bungkus glyph dalam `<span>` yang menjaga ukuran terlihat,
+dan biarkan `<button>` luarnya yang 44px. Kotak klik boleh melampaui yang terlihat.
+
+`aria-label` wajib pada tombol tanpa teks; prop `label` komponen ini tak punya default supaya
+lupa = tak bisa dirender.
+
+## Hover
+
+`hoverOnlyWhenSupported` menyala, jadi `hover:` **tidak berlaku** di layar sentuh. Konsekuensinya:
+sebuah aksi yang hanya muncul saat hover tak akan pernah terjangkau di HP. Jangan menyembunyikan
+kontrol di balik `opacity-0 group-hover:opacity-100` — `wire:confirm` sudah cukup untuk aksi
+destruktif. `group-hover:` boleh untuk **memperindah** elemen yang sudah terbaca saat diam.
+
+Kalau sebuah elemen sengaja diredupkan dan dipulihkan lewat hover, sediakan pemulihan untuk pointer
+kasar juga (`[@media(pointer:coarse)]:opacity-100`) — lihat panel statistik di `typing-engine`.
 
 ## Aturan pakai
 
@@ -83,6 +161,15 @@ Tiga keluarga font, satu skala modular (~1.2):
 - **Press Start 2P jangan memenuhi layar** — cukup untuk judul/aksen agar teks tetap nyaman.
 - Butuh warna yang belum ada perannya? Tambahkan **token semantic baru** yang menunjuk primitive —
   jangan tulis hex langsung di komponen.
+- **Field teks minimal `text-base` (16px).** Di bawahnya iOS Safari memperbesar seluruh halaman saat
+  field difokus, dan **tak mengembalikannya** — user terjebak di halaman ter-zoom sampai mencubitnya
+  sendiri.
+
+  Ini **satu-satunya pengecualian** dari aturan "tinggi mengikuti prototype", dan pengecualiannya
+  disengaja: 16px adalah ambang perangkat, bukan pilihan desain. Konsekuensinya field jadi ~2.7px
+  lebih tinggi dari prototype (dengan `lineHeight: 1`, kotak teks = ukuran font). Itu diterima
+  sebagai harga menghindari zoom yang tak bisa dibatalkan. Kalau tinggi persisnya nanti dibutuhkan,
+  kurangi `py-*`-nya — jangan turunkan font-nya.
 
 ## Layering & anchor (elemen melayang)
 

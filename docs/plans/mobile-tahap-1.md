@@ -180,13 +180,19 @@ pemain swipe selalu tampil akurasi 100% sementara pemain desktop membayar tiap t
 
 Bagian ini yang menahan scope agar tak melebar di tengah sesi pair programming.
 
-| Ditunda | Ke tahap | Kenapa tidak sekarang |
-|---|---|---|
-| Estetika & kepadatan (lane balapan, paragraf `text-xl` tetap, 14 teks < 11px) | 4 | Kelas masalah berbeda; butuh keputusan desain, bukan perbaikan bug |
-| 15 input lain + zoom iOS pada field < 16px | 4 | Menyentuh ~12 file; regresinya lebih sulit dilacak kalau digabung |
-| `dvh` untuk `h-[70vh]` di chat | 2 | Perlu hasil uji perangkat dulu — `dvh` yang berubah saat address bar muncul bisa bikin layout berdenyut |
-| `hoverOnlyWhenSupported` | 3 | Flag ini tak memperbaiki apa pun sendirian; ia **membuat masalahnya kelihatan**, jadi harus datang bersama pasangannya (statistik live yang sekarang `opacity-60 hover:opacity-100` akan permanen redup di HP) |
-| Buang `x-model` demi arsitektur `:value` satu arah | — | Lebih bersih, tapi menulis ulang lapisan input tanpa test JS, dan melanggar `RaceStateResetTest.php:71`. Dicatat sebagai pekerjaan masa depan |
+> **Status penundaan:** empat baris pertama sudah ditutup di
+> [`mobile-tahap-2-6.md`](mobile-tahap-2-6.md) — kecuali `dvh` untuk chat, yang setelah ditinjau
+> ulang diputuskan **tetap `vh`** (alasan penundaan di bawah ternyata benar: yang berdenyut adalah
+> tinggi tetap elemen terlihat, dan drawer chat persis kasus itu). `dvh` dipakai hanya untuk
+> `min-height` container terluar.
+
+| Ditunda | Ke tahap | Kenapa tidak saat itu | Hasil |
+|---|---|---|---|
+| Estetika & kepadatan (lane balapan, paragraf `text-xl` tetap, 14 teks < 11px) | 4 | Kelas masalah berbeda; butuh keputusan desain, bukan perbaikan bug | ✅ Selesai — akarnya ternyata `lineHeight: '1'` pada token, bukan estetika |
+| 15 input lain + zoom iOS pada field < 16px | 4 | Menyentuh ~12 file; regresinya lebih sulit dilacak kalau digabung | ✅ Selesai — 7 field nyata, dikunci `ViewportUnitTest` |
+| `dvh` untuk `h-[70vh]` di chat | 2 | Perlu hasil uji perangkat dulu — `dvh` yang berubah saat address bar muncul bisa bikin layout berdenyut | ❌ **Sengaja tidak dilakukan** — kekhawatiran ini terbukti benar; chat tetap `vh`, dan larangannya dikunci test |
+| `hoverOnlyWhenSupported` | 3 | Flag ini tak memperbaiki apa pun sendirian; ia **membuat masalahnya kelihatan**, jadi harus datang bersama pasangannya (statistik live yang sekarang `opacity-60 hover:opacity-100` akan permanen redup di HP) | ✅ Selesai — pasangannya diperbaiki lebih dulu, persis urutan yang diperingatkan di sini |
+| Buang `x-model` demi arsitektur `:value` satu arah | — | Lebih bersih, tapi menulis ulang lapisan input tanpa test JS, dan melanggar `RaceStateResetTest.php:71`. Dicatat sebagai pekerjaan masa depan | Masih terbuka |
 
 ---
 

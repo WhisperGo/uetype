@@ -82,14 +82,15 @@
             <x-modal name="team-member" maxWidth="lg">
                 <template x-if="selected">
                     <div class="p-6 sm:p-8">
-                        <div class="flex justify-end -mt-2 -mr-2">
-                            <button type="button" x-on:click="$dispatch('close-modal', 'team-member')"
-                                class="text-muted hover:text-foreground transition-colors p-1"
-                                aria-label="{{ __('about.close') }}">
+                        {{-- The wrapper's negative margin already pulls the 44px click box back
+                             into the modal padding, so the button itself needs none. --}}
+                        <div class="flex justify-end -mt-4 -mr-4">
+                            <x-icon-button x-on:click="$dispatch('close-modal', 'team-member')"
+                                :label="__('about.close')">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
-                            </button>
+                            </x-icon-button>
                         </div>
 
                         <div class="flex flex-col items-center text-center">

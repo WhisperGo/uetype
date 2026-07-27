@@ -98,6 +98,59 @@ Sudah diperbaiki sebelumnya; ini uji regresi.
 
 ---
 
+## D. Navigasi (Tahap 3)
+
+Lebar yang wajib dicek: **360, 390, 414, 640, 768, 1024**. Yang paling menentukan **640 dan 768** —
+di sanalah dulu seluruh bar desktop muncul sekaligus lalu meluber.
+
+| # | Langkah | Hasil yang diharapkan | Kalau gagal |
+|---|---|---|---|
+| D1 | Buka halaman apa pun di 640px dan 768px | Yang muncul **hamburger**, bukan bar desktop. Tak ada elemen nav yang terpotong atau menumpuk | Ambang `md:` hilang, kembali ke `sm:` |
+| D2 | Login dengan username panjang (>12 karakter), lihat nav di 640px | Username **ter-truncate** dengan elipsis; bar tak melebihi lebar layar, tak ada scroll horizontal | `min-w-0` atau `truncate` hilang |
+| D3 | Buka panel hamburger, lalu sentuh salah satu link | Panel **tertutup**, halaman baru terlihat penuh tanpa panel menutupinya | `livewire:navigating` di `nav-badges.js` tak jalan |
+| D4 | Buka panel, lalu ketuk di area **luar** panel | Panel tertutup | `@click.outside` pindah dari `<nav>` ke panel — ia akan menutup panel di frame yang sama saat dibuka |
+| D5 | Buka panel, tekan Escape (keyboard eksternal / emulator) | Panel tertutup | — |
+| D6 | Buka modal atau drawer chat **di atas** panel yang tertutup, tekan Escape | Yang tertutup **modal/drawer**, bukan sesuatu yang lain | Guard `&& this.open` hilang → handler nav menelan Escape milik lapisan di atasnya |
+| D7 | Ketuk hamburger dua kali cepat | Panel buka lalu tutup, tidak "nyangkut" terbuka | `@click.stop` hilang |
+| D8 | Muat ulang halaman di HP, perhatikan frame pertama | Panel **tak pernah berkedip terbuka** | `x-cloak` hilang |
+| D9 | Buka dropdown akun di jendela sempit (~400px, desktop) | Panel dropdown tetap **di dalam** layar, tak menjorok keluar tepi kanan | Clamp `max-w-[calc(100vw-2rem)]` hilang |
+
+---
+
+## E. Target sentuh & hover (Tahap 2 & 6)
+
+Uji dengan **ibu jari**, bukan telunjuk, dan **bukan** dengan mouse di DevTools — ukuran target
+hanya terasa dengan jari sungguhan.
+
+| # | Langkah | Hasil yang diharapkan | Kalau gagal |
+|---|---|---|---|
+| E1 | Buka drawer chat, tekan tiap tombol di header (kembali, buka penuh, hapus riwayat, tutup) | Tiap tombol kena **sekali coba** | Kotak klik < 44px |
+| E2 | Bermaksud **menutup** drawer, tekan tombol tutup 5× berturut-turut | Modal "hapus riwayat" **tak pernah** muncul | Jarak/warna tombol destruktif kurang — ini bug paling merugikan di kelas ini |
+| E3 | Bandingkan tinggi header drawer chat, header chat halaman penuh, dan bar navigasi dengan prototype | **Sama persis** seperti sebelumnya; ruang daftar pesan tak berkurang | Margin negatif penyerap kotak klik hilang → tombol 44px mendorong barisnya |
+| E4 | Sebagai host di lobby, tekan tombol kick (X merah) di kartu member | Kena sekali coba, dan **tidak** memicu tap kartunya sendiri | Kotak klik menabrak area kartu |
+| E5 | Buka profil teman, lihat tombol hapus pertemanan | Tombol **terlihat** tanpa perlu hover | Pola `opacity-0 group-hover:` kembali — di HP artinya tombolnya tak pernah ada |
+| E6 | Mulai tes ketik solo, ketik beberapa detik, lihat panel statistik (WPM/timer) | Statistik **terbaca jelas**, tidak permanen redup | Pemulihan `pointer: coarse` hilang; `hover:` tak berlaku di layar sentuh |
+| E7 | Tekan tombol apa pun, lalu geser jari menjauh | Tombol **tidak** tertinggal dalam keadaan ter-hover | `hoverOnlyWhenSupported` mati |
+| E8 | Tekan tombol tutup pada toast notifikasi yang muncul | Kena sekali coba | Toast muncul tanpa diminta; tombolnya dulu 16px |
+
+### Zoom iOS — hanya bisa diuji di iPhone sungguhan
+
+Tak bisa direproduksi di DevTools. Fokuskan ke tiap field ini di **iOS Safari** dan pastikan
+halaman **tidak** membesar sendiri:
+
+| # | Field |
+|---|---|
+| E9 | Pencarian teman (`/friends`) dan pencarian clan (`/clans`) |
+| E10 | Username di Settings |
+| E11 | Chat di dalam room multiplayer |
+| E12 | Konfirmasi hapus akun & bubarkan clan (yang sama dengan C1/C2) |
+| E13 | Jumlah hari di modal hapus riwayat chat |
+
+Kalau halaman mem-zoom, ia **tak kembali sendiri** — user terjebak sampai mencubitnya. Laporkan
+field mana yang memicunya.
+
+---
+
 ## Cara melaporkan
 
 Untuk tiap baris: **✅ lolos** / **❌ gagal** + perangkat + keyboard + versi OS. Untuk yang

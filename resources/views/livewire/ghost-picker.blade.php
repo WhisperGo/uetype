@@ -5,12 +5,13 @@
         <div class="p-6 space-y-5">
             <div class="flex items-center justify-between">
                 <h3 class="font-mono text-lg font-bold text-foreground">{{ __('ghost.title') }}</h3>
-                <button type="button" x-on:click="$dispatch('close-modal', 'ghost-picker')"
-                    class="text-muted hover:text-foreground transition-colors" aria-label="{{ __('ghost.close') }}">
+                {{-- `-m-2.5` so the 44px click box does not push the heading row taller. --}}
+                <x-icon-button x-on:click="$dispatch('close-modal', 'ghost-picker')"
+                    class="-m-2.5" :label="__('ghost.close')">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                </button>
+                </x-icon-button>
             </div>
 
             @if (! in_array($mainMode, ['time', 'words'], true))

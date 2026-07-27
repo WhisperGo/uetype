@@ -62,17 +62,21 @@
 
         @if ($activeMode === null)
             {{-- PICKER --}}
+            {{-- Padding stays `p-4` -- the header height comes from the prototype and is not
+                 ours to change. The 44px icon buttons would grow this row to ~76px, so each
+                 one carries `-my-3` to pull its click box back out of the flow: the box still
+                 measures 44px for the finger, the row still measures what it always did. --}}
             <div class="flex items-center justify-between p-4 border-b border-white/5 shrink-0">
                 <p class="font-display text-sm text-foreground">{{ __('chat.title') }}</p>
-                <div class="flex items-center gap-2">
-                    <a href="{{ route('chat.index') }}" wire:navigate class="text-muted hover:text-foreground transition shrink-0 p-1" aria-label="{{ __('chat.open_full') }}" title="{{ __('chat.open_full') }}">
+                <div class="flex items-center gap-1">
+                    <x-icon-button as="a" href="{{ route('chat.index') }}" wire:navigate class="-my-3" :label="__('chat.open_full')">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                         </svg>
-                    </a>
-                    <button @click="open = false" class="text-muted hover:text-foreground shrink-0" aria-label="{{ __('chat.close') }}">
+                    </x-icon-button>
+                    <x-icon-button @click="open = false" class="-my-3 -me-1" :label="__('chat.close')">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
+                    </x-icon-button>
                 </div>
             </div>
 
@@ -122,43 +126,51 @@
             </div>
         @else
             {{-- THREAD --}}
-            <div class="flex items-center gap-2 p-3 border-b border-white/5 shrink-0">
-                <button wire:click="backToPicker" class="text-muted hover:text-foreground transition shrink-0" aria-label="{{ __('chat.back_to_inbox') }}">
+            {{-- Padding stays `p-3`, same reasoning as the picker header above: the row height
+                 is the prototype's, and each 44px button pulls its own click box back out of
+                 the flow with `-my-2.5`. --}}
+            <div class="flex items-center gap-1 p-3 border-b border-white/5 shrink-0">
+                <x-icon-button wire:click="backToPicker" class="-my-2.5 -ms-1" :label="__('chat.back_to_inbox')">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                     </svg>
-                </button>
+                </x-icon-button>
 
                 @if ($activeMode === 'dm' && $this->activeFriend)
                     <div class="flex items-center gap-2 min-w-0 flex-1">
                         <x-friend-avatar :user="$this->activeFriend" :online="$this->activeFriend->isOnline()" size="w-7 h-7" fallback-size="w-4 h-4" />
                         <p class="font-mono text-xs font-bold text-foreground truncate">{{ $this->activeFriend->username }}</p>
                     </div>
-                    <a href="{{ route('chat.index', ['mode' => 'dm', 'with' => $this->activeFriend->username]) }}" wire:navigate class="text-muted hover:text-foreground transition shrink-0 p-1" aria-label="{{ __('chat.open_full') }}" title="{{ __('chat.open_full') }}">
+                    <x-icon-button as="a" href="{{ route('chat.index', ['mode' => 'dm', 'with' => $this->activeFriend->username]) }}" wire:navigate class="-my-2.5" :label="__('chat.open_full')">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                         </svg>
-                    </a>
+                    </x-icon-button>
                 @elseif ($activeMode === 'clan' && $this->myClan)
                     <div class="flex items-center gap-2 min-w-0 flex-1">
                         <x-clan-emblem :clan="$this->myClan" size="sm" />
                         <p class="font-mono text-xs font-bold text-foreground truncate">{{ $this->myClan->name }}</p>
                     </div>
-                    <a href="{{ route('chat.index', ['mode' => 'clan']) }}" wire:navigate class="text-muted hover:text-foreground transition shrink-0 p-1" aria-label="{{ __('chat.open_full') }}" title="{{ __('chat.open_full') }}">
+                    <x-icon-button as="a" href="{{ route('chat.index', ['mode' => 'clan']) }}" wire:navigate class="-my-2.5" :label="__('chat.open_full')">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                         </svg>
-                    </a>
+                    </x-icon-button>
                 @endif
 
-                <button wire:click="openClearModal" class="text-muted hover:text-red-400 transition shrink-0 p-1" aria-label="{{ __('chat.clear_chat') }}" title="{{ __('chat.clear_chat') }}">
+                {{-- Clear-chat is DESTRUCTIVE and sits next to close, so size alone is not
+                     enough: at 24px with a `gap-2` between them, a thumb aiming for "close"
+                     could wipe the history instead. `tone="danger"` makes it read differently
+                     the moment it is touched, and the extra `ms-1` buys separation. Size
+                     fixes "can't press it"; distance and colour fix "pressed the wrong one". --}}
+                <x-icon-button wire:click="openClearModal" tone="danger" class="-my-2.5 ms-1" :label="__('chat.clear_chat')">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
                     </svg>
-                </button>
-                <button @click="open = false" class="text-muted hover:text-foreground shrink-0 p-1" aria-label="{{ __('chat.close') }}">
+                </x-icon-button>
+                <x-icon-button @click="open = false" class="-my-2.5 -me-1" :label="__('chat.close')">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
+                </x-icon-button>
             </div>
 
             {{-- Message list --}}

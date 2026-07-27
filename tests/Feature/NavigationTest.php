@@ -87,11 +87,17 @@ it('keeps the desktop nav links from stretching to the full bar height', functio
     // `sm:-my-px` sisa warisan Breeze: dulu untuk menimpakan `border-b-2` item aktif
     // ke border bawah navbar, dan border itu sudah lama diganti warna + font-weight.
     //
+    // Ambangnya `md:`, bukan `sm:` lagi. Yang dijaga test ini BUKAN nama breakpoint-nya
+    // melainkan bahwa `items-center` ada di breakpoint tempat nav desktop hidup -- dan nav
+    // desktop pindah ke `md` (768px) karena pada `sm` (640px, HP lanskap) seluruh bar
+    // desktop muncul sekaligus lalu meluber. Kalau ambangnya bergeser lagi, assertion ini
+    // harus ikut bergeser, bukan dihapus.
+    //
     // Diperiksa pada HTML yang DIRENDER, bukan file sumbernya: komentar Blade dibuang
     // saat kompilasi, jadi nama kelas yang disebut di komentar penjelas tak ikut terhitung.
     $html = $this->actingAs(User::factory()->create())->get(route('typing'))->assertOk()->getContent();
 
-    expect($html)->toContain('sm:items-center')->not->toContain('sm:-my-px');
+    expect($html)->toContain('md:items-center')->not->toContain('sm:-my-px');
 });
 
 it('keeps the desktop nav link padding symmetric and tight', function () {

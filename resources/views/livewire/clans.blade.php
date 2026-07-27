@@ -311,7 +311,7 @@
             </svg>
             <input type="text" wire:model.live.debounce.300ms="search"
                 placeholder="{{ __('clan.browse.search_placeholder') }}"
-                class="w-full pl-11 pr-4 py-3.5 bg-surface/40 border border-white/10 rounded-2xl font-mono text-sm text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
+                class="w-full pl-11 pr-4 py-3.5 bg-surface/40 border border-white/10 rounded-2xl font-mono text-base text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
         </div>
 
         @if ($this->browseClans->count() > 0)
@@ -476,7 +476,7 @@
                          phone -- the guard stops being a confirmation and becomes a wall. --}}
                     <input type="text" wire:model="confirmDisbandName"
                         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-                        class="w-full px-4 py-2.5 bg-surface/40 border border-white/10 rounded-xl font-mono text-sm text-foreground placeholder-muted focus:border-danger/50 focus:ring-0 transition">
+                        class="w-full px-4 py-2.5 bg-surface/40 border border-white/10 rounded-xl font-mono text-base text-foreground placeholder-muted focus:border-danger/50 focus:ring-0 transition">
                     @error('disband')<p class="font-mono text-xs text-danger mt-2">{{ $message }}</p>@enderror
 
                     <div class="flex justify-end gap-3 mt-6">

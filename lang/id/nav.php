@@ -14,6 +14,7 @@ return [
     'settings' => 'Pengaturan',
     'monitoring' => 'Monitoring',
     'soon' => 'segera',
+    'toggle_menu' => 'Buka atau tutup menu navigasi',
     'login' => 'Masuk',
     'register' => 'Daftar',
     'logout' => 'Keluar',
