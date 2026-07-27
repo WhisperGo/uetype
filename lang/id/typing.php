@@ -29,7 +29,7 @@ return [
 
     // Khusus perangkat sentuh: input pemunculan keyboard tak terlihat, jadi tanpa ini tak ada
     // apa pun di layar yang memberi tahu bahwa teksnya harus disentuh dulu.
-    'tap_to_type' => 'Sentuh di sini untuk mulai mengetik',
+    'tap_to_type' => 'Ketuk untuk mulai mengetik',
     'input_aria' => 'Input tes mengetik',
 
     'result_rejected' => 'Hasil sesi ini ditolak oleh validasi server (tidak masuk akal) dan tidak disimpan.',

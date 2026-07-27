@@ -60,16 +60,19 @@
                 </div>
             </div>
 
-            <!-- Right side -->
-            <div class="hidden md:flex md:items-center md:gap-4 md:ms-6">
+            {{-- Right side. Now visible at ALL sizes (was desktop-only): the account dropdown
+                 doubles as the mobile "avatar → menu" trigger, sitting beside the hamburger.
+                 The hamburger owns primary navigation (modes); the avatar owns the account. --}}
+            <div class="flex items-center gap-2 md:gap-4 md:ms-6">
                 @auth
-                    <!-- Trophy shortcut -> Leaderboard -->
+                    {{-- Trophy shortcut -> Leaderboard. Desktop only: on mobile Leaderboard
+                         already lives in the hamburger's mode list. --}}
                     <a href="{{ $navLeaderboard['href'] }}" title="{{ __($navLeaderboard['label']) }}"
-                        class="p-2 rounded-lg border {{ $navLeaderboard['active'] ? 'text-gold border-gold/40 bg-gold/10' : 'text-muted border-transparent hover:text-gold hover:border-gold/30 hover:bg-surface' }} focus:outline-none focus-visible:ring-1 focus-visible:ring-gold/40 transition">
+                        class="hidden md:inline-flex p-2 rounded-lg border {{ $navLeaderboard['active'] ? 'text-gold border-gold/40 bg-gold/10' : 'text-muted border-transparent hover:text-gold hover:border-gold/30 hover:bg-surface' }} focus:outline-none focus-visible:ring-1 focus-visible:ring-gold/40 transition">
                         <x-icon-trophy />
                     </a>
 
-                    <div class="h-6 w-px bg-border"></div>
+                    <div class="hidden md:block h-6 w-px bg-border"></div>
                 @endauth
 
                 @auth
@@ -110,7 +113,10 @@
                                      shrink and pushes the whole bar wider than the viewport.
                                      `ch` rather than px because this is a mono face, where a
                                      character is a stable unit. --}}
-                                <span class="flex flex-col items-start font-mono min-w-0">
+                                {{-- Username/level text is desktop-only: on mobile the trigger
+                                     is the avatar alone (a well-understood "open account menu"
+                                     affordance) so the bar stays compact next to the hamburger. --}}
+                                <span class="hidden md:flex flex-col items-start font-mono min-w-0">
                                     <span class="text-sm font-bold text-foreground leading-tight truncate max-w-[12ch]">{{ Auth::user()->username }}</span>
                                     {{-- NOTE: this `open` is the DROPDOWN's, not the mobile
                                          panel's -- x-dropdown declares its own x-data, which
@@ -121,10 +127,16 @@
                                     <span class="text-xs leading-tight transition-colors" :class="open ? 'text-gold' : 'text-muted'">lv. {{ Auth::user()->levelData()['level'] }}</span>
                                 </span>
                             @else
-                                <span class="font-medium text-sm text-foreground px-1">{{ __('common.guest') }}</span>
+                                {{-- Mobile: a compact avatar-shaped glyph so guests get the same
+                                     trigger shape as members; desktop keeps the "Guest" label. --}}
+                                <span class="md:hidden flex items-center justify-center w-9 h-9 rounded-lg border-2 border-border text-muted">
+                                    <x-icon-profile class="w-5 h-5" />
+                                </span>
+                                <span class="hidden md:inline font-medium text-sm text-foreground px-1">{{ __('common.guest') }}</span>
                             @endauth
 
-                            <svg class="w-4 h-4 fill-current text-muted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                            {{-- Chevron desktop-only: on mobile the avatar alone signals a menu. --}}
+                            <svg class="hidden md:block w-4 h-4 fill-current text-muted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd"
                                     d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
                                     clip-rule="evenodd" />
@@ -180,115 +192,67 @@
                         @endauth
                     </x-slot>
                 </x-dropdown>
-            </div>
 
-            {{-- Hamburger. `type="button"` is explicit: a <button> with no type inside a form
-                 submits it. There is no parent form here today, so the old markup was safe only
-                 by accident -- and nothing guarded that accident.
-
-                 `@click.stop` keeps the tap from reaching the @click.outside handler on <nav>,
-                 which would otherwise close the panel in the same frame it opens.
-
-                 aria-expanded/aria-controls follow the shape already used by the chat overlay's
-                 FAB, so screen readers get the same contract in both places. --}}
-            <div class="flex items-center -me-2 md:hidden">
-                <button type="button" @click.stop="open = ! open"
-                    :aria-expanded="open ? 'true' : 'false'"
-                    aria-controls="mobile-nav-panel"
-                    aria-label="{{ __('nav.toggle_menu') }}"
-                    class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] transition rounded-md text-muted hover:text-foreground hover:bg-surface focus:outline-none focus-visible:ring-1 focus-visible:ring-border">
-                    <svg class="w-6 h-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                        <path :class="{ 'hidden': open, 'inline-flex': !open }" class="inline-flex"
-                            stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 6h16M4 12h16M4 18h16" />
-                        <path :class="{ 'hidden': !open, 'inline-flex': open }" class="hidden" stroke-linecap="round"
-                            stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+                {{-- Hamburger: mobile only, grouped on the right beside the avatar so the
+                     navigation and account triggers sit together. `type="button"` is explicit
+                     (a <button> with no type inside a form submits it). `@click.stop` keeps the
+                     tap from reaching @click.outside on <nav>, which would otherwise close the
+                     panel in the same frame it opens. aria-expanded/aria-controls mirror the
+                     chat FAB's contract. --}}
+                <div class="flex items-center -me-2 md:hidden">
+                    <button type="button" @click.stop="open = ! open"
+                        :aria-expanded="open ? 'true' : 'false'"
+                        aria-controls="mobile-nav-panel"
+                        aria-label="{{ __('nav.toggle_menu') }}"
+                        class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] transition rounded-md text-muted hover:text-foreground hover:bg-surface focus:outline-none focus-visible:ring-1 focus-visible:ring-border">
+                        <svg class="w-6 h-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                            <path :class="{ 'hidden': open, 'inline-flex': !open }" class="inline-flex"
+                                stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 6h16M4 12h16M4 18h16" />
+                            <path :class="{ 'hidden': !open, 'inline-flex': open }" class="hidden" stroke-linecap="round"
+                                stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
+    {{-- Scrim behind the mobile panel: dims and blurs the page so its content cannot bleed
+         through under an open menu (the old in-flow panel had neither, so the typing-engine
+         mode bar and the chat FAB used to show through). Starts at `top-16` so the nav bar
+         itself — and the hamburger that morphs into the close X — stays uncovered and tappable.
+         Tapping the scrim closes the menu, complementing @click.outside on <nav>. --}}
+    <div x-show="open" x-cloak x-transition.opacity.duration.200ms @click="open = false"
+        class="fixed inset-x-0 top-16 bottom-0 z-[45] md:hidden bg-background/70 backdrop-blur-sm"></div>
+
     {{-- Responsive Navigation Menu.
-         `x-cloak` so it cannot flash open during the frame before Alpine initialises.
+         Now a FIXED overlay (was an in-flow block/hidden toggle that shoved the page down).
+         `top-16` = the h-16 nav bar; opaque `bg-background` so the scrim-dimmed page does not
+         show through the panel itself. `x-cloak` so it cannot flash open before Alpine inits.
          Closing is handled in three places, none of them here: the hamburger toggles it,
-         @click.outside on <nav> dismisses a tap elsewhere, and nav-badges.js handles Escape
-         plus `livewire:navigating` (which is what stops a tapped link from leaving the panel
-         sitting over the page it just loaded). --}}
-    <div x-cloak :class="{ 'block': open, 'hidden': !open }" id="mobile-nav-panel" class="hidden border-t md:hidden border-white/5">
-        <div class="pt-2 pb-3 space-y-1">
+         @click.outside on <nav> (and the scrim) dismisses a tap elsewhere, and nav-badges.js
+         handles Escape plus `livewire:navigating` (which stops a tapped link from leaving the
+         panel sitting over the page it just loaded). --}}
+    <div x-show="open" x-cloak id="mobile-nav-panel"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 -translate-y-2"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 translate-y-0"
+        x-transition:leave-end="opacity-0 -translate-y-2"
+        class="fixed inset-x-0 top-16 z-[46] md:hidden bg-background border-b border-white/5 shadow-xl max-h-[calc(100vh-4rem)] overflow-y-auto">
+        {{-- Top group: the text-only nav links. Leaderboard joins them here (auth-only) WITHOUT
+             an icon -- deliberately: on mobile the whole top group stays text-only, so a lone
+             trophy would read as odd. The trophy icon lives on the desktop bar, not here. --}}
+        <div class="pt-2 pb-2 space-y-0.5">
             @foreach ($navPrimary as $item)
                 <x-responsive-nav-link href="{{ $item['href'] }}"
                     :active="$item['active']">{{ __($item['label']) }}</x-responsive-nav-link>
             @endforeach
             @auth
-                <x-responsive-nav-link href="{{ $navLeaderboard['href'] }}" :active="$navLeaderboard['active']">
-                    <span class="flex items-center gap-2">
-                        <x-icon-trophy class="w-4 h-4 text-gold" />
-                        {{ __($navLeaderboard['label']) }}
-                    </span>
-                </x-responsive-nav-link>
-            @endauth
-        </div>
-
-        <div class="pt-4 pb-1 border-t border-white/5">
-            @auth
-                {{-- Username and level only, matching the desktop dropdown. The email
-                     belongs to Settings and your own profile, not a nav panel that opens
-                     over the shoulder of anyone nearby. --}}
-                <div class="px-4">
-                    {{-- `min-w-0` + `truncate` for the same reason as the desktop dropdown:
-                         a long username would otherwise widen the panel past the viewport. --}}
-                    <div class="flex items-center gap-2 min-w-0">
-                        <span class="text-base font-medium text-foreground truncate">{{ Auth::user()->username }}</span>
-                        <span class="font-mono text-xs text-muted shrink-0">lv. {{ Auth::user()->levelData()['level'] }}</span>
-                    </div>
-                </div>
-                <div class="mt-3 space-y-1">
-                    @foreach ($navAccount as $item)
-                        <x-responsive-nav-link :href="$item['href']" :active="$item['active']">
-                            <span class="inline-flex items-center gap-2">
-                                {{-- On an active row the icon inherits brand-bright from the link
-                                     itself, so only the resting/hover colours are stated here. --}}
-                                <x-dynamic-component :component="$item['icon']"
-                                    class="h-4 w-4 shrink-0 transition {{ $item['active'] ? '' : 'text-muted/70 group-hover:text-gold' }}" />
-                                {{ __($item['label']) }}
-                                @if ($item['key'] === 'friends')
-                                    <span x-show="friendRequests > 0" x-cloak
-                                        class="w-2 h-2 rounded-full bg-gold shrink-0"></span>
-                                @endif
-                            </span>
-                        </x-responsive-nav-link>
-                    @endforeach
-                    <button type="button"
-                        x-on:click="$dispatch('open-modal', 'confirm-sign-out'); open = false"
-                        class="group flex w-full items-center gap-2 border-l-4 border-transparent py-2 ps-3 pe-4 text-start text-base font-medium text-muted transition duration-150 ease-in-out hover:border-white/20 hover:bg-surface hover:text-danger focus:border-white/20 focus:bg-surface focus:text-danger focus:outline-none">
-                        <x-icon-logout class="h-4 w-4 shrink-0 text-muted/70 transition group-hover:text-danger group-focus:text-danger" />
-                        <span>{{ __('nav.logout') }}</span>
-                    </button>
-                </div>
-            @else
-                <div class="px-4">
-                    <div class="text-base font-medium text-foreground">{{ __('common.guest') }}</div>
-                </div>
-                <div class="mt-3 space-y-1">
-                    <x-responsive-nav-link :href="route('login')">{{ __('nav.login') }}</x-responsive-nav-link>
-                </div>
-                <div class="px-4 mt-4">
-                    <p class="text-[0.6rem] font-mono uppercase tracking-wider text-muted/60 mb-1">{{ __('settings.language.label') }}</p>
-                    <div class="flex gap-2">
-                        @foreach (App\Support\Locale::labels() as $code => $label)
-                            <form method="POST" action="{{ route('locale.update') }}" class="flex-1">
-                                @csrf
-                                <input type="hidden" name="locale" value="{{ $code }}">
-                                <button type="submit"
-                                    class="w-full px-3 py-2 font-mono text-xs text-center transition border rounded-lg {{ app()->getLocale() === $code ? 'border-brand bg-brand/10 text-foreground' : 'border-white/10 text-muted hover:text-foreground' }}">
-                                    {{ strtoupper($code) }}
-                                </button>
-                            </form>
-                        @endforeach
-                    </div>
-                </div>
+                <x-responsive-nav-link href="{{ $navLeaderboard['href'] }}"
+                    :active="$navLeaderboard['active']">{{ __($navLeaderboard['label']) }}</x-responsive-nav-link>
             @endauth
         </div>
     </div>

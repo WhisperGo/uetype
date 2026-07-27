@@ -21,6 +21,17 @@ export default function navBadges(initial = 0) {
             this._onFriendship = () => this.refreshFriendRequests();
             window.addEventListener('friendship-updated-remote', this._onFriendship);
 
+            // The mobile menu is now a fixed overlay, so while it is open we (a) lock body
+            // scroll -- same `overflow-y-hidden` class the modal component uses -- so the
+            // dimmed page behind the scrim cannot scroll, and (b) broadcast open/close so the
+            // chat FAB can hide itself (it is a separate component pinned bottom-right and
+            // would otherwise sit on top of the menu). Driven off the single `open` flag that
+            // already backs both the dropdown and this panel.
+            this.$watch('open', (isOpen) => {
+                document.body.classList.toggle('overflow-y-hidden', isOpen);
+                window.dispatchEvent(new CustomEvent(isOpen ? 'mobile-nav-opened' : 'mobile-nav-closed'));
+            });
+
             // Escape closes the hamburger panel -- but ONLY when it is actually open.
             // Without that guard this handler swallows Escape from whatever is layered
             // above it (the generic modal, the chat overlay), which both use the key too.
@@ -44,6 +55,12 @@ export default function navBadges(initial = 0) {
                     window.removeEventListener('friendship-updated-remote', this._onFriendship);
                     document.removeEventListener('keydown', this._onKeydown);
                     this.open = false;
+                    // Setting open=false above fires the $watch on THIS element, but the page
+                    // is navigating away and the node may be torn down before it runs -- so
+                    // undo the body lock and restore the FAB explicitly, or the next page can
+                    // load with scroll frozen and the chat button missing.
+                    document.body.classList.remove('overflow-y-hidden');
+                    window.dispatchEvent(new CustomEvent('mobile-nav-closed'));
                 },
                 { once: true },
             );

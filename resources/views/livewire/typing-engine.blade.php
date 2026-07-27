@@ -129,7 +129,11 @@
                                     :class="currentMain === '{{ $type }}' ? 'bg-elevated border-border text-foreground font-bold' : 'border-border text-muted hover:text-foreground'">{{ $label }}</button>
                             @endforeach
 
-                            <span class="w-px h-4 bg-border mx-1" aria-hidden="true"></span>
+                            {{-- Divider between the type toggle and its durations. Hidden below
+                                 `sm`: on a phone the row wraps, leaving this bar dangling at the
+                                 end of the first line (annoying). Desktop keeps it -- there the
+                                 row is one line and the divider earns its place. --}}
+                            <span class="hidden sm:block w-px h-4 bg-border mx-1" aria-hidden="true"></span>
 
                             <template x-if="currentMain === 'time'">
                                 <div class="flex gap-1.5">
@@ -459,8 +463,8 @@
                      semantik. Ia hanya jalur cadangan -- sentuhan pada paragrafnya sendiri sudah
                      mendarat di input dan membuka keyboard tanpa JS. --}}
                 <button type="button" @click="focusTypingInput()"
-                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-surface/60 text-small font-mono text-muted">
-                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-brand/40 bg-brand/10 text-small font-mono text-foreground transition hover:bg-brand/15 active:scale-95">
+                    <svg class="w-4 h-4 shrink-0 text-brand-bright" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                     </svg>
                     {{ __('typing.tap_to_type') }}
@@ -489,9 +493,14 @@
                                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                         <span class="font-mono text-xs uppercase tracking-widest">{{ __('typing.restart') }}</span>
-                        <kbd class="font-mono text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">tab</kbd>
-                        <span class="font-mono text-[0.6rem] text-muted">{{ __('typing.then') }}</span>
-                        <kbd class="font-mono text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">enter</kbd>
+                        {{-- Keyboard hint: fine-pointer only. On touch there is no Tab/Enter, so
+                             `.no-touch` drops the whole cluster (see app.css) rather than showing
+                             instructions a phone user can't follow. --}}
+                        <span class="no-touch items-center gap-1.5">
+                            <kbd class="font-mono text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">tab</kbd>
+                            <span class="font-mono text-[0.6rem] text-muted">{{ __('typing.then') }}</span>
+                            <kbd class="font-mono text-[0.6rem] px-1.5 py-0.5 rounded bg-surface border border-white/10">enter</kbd>
+                        </span>
                     </button>
                 @endif
             </div>
