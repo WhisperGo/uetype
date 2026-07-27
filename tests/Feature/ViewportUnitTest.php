@@ -65,7 +65,9 @@ it('menjaga setiap field teks di atas ambang zoom iOS', function () {
 
         $src = tanpaKomentarBlade(file_get_contents($path));
 
-        preg_match_all('/<input\b[^>]*>/s', $src, $m);
+        // `<textarea>` difokus untuk mengetik sama seperti `<input>`, jadi ambang zoom yang
+        // sama berlaku -- keduanya di-scan.
+        preg_match_all('/<(input|textarea)\b[^>]*>/s', $src, $m);
 
         foreach ($m[0] as $tag) {
             if (preg_match('/type="(hidden|checkbox|radio|range|color)"/', $tag)) {

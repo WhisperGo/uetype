@@ -17,7 +17,10 @@
 ])
 
 @php
-    $field = 'w-full mt-1.5 px-4 py-3 bg-surface/40 border border-white/10 rounded-xl font-mono text-sm text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition';
+    // text-base (16px), NOT text-sm: iOS Safari zooms the whole page when a focused field is
+    // under 16px and never restores it. Applies to both <input>s and the <textarea> below,
+    // since they all share this string. See ViewportUnitTest / docs/mobile-test-checklist.md.
+    $field = 'w-full mt-1.5 px-4 py-3 bg-surface/40 border border-white/10 rounded-xl font-mono text-base text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition';
     $label = 'font-mono text-xs uppercase tracking-widest text-muted';
 @endphp
 

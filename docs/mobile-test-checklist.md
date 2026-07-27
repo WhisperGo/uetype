@@ -145,9 +145,30 @@ halaman **tidak** membesar sendiri:
 | E11 | Chat di dalam room multiplayer |
 | E12 | Konfirmasi hapus akun & bubarkan clan (yang sama dengan C1/C2) |
 | E13 | Jumlah hari di modal hapus riwayat chat |
+| E14 | Nama, tag, dan deskripsi di form **buat clan** & **edit clan** (`/clans`) — dulu `text-sm`, dinaikkan ke `text-base` |
 
 Kalau halaman mem-zoom, ia **tak kembali sendiri** — user terjebak sampai mencubitnya. Laporkan
 field mana yang memicunya.
+
+---
+
+## F. Section clan — pass responsif (layout HP)
+
+Section clan sudah mostly mobile-first; pass ini menutup pelanggaran konvensi + merapikan
+baris yang sempit di HP. Uji terutama di **360 dan 390** (HP sempit) dan bandingkan di **414**
+(tempat label status pending kembali muncul di ≥400px/`xs`).
+
+| # | Langkah | Hasil yang diharapkan | Kalau gagal |
+|---|---|---|---|
+| F1 | Sebagai leader/co-leader, buka roster clan, tekan tombol **kebab (⋮)** aksi member dengan ibu jari | Kena **sekali coba** (kotak klik 44px lewat `<x-icon-button>`) | Kembali ke tombol mentah `p-1.5` (~28px) |
+| F2 | Buka clan sendiri di 360px, lihat **toolbar hero** (Clan War / Chat / Leaderboard / Manage) | Toolbar menempati **baris penuh sendiri** di bawah identitas, rapi — bukan berdesakan di samping | `w-full sm:w-auto` hilang; tombol wrap 3–4 baris mepet identitas |
+| F3 | Sebagai leader dengan join-request masuk, lihat baris request di 360px | Nama tetap terbaca; **Accept + Reject** turun ke baris sendiri, tak menghimpit username jadi 3–4 huruf | Grup aksi tak `w-full sm:w-auto`, atau baris tak `flex-wrap` |
+| F4 | Buka tab **browse**, temukan clan berstatus "pending", lihat di 360px lalu 414px | Di <400px hanya tombol **Cancel** (label "request sent" tersembunyi); di ≥400px label muncul kembali | `hidden xs:inline` hilang; label menghimpit nama clan |
+| F5 | Buka Clan War yang sedang berjalan dengan clan lawan **bernama panjang tanpa spasi** | Nama lawan **membungkus / tak meluber**; tak ada scroll horizontal | `min-w-0`/`break-words` di blok lawan hilang |
+
+> Catatan: F1–F5 semuanya **kontrak markup** yang sudah dikunci
+> [`ClanResponsiveTest`](../tests/Feature/ClanResponsiveTest.php); yang diverifikasi di sini
+> adalah hasil **visual/sentuh sungguhan di perangkat**, yang tak bisa dibuktikan test.
 
 ---
 

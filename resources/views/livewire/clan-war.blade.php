@@ -83,11 +83,14 @@
             @endphp
             <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl mb-6">
                 <div class="flex items-center justify-between flex-wrap gap-4">
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-4 min-w-0">
                         <x-clan-emblem :clan="$opponent" size="md" />
-                        <div>
+                        {{-- min-w-0 + break-words: the only name block on this page without a
+                             shrink guard -- a long opponent name with no spaces would otherwise
+                             push the row wider than a phone. Matches the incoming/waiting blocks. --}}
+                        <div class="min-w-0">
                             <p class="font-mono text-xs uppercase tracking-widest text-muted mb-2">{{ __('clan.war.ongoing') }}</p>
-                            <p class="font-mono text-sm text-foreground">
+                            <p class="font-mono text-sm text-foreground break-words">
                                 {{ __('clan.war.vs_prefix') }} <span class="font-bold">{{ $opponent->name }}</span>
                                 {{ __('clan.war.vs_suffix', ['power' => number_format($opponent->power)]) }}
                             </p>

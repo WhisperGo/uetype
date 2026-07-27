@@ -86,7 +86,11 @@
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-2 shrink-0">
+                    {{-- w-full sm:w-auto: the hero stacks (flex-col) on phones, so this 4-button
+                         toolbar drops onto its own full-width row below the identity instead of
+                         being squeezed beside it as a shrink-0 block. sm:shrink-0 keeps the
+                         desktop side-by-side behaviour unchanged. --}}
+                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:shrink-0">
                         <x-btn-gold as="a" href="{{ route('clan-war.index') }}" wire:navigate>
                             {{ __('clan.clan_war') }}
                         </x-btn-gold>
@@ -155,17 +159,22 @@
                 <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">{{ __('clan.my_clan.join_requests', ['count' => $this->pendingRequests->count()]) }}</p>
                 <div class="space-y-3 mb-8">
                     @foreach ($this->pendingRequests as $req)
-                        <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl" wire:key="req-{{ $req->id }}">
+                        {{-- flex-wrap + the action group going w-full below sm: on a phone the
+                             Accept/Reject pair drops onto its own full-width row instead of
+                             crushing the username to a few characters beside two buttons. --}}
+                        <div class="flex flex-wrap items-center gap-3 p-4 border bg-surface/40 border-white/5 rounded-2xl" wire:key="req-{{ $req->id }}">
                             <x-friend-avatar :user="$req->user" />
                             <div class="flex-1 min-w-0">
                                 <p class="font-mono text-sm font-bold text-foreground truncate">{{ $req->user->username }}</p>
                                 <p class="font-mono text-xs text-muted mt-0.5">{{ __('clan.user_level', ['level' => $req->user->levelData()['level']]) }}</p>
                             </div>
-                            <x-btn-gold wire:click="approveMember({{ $req->id }})">{{ __('clan.my_clan.accept') }}</x-btn-gold>
-                            <button wire:click="rejectMember({{ $req->id }})"
-                                class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
-                                {{ __('clan.my_clan.reject') }}
-                            </button>
+                            <div class="flex items-center gap-2 w-full sm:w-auto sm:shrink-0">
+                                <x-btn-gold wire:click="approveMember({{ $req->id }})">{{ __('clan.my_clan.accept') }}</x-btn-gold>
+                                <button wire:click="rejectMember({{ $req->id }})"
+                                    class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                                    {{ __('clan.my_clan.reject') }}
+                                </button>
+                            </div>
                         </div>
                     @endforeach
                 </div>
@@ -240,13 +249,15 @@
                                  routine Promote invites misclicks. Always visible, never
                                  group-hover -- hover-only controls are dead on touch. --}}
                             <div class="shrink-0 relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
-                                <button type="button" @click="open = !open"
-                                    aria-label="{{ __('clan.aria.member_actions', ['name' => $user->username]) }}"
-                                    class="p-1.5 rounded-lg text-muted hover:text-foreground hover:bg-white/5 transition">
+                                {{-- 44px click box via <x-icon-button> (WCAG 2.5.5): the old
+                                     hand-written p-1.5 + w-4 svg was ~28px, too small for a thumb.
+                                     @click/aria pass straight through $attributes. --}}
+                                <x-icon-button @click="open = !open"
+                                    :label="__('clan.aria.member_actions', ['name' => $user->username])">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v.01M12 12v.01M12 19v.01" />
                                     </svg>
-                                </button>
+                                </x-icon-button>
 
                                 <div x-show="open" x-cloak
                                     x-transition:enter="transition ease-out duration-150"
@@ -343,7 +354,10 @@
                                      action on touch and make the row's meaning depend on
                                      pointer position. --}}
                                 <div class="flex items-center gap-3 shrink-0">
-                                    <span class="font-mono text-xs text-muted">{{ __('clan.browse.request_sent') }}</span>
+                                    {{-- hidden xs:inline: below 400px this status label + Cancel
+                                         squeeze the clan name; the Cancel button alone carries the
+                                         meaning there, and the label returns at xs (400px)+. --}}
+                                    <span class="hidden xs:inline font-mono text-xs text-muted">{{ __('clan.browse.request_sent') }}</span>
                                     <button type="button" wire:click="cancelJoinRequest({{ $row['clan']->id }})"
                                         class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
                                         {{ __('clan.browse.cancel_request') }}
