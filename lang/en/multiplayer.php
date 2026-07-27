@@ -108,7 +108,7 @@ return [
     'players_full' => 'Player slots are full (5/5).',
     'spectators_full' => 'Spectator slots are full (5/5).',
     'no_players_to_start' => 'No players to start the race yet.',
-    'need_more_players' => 'At least 2 players are needed. Spectators don\'t count -- ask someone to join as a player.',
+    'need_more_players' => 'At least 2 players are needed. Spectators don\'t count, so invite a friend to play.',
     'spectating_title' => 'You Are Spectating',
     'spectating_desc' => 'Watching the race live. Enjoy the show!',
     'you_spectated' => 'You spectated this match',

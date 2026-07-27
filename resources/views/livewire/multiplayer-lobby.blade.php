@@ -279,7 +279,11 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
+                {{-- Mobile: flex-wrap + justify-center so the lone 5th slot (2 per row -> 2/2/1)
+                     sits CENTERED instead of orphaned on the left. From sm up it's the original
+                     even 5-column grid. Each card is `w-[calc(50%-0.5rem)]` on mobile (two per
+                     row with the gap-4) and `sm:w-auto` so the grid tracks size it at sm+. --}}
+                <div class="flex flex-wrap justify-center gap-4 sm:grid sm:grid-cols-5">
                     @foreach (range(0, 4) as $i)
                         @php
                             $member = $this->orderedMembers->get($i);
@@ -290,7 +294,7 @@
                                 $canKick = $this->isHost && $member->user_id !== $this->roomData->host_id;
                             @endphp
                             <div
-                                class="p-5 border flex flex-col items-center justify-center text-center rounded-2xl relative transition duration-300 {{ $member->user_id === Auth::id() ? 'bg-elevated/60 border-brand-bright' : 'bg-surface/40 border-border/40' }}">
+                                class="w-[calc(50%-0.5rem)] sm:w-auto p-5 border flex flex-col items-center justify-center text-center rounded-2xl relative transition duration-300 {{ $member->user_id === Auth::id() ? 'bg-elevated/60 border-brand-bright' : 'bg-surface/40 border-border/40' }}">
                                 @if ($canKick)
                                     {{-- Host-only kick control: a small circled X in the card corner. --}}
                                     {{-- Opens the confirm-kick overlay (see bottom of view) instead of a browser confirm. --}}
@@ -330,7 +334,7 @@
                             {{-- Empty slot: click to invite a friend. Any member may invite.
                                  The dashed card turns into a "+ Invite" affordance on hover. --}}
                             <button type="button" x-on:click="openInvite()"
-                                class="group p-5 border border-dashed border-border/50 flex flex-col items-center justify-center text-center rounded-2xl transition duration-200 opacity-40 hover:opacity-100 hover:border-brand-bright/60 hover:bg-brand-bright/5 focus:outline-none focus-visible:ring-1 focus-visible:ring-brand-bright/50"
+                                class="w-[calc(50%-0.5rem)] sm:w-auto group p-5 border border-dashed border-border/50 flex flex-col items-center justify-center text-center rounded-2xl transition duration-200 opacity-40 hover:opacity-100 hover:border-brand-bright/60 hover:bg-brand-bright/5 focus:outline-none focus-visible:ring-1 focus-visible:ring-brand-bright/50"
                                 title="{{ __('multiplayer.invite_friend') }}"
                                 aria-label="{{ __('multiplayer.invite_friend') }}">
                                 <div
@@ -348,11 +352,15 @@
                 </div>
             </div>
 
-            <div class="space-y-1">
-                <div class="h-2 w-full bg-background rounded-full overflow-hidden border border-border/30">
-                    <div class="h-full bg-gold transition-all duration-300"
-                        style="width: {{ ($this->orderedMembers->count() / \App\Livewire\MultiplayerLobby::MAX_PLAYERS) * 100 }}%"></div>
-                </div>
+            {{-- Slot meter: one segment per player slot (filled = taken). Replaces a single
+                 gold progress bar, which on mobile read as a vague half-filled line -- the
+                 segments map 1:1 to the five cards above, so "3 of 5 in" is legible at a glance
+                 and lines up with the "joined X/5" count. --}}
+            @php $filledSlots = $this->orderedMembers->count(); @endphp
+            <div class="flex gap-1.5" aria-hidden="true">
+                @for ($s = 0; $s < \App\Livewire\MultiplayerLobby::MAX_PLAYERS; $s++)
+                    <div class="h-2 flex-1 rounded-full transition-colors duration-300 {{ $s < $filledSlots ? 'bg-gold' : 'bg-background border border-border/30' }}"></div>
+                @endfor
             </div>
 
             @php
@@ -361,47 +369,49 @@
             @endphp
 
             <div class="pt-6 border-t border-border/30 space-y-3">
-                {{-- Button row: primary action on the left, secondary actions pushed right. --}}
-                <div class="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
-                    {{-- LEFT: role-specific primary action (Start / Ready / Spectating badge). --}}
-                    <div class="flex flex-wrap items-center gap-3 sm:gap-4">
+                {{-- Button row: on a phone the actions stack (primary full-width, the two
+                     secondary actions share a 2-col row) so they never overflow or wrap into a
+                     ragged pile. From `sm` up it's the original one-line layout: primary left,
+                     secondary pushed right. Buttons are `w-full sm:w-auto` for that flip. --}}
+                <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
+                    {{-- Primary: role-specific action (Start / Ready / Spectating badge). --}}
+                    <div class="sm:flex sm:items-center sm:gap-4">
                         @if ($this->isHost)
                             <button wire:click="startRace" @disabled(!$this->allReady)
-                                class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->allReady ? 'bg-gold hover:bg-secondary-7 text-background shadow-md' : 'bg-elevated text-muted cursor-not-allowed border border-border/30' }}">
+                                class="w-full sm:w-auto px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $this->allReady ? 'bg-gold hover:bg-secondary-7 text-background shadow-md' : 'bg-elevated text-muted cursor-not-allowed border border-border/30' }}">
                                 {{ __('multiplayer.start_race') }}
                             </button>
                         @elseif (!$this->isSpectator)
                             @php $meReady = $this->roomData->members->where('user_id', Auth::id())->first()?->is_ready; @endphp
                             <button wire:click="toggleReady"
-                                class="px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $meReady ? 'bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5' : 'bg-gold hover:bg-secondary-7 text-background' }}">
+                                class="w-full sm:w-auto px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition duration-200 {{ $meReady ? 'bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5' : 'bg-gold hover:bg-secondary-7 text-background' }}">
                                 {{ $meReady ? __('multiplayer.cancel_ready') : __('multiplayer.im_ready') }}
                             </button>
                         @else
-                            <span class="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-border/40 bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider text-muted">
+                            <span class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-border/40 bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider text-muted">
                                 <span class="text-base leading-none">&#128065;</span>{{ __('multiplayer.you_are_spectating') }}
                             </span>
                         @endif
                     </div>
 
-                    {{-- RIGHT: secondary actions (role toggle + leave). The toggle is available to
-                         everyone including the host, only while waiting. --}}
-                    <div class="flex flex-wrap items-center gap-3 sm:gap-4">
+                    {{-- Secondary: role toggle + leave. 2-col grid on mobile, inline row at sm+. --}}
+                    <div class="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-center sm:gap-4">
                         @if ($this->isSpectator)
                             <button wire:click="toggleSpectator" @disabled($playersFull)
-                                class="px-6 py-3 bg-transparent border border-gold/50 text-gold hover:bg-gold/10 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                class="w-full sm:w-auto px-6 py-3 bg-transparent border border-gold/50 text-gold hover:bg-gold/10 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
                                 @if ($playersFull) title="{{ __('multiplayer.players_full') }}" @endif>
                                 {{ __('multiplayer.become_player') }}
                             </button>
                         @else
                             <button wire:click="toggleSpectator" @disabled($spectatorsFull)
-                                class="px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                class="w-full sm:w-auto px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
                                 @if ($spectatorsFull) title="{{ __('multiplayer.spectators_full') }}" @endif>
                                 {{ __('multiplayer.become_spectator') }}
                             </button>
                         @endif
 
                         <button wire:click="leaveRoom"
-                            class="px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition">
+                            class="w-full sm:w-auto px-6 py-3 bg-transparent border border-border/40 text-muted hover:text-foreground hover:bg-foreground/5 font-mono text-sm font-bold uppercase tracking-wider rounded-xl transition">
                             {{ __('multiplayer.leave_room') }}
                         </button>
                     </div>
@@ -417,9 +427,12 @@
                      present, still not startable -- so it says so explicitly. --}}
                 @if ($this->isHost && !$this->allReady)
                     @php $racerCount = $this->orderedMembers->count(); @endphp
-                    <div class="flex items-center gap-2">
-                        <span class="w-1.5 h-1.5 rounded-full bg-muted animate-pulse"></span>
-                        <span class="text-xs font-mono text-muted">
+                    {{-- items-start (not items-center) + a small mt on the dot: when the hint
+                         wraps to two lines on a phone, the dot stays aligned with the FIRST line
+                         instead of floating to the vertical middle. shrink-0 keeps it round. --}}
+                    <div class="flex items-start gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-muted animate-pulse shrink-0 mt-1.5"></span>
+                        <span class="text-xs font-mono text-muted leading-relaxed">
                             @if ($racerCount === 0)
                                 {{ __('multiplayer.no_players_to_start') }}
                             @elseif ($racerCount < \App\Livewire\MultiplayerLobby::MIN_PLAYERS_TO_START)

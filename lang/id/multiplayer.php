@@ -108,7 +108,7 @@ return [
     'players_full' => 'Slot pemain penuh (5/5).',
     'spectators_full' => 'Slot penonton penuh (5/5).',
     'no_players_to_start' => 'Belum ada pemain untuk memulai balapan.',
-    'need_more_players' => 'Butuh minimal 2 pemain. Penonton tidak dihitung -- minta seseorang bergabung sebagai pemain.',
+    'need_more_players' => 'Butuh minimal 2 pemain. Penonton tidak dihitung, jadi ajak temanmu untuk ikut bermain.',
     'spectating_title' => 'Kamu Sedang Menonton',
     'spectating_desc' => 'Menonton balapan secara langsung. Nikmati pertandingannya!',
     'you_spectated' => 'Kamu menonton pertandingan ini',

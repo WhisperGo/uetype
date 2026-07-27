@@ -68,11 +68,15 @@
 
     {{-- Send form. Input and button mirror the chat page (components/chat/composer):
          input bg-surface/40 border-white/10 focus:border-gold, gold send button (btn-gold). --}}
-    <form x-on:submit.prevent="send()" class="flex items-center gap-3 p-4 border-t border-white/5 shrink-0">
+    {{-- `min-w-0` on the input is the fix for the send button being pushed off the right edge
+         on mobile: a flex child defaults to `min-width: auto`, and a text input's intrinsic
+         min-width (~its size attr) then refuses to shrink, overflowing the row. `shrink-0` keeps
+         the button at its natural width. `gap-2 sm:gap-3` tightens the row on the narrowest phones. --}}
+    <form x-on:submit.prevent="send()" class="flex items-center gap-2 sm:gap-3 p-4 border-t border-white/5 shrink-0">
         <input type="text" x-model="draft" maxlength="500" autocomplete="off"
             placeholder="{{ __('multiplayer.chat_placeholder') }}"
-            class="flex-1 px-4 py-2.5 rounded-2xl text-base bg-surface/40 border border-white/10 font-mono text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
-        <x-btn-gold type="submit" size="xl" class="disabled:opacity-40" x-bind:disabled="draft.trim() === ''">
+            class="flex-1 min-w-0 px-4 py-2.5 rounded-2xl text-base bg-surface/40 border border-white/10 font-mono text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
+        <x-btn-gold type="submit" size="xl" class="shrink-0 disabled:opacity-40" x-bind:disabled="draft.trim() === ''">
             {{ __('multiplayer.chat_send') }}
         </x-btn-gold>
     </form>
