@@ -245,22 +245,31 @@ test('menghapus badge header tak mematikan start clock sudden death (hook sync t
 });
 
 /**
- * REGRESI: timer sudden death dulu baru jalan setelah user REFRESH. init() (yang dijalankan
- * saat refresh) adalah satu-satunya jalur yang andal memanggil startSuddenDeathClock();
- * jalur realtime (listener event & x-init hook) bisa gagal karena `this` yang di-capture jadi
- * basi lintas morph Livewire, atau x-init pada elemen yang disisipkan morph tak selalu jalan.
+ * REGRESI (akar masalah): timer sudden death dulu baru jalan setelah user REFRESH.
  *
- * Kuncinya: banner MUNCUL (jadi suddenDeathActive memang jadi true di instance yang hidup),
- * tapi clock tak menghitung mundur. Maka clock harus dinyalakan REAKTIF begitu flag jadi
- * true di instance itu -- lewat $watch, bukan bergantung pada siapa yang men-set flag-nya.
+ * Sebabnya: state SD dulu hidup di INSTANCE komponen Alpine (suddenDeathRemaining +
+ * setInterval per-instance). Saat SD mulai, string x-data ikut berubah (suddenDeathActive
+ * false -> true) sehingga Livewire morph bisa membuang instance lama & membuat yang baru;
+ * interval + angka reaktif menempel di instance basi, sedangkan banner (wire:ignore) tak
+ * di-rebind bersih -> banner MUNCUL tapi angkanya beku sampai refresh (init() membangun ulang).
+ *
+ * Perbaikan: pindahkan deadline SD ke GLOBAL STORE `race` pada jam MONOTONIC
+ * (performance.now()) -- persis pola `deadline` countdown 3-2-1 & posisi maskot yang memang
+ * kebal morph. Komponen hanya MEMBACA store, jadi instance mana pun yang bertahan pasca-morph
+ * menampilkan angka yang identik, dan sisa waktu digerakkan oleh satu ticker `now` 1 detik
+ * yang sudah ada -- bukan setInterval per-instance yang rentan.
  */
-test('sudden death menyalakan clock secara reaktif saat flag aktif (tanpa perlu refresh)', function () {
+test('timer sudden death hidup di store yang kebal morph, bukan di instance komponen', function () {
     $arena = file_get_contents(resource_path('js/race-arena.js'));
 
-    // $watch pada suddenDeathActive yang memanggil startSuddenDeathClock -> countdown mulai
-    // realtime di instance yang hidup, bukan hanya dari init() saat refresh.
-    expect($arena)->toContain("\$watch('suddenDeathActive'")
-        ->and($arena)->toContain('startSuddenDeathClock');
+    expect($arena)
+        // Deadline & flag SD ada di store, di-arm dari sisa-detik server (idempotent, earliest-wins).
+        ->toContain('armSuddenDeath')
+        ->toContain('sdDeadline')
+        // Sisa waktu diturunkan dari jam monotonic + ticker `now` store, bukan timer per-instance.
+        ->toContain('sdRemainingSeconds')
+        // Interval per-instance yang dulu bikin angka beku lintas morph sudah tak ada lagi.
+        ->and($arena)->not->toContain('_sdInterval');
 });
 
 /**
