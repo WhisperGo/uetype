@@ -116,10 +116,47 @@ const registerRaceArena = (Alpine) => {
                 return this.deadline - performance.now();
             },
 
+            // Sudden-death deadline, kept in the store on the MONOTONIC clock for the SAME
+            // reason as the start countdown's `deadline`: a Livewire morph / Alpine re-init must
+            // never restart NOR freeze it. Sudden death used to live in component instance state
+            // (a per-instance setInterval + reactive counter), and because the morph that turns
+            // SD on also flips the arena's x-data string (suddenDeathActive false->true), that
+            // morph could swap the Alpine instance -- leaving the timer ticking on a discarded
+            // one while the visible (wire:ignore) banner froze until a manual refresh. In the
+            // store the value is instance-independent: whichever instance survives reads the
+            // identical deadline, and the shared 1s `now` tick drives the countdown. sdArmed
+            // drives the banner's visibility (suddenDeathActive getter in the component).
+            sdDeadline: null,
+            sdArmed: false,
+
+            /**
+             * Arm sudden death from the server's REMAINING seconds. Idempotent & monotonic:
+             * the EARLIEST deadline wins, so a duplicate or looser broadcast can never extend
+             * the window -- mirrors the server, which never resets countdown_started_at once set.
+             */
+            armSuddenDeath(remainingSeconds) {
+                const rem = Math.max(0, Number(remainingSeconds) || 0);
+                const candidate = performance.now() + rem * 1000;
+                if (this.sdDeadline === null || candidate < this.sdDeadline) {
+                    this.sdDeadline = candidate;
+                }
+                this.sdArmed = true;
+                this.startClock(); // the shared 1s tick drives the reactive recompute below
+            },
+
+            /** Whole seconds left in the sudden-death window (15 -> 0). Reactive via `now`. */
+            sdRemainingSeconds() {
+                if (this.sdDeadline === null) return 0;
+                void this.now; // subscribe this read to the 1s tick so the banner recomputes
+                return Math.max(0, Math.ceil((this.sdDeadline - performance.now()) / 1000));
+            },
+
             reset() {
                 this.opponents = {};
                 this.raceKey = null;
                 this.deadline = null;
+                this.sdDeadline = null;
+                this.sdArmed = false;
                 this.stopClock();
             },
 
@@ -133,6 +170,8 @@ const registerRaceArena = (Alpine) => {
                 this.opponents = {};
                 this.raceKey = key;
                 this.deadline = null; // different race -> the old deadline no longer applies
+                this.sdDeadline = null; // ...and neither does the old sudden-death window
+                this.sdArmed = false;
             },
         });
     }
@@ -201,11 +240,20 @@ const registerRaceArena = (Alpine) => {
         // WPM ticker (1s): refreshes the number while the player has stopped typing.
         _wpmInterval: null,
 
-        // Sudden death: a client-side timer, but the server's checkSuddenDeath() is still the final source of truth.
-        suddenDeathActive: !!config.suddenDeathActive,
-        suddenDeathRemaining: config.suddenDeathRemaining ?? 15,
+        // Sudden death: state lives in the global `race` store (morph-proof), read here through
+        // getters -- so a Livewire re-init can never freeze the visible countdown. The server's
+        // checkSuddenDeath() is still the final source of truth for closing the race.
         lockedByTimeout: false,
-        _sdInterval: null,
+
+        // True once the store has been armed (drives the banner's x-show).
+        get suddenDeathActive() {
+            return this.$store.race ? this.$store.race.sdArmed : false;
+        },
+
+        // Whole seconds left, derived from the store's monotonic deadline + 1s `now` tick.
+        get suddenDeathRemaining() {
+            return this.$store.race ? this.$store.race.sdRemainingSeconds() : 0;
+        },
 
         init() {
             this.words = this.textToType.split(' ');
@@ -238,12 +286,19 @@ const registerRaceArena = (Alpine) => {
                 this.$store.race.resetForRace(this.raceKey());
             }
 
+            // Seed the store from the server's authoritative SD state (a mid-race reload, or a
+            // re-init while SD is already running, lands here). AFTER resetForRace so a genuinely
+            // new race has already cleared any stale window; armSuddenDeath is earliest-wins, so
+            // re-seeding the same race keeps the original deadline rather than extending it.
+            if (config.suddenDeathActive && this.$store.race) {
+                this.$store.race.armSuddenDeath(config.suddenDeathRemaining ?? 15);
+            }
+
             // Sudden death active at (re)init = the race is already running -> skip the countdown overlay.
             if (this.suddenDeathActive) {
                 this.raceStarted = true;
                 this.countdown = 'GO!';
                 this.startTime = Date.now();
-                this.startSuddenDeathClock();
                 // A spectator doesn't type: no local WPM or input focus needed.
                 if (!this.isSpectator) {
                     this.startWpmTicker();
@@ -263,19 +318,14 @@ const registerRaceArena = (Alpine) => {
             this._onSuddenDeath = (ev) => this.syncSuddenDeath(ev.detail.remaining);
             window.addEventListener('race-sudden-death', this._onSuddenDeath);
 
-            // Start the clock the instant suddenDeathActive flips true, WHOEVER flips it: the
-            // WebSocket event above, the server re-render's x-init hook, or a re-seed. This is
-            // the fix for "the timer only counts down after a manual refresh": before, the clock
-            // was reliably started only by init() (which runs on refresh), while the realtime
-            // paths could set the flag on one Alpine instance but call startSuddenDeathClock on a
-            // stale `this` that a Livewire morph had replaced -- so the live banner sat frozen at
-            // the full window. A reactive $watch always fires on the LIVE instance, and the flag
-            // becoming true is exactly what makes the banner appear, so the two can never
-            // disagree again. startSuddenDeathClock() is idempotent, so a redundant call is a
-            // no-op. $watch fires on CHANGE only, so "already active at mount" stays handled by
-            // the init() branch above.
-            this.$watch('suddenDeathActive', (active) => {
-                if (active) this.startSuddenDeathClock();
+            // Close the race the instant the shared window hits 0, on the LIVE instance. The
+            // countdown itself no longer needs starting -- it is derived from the store's
+            // monotonic deadline and the shared 1s `now` tick, so it can never freeze on a
+            // discarded instance (the "counts down only after a manual refresh" bug). This watch
+            // just fires the one-shot lockRace() at 0; it re-evaluates whenever `now` ticks, and
+            // lockRace() is idempotent, so a redundant fire is a no-op.
+            this.$watch('suddenDeathRemaining', (left) => {
+                if (this.suddenDeathActive && left <= 0) this.lockRace();
             });
 
             // A word's line number is only valid for the WIDTH and FONT it was measured at, so
@@ -398,10 +448,6 @@ const registerRaceArena = (Alpine) => {
                 clearInterval(this._countdownInterval);
                 this._countdownInterval = null;
             }
-            if (this._sdInterval) {
-                clearInterval(this._sdInterval);
-                this._sdInterval = null;
-            }
             if (this._wpmInterval) {
                 clearInterval(this._wpmInterval);
                 this._wpmInterval = null;
@@ -416,28 +462,16 @@ const registerRaceArena = (Alpine) => {
             }
         },
 
-        // Sync the remaining time from the server & make sure the local clock is running.
+        /**
+         * Sync sudden death from a server broadcast: arm the shared store deadline (idempotent,
+         * earliest-wins) so every instance -- including any that a Livewire morph creates after
+         * this -- reads the same countdown. The reactive display & the lockRace()-at-0 watch both
+         * flow from the store, so nothing here has to touch a per-instance timer.
+         */
         syncSuddenDeath(remainingFromServer) {
-            this.suddenDeathActive = true;
-            // Take the most conservative value if the clock is already running (avoid ticking back up).
-            if (this._sdInterval) {
-                this.suddenDeathRemaining = Math.min(this.suddenDeathRemaining, remainingFromServer);
-            } else {
-                this.suddenDeathRemaining = remainingFromServer;
-            }
-            this.startSuddenDeathClock();
+            if (!this.$store.race) return;
+            this.$store.race.armSuddenDeath(remainingFromServer);
             if (this.suddenDeathRemaining <= 0) this.lockRace();
-        },
-
-        startSuddenDeathClock() {
-            if (this._sdInterval) return;
-            this._sdInterval = setInterval(() => {
-                this.suddenDeathRemaining--;
-                if (this.suddenDeathRemaining <= 0) {
-                    this.suddenDeathRemaining = 0;
-                    this.lockRace();
-                }
-            }, 1000);
         },
 
         // Force-lock input & progress emits. Idempotent.
@@ -445,10 +479,6 @@ const registerRaceArena = (Alpine) => {
             if (this.lockedByTimeout) return;
             this.lockedByTimeout = true;
             this.isFinished = true;
-            if (this._sdInterval) {
-                clearInterval(this._sdInterval);
-                this._sdInterval = null;
-            }
             // WPM stops at its last value; the race is over for this player.
             if (this._wpmInterval) {
                 clearInterval(this._wpmInterval);
