@@ -62,7 +62,8 @@ it('refuses a survival claim of time that never passed', function () {
     // 9999 seconds of survival used to buy full points outright.
     Livewire::actingAs($user)->test(TypingEngine::class, ['warClaimId' => $claim->id])
         ->call('saveResult', ['durationMs' => 9999000, 'totalKeystrokes' => 6000, 'correctKeystrokes' => 6000])
-        ->assertRedirect(route('typing'));
+        // Rejected -> re-locked into the same (still unfilled) claim, not dumped into solo.
+        ->assertRedirect(route('typing', ['war_claim' => $claim->id]));
 
     $claim->refresh();
 
@@ -77,7 +78,8 @@ it('refuses a fabricated wpm claim in a time-mode war slot', function () {
     // 1500 chars "in" 120s = 150 WPM, exactly the ratio that maxes out the ceiling.
     Livewire::actingAs($user)->test(TypingEngine::class, ['warClaimId' => $claim->id])
         ->call('saveResult', ['durationMs' => 120000, 'totalKeystrokes' => 1500, 'correctKeystrokes' => 1500])
-        ->assertRedirect(route('typing'));
+        // Rejected -> re-locked into the same (still unfilled) claim, not dumped into solo.
+        ->assertRedirect(route('typing', ['war_claim' => $claim->id]));
 
     $claim->refresh();
 
@@ -91,7 +93,8 @@ it('refuses a fabricated words-mode war claim', function () {
     // A 10-word text is ~50 characters; 4000 is pure invention.
     Livewire::actingAs($user)->test(TypingEngine::class, ['warClaimId' => $claim->id])
         ->call('saveResult', ['durationMs' => 60000, 'totalKeystrokes' => 4000, 'correctKeystrokes' => 4000])
-        ->assertRedirect(route('typing'));
+        // Rejected -> re-locked into the same (still unfilled) claim, not dumped into solo.
+        ->assertRedirect(route('typing', ['war_claim' => $claim->id]));
 
     expect($claim->refresh()->typing_result_id)->toBeNull();
 });

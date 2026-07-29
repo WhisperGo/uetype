@@ -192,6 +192,30 @@ class ClanWar extends Component
             ->sum('points');
     }
 
+    /**
+     * The opposing clan's total points so far (only submitted modes) -- the missing half of
+     * the scoreboard: a war you can't see the enemy's score in is just solo practice with a
+     * countdown. Same "submitted only" rule as our own total, so both sides are compared on
+     * the same footing (a locked-but-unplayed slot is worth 0 for either clan).
+     */
+    public function getOpponentClanPointsProperty(): float
+    {
+        $war = $this->myActiveWar;
+
+        if (! $war || ! $this->myClan) {
+            return 0.0;
+        }
+
+        $opponentClanId = $war->challenger_clan_id === $this->myClan->id
+            ? $war->opponent_clan_id
+            : $war->challenger_clan_id;
+
+        return (float) ClanWarModeClaim::where('clan_war_id', $war->id)
+            ->where('clan_id', $opponentClanId)
+            ->whereNotNull('typing_result_id')
+            ->sum('points');
+    }
+
     // ---- ACTIONS ----
 
     /**

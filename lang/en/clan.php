@@ -99,6 +99,7 @@ return [
         'vs_suffix' => '(power :power)',
         'ends_at' => 'Ends :time',
         'your_points' => 'Your Points',
+        'opponent_points' => 'Opponent',
         'modes_heading' => 'War Modes',
         'modes_hint' => 'Claim an open mode and play it. Each mode can only be done once by your clan.',
         'mode_label' => ':mode · :config',

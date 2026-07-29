@@ -46,6 +46,7 @@ return [
     'play_again_title' => 'Play Again',
     'next_test_title' => 'Next Test',
     'retry_title' => 'Retry Test',
+    'back_to_war' => 'Back to Clan War',
 
     'error_heatmap' => 'error heatmap',
     'miss_count' => ':count wrong',

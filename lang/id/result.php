@@ -46,6 +46,7 @@ return [
     'play_again_title' => 'Main Lagi',
     'next_test_title' => 'Tes Berikutnya',
     'retry_title' => 'Ulangi Tes',
+    'back_to_war' => 'Kembali ke Clan War',
 
     'error_heatmap' => 'heatmap kesalahan',
     'miss_count' => ':count salah',

@@ -65,6 +65,16 @@ class TypingResult extends Component
     public $afk = false;
 
     /**
+     * War context when this result came from a Clan War attempt (['mode' => ..., 'config' => ...]),
+     * null for an ordinary solo run. Drives the "Back to Clan War" action in place of the
+     * solo Next Test / Retry buttons: a war attempt is one-shot, so replaying it is meaningless
+     * and the only sensible next step is returning to the war page.
+     *
+     * @var array{mode: string, config: string}|null
+     */
+    public $war = null;
+
+    /**
      * Achievement KEYS unlocked by this very session, straight from
      * AchievementService::syncUnlocks(). Titles are resolved in the view from the lang
      * files -- the only place they live. Empty for guests and for abandoned runs.
@@ -109,6 +119,8 @@ class TypingResult extends Component
         $this->afk = $result['afk'] ?? false;
         // `?? []` on purpose: a session stored before this key existed must still render.
         $this->newAchievements = $result['newAchievements'] ?? [];
+        // `?? null`: solo runs (and pre-deploy sessions) simply have no war context.
+        $this->war = $result['war'] ?? null;
     }
 
     /**

@@ -936,6 +936,14 @@ class TypingEngine extends Component
             // Compact by design: indices only. The result page reconstructs words from
             // textToType (already above) rather than us storing the string twice.
             'errorEvents' => $errorEvents,
+            // War context so the result screen can send the player BACK to Clan War instead
+            // of into a fresh solo test. A war attempt is one-shot (the claim is now filled),
+            // so "Next Test / Retry" makes no sense here -- the way forward is the war page.
+            // Null on an ordinary solo run.
+            'war' => $this->warLock !== null ? [
+                'mode' => $this->warLock['mode'],
+                'config' => $this->warLock['config'],
+            ] : null,
         ]);
         session()->save();
 
@@ -984,7 +992,11 @@ class TypingEngine extends Component
 
         session()->flash('result_rejected', __(self::REJECTION_MESSAGES[$reason] ?? 'typing.result_rejected'));
 
-        return $this->redirect(route('typing'));
+        // A rejected WAR attempt never filled its claim, so the slot is still ours and
+        // unplayed. Keep the war_claim on the redirect so the player lands back inside the
+        // locked war attempt (resolveWarClaim re-validates it) rather than being dumped into
+        // a solo session with no way back. On a solo run there's no param to carry.
+        return $this->redirect(route('typing', $this->warClaimId ? ['war_claim' => $this->warClaimId] : []));
     }
 
     /**

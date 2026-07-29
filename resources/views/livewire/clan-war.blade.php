@@ -99,9 +99,20 @@
                             </p>
                         </div>
                     </div>
-                    <div class="text-right">
-                        <p class="font-mono text-xs uppercase tracking-widest text-muted">{{ __('clan.war.your_points') }}</p>
-                        <p class="font-mono text-2xl sm:text-3xl font-bold text-gold tabular-nums">{{ rtrim(rtrim(number_format($this->myClanPoints, 1), '0'), '.') }}</p>
+                    {{-- Scoreboard: both clans, side by side. A war with only "your points"
+                         reads as solo practice on a timer -- seeing the opponent's running
+                         total is what makes it a race. Both totals count SUBMITTED slots only
+                         (same rule as the resolver), so the number here matches the outcome. --}}
+                    <div class="flex items-center gap-4 sm:gap-6">
+                        <div class="text-right">
+                            <p class="font-mono text-xs uppercase tracking-widest text-muted">{{ __('clan.war.your_points') }}</p>
+                            <p class="font-mono text-2xl sm:text-3xl font-bold text-gold tabular-nums">{{ rtrim(rtrim(number_format($this->myClanPoints, 1), '0'), '.') }}</p>
+                        </div>
+                        <span class="font-mono text-sm text-muted">{{ __('clan.war.vs_label') }}</span>
+                        <div class="text-right">
+                            <p class="font-mono text-xs uppercase tracking-widest text-muted">{{ __('clan.war.opponent_points') }}</p>
+                            <p class="font-mono text-2xl sm:text-3xl font-bold text-foreground tabular-nums">{{ rtrim(rtrim(number_format($this->opponentClanPoints, 1), '0'), '.') }}</p>
+                        </div>
                     </div>
                 </div>
             </div>
