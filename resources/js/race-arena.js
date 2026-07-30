@@ -12,6 +12,9 @@
  */
 // Alpine 'raceArena' component: typing + sudden-death logic.
 // registerRaceArena() is idempotent (global flag).
+
+import { evaluateTyping } from './word-mechanic';
+
 const registerRaceArena = (Alpine) => {
     if (window.__raceArenaRegistered) return;
     window.__raceArenaRegistered = true;
@@ -584,35 +587,11 @@ const registerRaceArena = (Alpine) => {
                 this.nudgeBlocked();
             }
 
-            const isNewChar = this.typedText.length > this.prevTypedLength;
-            const isWrong = this.typedText.length > 0 && !targetWord.startsWith(this.typedText);
+            const verdict = evaluateTyping(targetWord, this.typedText, this.prevTypedLength);
 
-            // Reject a wrong character AS IT IS TYPED: the only way forward through a word is to
-            // type its exact prefix, so a mistyped key never enters the field at all. This is
-            // stricter than the space-level word-lock (which only blocks the jump BETWEEN words)
-            // -- here the current word can never even hold a wrong letter.
-            //
-            // Backspace is always allowed: it shortens typedText, so isNewChar is false and this
-            // branch is skipped (a shorter prefix of a valid prefix is still valid).
-            if (isNewChar && isWrong) {
-                // Still count the attempt so accuracy stays honest -- the keystroke happened,
-                // it was just refused. Without this, accuracy would read a false 100%.
-                this.totalKeystrokes++;
-                this.totalMistakes++;
-
-                // Drop the offending character; the field reverts to the last correct prefix.
-                this.typedText = this.typedText.slice(0, this.prevTypedLength);
-                this.hasError = false;
-                this.nudgeBlocked();
-
-                return;
-            }
-
-            this.hasError = false;
-
-            if (isNewChar) {
-                this.totalKeystrokes++;
-            }
+            this.hasError = verdict.hasError;
+            this.totalKeystrokes += verdict.keystrokes;
+            this.totalMistakes += verdict.mistakes;
             this.prevTypedLength = this.typedText.length;
 
             // One formula shared with the WPM ticker (see correctCharsSoFar/currentWpm).
