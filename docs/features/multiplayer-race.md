@@ -247,6 +247,41 @@ Sisa waktu dikirim sebagai **durasi relatif** dari server dan disimpan di store 
 jam **monotonic** — dua pelajaran yang sudah dibayar mahal di §3.3 dan §3.4, diterapkan sejak
 awal di sini.
 
+**Sudden death menang atas plafon keras.** Kedua jam bisa hidup bersamaan: pemain pertama
+finish di detik 170 membuka jendela sampai detik 185, sementara plafon jatuh di detik 180.
+Tanpa penjaga, jam yang lebih pendek menang diam-diam — pemain yang tersisa cuma dapat 10 dari
+15 detik, **dan banner di layarnya masih menunjukkan sisa 5 detik** saat server sudah menutup
+race. Itu kegagalan yang sama dengan §3.3/§3.4 (memperlihatkan jendela yang tak benar-benar
+dimiliki), datang dari arah sebaliknya.
+
+Karena itu **begitu `countdown_started_at` terisi, plafon keras berhenti** dan sudden death yang
+memiliki akhir race. Ini aman, bukan sekadar murah hati: sudden death yang berjalan adalah
+**bukti** race ini tidak menggantung (ada yang finish) dan ia pasti menutup dalam ≤15 detik.
+Batas yang dilepas kecil dan diketahui: `MAX_RACE_SECONDS + SUDDEN_DEATH_SECONDS`.
+
+**Aturan mulai justru sebaliknya — ia menembus sudden death.** Versi pertama membuatnya ikut
+berhenti, dan itu diam-diam membatalkan janji yang jadi alasan aturan ini ada: lawan cepat yang
+finish di detik 8 membuka jendela sampai detik 23, dan sejak saat itu pemain yang diam **tak
+pernah lagi dinilai aturan 20 detik**. Jendelanya berubah jadi `min(20, waktu_finish + 15)`
+padahal layarnya menjanjikan 20. Dua puluh detik harus berarti dua puluh detik, atau ia bukan
+aturan yang bisa dijadikan pegangan pemain.
+
+Keduanya bisa berjalan bersamaan tanpa bertabrakan: aturan mulai **hanya** menyentuh racer yang
+masih di 0%, sudden death menutup race untuk semua. Yang lebih dulu habis, itulah yang menentukan
+— dan **banner menampilkan persis minimum itu** (`startPromptRemaining`), sehingga angka di layar
+selalu angka yang sungguhan. Menampilkan grace saja akan menjanjikan waktu yang akan dirampas
+sudden death; menampilkan sudden death saja menjanjikan waktu yang akan dirampas grace. Banner
+sudden death mundur untuk pemain itu (`!showStartPrompt`) supaya tak ada dua timer bertumpuk yang
+salah satunya keliru untuknya.
+
+**Plafon 180 detik ditampilkan** sebagai jam `m:ss` di header arena — header yang sama dipakai
+racer **dan penonton**, karena penonton pun menonton race yang bisa berakhir oleh jam itu dan
+arena tak memberi mereka isyarat lain. Sengaja tenang (kecil, `text-muted`, baru memerah di bawah
+30 detik): ini sebuah **batas**, bukan ancaman — dua timer yang keras tetap di tempat keputusan
+sesungguhnya, yaitu di atas kotak input. Jam ini **disembunyikan saat sudden death** karena di
+situ plafonnya memang berhenti berlaku, dan menghitung mundur ke tenggat yang tak lagi mengatur
+apa pun adalah kebohongan yang sama sekali lagi.
+
 > **Kalibrasi:** 20 dtk dan 180 dtk adalah **tebakan awal**. Setel ulang dari data permainan
 > nyata, **bukan** intuisi — pola yang sudah tiga kali menghukum pemain jujur di proyek ini
 > (`MAX_CHARS_PER_SECOND`, `IMPOSSIBLE_CONSISTENCY`, rate limit hasil solo; lihat
@@ -555,7 +590,7 @@ menyapunya:
 | **Cakupan** | Room **`waiting`** per-member; room **`racing`** hanya kalau **seluruh** member hilang | Mencabut **satu** peserta di tengah race merusak placement, jadi satu pemain yang masih online melindungi seluruh room. Tapi kalau tak ada siapa-siapa lagi, race tak bisa menutup dirinya sendiri (§3.4: server gerbang, bukan pemicu) — room-nya **dihapus**, tanpa finalisasi, tanpa baris history, tanpa XP. Balapan yang tak diselesaikan siapa pun tak menghasilkan hasil yang layak disimpan, sejalan dengan aturan "DNF tak pernah dicatat". |
 | **Host tersapu** | **Handoff** ke member tersisa (racer diprioritaskan), atau room dihapus kalau semua tersapu | Memakai ulang `settleAbandonedRoom()`/`reassignHostIfNeeded()` yang sama dengan leave/kick — satu definisi. Sisa member disiarkan `RoomUpdated` agar slot bebas/host baru langsung ter-render. |
 | **Pemanggil dikecualikan** | `exceptUserId` = user yang halamannya baru load | Ia provably hadir; heartbeat-nya mungkin belum mendarat pada fresh load, jadi jangan sampai menyapu diri sendiri. **Batasnya:** pengecualian ini juga membuat baris **basi milik sendiri** kebal, dan itu bukan tugas sapuan ini untuk menutupnya — lihat §3.12.a. |
-| **Room `finished`** | Dihapus kalau **seluruh** member offline (`sweepStaleFinishedRooms`) | Dulu status ini **tak disapu siapa pun**: sapuan pertama memfilter `waiting`, kedua memfilter `racing`, jadi room `finished` jatuh di antaranya. Akibatnya cara paling **biasa** sebuah race berakhir — semua orang menutup tab di layar hasil — meninggalkan room beserta seluruh barisnya **selamanya**, dan pemain yang kembali besoknya di-restore ke modal hasil basi. All-or-nothing seperti race: layar hasil masih menjalankan tugasnya selama masih ada **satu** orang yang membacanya. Tak ada data yang hilang — `finalizeRace()` sudah menulis `multiplayer_match_history` dan XP jauh sebelum room bisa mencapai status ini. |
+| **Room `finished`** | Dihapus kalau **seluruh** member offline — satu query bersama room `racing` (`sweepDeadRooms`) | Dulu status ini **tak disapu siapa pun**: sapuan pertama memfilter `waiting`, kedua memfilter `racing`, jadi room `finished` jatuh di antaranya. Akibatnya cara paling **biasa** sebuah race berakhir — semua orang menutup tab di layar hasil — meninggalkan room beserta seluruh barisnya **selamanya**, dan pemain yang kembali besoknya di-restore ke modal hasil basi. All-or-nothing seperti race: layar hasil masih menjalankan tugasnya selama masih ada **satu** orang yang membacanya. Tak ada data yang hilang — `finalizeRace()` sudah menulis `multiplayer_match_history` dan XP jauh sebelum room bisa mencapai status ini. |
 
 **Catatan test:** `UserFactory` kini default **online** (`last_seen_at = now()`) karena akun uji
 merepresentasikan user aktif; test yang butuh user absen memakai state `->offline()`. Test

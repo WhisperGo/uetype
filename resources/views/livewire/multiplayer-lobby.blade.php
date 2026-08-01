@@ -494,7 +494,28 @@
                      clock from the server's authoritative remaining the moment the server
                      confirms SD, exactly what the old visible badge's x-init did. Kept so
                      removing the badge does not change WHEN the countdown starts. --}}
-                <span>@if ($this->suddenDeathActive)<span x-init="syncSuddenDeath(@js($this->suddenDeathRemaining))" class="hidden"></span>@endif</span>
+                {{-- ===== RACE CLOCK (the hard ceiling) =====
+                     The left slot is no longer empty: it carries the time left in the race, so
+                     nobody is running against a limit they cannot see. Deliberately quiet --
+                     muted, small, m:ss -- because this is a bound, not a threat; it only turns
+                     urgent (danger) under 30s. The two loud timers stay where the decision
+                     actually is: above the input.
+
+                     Placed in the shared header so SPECTATORS see it too -- they are watching a
+                     race that can end on this clock, and the arena gives them no other cue.
+
+                     `wire:ignore` for the same reason as both banners below: this subtree is
+                     morphed ~8x/second and the server renders the value empty (x-text is
+                     client-only), so without it the number freezes between 1s ticks. --}}
+                <span class="flex items-center gap-3 min-w-0">
+                    <span wire:ignore x-show="showRaceClock" x-cloak
+                        class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-widest transition-colors duration-200"
+                        :class="raceDeadlineRemaining <= 30 ? 'text-danger' : 'text-muted'">
+                        <span>{{ __('multiplayer.race_time_left') }}</span>
+                        <span class="font-bold tabular-nums" x-text="raceClockLabel"></span>
+                    </span>
+                    @if ($this->suddenDeathActive)<span x-init="syncSuddenDeath(@js($this->suddenDeathRemaining))" class="hidden"></span>@endif
+                </span>
                 <span class="flex items-center gap-3 shrink-0">
                     @if ($this->spectatorCount > 0)
                         <span class="flex items-center gap-1.5 font-mono text-[11px] text-muted">
@@ -827,7 +848,11 @@
                          Alpine only rewrites them on the next 1s tick -- so the number visibly
                          FROZE between ticks. wire:ignore blocks morphing, not Alpine, so the
                          countdown updates every second untouched. --}}
-                    <div wire:ignore x-show="suddenDeathActive && raceStarted && !isFinished" x-cloak
+                    {{-- `!showStartPrompt`: a racer still at 0% is governed by the earlier of the
+                         two clocks, and their own banner below already shows that minimum. Two
+                         urgent timers stacked above one input is noise, and the sudden-death
+                         number would be the WRONG one for them. --}}
+                    <div wire:ignore x-show="suddenDeathActive && raceStarted && !isFinished && !showStartPrompt" x-cloak
                         x-transition:enter="transition ease-out duration-200"
                         x-transition:enter-start="opacity-0 -translate-y-1"
                         x-transition:enter-end="opacity-100 translate-y-0"
@@ -860,13 +885,13 @@
                         x-transition:enter-start="opacity-0 -translate-y-1"
                         x-transition:enter-end="opacity-100 translate-y-0"
                         class="mb-3 flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl transition-colors duration-200"
-                        :class="startGraceRemaining <= 5 ? 'bg-danger/10 border border-danger/40' : 'bg-gold/10 border border-gold/40'">
-                        <span class="w-2 h-2 rounded-full animate-pulse" :class="startGraceRemaining <= 5 ? 'bg-danger' : 'bg-gold'"></span>
+                        :class="startPromptRemaining <= 5 ? 'bg-danger/10 border border-danger/40' : 'bg-gold/10 border border-gold/40'">
+                        <span class="w-2 h-2 rounded-full animate-pulse" :class="startPromptRemaining <= 5 ? 'bg-danger' : 'bg-gold'"></span>
                         <span class="font-mono text-xs font-bold uppercase tracking-widest"
-                            :class="startGraceRemaining <= 5 ? 'text-danger' : 'text-gold'">{{ __('multiplayer.start_typing_now') }}</span>
+                            :class="startPromptRemaining <= 5 ? 'text-danger' : 'text-gold'">{{ __('multiplayer.start_typing_now') }}</span>
                         <span class="font-mono font-black tabular-nums transition-all duration-200"
-                            :class="startGraceRemaining <= 5 ? 'text-danger text-2xl' : 'text-gold text-lg'"
-                            x-text="startGraceRemaining + 's'"></span>
+                            :class="startPromptRemaining <= 5 ? 'text-danger text-2xl' : 'text-gold text-lg'"
+                            x-text="startPromptRemaining + 's'"></span>
                     </div>
 
                     <!-- SINGLE-WORD INPUT FIELD WITH DYNAMIC ERROR HIGHLIGHTING -->

@@ -50,6 +50,7 @@ return [
 
     'sudden_death' => 'Sudden Death',
     'start_typing_now' => 'Start typing',
+    'race_time_left' => 'Time left',
     'room_label' => 'Room',
     'race_starting' => 'The Race is Starting',
     'mascot_track' => 'Mascot Race Track',

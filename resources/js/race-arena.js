@@ -323,18 +323,47 @@ const registerRaceArena = (Alpine) => {
          * That was the actual complaint; enforcing it silently would have fixed the hang and
          * left the game feeling arbitrary instead.
          */
+        /**
+         * Seconds an idle racer actually has left -- the EARLIER of the two clocks that can
+         * end their race.
+         *
+         * Both can genuinely be live at once: a fast opponent can finish a 45-word text well
+         * inside the 20-second grace window, and sudden death then runs on top of it. Showing
+         * the grace number alone would promise time that sudden death is about to take away;
+         * showing sudden death alone would promise time the grace rule is about to take away.
+         * The minimum is the only number that is true in both directions -- the same principle
+         * as §3.3/§3.4, applied before it could become another bug.
+         */
+        get startPromptRemaining() {
+            return this.suddenDeathActive
+                ? Math.min(this.startGraceRemaining, this.suddenDeathRemaining)
+                : this.startGraceRemaining;
+        },
+
         get showStartPrompt() {
             return this.raceStarted
                 && !this.isSpectator
                 && !this.isFinished
                 && !this.lockedByTimeout
-                // Sudden death outranks it: a fast opponent can finish a 45-word text inside
-                // the grace window, so both clocks can genuinely be live at once. Two urgent
-                // red timers stacked above the input is noise, and the shorter one is the one
-                // that decides this player's race.
-                && !this.suddenDeathActive
                 && this.progressPercent === 0
-                && this.startGraceRemaining > 0;
+                && this.startPromptRemaining > 0;
+        },
+
+        /**
+         * Whole race time left (the hard ceiling), shown so nobody is racing against a limit
+         * they cannot see. Hidden once sudden death starts: the ceiling stands down then
+         * (see resolveRaceDeadlinesIfElapsed), so continuing to display it would be counting
+         * toward a deadline that no longer governs anything.
+         */
+        get showRaceClock() {
+            return this.raceStarted && !this.suddenDeathActive && this.raceDeadlineRemaining > 0;
+        },
+
+        /** m:ss for the race clock -- a bare "147" reads as nothing at this scale. */
+        get raceClockLabel() {
+            const left = Math.max(0, this.raceDeadlineRemaining);
+
+            return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
         },
 
         init() {
@@ -428,7 +457,11 @@ const registerRaceArena = (Alpine) => {
             // costs one resolution. Deliberately does NOT lock the local race: the grace
             // deadline drops only the idle players, and everyone else must keep typing.
             const askServerToResolve = (left) => {
-                if (left <= 0 && this.raceStarted && !this.lockedByTimeout && this.$wire) {
+                // Skipped while sudden death runs: that window owns the ending server-side
+                // (see resolveRaceDeadlinesIfElapsed), so this would only spend a round-trip
+                // to be told no.
+                if (left <= 0 && this.raceStarted && !this.lockedByTimeout
+                    && !this.suddenDeathActive && this.$wire) {
                     this.$wire.checkRaceDeadline();
                 }
             };

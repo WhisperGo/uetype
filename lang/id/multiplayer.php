@@ -50,6 +50,7 @@ return [
 
     'sudden_death' => 'Sudden Death',
     'start_typing_now' => 'Mulai mengetik',
+    'race_time_left' => 'Sisa waktu',
     'room_label' => 'Ruang',
     'race_starting' => 'Balapan Dimulai',
     'mascot_track' => 'Lintasan Balap Maskot',

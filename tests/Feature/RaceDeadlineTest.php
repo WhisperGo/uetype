@@ -225,6 +225,157 @@ it('keeps a genuine finisher’s time when the hard limit closes the race', func
         ->and($memberTertinggal->fresh()->place)->toBeNull();
 });
 
+// ===== PLAFON KERAS vs SUDDEN DEATH =====
+
+/**
+ * Dua jam bisa hidup bersamaan, dan yang satu tak boleh memotong yang lain.
+ *
+ * Pemain pertama finish di detik 170 menyalakan sudden death sampai detik 185 — tapi plafon
+ * keras jatuh di detik 180. Tanpa penjaga ini, pemain yang tersisa hanya dapat 10 dari 15
+ * detik jatahnya, dan yang paling merusak: banner di layarnya **masih menunjukkan sisa 5
+ * detik** saat server sudah menutup race. Itu persis kelas bug yang sudah dua kali dibayar di
+ * §3.3 dan §3.4 — pemain melihat jendela yang tak benar-benar ia punya.
+ *
+ * Plafon keras adalah jaring anti-menggantung. Sudden death yang berjalan membuktikan race ini
+ * TIDAK menggantung (ada yang finish) dan pasti menutup dirinya dalam <=15 detik, jadi jaring
+ * itu tak punya alasan untuk ikut campur.
+ */
+it('does not let the hard limit cut a running sudden-death window short', function () {
+    $finisher = User::factory()->create();
+    $masihNgetik = User::factory()->create();
+
+    // Race sudah lewat plafon keras, tapi sudden death baru berjalan 11 dari 15 detik.
+    $room = deadlineRoom('DL0015', $finisher, MultiplayerLobby::MAX_RACE_SECONDS + 1);
+    $room->update(['countdown_started_at' => now()->subSeconds(11)]);
+
+    RoomMember::create([
+        'room_id' => $room->id, 'user_id' => $finisher->id, 'role' => RoomMember::ROLE_PLAYER,
+        'is_ready' => true, 'progress_percent' => 100, 'accuracy' => 97, 'wpm' => 60,
+        'finished_time_seconds' => 170,
+    ]);
+    $member = deadlineRacer($room, $masihNgetik, progress: 80);
+
+    Livewire::actingAs($masihNgetik)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'DL0015')
+        ->set('step', 'racing')
+        ->call('checkRaceDeadline');
+
+    // 4 detik terakhirnya utuh: race masih jalan, dan ia belum di-DNF.
+    expect($room->fresh()->status)->toBe('racing')
+        ->and($member->fresh()->finished_time_seconds)->toBeNull();
+});
+
+/** Setelah jendelanya benar-benar habis, sudden death sendiri yang menutup — bukan menggantung. */
+it('still closes once the sudden-death window itself elapses past the hard limit', function () {
+    $finisher = User::factory()->create();
+    $masihNgetik = User::factory()->create();
+
+    $room = deadlineRoom('DL0016', $finisher, MultiplayerLobby::MAX_RACE_SECONDS + 20);
+    $room->update(['countdown_started_at' => now()->subSeconds(16)]); // 15 dtk sudah lewat
+
+    RoomMember::create([
+        'room_id' => $room->id, 'user_id' => $finisher->id, 'role' => RoomMember::ROLE_PLAYER,
+        'is_ready' => true, 'progress_percent' => 100, 'accuracy' => 97, 'wpm' => 60,
+        'finished_time_seconds' => 170,
+    ]);
+    $member = deadlineRacer($room, $masihNgetik, progress: 80);
+
+    Livewire::actingAs($masihNgetik)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'DL0016')
+        ->set('step', 'racing')
+        ->call('checkSuddenDeath');
+
+    expect($room->fresh()->status)->toBe('finished')
+        ->and($member->fresh()->finished_time_seconds)->toBe(RoomMember::DNF_SENTINEL_SECONDS);
+});
+
+/**
+ * Aturan MULAI, berbeda dari plafon, tetap berjalan MENEMBUS sudden death.
+ *
+ * Versi pertama membuatnya ikut berhenti, dan itu diam-diam membatalkan janji yang jadi alasan
+ * aturan ini ada: lawan cepat yang finish di detik 8 membuka jendela sudden death sampai detik
+ * 23, dan sejak saat itu pemain yang diam tak pernah lagi dinilai aturan 20 detik — jendelanya
+ * berubah jadi `min(20, waktu_finish + 15)`, padahal layarnya menjanjikan 20.
+ *
+ * Dua puluh detik harus berarti dua puluh detik, atau ia bukan aturan yang bisa dijadikan
+ * pegangan pemain.
+ */
+it('keeps enforcing the start grace right through a sudden-death window', function () {
+    $finisher = User::factory()->create();
+    $belumNgetik = User::factory()->create();
+    $ngetik = User::factory()->create();
+
+    // Finish cepat di detik 8 -> sudden death sampai detik 23. Grace tetap jatuh di detik 20.
+    $room = deadlineRoom('DL0017', $finisher, MultiplayerLobby::START_GRACE_SECONDS + 1);
+    $room->update(['countdown_started_at' => now()->subSeconds(13)]);
+
+    RoomMember::create([
+        'room_id' => $room->id, 'user_id' => $finisher->id, 'role' => RoomMember::ROLE_PLAYER,
+        'is_ready' => true, 'progress_percent' => 100, 'accuracy' => 98, 'wpm' => 90,
+        'finished_time_seconds' => 8,
+    ]);
+    $diam = deadlineRacer($room, $belumNgetik);
+    $aktif = deadlineRacer($room, $ngetik, progress: 45);
+
+    Livewire::actingAs($belumNgetik)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'DL0017')
+        ->set('step', 'racing')
+        ->call('checkRaceDeadline');
+
+    // Yang diam tetap dijatuhkan aturan 20 detik; yang mengetik tak tersentuh dan race
+    // dibiarkan sudden death yang menutup.
+    expect($diam->fresh()->finished_time_seconds)->toBe(RoomMember::DNF_SENTINEL_SECONDS)
+        ->and($aktif->fresh()->finished_time_seconds)->toBeNull()
+        ->and($room->fresh()->status)->toBe('racing');
+});
+
+/**
+ * Yang ditampilkan ke pemain diam harus deadline SEBENARNYA, yaitu yang lebih dulu habis dari
+ * kedua jam. Menampilkan grace saja menjanjikan waktu yang akan dirampas sudden death;
+ * menampilkan sudden death saja menjanjikan waktu yang akan dirampas grace.
+ */
+it('shows an idle racer the earlier of the two clocks, never just one of them', function () {
+    $arena = file_get_contents(resource_path('js/race-arena.js'));
+    $markup = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php')));
+
+    expect($arena)
+        ->toContain('Math.min(this.startGraceRemaining, this.suddenDeathRemaining)');
+
+    // Banner memakai minimum itu, bukan angka grace mentah.
+    expect($markup)
+        ->toContain('x-text="startPromptRemaining + \'s\'"')
+        ->not->toContain('x-text="startGraceRemaining + \'s\'"');
+
+    // Dan banner sudden death mundur untuk pemain itu, supaya tak ada dua timer bertumpuk
+    // yang salah satunya menunjukkan angka yang keliru untuknya.
+    expect($markup)->toContain('suddenDeathActive && raceStarted && !isFinished && !showStartPrompt');
+});
+
+/**
+ * PERMINTAAN EKSPLISIT: batas 180 detik harus TERLIHAT. Batas yang tak terlihat membuat race
+ * yang tiba-tiba ditutup terasa seperti bug, bukan aturan.
+ */
+it('shows the race clock to racers and spectators alike', function () {
+    $arena = file_get_contents(resource_path('js/race-arena.js'));
+    $markup = tanpaKomentarBlade(file_get_contents(resource_path('views/livewire/multiplayer-lobby.blade.php')));
+
+    // m:ss, bukan detik mentah -- "147" tak terbaca sebagai waktu pada skala ini.
+    expect($arena)->toContain('raceClockLabel');
+
+    // Ada di header bersama (racer + spectator memakai header yang sama), dan kebal morph.
+    expect($markup)
+        ->toContain('wire:ignore x-show="showRaceClock"')
+        ->toContain('multiplayer.race_time_left')
+        ->toContain('x-text="raceClockLabel"');
+});
+
+/** Jam race disembunyikan saat sudden death: plafonnya memang berhenti berlaku di situ. */
+it('hides the race clock once the ceiling stops governing', function () {
+    $arena = file_get_contents(resource_path('js/race-arena.js'));
+
+    expect($arena)->toContain('this.raceStarted && !this.suddenDeathActive && this.raceDeadlineRemaining > 0');
+});
+
 // ===== KONSEKUENSI HASIL =====
 
 /**

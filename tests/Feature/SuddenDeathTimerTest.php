@@ -224,7 +224,12 @@ test('banner sudden death racer kebal morph lewat wire:ignore', function () {
 
     // Banner di atas kotak input harus wire:ignore supaya morph ~8x/detik tak menghapus
     // x-text-nya dan membekukan angkanya.
-    expect($markup)->toContain('wire:ignore x-show="suddenDeathActive && raceStarted && !isFinished"');
+    //
+    // `!showStartPrompt` ikut di syaratnya sejak deadline mulai ditambahkan: pemain yang masih
+    // di 0% dikuasai jam yang lebih dulu habis di antara grace dan sudden death, dan banner
+    // mereka sendiri sudah menampilkan minimum itu — angka sudden death justru KELIRU untuk
+    // mereka. Yang dijaga test ini tetap sama: wire:ignore-nya ada.
+    expect($markup)->toContain('wire:ignore x-show="suddenDeathActive && raceStarted && !isFinished && !showStartPrompt"');
 });
 
 test('penonton (spectator/selesai/menyerah) tetap melihat countdown sudden death', function () {

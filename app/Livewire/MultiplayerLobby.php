@@ -1237,10 +1237,35 @@ class MultiplayerLobby extends Component
 
         $elapsed = now()->diffInSeconds($room->race_starts_at, true);
 
-        if ($elapsed >= self::MAX_RACE_SECONDS) {
+        // The CEILING -- and only the ceiling -- stands down once sudden death is running.
+        //
+        // Otherwise the two clocks race each other and the shorter one silently wins: a player
+        // finishing at second 170 opens a window to 185, but the ceiling at 180 would close the
+        // room with five seconds still on the countdown the remaining player can see. That is
+        // the same failure §3.3/§3.4 were written about -- showing someone a window they do not
+        // actually have -- arriving from the opposite direction.
+        //
+        // Standing down is safe rather than merely kind: a running sudden death is PROOF the
+        // race is not hung (somebody finished), and it is guaranteed to close within
+        // SUDDEN_DEATH_SECONDS. The ceiling exists to catch races that hang; this is not one.
+        // The bound it gives up is small and known: MAX_RACE_SECONDS + SUDDEN_DEATH_SECONDS.
+        if (! $room->countdown_started_at && $elapsed >= self::MAX_RACE_SECONDS) {
             return $this->closeRaceNow($room);
         }
 
+        // The START GRACE, by contrast, keeps running THROUGH sudden death.
+        //
+        // It used to stand down here too, and that quietly broke the promise the rule exists to
+        // make. A fast opponent finishing at second 8 opened a sudden-death window to 23, and
+        // from that moment the idle player was no longer judged by this rule at all -- their
+        // window became min(20, first_finish + 15) instead of the 20 seconds they were shown.
+        // Twenty seconds has to mean twenty seconds, or it is not a rule players can act on.
+        //
+        // Safe to run alongside sudden death because the two never contradict each other: this
+        // one only ever touches racers still sitting at 0%, and sudden death closes the race
+        // for everyone. Whichever expires first is the one that decides, and the banner shows
+        // exactly that minimum (see startPromptRemaining in race-arena.js) so the number on
+        // screen is always the real one.
         if (! $includeStartGrace || $elapsed < self::START_GRACE_SECONDS) {
             return false;
         }
