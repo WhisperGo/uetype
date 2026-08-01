@@ -73,7 +73,11 @@ class MultiplayerLobby extends Component
 
     // Initial race countdown ("3, 2, 1, GO!"). Server sets race_starts_at = now() + this
     // so all clients stay in sync.
-    private const COUNTDOWN_SECONDS = 3;
+    //
+    // Public because it is not only a countdown length: it is the reason race_starts_at sits
+    // in the FUTURE for the first few seconds of a 'racing' room, which is the window every
+    // clock derived from race_starts_at has to survive (see RaceDeadlineTest).
+    public const COUNTDOWN_SECONDS = 3;
 
     // Separate capacities: racers and spectators are each capped at 5. Single constants
     // so join/toggle/guard don't scatter magic numbers.
@@ -1235,7 +1239,13 @@ class MultiplayerLobby extends Component
             return false;
         }
 
-        $elapsed = now()->diffInSeconds($room->race_starts_at, true);
+        // Signed, and shared with the two accessors the player actually sees: race_starts_at
+        // sits in the FUTURE for the length of the 3-2-1 countdown, and an absolute diff turns
+        // that into elapsed time the race has not spent yet. Latent here rather than active --
+        // an absolute pre-start value never exceeds COUNTDOWN_SECONDS, so it could not reach
+        // either threshold -- but the only thing making it safe is that the countdown happens
+        // to be short, and that is not an invariant written down anywhere.
+        $elapsed = $this->raceElapsedSeconds($room);
 
         // The CEILING -- and only the ceiling -- stands down once sudden death is running.
         //

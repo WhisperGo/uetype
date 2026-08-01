@@ -15,6 +15,17 @@
 
 import { evaluateTyping } from './word-mechanic';
 
+/**
+ * How long a client waits before asking the server again to resolve an expired race deadline.
+ *
+ * The ask has to be able to REPEAT (see askServerToResolve), but it must not become a poll:
+ * every racer and spectator in the room runs this loop, and the server resolves the deadline
+ * on the first ask that is actually due. Five seconds keeps a lost or premature attempt from
+ * stranding a race while costing at most one request per client per five seconds, only ever
+ * while a clock is already at zero.
+ */
+const DEADLINE_RETRY_MS = 5000;
+
 const registerRaceArena = (Alpine) => {
     if (window.__raceArenaRegistered) return;
     window.__raceArenaRegistered = true;
@@ -311,6 +322,17 @@ const registerRaceArena = (Alpine) => {
             return this.$store.race ? this.$store.race.ceilingRemainingSeconds() : 0;
         },
 
+        // The store's shared 1s tick, exposed so it can be $watch'd from here. Watching
+        // '$store.race.now' directly would throw on the render where the store isn't up yet;
+        // every other reader in this component already guards it the same way.
+        get _clockTick() {
+            return this.$store.race ? this.$store.race.now : 0;
+        },
+
+        // Monotonic timestamp of the last checkRaceDeadline() call, so the retry above is
+        // throttled rather than fired on every tick.
+        _lastDeadlineAsk: 0,
+
         /**
          * Show the "start typing" countdown.
          *
@@ -448,26 +470,42 @@ const registerRaceArena = (Alpine) => {
                 );
             }
 
-            // Ask the SERVER to resolve the deadline when either clock reaches zero. This is
-            // the only signal available when nobody is typing: the server also enforces both
+            // Ask the SERVER to resolve the deadline once a clock reaches zero. This is the
+            // only signal available when nobody is typing: the server also enforces both
             // deadlines on the progress path, but that path needs someone to still be emitting.
             //
-            // Fires once per crossing (Alpine watches value CHANGES, and both settle at 0), and
-            // resolveRaceDeadlinesIfElapsed is idempotent, so several clients firing together
-            // costs one resolution. Deliberately does NOT lock the local race: the grace
-            // deadline drops only the idle players, and everyone else must keep typing.
-            const askServerToResolve = (left) => {
-                // Skipped while sudden death runs: that window owns the ending server-side
-                // (see resolveRaceDeadlinesIfElapsed), so this would only spend a round-trip
-                // to be told no.
-                if (left <= 0 && this.raceStarted && !this.lockedByTimeout
-                    && !this.suddenDeathActive && this.$wire) {
-                    this.$wire.checkRaceDeadline();
-                }
+            // Driven by the store's 1s tick rather than by $watch on the countdowns themselves,
+            // and that is the fix rather than a refinement. Alpine's $watch fires on a value
+            // CHANGE; both clocks reach 0 and then sit there forever, so watching them gives
+            // exactly ONE attempt per race. One dropped request -- a throttled tab, a failed
+            // round-trip, or a clock armed slightly early being told "not yet" -- and the
+            // server is never asked again. A race that hangs is precisely the bug this whole
+            // feature exists to prevent, so the trigger must be able to repeat.
+            //
+            // resolveRaceDeadlinesIfElapsed is idempotent and race-safe, so a retry (or several
+            // clients retrying together) costs one resolution. Deliberately does NOT lock the
+            // local race: the grace deadline drops only the idle players, and everyone else
+            // must keep typing.
+            const askServerToResolve = () => {
+                if (!this.raceStarted || this.lockedByTimeout || !this.$wire) return;
+
+                // The ceiling stands down while sudden death runs (that window owns the ending
+                // server-side), but the START GRACE keeps running straight through it -- so the
+                // guard belongs on the ceiling alone. Applying it to both is what left the
+                // server willing to drop an idle player while no client would ever ask.
+                const due = this.startGraceRemaining <= 0
+                    || (this.raceDeadlineRemaining <= 0 && !this.suddenDeathActive);
+
+                if (!due) return;
+
+                const at = performance.now();
+                if (at - this._lastDeadlineAsk < DEADLINE_RETRY_MS) return;
+
+                this._lastDeadlineAsk = at;
+                this.$wire.checkRaceDeadline();
             };
 
-            this.$watch('startGraceRemaining', askServerToResolve);
-            this.$watch('raceDeadlineRemaining', askServerToResolve);
+            this.$watch('_clockTick', askServerToResolve);
 
             // A word's line number is only valid for the WIDTH and FONT it was measured at, so
             // every cause of a re-wrap has to drop the snapshot and re-measure. Miss one and

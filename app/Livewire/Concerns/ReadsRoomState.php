@@ -331,9 +331,7 @@ trait ReadsRoomState
             return 0;
         }
 
-        $elapsed = now()->diffInSeconds($room->race_starts_at, true);
-
-        return max(0, MultiplayerLobby::START_GRACE_SECONDS - (int) floor($elapsed));
+        return max(0, MultiplayerLobby::START_GRACE_SECONDS - (int) floor($this->raceElapsedSeconds($room)));
     }
 
     /** Seconds left before the hard race ceiling closes the room; a countdown, same rules as above. */
@@ -345,9 +343,30 @@ trait ReadsRoomState
             return 0;
         }
 
-        $elapsed = now()->diffInSeconds($room->race_starts_at, true);
+        return max(0, MultiplayerLobby::MAX_RACE_SECONDS - (int) floor($this->raceElapsedSeconds($room)));
+    }
 
-        return max(0, MultiplayerLobby::MAX_RACE_SECONDS - (int) floor($elapsed));
+    /**
+     * Seconds since the race started -- NEGATIVE while the 3-2-1 countdown is still running.
+     *
+     * The sign is the whole point. startRace() writes `status = 'racing'` in the same update as
+     * `race_starts_at = now() + COUNTDOWN_SECONDS`, so for the first few seconds of a racing
+     * room the start line sits in the FUTURE. An absolute diff reads that as three seconds
+     * already spent and hands every clock derived from it a head start it never had.
+     *
+     * That is not cosmetic: the arena locks its countdowns from whatever remaining the server
+     * reported when THAT page rendered (armRaceDeadlines, earliest-wins), and every player
+     * renders a different fraction of a second apart -- so one shared deadline showed a
+     * different number on every screen, and the enforcement it drove fired early enough to be
+     * refused and then never asked again.
+     *
+     * Same lesson, same file: getRaceStartsInMsProperty() below has always used the signed
+     * form, and its comment already says "May be negative". Shared here so the two clocks and
+     * MultiplayerLobby::resolveRaceDeadlinesIfElapsed() cannot drift on the sign again.
+     */
+    protected function raceElapsedSeconds(Room $room): float
+    {
+        return -(float) now()->diffInSeconds($room->race_starts_at, false);
     }
 
     /** Absolute time (ISO string) when the race officially starts, for a synced 3-2-1 countdown. */

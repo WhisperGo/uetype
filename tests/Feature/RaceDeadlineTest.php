@@ -376,6 +376,152 @@ it('hides the race clock once the ceiling stops governing', function () {
     expect($arena)->toContain('this.raceStarted && !this.suddenDeathActive && this.raceDeadlineRemaining > 0');
 });
 
+// ===== TITIK NOL KEDUA JAM =====
+
+/**
+ * KEDUA JAM MULAI DI `race_starts_at`, BUKAN SAAT ARENA DIRENDER.
+ *
+ * Ini gampang sekali terlewat: startRace() menulis `status = 'racing'` BERSAMAAN dengan
+ * `race_starts_at = now() + COUNTDOWN_SECONDS`, jadi arena — beserta kedua jamnya — dirender
+ * tiga detik SEBELUM race benar-benar dimulai. Selama tiga detik itu `now - race_starts_at`
+ * bernilai negatif, dan `diffInSeconds($absolute: true)` membalikkannya jadi positif: server
+ * melapor "sudah lewat 3 detik" untuk race yang belum jalan, lalu memotong kedua jam segitu.
+ *
+ * Akibatnya nyata dan per-pemain, bukan sekadar kosmetik: klien mengunci deadline dari sisa
+ * detik SAAT HALAMANNYA dirender (armRaceDeadlines, earliest-wins), dan tiap pemain merender
+ * di milidetik berbeda — host di T-3.0 mengunci detik 14, pemain lain di T-2.8 mengunci detik
+ * 15, dan pemain yang reload di tengah race justru satu-satunya yang mengunci detik 20 yang
+ * benar. Timer yang sama menunjukkan angka berbeda di tiap layar.
+ *
+ * Jawaban yang benar sudah ada di berkas yang sama sejak lama: getRaceStartsInMsProperty()
+ * memakai selisih BERTANDA dan komentarnya menulis eksplisit "May be negative". Kedua accessor
+ * ini menyalin polanya tanpa menyalin tandanya. Test inilah yang absen, dan itulah kenapa bug
+ * ini lolos sementara seluruh test lain hijau — semuanya memanggil checkRaceDeadline() pada
+ * race yang SUDAH berjalan, jadi tak satu pun pernah melewati jendela pra-start.
+ */
+it('starts both clocks at race_starts_at, not at the moment the arena renders', function () {
+    $this->freezeTime();
+
+    $host = User::factory()->create();
+
+    // Race dijadwalkan tiga detik ke depan: persis keadaan selama hitung mundur 3-2-1.
+    $room = deadlineRoom('DL0020', $host, -MultiplayerLobby::COUNTDOWN_SECONDS);
+    deadlineRacer($room, $host);
+
+    $lobby = Livewire::actingAs($host)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'DL0020')
+        ->set('step', 'racing')
+        ->instance();
+
+    // Pemain memang punya 3 detik hitung mundur DITAMBAH jendela penuhnya, bukan dikurangi.
+    expect($lobby->startGraceRemaining)
+        ->toBe(MultiplayerLobby::START_GRACE_SECONDS + MultiplayerLobby::COUNTDOWN_SECONDS)
+        ->and($lobby->raceDeadlineRemaining)
+        ->toBe(MultiplayerLobby::MAX_RACE_SECONDS + MultiplayerLobby::COUNTDOWN_SECONDS);
+});
+
+it('has both clocks read their full constant exactly at the start line', function () {
+    $this->freezeTime();
+
+    $host = User::factory()->create();
+
+    $room = deadlineRoom('DL0021', $host, 0);
+    deadlineRacer($room, $host);
+
+    $lobby = Livewire::actingAs($host)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'DL0021')
+        ->set('step', 'racing')
+        ->instance();
+
+    expect($lobby->startGraceRemaining)->toBe(MultiplayerLobby::START_GRACE_SECONDS)
+        ->and($lobby->raceDeadlineRemaining)->toBe(MultiplayerLobby::MAX_RACE_SECONDS);
+});
+
+it('counts both clocks down once the race is genuinely running', function () {
+    $this->freezeTime();
+
+    $host = User::factory()->create();
+
+    $room = deadlineRoom('DL0022', $host, 5);
+    deadlineRacer($room, $host);
+
+    $lobby = Livewire::actingAs($host)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'DL0022')
+        ->set('step', 'racing')
+        ->instance();
+
+    expect($lobby->startGraceRemaining)->toBe(MultiplayerLobby::START_GRACE_SECONDS - 5)
+        ->and($lobby->raceDeadlineRemaining)->toBe(MultiplayerLobby::MAX_RACE_SECONDS - 5);
+});
+
+/**
+ * Sisi kedua dari bug yang sama: klien yang mengunci jam terlalu pendek akan bertanya ke server
+ * TERLALU CEPAT, server menjawab "belum", dan karena pemicunya dulu sebuah $watch yang hanya
+ * menyala sekali per perubahan nilai — dan nilainya lalu diam di 0 selamanya — tak ada yang
+ * pernah bertanya lagi. Aturan 20 detik jadi tak pernah menjatuhkan siapa pun.
+ *
+ * Test ini mengunci setengah bagian server: bertanya sebelum waktunya tak boleh melakukan apa
+ * pun, dan bertanya LAGI setelah waktunya harus tetap bekerja. Setengah bagian klien (pemicu
+ * yang berulang, bukan sekali tembak) dijaga oleh assertion race-arena.js di bawah.
+ */
+it('stays answerable after an early check: asking too soon must not disarm the rule', function () {
+    $diam = User::factory()->create();
+    $ngetik = User::factory()->create();
+
+    // Detik 14 -- persis titik di mana klien yang salah-kunci akan bertanya.
+    $room = deadlineRoom('DL0023', $ngetik, MultiplayerLobby::START_GRACE_SECONDS - 6);
+    $member = deadlineRacer($room, $diam);
+    deadlineRacer($room, $ngetik, progress: 30);
+
+    $lobby = Livewire::actingAs($diam)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'DL0023')
+        ->set('step', 'racing')
+        ->call('checkRaceDeadline');
+
+    expect($member->fresh()->finished_time_seconds)->toBeNull();
+
+    // Waktunya benar-benar habis, dan pertanyaan KEDUA harus tetap dilayani.
+    $room->update(['race_starts_at' => now()->subSeconds(MultiplayerLobby::START_GRACE_SECONDS + 1)]);
+
+    $lobby->call('checkRaceDeadline');
+
+    expect($member->fresh()->finished_time_seconds)->toBe(RoomMember::DNF_SENTINEL_SECONDS);
+});
+
+/**
+ * Pemicu klien harus BERULANG, bukan sekali tembak.
+ *
+ * `$watch` di Alpine menyala pada PERUBAHAN nilai. Kedua jam menghitung mundur ke 0 lalu diam
+ * di sana, jadi satu panggilan yang hilang — request gagal, tab ter-throttle, atau (seperti di
+ * atas) waktunya belum tiba — berarti server tak pernah ditanya lagi dan race menggantung.
+ * Justru race yang menggantung inilah yang jadi alasan fitur ini dibuat.
+ *
+ * Jadi pemicunya menumpang tick 1 detik milik store — sumber waktu yang sama yang membuat
+ * sudden death kebal morph, dan alasan yang sama kenapa interval per-instance dibuang dulu.
+ */
+it('re-asks the server on every tick instead of once per crossing', function () {
+    $arena = file_get_contents(resource_path('js/race-arena.js'));
+
+    expect($arena)
+        ->toContain('_clockTick')
+        ->toContain("this.\$watch('_clockTick', askServerToResolve)")
+        ->not->toContain("this.\$watch('startGraceRemaining', askServerToResolve)")
+        ->not->toContain("this.\$watch('raceDeadlineRemaining', askServerToResolve)");
+});
+
+/**
+ * Guard sudden death hanya boleh membungkus PLAFON. Plafon memang mundur selama sudden death
+ * (resolveRaceDeadlinesIfElapsed), tapi grace sengaja terus berjalan menembusnya — dan klien
+ * yang menolak bertanya membuat keputusan server itu tak pernah sampai ke mana-mana.
+ */
+it('keeps asking about the start grace while sudden death runs, but not about the ceiling', function () {
+    $arena = file_get_contents(resource_path('js/race-arena.js'));
+
+    expect($arena)
+        ->toContain('this.raceDeadlineRemaining <= 0 && !this.suddenDeathActive')
+        ->not->toContain('&& !this.suddenDeathActive && this.$wire');
+});
+
 // ===== KONSEKUENSI HASIL =====
 
 /**

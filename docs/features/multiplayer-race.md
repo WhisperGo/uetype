@@ -282,6 +282,47 @@ sesungguhnya, yaitu di atas kotak input. Jam ini **disembunyikan saat sudden dea
 situ plafonnya memang berhenti berlaku, dan menghitung mundur ke tenggat yang tak lagi mengatur
 apa pun adalah kebohongan yang sama sekali lagi.
 
+**Kedua jam mulai di `race_starts_at`, bukan saat arena dirender.** Ini pelajaran ketiga dari
+keluarga yang sama dengan §3.3 dan §3.4, dan ia sempat lolos ke produksi. `startRace()` menulis
+`status = 'racing'` **dalam update yang sama** dengan `race_starts_at = now() + COUNTDOWN_SECONDS`,
+jadi selama hitung mundur 3-2-1 garis start berada di **masa depan**. `diffInSeconds($absolute: true)`
+membacanya sebagai tiga detik yang **sudah** berlalu, lalu memotong kedua jam sebanyak itu:
+pemain menerima 17 dan 177, bukan 23 dan 183.
+
+Kerusakannya bukan kosmetik, dan bentuknya **per-pemain**. Klien mengunci deadline dari sisa
+detik yang dilaporkan server **saat halaman ITU dirender** (`armRaceDeadlines`, earliest-wins),
+dan tiap pemain merender terpaut milidetik: host yang menekan Start mengunci detik 14, pemain
+lain yang menerima broadcast mengunci detik 15, dan pemain yang reload di tengah race justru
+satu-satunya yang mengunci detik 20 yang benar. Satu tenggat bersama, angka berbeda di tiap
+layar. Karena `arm()` earliest-wins, morph berikutnya **mengunci nilai terpendek yang salah**
+alih-alih mengoreksinya.
+
+Lalu kerusakan kedua menyusul: klien yang mengunci terlalu pendek bertanya ke server di detik 14,
+server menjawab "belum 20", dan — karena pemicunya dulu `$watch` yang hanya menyala pada
+**perubahan** nilai, sedangkan nilainya lalu diam di 0 selamanya — **tak ada yang pernah bertanya
+lagi**. Jalur progres pun tak menolong (`$includeStartGrace: false`). Hasil bersihnya: aturan 20
+detik tak pernah menjatuhkan siapa pun, dan yang tersisa hanya banner yang hilang enam detik lebih
+awal. Kalau **semua** pemain berhenti mengetik, plafon 180 detik jatuh dalam lubang yang sama dan
+race menggantung — persis bug yang jadi alasan §3.3.a ini ditulis.
+
+Dua perbaikan, keduanya sekaligus menghapus satu asumsi diam-diam:
+
+- `ReadsRoomState::raceElapsedSeconds()` — satu definisi elapsed **bertanda** (negatif selama
+  hitung mundur), dipakai bersama oleh kedua accessor dan `resolveRaceDeadlinesIfElapsed()`,
+  sehingga tandanya tak bisa menyimpang lagi di salah satunya. Jawabannya sebenarnya sudah ada
+  di berkas yang sama sejak lama: `getRaceStartsInMsProperty()` selalu memakai bentuk bertanda,
+  dan komentarnya sudah menulis *"May be negative"*.
+- Pemicu klien menumpang **tick 1 detik milik store** (`_clockTick`), di-throttle 5 detik, bukan
+  `$watch` pada jam yang menghitung mundur. Sebuah tenggat harus bisa **ditanyakan ulang**: satu
+  request yang hilang, satu tab yang di-throttle browser, atau satu pertanyaan yang datang terlalu
+  cepat tidak boleh berarti race menggantung selamanya. Guard sudden death kini membungkus
+  **plafon saja** — sesuai pembagian di sisi server, di mana grace memang menembus sudden death.
+
+Seluruh suite hijau saat bug ini hidup, dan alasannya layak dicatat: setiap test memanggil
+`checkRaceDeadline()` pada race yang **sudah** berjalan, jadi tak satu pun pernah melewati jendela
+pra-start. `RaceDeadlineTest` sekarang mengunci ketiga titik jam itu — pra-start, garis start, dan
+sesudahnya — beserta syarat bahwa bertanya terlalu cepat tak boleh melumpuhkan aturannya.
+
 > **Kalibrasi:** 20 dtk dan 180 dtk adalah **tebakan awal**. Setel ulang dari data permainan
 > nyata, **bukan** intuisi — pola yang sudah tiga kali menghukum pemain jujur di proyek ini
 > (`MAX_CHARS_PER_SECOND`, `IMPOSSIBLE_CONSISTENCY`, rate limit hasil solo; lihat
