@@ -311,6 +311,45 @@ trait ReadsRoomState
         return max(0, self::SUDDEN_DEATH_SECONDS - (int) floor($elapsed));
     }
 
+    /**
+     * Seconds left in the start-grace window, as a countdown (20 -> 0).
+     *
+     * A RELATIVE duration, never an absolute deadline -- the same lesson already paid for
+     * twice here (the 3-2-1 countdown in getRaceStartsInMsProperty, and sudden death in
+     * SuddenDeathTriggered): a client comparing a server timestamp against its own Date.now()
+     * reads its clock skew as elapsed time, and a fast clock would show this window already
+     * expired to a player who has their full 20 seconds.
+     *
+     * Derived from the same race_starts_at and constant the server judges by, so the number
+     * shown and the number enforced cannot drift.
+     */
+    public function getStartGraceRemainingProperty(): int
+    {
+        $room = $this->roomData;
+
+        if (! $room || ! $room->race_starts_at || $room->status !== 'racing') {
+            return 0;
+        }
+
+        $elapsed = now()->diffInSeconds($room->race_starts_at, true);
+
+        return max(0, MultiplayerLobby::START_GRACE_SECONDS - (int) floor($elapsed));
+    }
+
+    /** Seconds left before the hard race ceiling closes the room; a countdown, same rules as above. */
+    public function getRaceDeadlineRemainingProperty(): int
+    {
+        $room = $this->roomData;
+
+        if (! $room || ! $room->race_starts_at || $room->status !== 'racing') {
+            return 0;
+        }
+
+        $elapsed = now()->diffInSeconds($room->race_starts_at, true);
+
+        return max(0, MultiplayerLobby::MAX_RACE_SECONDS - (int) floor($elapsed));
+    }
+
     /** Absolute time (ISO string) when the race officially starts, for a synced 3-2-1 countdown. */
     public function getRaceStartsAtProperty(): ?string
     {

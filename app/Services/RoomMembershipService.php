@@ -120,6 +120,55 @@ class RoomMembershipService
     {
         $this->sweepStaleWaitingMembers($exceptUserId);
         $this->sweepAbandonedRaces($exceptUserId);
+        $this->sweepStaleFinishedRooms($exceptUserId);
+    }
+
+    /**
+     * Delete FINISHED rooms nobody is looking at any more.
+     *
+     * These fell through a gap: the waiting sweep filters `status = 'waiting'` and the race
+     * sweep filters `status = 'racing'`, so a room that reached 'finished' was swept by
+     * neither. Everyone closing their tab on the result screen -- the single most ordinary way
+     * a race ends -- therefore left the room and every one of its member rows behind forever,
+     * and a player returning the next day was restored straight back into a stale result
+     * modal.
+     *
+     * ALL-OR-NOTHING, the same rule as sweepAbandonedRaces() and for a related reason: the
+     * result screen is still doing its job for as long as ONE person is there to read it, and
+     * pulling individual rows out from under them would empty the board they are looking at.
+     * Once nobody is left there is no board.
+     *
+     * Nothing is lost by deleting: finalizeRace() has already written the permanent
+     * multiplayer_match_history rows and the XP by the time a room can reach this status.
+     *
+     * No broadcast, for the same reason as the race sweep: every member is gone by definition.
+     */
+    private function sweepStaleFinishedRooms(?int $exceptUserId = null): void
+    {
+        $cutoff = now()->subSeconds(User::ONLINE_THRESHOLD_SECONDS);
+
+        $stale = Room::query()
+            ->where('status', 'finished')
+            ->whereDoesntHave('members', function ($member) use ($cutoff, $exceptUserId) {
+                $member->whereHas('user', function ($user) use ($cutoff, $exceptUserId) {
+                    $user->where(function ($present) use ($cutoff, $exceptUserId) {
+                        $present->where('last_seen_at', '>=', $cutoff);
+
+                        // The caller is provably here even before their first heartbeat lands.
+                        if ($exceptUserId) {
+                            $present->orWhere('id', $exceptUserId);
+                        }
+                    });
+                });
+            })
+            ->get();
+
+        if ($stale->isEmpty()) {
+            return;
+        }
+
+        // room_members cascades on the foreign key, so deleting the room clears its rows.
+        DB::transaction(fn () => Room::whereIn('id', $stale->pluck('id'))->delete());
     }
 
     /**

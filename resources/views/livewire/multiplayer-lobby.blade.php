@@ -478,6 +478,8 @@
                 raceStartsInMs: @js($this->raceStartsInMs),
                 suddenDeathActive: @js($this->suddenDeathActive),
                 suddenDeathRemaining: @js($this->suddenDeathRemaining),
+                startGraceRemaining: @js($this->startGraceRemaining),
+                raceDeadlineRemaining: @js($this->raceDeadlineRemaining),
                 resumeProgress: @js($this->myResumeProgress),
             })"
             @keydown.tab.prevent="if (raceStarted && !isFinished && !lockedByTimeout) $refs.typeInput?.focus()">
@@ -835,6 +837,36 @@
                         <span class="font-mono font-black tabular-nums text-danger transition-all duration-200"
                             :class="suddenDeathRemaining <= 5 ? 'text-2xl' : 'text-lg'"
                             x-text="suddenDeathRemaining + 's'"></span>
+                    </div>
+
+                    {{-- ===== START-TYPING COUNTDOWN =====
+                         Shown only to a racer who has not produced a single percent yet, and only
+                         while the grace window is open. This is the visible half of the start
+                         deadline: enforcing it silently would have stopped races hanging while
+                         leaving the game feeling arbitrary — the original complaint was that
+                         nothing gives a player any reason to begin.
+
+                         Gold rather than danger red, and it steps up to red under 5s: at 20
+                         seconds out this is a nudge, not a threat, and spending the alarm colour
+                         immediately would leave nothing louder for the moment it matters. Sudden
+                         death keeps red for itself (see showStartPrompt, which stands down when
+                         that banner is up).
+
+                         `wire:ignore` for exactly the reason the banner above carries it: this
+                         subtree is morphed ~8x/second and the server renders the counter with no
+                         text, so without it the number freezes between 1s ticks. --}}
+                    <div wire:ignore x-show="showStartPrompt" x-cloak
+                        x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="opacity-0 -translate-y-1"
+                        x-transition:enter-end="opacity-100 translate-y-0"
+                        class="mb-3 flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl transition-colors duration-200"
+                        :class="startGraceRemaining <= 5 ? 'bg-danger/10 border border-danger/40' : 'bg-gold/10 border border-gold/40'">
+                        <span class="w-2 h-2 rounded-full animate-pulse" :class="startGraceRemaining <= 5 ? 'bg-danger' : 'bg-gold'"></span>
+                        <span class="font-mono text-xs font-bold uppercase tracking-widest"
+                            :class="startGraceRemaining <= 5 ? 'text-danger' : 'text-gold'">{{ __('multiplayer.start_typing_now') }}</span>
+                        <span class="font-mono font-black tabular-nums transition-all duration-200"
+                            :class="startGraceRemaining <= 5 ? 'text-danger text-2xl' : 'text-gold text-lg'"
+                            x-text="startGraceRemaining + 's'"></span>
                     </div>
 
                     <!-- SINGLE-WORD INPUT FIELD WITH DYNAMIC ERROR HIGHLIGHTING -->
@@ -1207,6 +1239,56 @@
         </x-modal>
     @endauth
 
+    {{-- ===== ROOM-SWITCH CONFIRMATION =====
+         Raised whenever entering another room would abandon the one the player is in --
+         through an invite, a typed join code, or Create Room. Driven by the server property
+         $pendingRoomSwitch rather than an 'open-modal' event, because the invite path arrives
+         on a FRESH PAGE LOAD (/multiplayer?invite=CODE) and the question must already exist
+         in the first render; an event dispatched during mount() would have no listener yet.
+
+         The wire:key carries the pending state so Livewire replaces this subtree whenever it
+         changes, giving <x-modal> a new Alpine instance seeded with the right `show`. Without
+         it the modal would open on a page load but never in-page, since x-data initialises
+         once and a morph does not re-run it.
+
+         The old room's code is named explicitly: the player has to know WHICH room they are
+         about to give up, not merely be asked whether they are sure. --}}
+    @auth
+        <div wire:key="room-switch-{{ $pendingRoomSwitch ? ($pendingRoomSwitch['to'] ?? 'create') : 'none' }}">
+            <x-modal name="confirm-room-switch" maxWidth="md" :show="$pendingRoomSwitch !== null" focusable>
+                <div class="p-5 sm:p-6">
+                    <h2 class="font-mono text-xl font-semibold leading-tight text-foreground">
+                        {{ __('multiplayer.switch_confirm_title') }}
+                    </h2>
+                    <p class="mt-2 text-sm leading-6 text-muted">
+                        @if ($pendingRoomSwitch && $pendingRoomSwitch['to'])
+                            {{ __('multiplayer.switch_confirm_body', [
+                                'from' => $pendingRoomSwitch['from'],
+                                'to' => $pendingRoomSwitch['to'],
+                            ]) }}
+                        @else
+                            {{ __('multiplayer.switch_confirm_body_create', [
+                                'from' => $pendingRoomSwitch['from'] ?? '',
+                            ]) }}
+                        @endif
+                    </p>
+
+                    <div class="mt-6 flex items-center justify-end gap-2">
+                        <button type="button" wire:click="cancelRoomSwitch"
+                            class="rounded-lg px-3 py-1.5 font-mono text-sm text-muted transition-colors duration-150 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                            {{ __('multiplayer.switch_confirm_cancel') }}
+                        </button>
+
+                        <button type="button" wire:click="confirmRoomSwitch"
+                            class="rounded-lg px-3 py-1.5 font-mono text-sm font-medium text-danger transition-colors duration-150 hover:bg-danger/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                            {{ __('multiplayer.switch_confirm_ok') }}
+                        </button>
+                    </div>
+                </div>
+            </x-modal>
+        </div>
+    @endauth
+
     {{-- Host kick confirmation overlay. Opened by askKick(id, name) from a kick button
          (player card or spectator list), which stashes the target in Alpine state. The
          Confirm button calls confirmKick() -> $wire.kickMember(kickId). Same x-modal
@@ -1265,8 +1347,16 @@
 
                                 <div class="min-w-0 flex-1">
                                     <p class="font-mono text-sm font-bold text-foreground truncate">{{ $friend->username }}</p>
-                                    <p class="font-mono text-[11px] uppercase tracking-wider {{ $row['online'] ? 'text-active' : 'text-muted' }}">
-                                        {{ $row['online'] ? __('multiplayer.invite_online') : __('multiplayer.invite_offline') }}
+                                    {{-- "In another room" outranks plain online: it is the fact that
+                                         changes what inviting them MEANS. Accepting now costs them
+                                         whatever they are in the middle of, and the picker used to
+                                         look identical either way. --}}
+                                    <p class="font-mono text-[11px] uppercase tracking-wider {{ $row['busy'] && ! $row['in_room'] ? 'text-gold' : ($row['online'] ? 'text-active' : 'text-muted') }}">
+                                        @if ($row['busy'] && ! $row['in_room'])
+                                            {{ __('multiplayer.invite_busy') }}
+                                        @else
+                                            {{ $row['online'] ? __('multiplayer.invite_online') : __('multiplayer.invite_offline') }}
+                                        @endif
                                     </p>
                                 </div>
 

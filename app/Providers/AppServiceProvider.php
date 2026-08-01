@@ -2,10 +2,14 @@
 
 namespace App\Providers;
 
+use App\Listeners\DepartRoomsOnAuthChange;
 use App\Models\User;
 use App\Support\PageTitle;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
@@ -45,6 +49,13 @@ class AppServiceProvider extends ServiceProvider
         if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }
+
+        // A multiplayer room membership must not survive the login session that made it --
+        // see DepartRoomsOnAuthChange for why last_seen_at cannot answer this. Registered
+        // EXPLICITLY rather than relying on event auto-discovery: bootstrap/app.php does not
+        // call withEvents(), so a listener dropped into app/Listeners would simply never run
+        // and the failure would be silent.
+        Event::listen([Login::class, Logout::class], DepartRoomsOnAuthChange::class);
 
         Volt::mount([
             resource_path('views/livewire'),

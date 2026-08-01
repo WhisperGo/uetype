@@ -154,12 +154,54 @@ const registerRaceArena = (Alpine) => {
                 return Math.max(0, Math.ceil((this.sdDeadline - performance.now()) / 1000));
             },
 
+            // The two race deadlines, held here for exactly the reasons sdDeadline is: the
+            // monotonic clock means a wrong client clock can't shorten or extend them, and
+            // living in the store means a Livewire morph can't freeze them on a discarded
+            // Alpine instance. Both are seeded from server-issued REMAINING seconds.
+            //
+            // graceDeadline = the point an untouched racer is dropped as DNF.
+            // ceilingDeadline = the point the race closes for everyone.
+            graceDeadline: null,
+            ceilingDeadline: null,
+
+            /**
+             * Arm both race deadlines from the server's remaining seconds. Earliest-wins and
+             * idempotent, same contract as armSuddenDeath: re-seeding on a morph or a second
+             * render keeps the original deadline instead of quietly granting more time.
+             */
+            armRaceDeadlines(graceSeconds, ceilingSeconds) {
+                const arm = (current, seconds) => {
+                    const candidate = performance.now() + Math.max(0, Number(seconds) || 0) * 1000;
+                    return current === null || candidate < current ? candidate : current;
+                };
+
+                this.graceDeadline = arm(this.graceDeadline, graceSeconds);
+                this.ceilingDeadline = arm(this.ceilingDeadline, ceilingSeconds);
+                this.startClock();
+            },
+
+            /** Whole seconds before an idle racer is dropped. Reactive via `now`. */
+            graceRemainingSeconds() {
+                if (this.graceDeadline === null) return 0;
+                void this.now;
+                return Math.max(0, Math.ceil((this.graceDeadline - performance.now()) / 1000));
+            },
+
+            /** Whole seconds before the race closes for everyone. Reactive via `now`. */
+            ceilingRemainingSeconds() {
+                if (this.ceilingDeadline === null) return 0;
+                void this.now;
+                return Math.max(0, Math.ceil((this.ceilingDeadline - performance.now()) / 1000));
+            },
+
             reset() {
                 this.opponents = {};
                 this.raceKey = null;
                 this.deadline = null;
                 this.sdDeadline = null;
                 this.sdArmed = false;
+                this.graceDeadline = null;
+                this.ceilingDeadline = null;
                 this.stopClock();
             },
 
@@ -175,6 +217,8 @@ const registerRaceArena = (Alpine) => {
                 this.deadline = null; // different race -> the old deadline no longer applies
                 this.sdDeadline = null; // ...and neither does the old sudden-death window
                 this.sdArmed = false;
+                this.graceDeadline = null; // ...nor the previous race's start/ceiling clocks
+                this.ceilingDeadline = null;
             },
         });
     }
@@ -258,6 +302,41 @@ const registerRaceArena = (Alpine) => {
             return this.$store.race ? this.$store.race.sdRemainingSeconds() : 0;
         },
 
+        // Seconds before an idle racer is dropped, and before the race closes for everyone.
+        get startGraceRemaining() {
+            return this.$store.race ? this.$store.race.graceRemainingSeconds() : 0;
+        },
+
+        get raceDeadlineRemaining() {
+            return this.$store.race ? this.$store.race.ceilingRemainingSeconds() : 0;
+        },
+
+        /**
+         * Show the "start typing" countdown.
+         *
+         * Gated on progressPercent === 0 -- the SAME quantity the server judges by -- rather
+         * than on totalKeystrokes. They are not the same: two mistyped characters raise the
+         * keystroke count while progress stays at 0, and a player warned by one rule but
+         * dropped by another would be told they were fine right up until they weren't.
+         *
+         * The countdown exists because a deadline nobody can see does not make anyone start.
+         * That was the actual complaint; enforcing it silently would have fixed the hang and
+         * left the game feeling arbitrary instead.
+         */
+        get showStartPrompt() {
+            return this.raceStarted
+                && !this.isSpectator
+                && !this.isFinished
+                && !this.lockedByTimeout
+                // Sudden death outranks it: a fast opponent can finish a 45-word text inside
+                // the grace window, so both clocks can genuinely be live at once. Two urgent
+                // red timers stacked above the input is noise, and the shorter one is the one
+                // that decides this player's race.
+                && !this.suddenDeathActive
+                && this.progressPercent === 0
+                && this.startGraceRemaining > 0;
+        },
+
         init() {
             this.words = this.textToType.split(' ');
 
@@ -330,6 +409,32 @@ const registerRaceArena = (Alpine) => {
             this.$watch('suddenDeathRemaining', (left) => {
                 if (this.suddenDeathActive && left <= 0) this.lockRace();
             });
+
+            // Seed the race deadlines from the server's remaining seconds (see the store).
+            // AFTER resetForRace, so a genuinely new race starts from a clean pair.
+            if (this.$store.race) {
+                this.$store.race.armRaceDeadlines(
+                    config.startGraceRemaining ?? 0,
+                    config.raceDeadlineRemaining ?? 0,
+                );
+            }
+
+            // Ask the SERVER to resolve the deadline when either clock reaches zero. This is
+            // the only signal available when nobody is typing: the server also enforces both
+            // deadlines on the progress path, but that path needs someone to still be emitting.
+            //
+            // Fires once per crossing (Alpine watches value CHANGES, and both settle at 0), and
+            // resolveRaceDeadlinesIfElapsed is idempotent, so several clients firing together
+            // costs one resolution. Deliberately does NOT lock the local race: the grace
+            // deadline drops only the idle players, and everyone else must keep typing.
+            const askServerToResolve = (left) => {
+                if (left <= 0 && this.raceStarted && !this.lockedByTimeout && this.$wire) {
+                    this.$wire.checkRaceDeadline();
+                }
+            };
+
+            this.$watch('startGraceRemaining', askServerToResolve);
+            this.$watch('raceDeadlineRemaining', askServerToResolve);
 
             // A word's line number is only valid for the WIDTH and FONT it was measured at, so
             // every cause of a re-wrap has to drop the snapshot and re-measure. Miss one and

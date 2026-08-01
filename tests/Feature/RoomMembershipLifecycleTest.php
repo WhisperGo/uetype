@@ -25,18 +25,35 @@ function lobbyFor(User $user)
     return Livewire::actingAs($user)->test(MultiplayerLobby::class);
 }
 
+/**
+ * Leaving a room by entering another one now takes a CONFIRMATION first
+ * (RoomSwitchConfirmationTest) -- silently relocating a player was the bug. The settle
+ * behaviour these tests are about is unchanged once confirmed, so both helpers answer the
+ * question straight away.
+ *
+ * confirmRoomSwitch() is a no-op when nothing is pending, so chaining it is safe for the
+ * first create/join too and keeps each test reading as one action.
+ */
+function createRoomAs(User $user)
+{
+    return lobbyFor($user)->call('createRoom')->call('confirmRoomSwitch');
+}
+
 function joinRoomAs(User $user, string $code)
 {
-    return lobbyFor($user)->set('joinCodeInput', str_split($code))->call('joinRoom');
+    return lobbyFor($user)
+        ->set('joinCodeInput', str_split($code))
+        ->call('joinRoom')
+        ->call('confirmRoomSwitch');
 }
 
 it('deletes the room a player abandons by creating a new one', function () {
     $host = User::factory()->create();
 
-    lobbyFor($host)->call('createRoom');
+    createRoomAs($host);
     $first = Room::first();
 
-    lobbyFor($host)->call('createRoom');
+    createRoomAs($host);
 
     expect(Room::whereKey($first->id)->exists())->toBeFalse()
         ->and(Room::count())->toBe(1);
@@ -46,11 +63,11 @@ it('keeps a player in exactly one room when they join another', function () {
     $host = User::factory()->create();
     $joiner = User::factory()->create();
 
-    lobbyFor($host)->call('createRoom');
+    createRoomAs($host);
     $target = Room::first();
 
     // $joiner sudah jadi host di room-nya sendiri, lalu bergabung ke room lain.
-    lobbyFor($joiner)->call('createRoom');
+    createRoomAs($joiner);
     $own = Room::where('id', '!=', $target->id)->first();
 
     joinRoomAs($joiner, $target->code);
@@ -66,11 +83,11 @@ it('does not delete the abandoned room when other members remain', function () {
     $other = User::factory()->create();
     $target = User::factory()->create();
 
-    lobbyFor($host)->call('createRoom');
+    createRoomAs($host);
     $shared = Room::first();
     joinRoomAs($other, $shared->code);
 
-    lobbyFor($target)->call('createRoom');
+    createRoomAs($target);
     $targetRoom = Room::where('id', '!=', $shared->id)->first();
 
     // $other pergi, tapi $host masih di sana -> room TIDAK boleh ikut terhapus.
@@ -84,11 +101,11 @@ it('hands the room over to someone else when the host leaves by creating a new r
     $host = User::factory()->create();
     $other = User::factory()->create();
 
-    lobbyFor($host)->call('createRoom');
+    createRoomAs($host);
     $room = Room::first();
     joinRoomAs($other, $room->code);
 
-    lobbyFor($host)->call('createRoom');
+    createRoomAs($host);
 
     // Room tetap hidup untuk $other, dan host-nya berpindah -- bukan tetap
     // menunjuk pemain yang sudah tak ada di sana.
