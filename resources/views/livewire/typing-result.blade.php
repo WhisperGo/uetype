@@ -1,6 +1,18 @@
 <div class="text-muted font-mono selection:bg-brand selection:text-foreground outline-none py-16"
     x-data
-    @keydown.window="if($event.key === 'Tab') { $event.preventDefault(); document.getElementById('restartButton').focus(); }">
+    {{-- Tab moves focus to THIS screen's primary action. The target is resolved first and the
+         key is only swallowed once one exists: the previous version called preventDefault()
+         and then getElementById('restartButton').focus() with no guard, so on a Clan War
+         result -- where the primary action is <x-result-back-to-war />, not #restartButton --
+         every Tab press threw a TypeError after the key had already been eaten, leaving
+         nothing reachable by keyboard at all.
+
+         An attribute rather than an id: the primary action is "back to war" on one branch and
+         "next test" on another, and an id named restartButton cannot honestly name both. --}}
+    @keydown.window="if ($event.key === 'Tab') {
+        const target = $root.querySelector('[data-result-primary]');
+        if (target) { $event.preventDefault(); target.focus(); }
+    }">
     {{-- `sm:px-6 lg:px-8` to match every other page (see x-page-container). This was the one
          page stuck at a flat `px-4`, so from 640px up its content sat closer to the edge than
          the rest of the app -- visible as soon as you moved between pages. --}}
@@ -168,9 +180,10 @@
                 @endauth
 
                 @if ($war)
+                    <x-result-war-points :war="$war" :accuracy="$accuracy" />
                     <x-result-back-to-war />
                 @else
-                    <a id="restartButton" href="/typing"
+                    <a id="restartButton" data-result-primary href="/typing"
                         class="inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-mono font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition">
                         <span>{{ __('result.play_again_title') }}</span>
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -674,12 +687,13 @@
         {{-- War attempt: the run is one-shot (the claim is filled), so Next Test / Retry are
              replaced by a single way back to the war. Solo keeps the usual randomized flow. --}}
         @if ($war)
-            <div class="mt-10">
+            <div class="mt-10 space-y-4">
+                <x-result-war-points :war="$war" :accuracy="$accuracy" />
                 <x-result-back-to-war />
             </div>
         @else
             <div class="mt-10 flex items-stretch gap-3">
-                <a id="restartButton" href="/typing"
+                <a id="restartButton" data-result-primary href="/typing"
                     class="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gold text-background font-mono font-semibold text-sm hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 transition"
                     title="{{ __('result.next_test_title') }}">
                     <span>{{ __('result.next_test_title') }}</span>

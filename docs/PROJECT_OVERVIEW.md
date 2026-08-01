@@ -276,7 +276,7 @@ Livewire/Volt, jadi tak ada lagi controller kosong yang menyesatkan.
 | `MessageEdited` / `MessageDeleted` | `chat.{id}` atau `clan-chat.{id}` |
 | `FriendshipUpdated` | `friends.{userId}` |
 | `PresenceUpdated` | `friends.{friendId}` |
-| `ClanUpdated` | `clan.{userId}` |
+| `ClanUpdated` | `clan.{userId}` — toast (bila ada `notification`) **atau** refresh war senyap dengan `null`, fan-out ke seluruh member kedua clan ([clan-war.md](features/clan-war.md) §3.7) |
 
 ## 9. Dokumentasi Fitur (sudah ada, per topik)
 

@@ -74,9 +74,15 @@ it('builds the public profile url from the username, not the numeric id (anti-en
 /**
  * The href on the profile's back arrow, as rendered.
  *
- * Anchored on the aria-label and scanned backwards to the nearest href, rather than
- * matching attributes in order: the tag also carries an Alpine @click containing "> 1",
- * so any `[^>]*` between the two attributes stops at the wrong character.
+ * Anchored on the aria-label, then the WHOLE opening tag is read, rather than matching
+ * attributes in order: the tag also carries an Alpine @click containing "> 1", so any
+ * `[^>]*` walking the tag stops at the wrong character. `(?:[^>"]|"[^"]*")*` skips over
+ * anything inside a quoted value, so the `>` in that handler no longer ends the tag early.
+ *
+ * The tag is read whole rather than only up to the aria-label because the arrow is now an
+ * <x-icon-button>, and ComponentAttributeBag::merge() emits the component's own defaults
+ * (aria-label, title) BEFORE the call site's attributes -- so href sits after the label now.
+ * The assertion itself is unchanged: the href must equal the page the visitor came from.
  */
 function backArrowHref(string $html): ?string
 {
@@ -93,7 +99,11 @@ function backArrowHref(string $html): ?string
         return null;
     }
 
-    preg_match('/href="([^"]*)"/', substr($html, $tagStart, $labelPos - $tagStart), $m);
+    if (! preg_match('/<a\s(?:[^>"]|"[^"]*")*>/', substr($html, $tagStart), $tag)) {
+        return null;
+    }
+
+    preg_match('/href="([^"]*)"/', $tag[0], $m);
 
     return $m[1] ?? null;
 }

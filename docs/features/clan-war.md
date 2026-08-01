@@ -94,9 +94,76 @@ lebih responsif bagi pemain. Dicek lewat `bothClansFinishedAllModes()`.
 aplikasi. Ceiling per mode dipusatkan di katalog (satu sumber kebenaran dipakai komponen, scorer,
 dan resolver).
 
+### 3.7 Real-time lewat channel `clan.{userId}` yang sudah ada, bukan channel war baru
+
+Halaman Clan War dulu **hanya berubah saat di-reload**: poin lawan bertambah tapi layar diam,
+dan panel "menunggu di-accept" bertahan meski lawan sudah menerima tantangan.
+
+Penyebabnya bukan satu, melainkan dua yang saling menutupi:
+
+1. **Jembatannya menembak ke ruang kosong.** `clan-war.blade.php` sudah lama memuat blok
+   `@script` yang meneruskan event window `clan-updated-remote` ke `$wire.dispatch('clan-updated')`
+   — salinan persis dari halaman Clans. Tapi [`ClanWar`](../../app/Livewire/ClanWar.php) tak punya
+   `#[On(...)]` **sama sekali**, jadi dispatch itu dead code.
+2. **Tak ada yang menyiarkan.** `claimMode()`, `cancelClaim()`, dan
+   `TypingEngine::attachToWarClaim()` tak memanggil `broadcast()` sama sekali; `acceptChallenge()`
+   memang menyiarkan, tapi **hanya ke leader penantang** — padahal panel yang sama dilihat seluruh
+   member clan itu.
+
+**Yang dipakai: `ClanUpdated($userId, null)` ke tiap peserta**, lewat
+[`ClanWarBroadcast::refresh()`](../../app/Support/ClanWarBroadcast.php) +
+`ClanWar::participantUserIds()` (member **aktif** kedua clan, satu query).
+
+*Kenapa memakai ulang channel per-user, bukan membuat `war.{id}`:* `toasts.js` (`listenClan`)
+sudah menaikkan `clan-updated-remote` pada **setiap** `.clan.updated` dan hanya memunculkan toast
+bila ada `message` — jadi payload `null` sudah persis berarti "render ulang dirimu", dan setiap
+halaman yang sudah subscribe mendapatkannya gratis. Channel khusus menuntut subscription Echo
+baru, jembatan JS baru, dan siklus subscribe/unsubscribe baru untuk halaman yang ketiganya sudah
+punya.
+
+*Kenapa biayanya tak masalah:* fan-out-nya dibatasi bentuk war, bukan ukuran aplikasi — dua roster,
+dan maksimal 9 claim + 9 cancel + 9 submit per sisi selama tiga hari.
+
+**Handler `#[On('clan-updated')]`-nya kosong, dan itu memang cukup.** Seluruh data halaman ini
+berasal dari computed property gaya lama `getXProperty()`, yang dimemoisasi di store per-*request*
+— store yang dibangun ulang dari snapshot tiap round-trip. Jadi *menangani* event-nya saja sudah
+menjalankan ulang semua query. (`Clans::refreshClan()` berisi `forgetClanCache()` justru karena
+komponen itu memakai `#[Computed]` **dan** memutasi data di dalam satu request yang sama.)
+
+**Leader tak dikirimi dua kali.** Yang sudah menerima `ClanUpdated` ber-pesan untuk perubahan yang
+sama dilewati (`exceptUserIds`): `toasts.js` me-refresh lewat event itu juga, jadi event senyap
+kedua cuma round-trip mubazir.
+
+`declineChallenge()` dan `challengeClan()` ikut diperbaiki — kelas bugnya identik, pemain kebetulan
+baru melaporkan kasus accept.
+
+### 3.8 Layar hasil memberi tahu poin yang benar-benar diterima war
+
+Poin sebenarnya **sudah** dihitung dan tersimpan ke `clan_war_mode_claims.points` sejak awal, tapi
+`attachToWarClaim()` membuangnya sebagai variabel lokal — pemain menyelesaikan slot lalu kembali ke
+halaman war tanpa pernah tahu kontribusinya berapa.
+
+[`ClanWarScorer::breakdown()`](../../app/Services/ClanWarScorer.php) kini membeberkan faktor yang
+dikalikan, dan **`score()` didefinisikan ulang di atasnya** — bukan sebaliknya. Layar yang
+menurunkan rasionya sendiri akan jadi sumber kebenaran kedua, bebas menyimpang dari angka yang
+benar-benar dijumlahkan scoreboard.
+
+`basis` (`wpm` | `duration`) ikut dikembalikan karena survival dinilai dari **lama bertahan**, bukan
+WPM: tanpa itu setiap pemanggil harus menulis ulang cabang tersebut untuk melabeli angkanya, dan
+layar yang berbunyi "kecepatan … wpm" untuk survival hard menyatakan sesuatu yang **salah** tentang
+mode ber-ceiling tertinggi di game ini.
+
+**`score: null` adalah state kelas satu, bukan angka 0.** Otoritasnya adalah update bersyarat
+`whereNull('typing_result_id')`, bukan scorer: submit paralel rekan sekelompok bisa mengisi slot
+lebih dulu, dan war tak menerima apa pun dari run ini. Layar lalu menampilkan
+`result.war.not_counted_title` (emas, sama seperti banner AFK — ini bukan tuduhan, cuma kerja yang
+tak mendarat), bukan "0 poin" yang tak akan pernah cocok dengan scoreboard mana pun.
+
 ## 4. Integritas
 
 Poin war hanya dihitung dari `ClanWarModeClaim` yang **sudah disubmit** (`typing_result_id` terisi).
+Layar hasil pun tak pernah melaporkan poin yang **tak** diterima war: yang memutuskan adalah update
+bersyarat itu, bukan scorer (§3.8).
 Klaim yang terkunci tapi belum dikerjakan bernilai 0 — mencegah "kunci semua mode lalu diam" memberi
 keuntungan. Hasil ketik war tetap melewati anti-cheat & Net WPM yang sama dengan mode solo.
 

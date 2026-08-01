@@ -48,6 +48,16 @@ return [
     'retry_title' => 'Ulangi Tes',
     'back_to_war' => 'Kembali ke Clan War',
 
+    'war' => [
+        'heading' => 'Kontribusi War',
+        'points' => ':points / :ceiling poin',
+        'factor_pace_wpm' => 'kecepatan :value wpm → :ratio× dari :scale',
+        'factor_pace_survival' => 'bertahan :value dtk → :ratio× dari :scale dtk',
+        'factor_accuracy' => 'akurasi :value% → :multiplier×',
+        'not_counted_title' => 'Tak dihitung untuk war',
+        'not_counted_body' => 'Slot ini sudah disubmit, atau war berakhir sebelum kamu selesai. Hasil ketikmu tetap tersimpan.',
+    ],
+
     'error_heatmap' => 'heatmap kesalahan',
     'miss_count' => ':count salah',
 

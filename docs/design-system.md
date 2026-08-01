@@ -144,6 +144,28 @@ dan biarkan `<button>` luarnya yang 44px. Kotak klik boleh melampaui yang terlih
 `aria-label` wajib pada tombol tanpa teks; prop `label` komponen ini tak punya default supaya
 lupa = tak bisa dirender.
 
+### Dua ukuran, dua kriteria — jangan ditukar
+
+| Kontrol | Komponen | Kotak klik | Kriteria |
+|---|---|---|---|
+| **Ikon saja** (tanpa teks) | [`<x-icon-button>`](../resources/views/components/icon-button.blade.php) | 44×44px | WCAG 2.5.5 |
+| **Tautan ber-teks di kepala halaman** | [`<x-header-link>`](../resources/views/components/header-link.blade.php) | tinggi 32px | WCAG 2.5.8 (min. 24px) |
+
+Aturan ini sebelumnya cuma hidup di komentar `x-nav-link`, dan akibatnya terlihat: lima halaman
+menulis tautan header-nya sendiri dengan **empat ukuran font, tiga ukuran chevron, satu aria-label
+di antara kelimanya, dan tak satu pun punya cincin fokus**. Yang di Clan War bahkan tanpa padding —
+kotak kliknya setinggi teks 12px, **separuh** dari minimum 24px.
+
+Kontrol ber-teks tak perlu 44px karena ia sudah mendapat lebar dari teksnya; yang kurang selama ini
+justru **tingginya**. Keduanya tetap tunduk pada aturan mengikat di atas: `<x-header-link>` memakai
+`px-2 py-2.5` yang dibatalkan `-mx-2 -my-2.5`, jadi kotaknya membesar tanpa menggeser baris header.
+Konsekuensi yang perlu diingat saat memakai: baris pemanggil harus tetap ber-`gap-4` — jarak lebih
+rapat membuat dua kotak yang sudah melebar 8px ke samping saling bertumpuk.
+
+Chevron "kembali" ikut pindah ke markup (prop `back`) dan diberi `aria-hidden`, sehingga panah `←`
+tak lagi dibakukan ke dalam string terjemahan (`clan.back_to_clan`) — tipografi yang tak bisa
+diterjemahkan dan dibacakan screen reader sebagai kata.
+
 ## Hover
 
 `hoverOnlyWhenSupported` menyala, jadi `hover:` **tidak berlaku** di layar sentuh. Konsekuensinya:

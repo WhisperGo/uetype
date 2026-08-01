@@ -5,14 +5,16 @@
 
     <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
         <h1 class="font-display text-fluid-title tracking-wide text-foreground">{{ __('clan.war_title') }}</h1>
+        {{-- gap-4 is load-bearing: <x-header-link> grows its click box 8px sideways with a
+             negative margin, so a tighter gap would make the two targets overlap. --}}
         <div class="flex items-center gap-4">
-            <a href="{{ route('clan-leaderboard.index') }}" wire:navigate class="font-mono text-xs text-muted hover:text-foreground transition">
+            <x-header-link href="{{ route('clan-leaderboard.index') }}" wire:navigate>
                 {{ __('clan.leaderboard') }}
-            </a>
+            </x-header-link>
             @if ($this->myClan)
-                <a href="{{ route('clans.index') }}" wire:navigate class="font-mono text-xs text-muted hover:text-foreground transition">
+                <x-header-link back href="{{ route('clans.index') }}" wire:navigate>
                     {{ __('clan.back_to_clan') }}
-                </a>
+                </x-header-link>
             @endif
         </div>
     </div>

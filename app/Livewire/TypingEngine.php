@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Enums\ClanWarStatus;
+use App\Models\ClanWar as ClanWarModel;
 use App\Models\ClanWarFixedText;
 use App\Models\ClanWarModeClaim;
 use App\Models\TypingResult;
@@ -15,8 +16,10 @@ use App\Services\LongitudinalBaseline;
 use App\Services\SoloSessionGuard;
 use App\Services\TextGeneratorService;
 use App\Services\TypingErrorInspector;
+use App\Support\ClanWarBroadcast;
 use App\Support\SoloSessionPayload;
 use App\Support\TypingLanguage;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -380,25 +383,42 @@ class TypingEngine extends Component
      * Link the typing result to the war claim (re-validated, never trusting the client's
      * $warClaimId). The conditional update `whereNull('typing_result_id')` prevents two
      * parallel submits from filling the same claim. Called inside saveResult()'s DB::transaction.
+     *
+     * Returns what the war actually received, or null when this attempt filled NO claim. The
+     * authority is the conditional update, not the scorer: a teammate's parallel submit can
+     * take the slot a millisecond earlier, and the war then got nothing from this run. The
+     * result screen reads this, so returning points the war never received would put a number
+     * on screen that no scoreboard will ever agree with.
+     *
+     * @return array{war_id: int, ceiling: int, basis: string, basis_value: float, basis_scale: int,
+     *               performance_ratio: float, accuracy_multiplier: float, points: float}|null
      */
-    private function attachToWarClaim(TypingResult $typingResult): void
+    private function attachToWarClaim(TypingResult $typingResult): ?array
     {
         $claim = $this->resolveWarClaim();
 
         if (! $claim) {
-            return;
+            return null;
         }
 
-        $points = ClanWarScorer::score($claim->mode, $claim->mode_config, $typingResult);
+        $breakdown = ClanWarScorer::breakdown($claim->mode, $claim->mode_config, $typingResult);
+
+        if ($breakdown === null) {
+            return null;
+        }
 
         // Conditional update: only fill if not yet submitted (idempotent, race-safe).
-        ClanWarModeClaim::where('id', $claim->id)
+        $filled = ClanWarModeClaim::where('id', $claim->id)
             ->whereNull('typing_result_id')
             ->update([
                 'typing_result_id' => $typingResult->id,
                 'user_id' => Auth::id(),
-                'points' => $points,
+                'points' => $breakdown['points'],
             ]);
+
+        return $filled === 1
+            ? $breakdown + ['war_id' => $claim->clan_war_id]
+            : null;
     }
 
     // Validate mode+sub-mode against the whitelist, falling back to a safe default if wild.
@@ -791,6 +811,9 @@ class TypingEngine extends Component
         // Initialised here, not inside the auth gate: the session payload below is built for
         // guests and abandoned runs too, and both must carry an empty list rather than nothing.
         $newlyUnlocked = [];
+        // What the war received from this run, or null if it received nothing (see
+        // attachToWarClaim). Same reason as above for living outside the auth gate.
+        $warScore = null;
 
         if (Auth::check() && $isAfk) {
             // Nothing is written for an abandoned run, but the result screen still renders
@@ -826,7 +849,7 @@ class TypingEngine extends Component
                 : TypingResult::REVIEW_PENDING;
 
             DB::transaction(function () use (
-                &$xpEarned, $user, $duration, $finalNetWpm, $finalRawWpm, $finalAccuracy,
+                &$xpEarned, &$warScore, $user, $duration, $finalNetWpm, $finalRawWpm, $finalAccuracy,
                 $correctKeystrokes, $incorrectKeystrokes, $score, $reviewStatus, $reviewReason
 
             ) {
@@ -857,7 +880,7 @@ class TypingEngine extends Component
 
                 // Link to the war claim if this session works one (fail-safe: a solo attempt
                 // is still saved normally whatever the outcome).
-                $this->attachToWarClaim($typingResult);
+                $warScore = $this->attachToWarClaim($typingResult);
 
                 // WPM record only from the measured time/words modes; survival is excluded
                 // (achieved under stamina pressure, not apples-to-apples, just a side stat).
@@ -870,6 +893,13 @@ class TypingEngine extends Component
                     $user->save();
                 }
             });
+
+            // Both clans' scoreboards just moved. Broadcast AFTER the transaction, never inside
+            // it: ClanUpdated is ShouldBroadcastNow, so a listener re-querying before COMMIT
+            // would render the pre-submit totals and then never hear about it again.
+            if ($warScore !== null) {
+                ClanWarBroadcast::refresh(ClanWarModel::findOrFail($warScore['war_id']));
+            }
 
             // Snapshot after XP is applied: level & progress for the result page.
             $user = $user->fresh();
@@ -943,6 +973,12 @@ class TypingEngine extends Component
             'war' => $this->warLock !== null ? [
                 'mode' => $this->warLock['mode'],
                 'config' => $this->warLock['config'],
+                // What the war actually received, or NULL when this attempt filled no claim
+                // (a teammate submitted the slot first, the war ended mid-run, or the claim
+                // stopped validating). The screen must say so rather than print points no
+                // scoreboard will ever show. war_id is internal plumbing for the broadcast
+                // above and has no business in a view.
+                'score' => $warScore === null ? null : Arr::except($warScore, ['war_id']),
             ] : null,
         ]);
         session()->save();

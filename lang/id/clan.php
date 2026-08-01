@@ -6,8 +6,9 @@ return [
     'leaderboard_title' => 'PAPAN PERINGKAT CLAN',
 
     'leaderboard' => 'Papan Peringkat',
-    'back_to_clan' => '← Kembali ke Clan',
-    'back_to_clan_plain' => 'Kembali ke Clan',
+    // Tanpa panah di dalam string: chevron-nya markup (<x-header-link back>), jadi bisa diatur
+    // ukurannya dan disembunyikan dari screen reader.
+    'back_to_clan' => 'Kembali ke Clan',
     'clan_war' => 'Clan War',
     'chat' => 'Chat Clan',
 

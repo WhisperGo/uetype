@@ -6,8 +6,10 @@ return [
     'leaderboard_title' => 'CLAN LEADERBOARD',
 
     'leaderboard' => 'Leaderboard',
-    'back_to_clan' => '← Back to Clan',
-    'back_to_clan_plain' => 'Back to Clan',
+    // No arrow in the string: the chevron is markup (<x-header-link back>), so it can be sized
+    // and hidden from screen readers. A literal arrow here is untranslatable typography that
+    // gets read aloud as a word.
+    'back_to_clan' => 'Back to Clan',
     'clan_war' => 'Clan War',
     'chat' => 'Clan Chat',
 

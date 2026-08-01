@@ -3,10 +3,11 @@
     <x-page-container>
 
     <div class="flex items-center justify-between mb-6">
-        <a href="{{ route('clan-leaderboard.index') }}" wire:navigate class="text-muted hover:text-foreground transition inline-flex items-center gap-2" aria-label="{{ __('clan.aria.back_leaderboard') }}">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
-            <span class="font-mono text-xs">{{ __('clan.leaderboard') }}</span>
-        </a>
+        {{-- label: the visible text names a DESTINATION ("Leaderboard"), not the action, so
+             the accessible name spells out what following it does. --}}
+        <x-header-link back :label="__('clan.aria.back_leaderboard')" href="{{ route('clan-leaderboard.index') }}" wire:navigate>
+            {{ __('clan.leaderboard') }}
+        </x-header-link>
     </div>
 
     {{-- ===== CLAN HEADER (identity banner) ===== --}}
