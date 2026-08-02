@@ -10,6 +10,7 @@ use App\Models\Clan;
 use App\Models\ClanMember;
 use App\Models\ClanWar as ClanWarModel;
 use App\Models\ClanWarModeClaim;
+use App\Services\ClanWarAttempt;
 use App\Services\ClanWarModeCatalog;
 use App\Services\ClanWarResolver;
 use App\Support\ClanWarBroadcast;
@@ -197,13 +198,22 @@ class ClanWar extends Component
             ->get()
             ->keyBy(fn (ClanWarModeClaim $c) => $c->mode.'|'.$c->mode_config);
 
-        return collect(ClanWarModeCatalog::MODES)->map(function (array $m) use ($claims) {
+        $clock = app(ClanWarAttempt::class);
+
+        return collect(ClanWarModeCatalog::MODES)->map(function (array $m) use ($claims, $clock) {
             $claim = $claims->get($m['mode'].'|'.$m['config']);
 
             $status = 'open';
             if ($claim) {
                 $status = match (true) {
                     $claim->isSubmitted() => 'done',
+
+                    // Checked BEFORE in_progress, and that order is the whole fix. This arm did
+                    // not exist, so a slot whose clock had run out still counted as in progress
+                    // and still offered Resume -- a button whose only possible outcome was an
+                    // error, because every server path behind it refuses a spent attempt.
+                    $clock->isClaimExpired($claim) => 'expired',
+
                     $claim->attemptStarted() => 'in_progress',
                     default => 'claimed',
                 };
@@ -381,6 +391,16 @@ class ClanWar extends Component
             ->first();
 
         if (! $claim) {
+            return null;
+        }
+
+        // Hiding the button is not the same as closing the door: `wire:click` is a public
+        // endpoint, so a spent attempt has to be refused here too rather than only in the view.
+        // Sending the player into /typing for one produced the error this guard now replaces --
+        // TypingEngine would settle or bounce them straight back out.
+        if (app(ClanWarAttempt::class)->isClaimExpired($claim)) {
+            session()->flash('clan_war_claim_error', __('clan.error.attempt_expired'));
+
             return null;
         }
 

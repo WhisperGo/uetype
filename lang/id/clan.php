@@ -111,6 +111,7 @@ return [
         'start_attempt' => 'Mulai Percobaan',
         'resume' => 'Lanjutkan',
         'in_progress' => 'percobaan berjalan',
+        'attempt_expired' => 'waktu percobaan habis',
         'no_quota' => 'Jatah klaim habis',
         'confirm_start_title' => 'Mulai percobaanmu?',
         'confirm_start_body' => 'Kamu dapat satu percobaan untuk mode ini. Jamnya mulai sekarang dan terus berjalan — refresh atau keluar halaman tidak akan mengulanginya.',

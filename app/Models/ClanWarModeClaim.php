@@ -23,6 +23,7 @@ class ClanWarModeClaim extends Model
         'attempt_live_correct_chars',
         'attempt_live_total_chars',
         'attempt_chars',
+        'attempt_grace_used',
         'typing_result_id',
         'points',
         'claimed_at',
@@ -39,6 +40,7 @@ class ClanWarModeClaim extends Model
         'attempt_live_correct_chars' => 'integer',
         'attempt_live_total_chars' => 'integer',
         'attempt_chars' => 'integer',
+        'attempt_grace_used' => 'boolean',
     ];
 
     /** The war this claim is part of. */

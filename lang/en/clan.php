@@ -112,6 +112,7 @@ return [
         'start_attempt' => 'Start Attempt',
         'resume' => 'Resume',
         'in_progress' => 'attempt in progress',
+        'attempt_expired' => 'attempt timed out',
         'no_quota' => 'No claims left',
         'confirm_start_title' => 'Start your attempt?',
         'confirm_start_body' => 'You get one attempt at this mode. The clock starts now and keeps running — reloading or leaving will not restart it.',

@@ -212,6 +212,19 @@
                                 </div>
                                 @break
 
+                            @case('expired')
+                                {{-- Terminal. The attempt's clock ran out, so there is nothing to
+                                     resume and nothing to cancel: a slot gets one attempt, and
+                                     this one is spent for whatever it managed to bank.
+
+                                     No button at all, deliberately. Offering Resume here was the
+                                     bug -- every server path behind it refuses a spent attempt,
+                                     so the button could only ever produce an error. --}}
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="font-mono text-[0.7rem] text-muted truncate">{{ __('clan.war.attempt_expired') }} · {{ $slot['claim']->user->username }}</span>
+                                </div>
+                                @break
+
                             @default
                                 {{-- Done: show who played it plus the ORIGINAL TYPING RESULT behind the points. --}}
                                 @php $tr = $slot['claim']->typingResult; @endphp

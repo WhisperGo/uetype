@@ -61,11 +61,32 @@ it('shrinks the remaining time on a resumed time attempt', function () {
 
     $lock = remountWarAttempt($player, $claim)->get('warLock');
 
-    // A 30-second slot opened 25 seconds ago resumes at 15, not at 30: 25 seconds really
-    // passed, less the 10-second allowance for page load (COUNTDOWN_GRACE_SECONDS).
-    expect($lock['remaining'])->toBe(15)
+    // A 30-second slot opened 25 seconds ago resumes at 5, not at 30: 25 seconds really passed.
+    //
+    // No page-load allowance is left to soften it. COUNTDOWN_GRACE_SECONDS was spent by the
+    // FIRST mount above -- it pays for one page load, and one is what has happened. It used to
+    // be re-added on every call, so this assertion read 15 and ten refreshes on a 60-second
+    // slot handed back 100 seconds of clock.
+    expect($lock['remaining'])->toBe(5)
         ->and($lock['resume'])->toBeTrue()
         ->and($lock['expired'])->toBeFalse();
+});
+
+it('spends the countdown grace once, however many times the page is reloaded', function () {
+    [$player, $claim] = warAttemptScenario('time', '30');
+
+    $this->freezeSecond();
+
+    // Sepuluh kali reload beruntun. Dulu tiap mount menambah 10 detik kelonggaran, jadi jam yang
+    // seharusnya mengikat justru tumbuh setiap kali halaman dibuka ulang -- reroll yang persis
+    // ingin dicegah oleh seluruh sistem attempt ini.
+    foreach (range(1, 10) as $ignored) {
+        remountWarAttempt($player, $claim);
+    }
+
+    $claim->update(['attempt_started_at' => now()->subSeconds(25)]);
+
+    expect(remountWarAttempt($player, $claim)->get('warLock')['remaining'])->toBe(5);
 });
 
 /**
@@ -135,22 +156,34 @@ it('does not promise that leaving cancels the attempt', function () {
     remountWarAttempt($player, $claim)->assertSee(__('typing.war_lock_leave'));
 });
 
-it('still renders an expired attempt that has progress to bank', function () {
+/**
+ * Attempt kedaluwarsa yang PUNYA hasil dibukukan oleh SERVER, bukan oleh klien.
+ *
+ * Dulu halaman ketik tetap dirender dengan `expired: true`, lalu `x-init` memanggil finish().
+ * Tapi finish() melaporkan apa yang diketik SESI INI, dan sesi yang baru saja dimuat tidak
+ * mengetik apa pun -- kiriman nol keystroke atas nol detik itu ditolak anti-cheat sebagai
+ * `no_input`. Yang menyelamatkannya cuma kebetulan: buku besar mengisi ulang angkanya di sisi
+ * server. Klien tak pernah punya informasi untuk disumbangkan di titik ini.
+ */
+it('settles an expired attempt with banked work without rendering a typing page', function () {
     [$player, $claim] = warAttemptScenario('time', '15');
 
     remountWarAttempt($player, $claim);
-    $claim->update(['attempt_started_at' => now()->subMinutes(5), 'attempt_chars' => 120]);
 
-    $lock = remountWarAttempt($player, $claim)->get('warLock');
+    // Satu sesi penuh sudah dibukukan: 120 karakter dalam 30 detik mengetik.
+    $claim->update([
+        'attempt_started_at' => now()->subMinutes(5),
+        'attempt_chars' => 120,
+        'attempt_carried_ms' => 30_000,
+        'attempt_carried_correct_chars' => 118,
+        'attempt_carried_total_chars' => 120,
+    ]);
 
-    // Tetap war-locked: melepas lock akan menjatuhkan pemain ke sesi solo gratis di URL
-    // ?war_claim=. Halaman ini dirender justru supaya 120 karakter yang sudah diketik bisa
-    // dibukukan -- yang TAK punya apa pun untuk dibukukan dipulangkan ke halaman war (test
-    // di atas).
-    expect($lock['remaining'])->toBe(0)
-        ->and($lock['expired'])->toBeTrue()
-        ->and($lock['chars'])->toBe(120)
-        ->and($lock['mode'])->toBe('time');
+    remountWarAttempt($player, $claim)->assertRedirect(route('typing.result'));
+
+    // Slot terisi: kerjanya masuk, bukan hangus dan bukan memantul.
+    expect($claim->refresh()->typing_result_id)->not->toBeNull()
+        ->and((float) $claim->points)->toBeGreaterThan(0.0);
 });
 
 it('does not reset the character ceiling on a refresh', function () {
@@ -179,11 +212,13 @@ it('never lets a refresh buy characters beyond the attempt wall budget', functio
     // Menunggu lebih lama tak boleh jadi lisensi mengklaim apa pun: window-nya dibatasi
     // panjang slot + grace, jadi plafonnya berhenti tumbuh mengikuti waktu tunggu.
     //
-    // 35 detik, bukan 600: di atas ~40 detik slot time/30 sudah kedaluwarsa dan memantul ke
-    // halaman war, yang berarti test ini akan lulus karena alasan yang salah -- tak pernah
-    // menyentuh plafonnya sama sekali.
-    app(SoloSessionGuard::class)->backdate(30);
-    $claim->update(['attempt_started_at' => now()->subSeconds(35)]);
+    // 28 detik, bukan 600 dan bukan lagi 35: attempt harus tetap HIDUP saat submit, atau
+    // kirimannya diselesaikan sebagai attempt kedaluwarsa dan test ini lulus karena alasan yang
+    // salah -- tak pernah menyentuh plafon yang justru sedang diuji. Ambangnya turun setelah
+    // COUNTDOWN_GRACE_SECONDS jadi jatah sekali per attempt: mount pertama di atas sudah
+    // memakainya, jadi slot time/30 ini kedaluwarsa pada 30 detik, bukan 40.
+    app(SoloSessionGuard::class)->backdate(28);
+    $claim->update(['attempt_started_at' => now()->subSeconds(28)]);
 
     $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 4000, 'correctKeystrokes' => 4000])
         ->assertRedirect(route('typing', ['war_claim' => $claim->id]));

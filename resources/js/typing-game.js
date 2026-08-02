@@ -100,6 +100,21 @@ export default function typingGame(initialText, warAttempt = null) {
         currentIndex: 0,
         inputResults: [],
         startTime: null,
+
+        /**
+         * When the countdown began, as distinct from when TYPING began.
+         *
+         * They were the same field once, and that was the bug behind "the timer resets on
+         * refresh". `startTime` is stamped on the first keystroke because WPM is measured over
+         * typing, not over sitting still -- correct, and it must stay that way. But the war
+         * countdown was read off the same stamp, so on a resumed attempt the clock simply did
+         * not move until a key was pressed: the server kept counting, the screen did not, and a
+         * player could sit on a paused 35-second display for as long as they liked.
+         *
+         * Null on a fresh attempt (armed by the first keystroke, so reading time stays free) and
+         * on every solo session.
+         */
+        countdownStart: null,
         timer: 0,
         wpm: 0,
         rawWpm: 0,
@@ -203,6 +218,17 @@ export default function typingGame(initialText, warAttempt = null) {
             this.resetProgress();
             this.restoreGhostSelection();
 
+            // A resumed war attempt is already on the clock, so the countdown starts NOW rather
+            // than on the first keystroke. Waiting for a key was what let a reload hand back the
+            // full slot: the server kept counting from its anchor while the screen sat frozen at
+            // whatever it was handed, so the pressure the slot is defined by simply stopped.
+            //
+            // Fresh attempts are untouched -- they still arm on the first keystroke, which is
+            // what keeps reading time free (see ClanWarAttempt::GRACE_SECONDS).
+            if (this.warAttempt?.deadlineArmed && !this.warAttempt?.expired) {
+                this.startClock();
+            }
+
             // Cleanup is stored so listeners don't stack up on Alpine remount.
             const cleanup = this.$wire.on('mode-changed', (payload) => {
                 this.resetForNewText(payload.text ?? '');
@@ -264,6 +290,7 @@ export default function typingGame(initialText, warAttempt = null) {
             this.currentIndex = 0;
             this.inputResults = [];
             this.startTime = null;
+            this.countdownStart = null;
             this.isStarted = false;
             this.isFinished = false;
 
@@ -1053,35 +1080,7 @@ export default function typingGame(initialText, warAttempt = null) {
                     this.startGhostAnimationLoop();
                 }
 
-                this.timerInterval = setInterval(() => {
-                    const timeElapsed = Math.floor((Date.now() - this.startTime) / 1000);
-                    if (this.currentMain === 'time') {
-                        // timerStart, not the sub-mode: on a resumed war slot they differ, and
-                        // reading the sub-mode here would quietly restore the full test length
-                        // one second after resetProgress() shortened it.
-                        let remaining = this.timerStart - timeElapsed;
-                        this.timer = remaining > 0 ? remaining : 0;
-                        if (this.timer <= 0) this.finish();
-                    } else {
-                        this.timer = timeElapsed;
-
-                        // Survival war slots run inside a wall budget that shrinks with every
-                        // abandoned attempt, so stop at it rather than letting the player type
-                        // seconds the war will not credit.
-                        if (this.currentMain === 'survival' && this.warAttempt?.budget != null
-                            && timeElapsed >= this.warAttempt.budget) {
-                            this.finish();
-                        }
-                    }
-                    this.calculateStats();
-
-                    if (timeElapsed > 0 && !this.isFinished) {
-                        this.wpmHistory.push(this.wpm);
-                        const timeElapsedMins = (Date.now() - this.startTime) / 60000;
-                        const raw = Math.round((this.totalKeystrokes / 5) / timeElapsedMins) || 0;
-                        this.rawHistory.push(raw);
-                    }
-                }, 1000);
+                this.startClock();
             }
 
             // After the start block: the first keystroke only stamps the clock (no gap to
@@ -1231,6 +1230,71 @@ export default function typingGame(initialText, warAttempt = null) {
             } else {
                 this.accuracy = 0;
             }
+        },
+
+        /**
+         * Start the one-second loop that drives the countdown, the stats and the WPM history.
+         *
+         * Split out of the first-keystroke block because a RESUMED war attempt has to start it
+         * at MOUNT instead -- the server's clock is already running, so a countdown that waits
+         * for a keystroke is a countdown the player can pause by not typing.
+         *
+         * The two clocks inside are deliberately separate. `countdownStart` drives the war
+         * deadline and runs from whenever the clock was armed; `startTime` drives WPM and runs
+         * from the first keystroke. Reading both off one stamp is what let a resumed player
+         * watch a frozen timer.
+         *
+         * Idempotent: arming an already-running clock is a no-op, so the mount arming it and a
+         * later keystroke arming it again settle on one interval rather than two.
+         */
+        startClock() {
+            if (this.timerInterval) return;
+
+            this.countdownStart = this.countdownStart ?? Date.now();
+
+            this.timerInterval = setInterval(() => {
+                // The countdown's own clock. On a fresh attempt it was armed by the first
+                // keystroke, so this equals the typing clock; on a resume it was armed at mount.
+                const countdownElapsed = Math.floor((Date.now() - this.countdownStart) / 1000);
+
+                // The typing clock, which stays null until the player actually types. A resumed
+                // attempt can be counting down with nobody typing yet, and the stats below must
+                // report zero for that rather than crediting the wait.
+                const typedElapsed = this.startTime
+                    ? Math.floor((Date.now() - this.startTime) / 1000)
+                    : 0;
+
+                if (this.currentMain === 'time') {
+                    // timerStart, not the sub-mode: on a resumed war slot they differ, and
+                    // reading the sub-mode here would quietly restore the full test length
+                    // one second after resetProgress() shortened it.
+                    const remaining = this.timerStart - countdownElapsed;
+                    this.timer = remaining > 0 ? remaining : 0;
+                    if (this.timer <= 0) this.finish();
+                } else {
+                    this.timer = typedElapsed;
+
+                    // Survival war slots run inside a wall budget that shrinks with every
+                    // abandoned attempt, so stop at it rather than letting the player type
+                    // seconds the war will not credit.
+                    if (this.currentMain === 'survival' && this.warAttempt?.budget != null
+                        && countdownElapsed >= this.warAttempt.budget) {
+                        this.finish();
+                    }
+                }
+
+                this.calculateStats();
+
+                // History samples describe TYPING, so they are gated on the typing clock: a
+                // resumed attempt waiting for its first keystroke must not push a run of zeros
+                // that the consistency check would then read as inhumanly steady.
+                if (this.startTime && typedElapsed > 0 && !this.isFinished) {
+                    this.wpmHistory.push(this.wpm);
+                    const timeElapsedMins = (Date.now() - this.startTime) / 60000;
+                    const raw = Math.round((this.totalKeystrokes / 5) / timeElapsedMins) || 0;
+                    this.rawHistory.push(raw);
+                }
+            }, 1000);
         },
 
         finish() {

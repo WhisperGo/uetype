@@ -72,6 +72,52 @@ it('refuses to open a claim belonging to somebody else', function () {
         ->assertNoRedirect();
 });
 
+/**
+ * REGRESI: tombol "Lanjutkan" pada slot yang jamnya sudah habis.
+ *
+ * Status kartu dihitung hanya dari attempt_started_at dan typing_result_id, jadi attempt yang
+ * jamnya sudah nol tetap terbaca `in_progress` -- lengkap dengan tombol Lanjutkan. Setiap jalur
+ * server di baliknya menolak attempt yang sudah habis, jadi satu-satunya hasil yang mungkin dari
+ * tombol itu adalah pesan error. Kartunya sekarang terminal, dan tombolnya hilang.
+ */
+it('marks a slot whose clock has run out as expired instead of in progress', function () {
+    [$player, $claim] = warAttemptScenario('time', '30');
+
+    remountWarAttempt($player, $claim);
+    $claim->update(['attempt_started_at' => now()->subMinutes(5)]);
+
+    $grid = Livewire::actingAs($player)->test(ClanWar::class)->get('modeGrid');
+    $slot = $grid->firstWhere(fn ($s) => $s['mode'] === 'time' && $s['config'] === '30');
+
+    expect($slot['status'])->toBe('expired');
+});
+
+it('refuses to re-open a claim whose attempt clock has run out', function () {
+    // Menyembunyikan tombol bukan menutup pintu: wire:click adalah endpoint publik, jadi klaim
+    // yang sudah habis harus ditolak di sini juga -- bukan cuma di view.
+    [$player, $claim] = warAttemptScenario('time', '15');
+
+    remountWarAttempt($player, $claim);
+    $claim->update(['attempt_started_at' => now()->subMinutes(5)]);
+
+    Livewire::actingAs($player)->test(ClanWar::class)
+        ->call('startAttempt', $claim->id)
+        ->assertNoRedirect();
+});
+
+it('still lets a survival slot inside its budget be entered', function () {
+    // Penjagaan kedaluwarsa di atas tak boleh terlalu rakus: survival punya anggaran 120 detik,
+    // dan attempt yang baru berjalan 10 detik masih hidup sepenuhnya.
+    [$player, $claim] = warAttemptScenario('survival', 'hard');
+
+    remountWarAttempt($player, $claim);
+    $claim->update(['attempt_started_at' => now()->subSeconds(10)]);
+
+    Livewire::actingAs($player)->test(ClanWar::class)
+        ->call('startAttempt', $claim->id)
+        ->assertRedirect(route('typing', ['war_claim' => $claim->id]));
+});
+
 it('does not start an attempt merely by rendering the grid', function () {
     // Menambatkan jam adalah langkah yang tak bisa dibatalkan, dan ia milik mesin ketik.
     // Membuka halaman war tidak boleh membakar slot siapa pun.

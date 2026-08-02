@@ -49,6 +49,11 @@ class ClanWarAttempt
      * a RESUME, and somebody re-entering an attempt has already read the text. Reusing the
      * 30-second grace here would hand back the entire clock of a 30-second slot, turning the
      * refresh this class exists to price back into a free restart.
+     *
+     * Granted ONCE per attempt, not once per mount -- see `attempt_grace_used`. It used to be
+     * added by remainingSeconds() on every call, and remainingSeconds() runs on every page
+     * load, so ten refreshes on a 60-second slot handed back 100 seconds. An allowance for a
+     * page load has to be spent the way a page load is: once.
      */
     public const COUNTDOWN_GRACE_SECONDS = 10.0;
 
@@ -309,6 +314,55 @@ class ClanWarAttempt
         return max(0.0, min($durationSeconds, self::SURVIVAL_BUDGET_SECONDS - $wasted));
     }
 
+    /**
+     * Whether this claim's attempt has run out of clock. THE answer, for every caller.
+     *
+     * This predicate exists because four places used to derive it independently and disagreed:
+     * the war grid never asked at all (so it offered Resume on a spent slot), the client
+     * restarted its countdown from zero, ClanWarAttemptState::isExpired() answered only for a
+     * mounted attempt, and ClanWarResolver used a 15-minute proxy. Anything that needs to know
+     * "is this attempt still alive" asks here now, so the four can no longer drift apart.
+     *
+     * Reads the claim alone -- no mounted state, no ClanWarAttemptState -- precisely so the
+     * grid and the resolver can call it over a plain query result.
+     *
+     * `words` is never expired, and that is a real answer rather than a gap: the mode has no
+     * countdown and no budget, so there is no clock for it to run out of. STALE_MINUTES stays
+     * the safety net there (see ClanWarResolver).
+     */
+    public function isClaimExpired(ClanWarModeClaim $claim): bool
+    {
+        if ($claim->attempt_started_at === null) {
+            return false;
+        }
+
+        $elapsed = $this->elapsedSeconds($claim);
+
+        return match ($claim->mode) {
+            'time' => $this->remainingSeconds($claim, $elapsed) <= 0,
+            'survival' => $this->survivalBudgetRemaining($claim, $elapsed) <= 0,
+            default => false,
+        };
+    }
+
+    /**
+     * Mark this attempt's one countdown grace as spent, returning whether it was still unspent.
+     *
+     * Separated from open() because only a real MOUNT may burn it: open() also runs during
+     * saveResult(), and consuming the allowance there would charge a player for the page load
+     * they are in the middle of leaving.
+     */
+    public function consumeCountdownGrace(ClanWarModeClaim $claim): void
+    {
+        if ($claim->attempt_grace_used) {
+            return;
+        }
+
+        ClanWarModeClaim::whereKey($claim->id)->update(['attempt_grace_used' => true]);
+
+        $claim->attempt_grace_used = true;
+    }
+
     /** Seconds since the attempt was anchored; 0 when it was never opened. */
     public function elapsedSeconds(ClanWarModeClaim $claim): float
     {
@@ -352,7 +406,13 @@ class ClanWarAttempt
             ->forSoloMode($claim->mode, (string) $claim->mode_config, $contentLang);
     }
 
-    /** Seconds left on a `time` slot, clamped so it never exceeds the slot's own length. */
+    /**
+     * Seconds left on a `time` slot, clamped so it never exceeds the slot's own length.
+     *
+     * The grace is added only while it is UNSPENT. Adding it unconditionally was the leak:
+     * this runs on every mount, so every refresh renewed the allowance and the countdown the
+     * slot is defined by stopped being a bound at all.
+     */
     private function remainingSeconds(ClanWarModeClaim $claim, float $elapsed): ?int
     {
         if ($claim->mode !== 'time') {
@@ -360,8 +420,9 @@ class ClanWarAttempt
         }
 
         $nominal = (int) $claim->mode_config;
+        $grace = $claim->attempt_grace_used ? 0.0 : self::COUNTDOWN_GRACE_SECONDS;
 
-        return max(0, min($nominal, (int) floor($nominal + self::COUNTDOWN_GRACE_SECONDS - $elapsed)));
+        return max(0, min($nominal, (int) floor($nominal + $grace - $elapsed)));
     }
 
     private function survivalBudgetRemaining(ClanWarModeClaim $claim, float $elapsed): ?float

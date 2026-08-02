@@ -225,11 +225,26 @@ class TypingEngine extends Component
             // Not an early `return`: the rest of mount() still has to leave the component in a
             // renderable state (textToType is spread into Alpine unconditionally), and Livewire
             // honours the queued redirect either way.
-            if ($attempt->isExpired() && $attempt->resumeChars <= 0) {
-                session()->flash('clan_war_claim_error', __('clan.error.attempt_expired'));
+            if ($attempt->isExpired()) {
+                // An expired attempt is settled HERE, by the server, from the ledger -- never by
+                // asking the client to finish() a session it never ran.
+                //
+                // That used to be an `x-init` auto-finish in the view, and it submitted
+                // `durationMs: 0` over zero keystrokes, because the restored characters are
+                // deliberately not credited to the client's counters (they live in the ledger).
+                // Anti-cheat then refused it as `no_input` and bounced the player back into the
+                // same expired claim, which ran the same auto-finish again. The client has no
+                // information to contribute at this point; everything the run is worth is
+                // already on this side of the wire.
+                $this->settleExpiredAttempt($claim, $attempt);
 
-                $this->redirect(route('clan-war.index'));
+                return;
             }
+
+            // The one countdown grace this attempt gets, spent on the mount that renders it.
+            // Charged here rather than in open() because open() also runs during saveResult(),
+            // and burning the allowance there would bill a player for the load they are leaving.
+            app(ClanWarAttempt::class)->consumeCountdownGrace($claim);
 
             // The claim id and the endpoint are added here rather than inside the state object:
             // one is routing and the other is identity, and ClanWarAttemptState is about what
@@ -453,6 +468,79 @@ class TypingEngine extends Component
          * Livewire queue the payload is a handful of integers, so it can report every finished word
          * instead of every fifth second.
          */
+
+    /**
+     * Close out an attempt whose clock ran out while nobody was on the page.
+     *
+     * Two outcomes, decided by whether the ledger holds anything:
+     *
+     *  - NOTHING banked: the slot produced no typing at all, so there is no result to write.
+     *    The player goes back to the war with an explanation. Rendering a typing page for a
+     *    spent attempt is worse than useless -- it is a trap, and it was the shape of the
+     *    original infinite loop.
+     *  - WORK banked: the ledger already holds every keystroke and every millisecond of it, so
+     *    the run is submitted through the ordinary saveResult() path with a payload the SERVER
+     *    wrote. Reusing that path rather than a private shortcut is the point: anti-cheat, the
+     *    character ceiling, XP, personal bests and the war scorer all keep applying, and there
+     *    is no second way into TypingResult that could drift from the first.
+     *
+     * The live slot is sealed by mount() before this runs, so `carried` here is the whole
+     * attempt -- including the session that was interrupted by the reload.
+     */
+    private function settleExpiredAttempt(ClanWarModeClaim $claim, ClanWarAttemptState $attempt): void
+    {
+        $carried = app(ClanWarAttempt::class)->carried($claim);
+
+        if ($carried['total'] <= 0) {
+            session()->flash('clan_war_claim_error', __('clan.error.attempt_expired'));
+
+            $this->redirect(route('clan-war.index'));
+
+            return;
+        }
+
+        // The submission below runs the full saveResult() pipeline, and that pipeline checks
+        // the run against the text the server ISSUED for this tab. mount() returns before
+        // generateText() on this path, so the record has to be laid down here or the settlement
+        // would be refused as `session_mismatch` -- rejected for the absence of a session it
+        // was never going to have. The text is the attempt's own frozen one, so what is issued
+        // is exactly what the ledger's characters were typed against.
+        $this->textToType = $attempt->text;
+
+        app(SoloSessionGuard::class)->start(
+            $this->mainMode,
+            (string) $this->subMode,
+            $attempt->text,
+            $this->tabKey
+        );
+
+        // Zeroes for this SESSION's counters, because this session typed nothing: every
+        // keystroke being banked belongs to the ledger, and saveResult() adds that itself
+        // (see the `$carried` block there). Reporting the ledger here as well would count the
+        // same work twice.
+        //
+        // `wpmHistory` stays empty on purpose. It is a per-second sample of a live run, and no
+        // run is live here; the consistency check reads MIN_CONSISTENCY_SAMPLES and correctly
+        // declines to judge a sample this small rather than reading a fabricated one.
+        $this->saveResult([
+            'durationMs' => 0,
+            'totalKeystrokes' => 0,
+            'correctKeystrokes' => 0,
+            'wpmHistory' => [],
+            'rawHistory' => [],
+            'missedChars' => [],
+            'drainEventCount' => 0,
+            'errorEvents' => [],
+
+            // Explicitly not AFK. The gap this measures is silence DURING a run, and the
+            // silence here is the reload itself -- the player did not walk away from their
+            // typing, they were cut off from it. Leaving it at 0 keeps isAfkSession() from
+            // discarding work that genuinely happened.
+            'maxIdleMs' => 0,
+            'keyIntervals' => [],
+            'keyStrokeCount' => 0,
+        ]);
+    }
 
     /**
      * The attempt state for a claim, opened once per request and reused.

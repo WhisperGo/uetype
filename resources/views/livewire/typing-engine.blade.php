@@ -12,18 +12,19 @@
         currentSub: @entangle('subMode'),
         ...typingGame(@js($textToType), @js($warLock))
     }"
-        {{-- A reloaded war attempt keeps the SERVER's clock, so its remaining seconds may
-             already be spent. Bank whatever the resume restored -- but ONLY if there is
-             something to bank.
+        {{-- An expired war attempt is no longer settled here.
 
-             `chars > 0` is the load-bearing half of this condition. Finishing an empty
-             session submits zero keystrokes over zero seconds, which anti-cheat refuses as
-             `no_input`, which redirects back into the same expired claim, which runs this
-             again: an infinite loop the player sees as "rejected" with no way to type.
-             Survival triggered it every single time, because survival never resumes and so
-             never has anything to bank. mount() now sends that case to the war page before
-             any of this renders; this condition is what stops it being recreated here. --}}
-        x-init="if (warAttempt?.expired && warAttempt?.chars > 0) { $nextTick(() => finish()); }"
+             It used to be: `if (warAttempt?.expired && warAttempt?.chars > 0) finish()`. But
+             finish() reports what THIS session typed, and a session that only just loaded
+             typed nothing -- so it submitted zero keystrokes over zero seconds, which
+             anti-cheat refused as `no_input`, which redirected back into the same expired
+             claim, which ran this again. The `chars > 0` half stopped the survival case
+             looping, but the loop itself was only ever one mode away from returning.
+
+             The client never had anything to contribute at this point: every keystroke the
+             attempt is worth already lives in the server's ledger. TypingEngine::mount() now
+             settles it there, through the ordinary saveResult() pipeline, and this page is
+             simply never rendered for a spent attempt. --}}
         {{-- Three events, because no single one of them fires reliably everywhere and this is
              the report that decides where the player comes back.
 

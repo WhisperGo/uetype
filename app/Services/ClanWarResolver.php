@@ -133,17 +133,28 @@ class ClanWarResolver
     {
         $target = count(ClanWarModeCatalog::MODES);
 
+        // mode/mode_config come along because the expiry check below reads them: a slot's clock
+        // is defined by which slot it is.
         $claims = ClanWarModeClaim::where('clan_war_id', $war->id)
             ->where('clan_id', $clanId)
-            ->get(['user_id', 'typing_result_id', 'attempt_started_at']);
+            ->get(['user_id', 'typing_result_id', 'attempt_started_at', 'mode', 'mode_config', 'attempt_grace_used']);
 
         if ($claims->whereNotNull('typing_result_id')->count() >= $target) {
             return true;
         }
 
+        $clock = app(ClanWarAttempt::class);
         $staleBefore = now()->subMinutes(ClanWarAttempt::STALE_MINUTES);
 
+        // An unsubmitted claim is only PENDING while it could still turn into something.
+        //
+        // The staleness clock stays, but it is now the fallback rather than the whole test.
+        // It is a 15-minute proxy for "this is never coming", and for a `time 60` slot anchored
+        // three minutes ago the real answer is already available and exact -- waiting out the
+        // proxy just held the war open past the point of any doubt. `words` has no clock of its
+        // own, so there STALE_MINUTES is still the only thing that can answer.
         $hasPending = $claims->contains(fn (ClanWarModeClaim $c) => $c->typing_result_id === null
+            && ! $clock->isClaimExpired($c)
             && ($c->attempt_started_at === null || $c->attempt_started_at->gt($staleBefore)));
 
         if ($hasPending) {

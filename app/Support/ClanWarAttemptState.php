@@ -81,7 +81,7 @@ final class ClanWarAttemptState
      *
      * @return array{mode: string, config: string, resume: bool, chars: int, carriedMs: int,
      *               carriedCorrect: int, carriedTotal: int, remaining: int|null,
-     *               budget: float|null, expired: bool}
+     *               budget: float|null, expired: bool, deadlineArmed: bool}
      */
     public function toLockPayload(string $mode, string $config): array
     {
@@ -96,6 +96,15 @@ final class ClanWarAttemptState
             'remaining' => $this->remainingSeconds,
             'budget' => $this->survivalBudgetRemaining,
             'expired' => $this->isExpired(),
+
+            // Whether the countdown must start at PAGE LOAD rather than at the first keystroke.
+            //
+            // A fresh attempt arms on the first keystroke, which is what makes the reading time
+            // before it free -- that is the whole point of GRACE_SECONDS. A RESUME cannot: the
+            // server's clock has been running since the anchor, so waiting for a keystroke that
+            // may never come let a player sit on a paused countdown indefinitely. Re-entering an
+            // attempt is not reading time; the text has already been read.
+            'deadlineArmed' => $this->isResume,
         ];
     }
 }
