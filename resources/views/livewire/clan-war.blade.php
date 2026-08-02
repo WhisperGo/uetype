@@ -174,9 +174,13 @@
                                 <div class="flex items-center justify-between gap-2">
                                     <span class="font-mono text-[0.7rem] text-muted truncate">{{ __('clan.war.claimed_by', ['name' => $slot['claim']->user->username]) }}</span>
                                     @if ($slot['claim']->user_id === auth()->id())
-                                        <x-btn-gold as="a" size="xs" class="shrink-0"
-                                            @click.prevent="$dispatch('open-modal', { name: 'confirm-start-attempt', href: @js(route('typing', ['war_claim' => $slot['claim']->id])), label: @js($labelMode.' '.$labelConfig) })"
-                                            href="{{ route('typing', ['war_claim' => $slot['claim']->id]) }}">{{ __('clan.war.start_attempt') }}</x-btn-gold>
+                                        {{-- Interpolated with {{ }}, never @js(): Blade does not compile
+                                             directives inside a component tag's attributes, so an @js()
+                                             here would reach Alpine verbatim and kill the whole handler. --}}
+                                        <x-btn-gold size="xs" class="shrink-0"
+                                            @click="$dispatch('open-modal', { name: 'confirm-start-attempt', id: {{ $slot['claim']->id }}, label: '{{ $labelMode.' '.$labelConfig }}' })">
+                                            {{ __('clan.war.start_attempt') }}
+                                        </x-btn-gold>
                                     @endif
                                 </div>
                                 @if ($slot['claim']->user_id === auth()->id() || $this->isLeader)
@@ -196,8 +200,14 @@
                                 <div class="flex items-center justify-between gap-2">
                                     <span class="font-mono text-[0.7rem] text-muted truncate">{{ __('clan.war.in_progress') }} · {{ $slot['claim']->user->username }}</span>
                                     @if ($slot['claim']->user_id === auth()->id())
-                                        <x-btn-gold as="a" size="xs" class="shrink-0" wire:navigate
-                                            href="{{ route('typing', ['war_claim' => $slot['claim']->id]) }}">{{ __('clan.war.resume') }}</x-btn-gold>
+                                        {{-- Same server action as Start, minus the confirmation: the
+                                             clock is already anchored, so re-entering costs nothing new.
+                                             It also drops a wire:navigate that was wrong here -- the
+                                             engine must be entered by a full page load. --}}
+                                        <x-btn-gold size="xs" class="shrink-0"
+                                            wire:click="startAttempt({{ $slot['claim']->id }})">
+                                            {{ __('clan.war.resume') }}
+                                        </x-btn-gold>
                                     @endif
                                 </div>
                                 @break
@@ -315,11 +325,13 @@
              than on claiming: opening the page anchors a clock the player cannot wind back, and
              a misclick would otherwise burn the slot with nothing typed.
 
-             A plain <a>, not wire:navigate: the typing engine must be entered by a FULL page
-             load. An SPA navigation leaves the previous component's Alpine state in place, and
-             this page is the one that has to hand over a freshly anchored attempt. --}}
-        <div x-data="{ startHref: '', startLabel: '' }"
-            @open-modal.window="if ($event.detail?.name === 'confirm-start-attempt') { startHref = $event.detail.href; startLabel = $event.detail.label; $dispatch('open-modal', 'confirm-start-attempt') }">
+             Carries a claim ID, not a URL. The previous version bound an <a :href> filled from
+             the dispatch payload, which meant the route had to be interpolated inside an Alpine
+             expression -- done with @js() inside a <x-btn-gold> tag, where Blade never compiled
+             it. $wire.startAttempt() issues the redirect server-side instead, so the engine is
+             still entered by a full page load and no URL touches Alpine. --}}
+        <div x-data="{ startId: null, startLabel: '' }"
+            @open-modal.window="if ($event.detail?.name === 'confirm-start-attempt') { startId = $event.detail.id; startLabel = $event.detail.label; $dispatch('open-modal', 'confirm-start-attempt') }">
             <x-modal name="confirm-start-attempt" maxWidth="md">
                 <div class="p-6">
                     <p class="font-mono text-sm font-bold text-foreground">{{ __('clan.war.confirm_start_title') }}</p>
@@ -330,10 +342,11 @@
                             class="px-4 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
                             {{ __('clan.modal.cancel') }}
                         </button>
-                        <a :href="startHref"
+                        <button type="button"
+                            @click="$wire.startAttempt(startId); $dispatch('close-modal', 'confirm-start-attempt')"
                             class="px-4 py-2 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/80 rounded-lg transition">
                             {{ __('clan.war.start_attempt') }}
-                        </a>
+                        </button>
                     </div>
                 </div>
             </x-modal>

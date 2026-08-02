@@ -340,6 +340,54 @@ class ClanWar extends Component
     }
 
     /**
+     * Enter the typing engine for one of MY claims -- reserved or already in progress.
+     *
+     * A server action rather than an <a href> built in the blade, and the reason is a bug this
+     * replaces: the link's Alpine handler interpolated the route with @js(), which Blade does
+     * NOT compile inside a component tag's attribute (<x-btn-gold>). The directive reached the
+     * browser verbatim, Alpine choked on the `=>` in the PHP array, and the whole @click.prevent
+     * died -- .prevent still cancelled the navigation, so the button did precisely nothing.
+     * Routing through Livewire keeps URLs out of Alpine expressions entirely, so the failure
+     * mode cannot come back.
+     *
+     * It also puts the ownership check on the SERVER. The grid only ever hid the button behind
+     * an @if, while the guard that mattered lived in TypingEngine::resolveWarClaim(); that guard
+     * is still there, and this is a second lock on the door rather than a replacement for it.
+     *
+     * NOT wire:navigate: the typing engine has to be entered by a full page load, because an SPA
+     * navigation leaves the previous component's Alpine state in place and this is the hand-off
+     * that anchors a fresh attempt. $this->redirect() without navigate: true is exactly that.
+     */
+    public function startAttempt(int $claimId)
+    {
+        if (! $this->myClan) {
+            return null;
+        }
+
+        $war = $this->myActiveWar;
+
+        if (! $war || $war->status !== ClanWarStatus::Ongoing) {
+            return null;
+        }
+
+        // Mirrors TypingEngine::resolveWarClaim(): mine, my clan's, in this war, not yet played.
+        // A submitted claim is finished -- re-entering it would offer a second attempt at a slot
+        // that already scored.
+        $claim = ClanWarModeClaim::where('id', $claimId)
+            ->where('clan_war_id', $war->id)
+            ->where('clan_id', $this->myClan->id)
+            ->where('user_id', Auth::id())
+            ->whereNull('typing_result_id')
+            ->first();
+
+        if (! $claim) {
+            return null;
+        }
+
+        return $this->redirect(route('typing', ['war_claim' => $claim->id]));
+    }
+
+    /**
      * Hand back a RESERVED claim (the mode reopens); the claimer themselves or a leader.
      *
      * Only a claim whose attempt was never opened. An opened attempt is spent whatever it
