@@ -58,14 +58,22 @@ function survivalConfig(difficulty) {
 }
 
 /**
- * How often a Clan War attempt reports its resume position, in milliseconds.
+ * Floor between two Clan War progress reports, in milliseconds.
  *
- * Chosen for payload rather than precision: textToType is a public Livewire property, so every
- * round trip carries the whole text both ways. At 5 seconds a two-minute slot costs ~24 trips.
- * Reporting coarsely can only ever cost the player who reloads -- they resume slightly further
- * back than they really were -- so erring towards fewer pings is the safe direction.
+ * Was 5000, and that number came from a constraint that no longer exists: the report was a
+ * Livewire call, and textToType is a public property that rode along on every round trip, so
+ * each ping dragged the whole text up and back. Reporting was made rare to make it cheap.
+ *
+ * The cost of that was paid entirely by the player who reloaded. Five seconds at 60 WPM is
+ * twenty-five characters -- five words -- and they were lost every time, on top of the ping
+ * that never survived the unload at all. "Coarse is safe" was true about correctness and quietly
+ * false about the experience it was protecting.
+ *
+ * The report is now a plain endpoint carrying five integers, so it can run at the pace the
+ * player actually generates events. One second still collapses a burst of finished words into
+ * a single write without ever being felt.
  */
-const WAR_PROGRESS_MIN_INTERVAL_MS = 5000;
+const WAR_PROGRESS_MIN_INTERVAL_MS = 1000;
 
 /**
  * Mirrors race-arena.js restoreProgress(): rebuild a word position from a saved percentage.
@@ -466,57 +474,90 @@ export default function typingGame(initialText, warAttempt = null) {
         },
 
         /**
-         * Tell the server how far this Clan War attempt has got, so a reload resumes here.
+         * Tell the server where this Clan War attempt has got to, and what this session spent
+         * getting there.
          *
-         * Throttled hard (see WAR_PROGRESS_MIN_INTERVAL_MS) and skipped entirely when the
-         * percentage has not moved. Survival never reports: a stamina curve cannot be resumed,
-         * so it restarts inside a shrinking wall budget instead.
+         * Two things travel together and must never be separated: the POSITION (so a reload
+         * resumes here) and this session's LEDGER -- its own typing clock and its own keystroke
+         * counts. The ledger is what makes a resumed run score honestly, because the session
+         * that follows a refresh can only report itself; everything before it is whatever these
+         * pings managed to bank.
          *
-         * Best-effort by design -- the server clamps, bounds and only ever raises the stored
-         * value, so a dropped ping costs nothing but a slightly earlier resume point.
+         * That coupling is also what makes a dropped ping harmless. Losing one loses the
+         * position AND the time AND the characters together, so what survives is still an
+         * internally consistent run -- the player simply resumes a little further back than
+         * they really were. Reporting fewer characters over fewer seconds is the same pace.
+         *
+         * `force` is for page unload, where the throttle must not swallow the one report that
+         * decides where the player comes back.
          */
         reportWarProgress(force = false) {
             if (!this.warAttempt || this.currentMain === 'survival' || !this.isStarted) return;
 
-            const total = this.targetArray.length;
-            if (!total) return;
-
-            const percent = Math.max(0, Math.min(100, Math.floor((this.currentIndex / total) * 100)));
-
-            if (percent === this._warProgressLast) return;
+            if (this.currentIndex === this._warProgressLast && !force) return;
 
             const now = Date.now();
             if (!force && now - this._warProgressSentAt < WAR_PROGRESS_MIN_INTERVAL_MS) return;
 
             this._warProgressSentAt = now;
-            this._warProgressLast = percent;
+            this._warProgressLast = this.currentIndex;
 
-            // The component may be gone (navigating away); losing the ping is acceptable.
-            this.$wire?.reportWarProgress(percent);
+            const body = JSON.stringify({
+                claim: this.warAttempt.claim,
+                chars: this.currentIndex,
+                // This session's own clock and counters -- never the attempt's totals. The
+                // server holds those, and handing the client a running total to echo back
+                // would be inviting it to inflate one.
+                typedMs: this.startTime ? Date.now() - this.startTime : 0,
+                totalKeystrokes: this.totalKeystrokes,
+                correctKeystrokes: this.correctKeystrokes,
+            });
+
+            // keepalive so the browser finishes the request even as the page goes away -- the
+            // whole reason this left the Livewire queue. Errors are swallowed: there is nothing
+            // to retry during an unload, and the server only ever raises what it stores.
+            fetch(this.warAttempt.report, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body,
+                keepalive: true,
+            }).catch(() => {});
         },
 
         /**
-         * Rebuild the word position from the server's saved percentage (a reloaded attempt).
+         * Rebuild the word position from the character count the server saved (a reloaded
+         * attempt).
          *
-         * Mirrors race-arena.js restoreProgress(): convert the percentage back to a character
-         * count and consume whole "word + space" spans until the next word would not fit, so
-         * the cursor lands at the START of the first unfinished word. A partial word is never
-         * restored -- the percentage was derived from committed words, so a prefix was never
-         * part of it, and inventing one would put characters on screen the player never typed.
+         * Consumes whole "word + space" spans until the next word would not fit, so the cursor
+         * lands at the START of the first unfinished word. A partial word is never restored --
+         * the saved position was recorded on finished words, so a prefix was never part of it,
+         * and inventing one would put characters on screen the player never typed.
          *
-         * The restored characters are marked correct locally so live WPM reads sensibly, but
-         * they are NOT credit: the server bounds the submitted totals against the attempt's
-         * own clock either way (SoloSessionGuard::maxPlausibleChars).
+         * What this restores is a VIEW, not credit. The characters are drawn as already-correct
+         * so the player can see their work is still there, but they are deliberately NOT added
+         * to totalKeystrokes/correctKeystrokes.
+         *
+         * That line is the whole bug this method used to carry. Adding them made this session's
+         * counters describe the entire attempt while startTime still described only this
+         * session, so the characters of an hour could be divided by the seconds of a minute --
+         * and, because the restored characters were all marked correct, every mistake made
+         * before the reload was erased along the way. Both halves of the attempt's real totals
+         * now live on the server (the ledger in ClanWarAttempt), which is the only place that
+         * can see more than one session.
          */
         restoreWarProgress() {
-            const progress = this.warAttempt?.progress ?? 0;
+            const chars = this.warAttempt?.chars ?? 0;
 
-            if (!this.warAttempt || progress <= 0 || this.currentMain === 'survival') return;
+            if (!this.warAttempt || chars <= 0 || this.currentMain === 'survival') return;
 
             const { consumed, wordIndex } = resumePosition(
                 this.wordBounds,
                 this.targetArray.length,
-                progress
+                chars
             );
 
             if (consumed <= 0) return;
@@ -528,9 +569,7 @@ export default function typingGame(initialText, warAttempt = null) {
                 this.inputResults[i] = true;
             }
 
-            this.totalKeystrokes = consumed;
-            this.correctKeystrokes = consumed;
-            this._warProgressLast = progress;
+            this._warProgressLast = consumed;
         },
 
         // Backspacing into the previous word: undo its last commit scoring. The 'dirty'
@@ -1158,7 +1197,17 @@ export default function typingGame(initialText, warAttempt = null) {
         calculateStats() {
             if (!this.startTime) return;
 
-            const elapsedMs = Date.now() - this.startTime;
+            // A resumed Clan War attempt is ONE run split across page loads, so the numbers on
+            // screen have to describe the run, not the fragment. The server already adds these
+            // when it scores the submission (ClanWarAttempt's ledger); adding them here too is
+            // what stops the live figure and the result screen from disagreeing — a resumed
+            // player would otherwise watch a WPM they know is wrong, then see it jump at the
+            // end. Zero for every solo session, which leaves the arithmetic below untouched.
+            const carriedMs = this.warAttempt?.carriedMs ?? 0;
+            const carriedCorrect = this.warAttempt?.carriedCorrect ?? 0;
+            const carriedTotal = this.warAttempt?.carriedTotal ?? 0;
+
+            const elapsedMs = (Date.now() - this.startTime) + carriedMs;
 
             // 1-second floor: keep WPM from exploding at the very start of typing.
             const effectiveMs = (elapsedMs < 1000 && !this.isFinished) ? 1000 : elapsedMs;
@@ -1166,16 +1215,19 @@ export default function typingGame(initialText, warAttempt = null) {
 
             if (timeElapsed <= 0) return;
 
+            const correct = this.correctKeystrokes + carriedCorrect;
+            const total = this.totalKeystrokes + carriedTotal;
+
             // Net WPM from correctKeystrokes — the same source as finish/server, so the live
             // number is identical to the one on the result page.
-            this.wpm = Math.round((this.correctKeystrokes / 5) / timeElapsed) || 0;
+            this.wpm = Math.round((correct / 5) / timeElapsed) || 0;
 
             // Raw WPM: ignores errors (total keystrokes / 5).
-            this.rawWpm = Math.round((this.totalKeystrokes / 5) / timeElapsed) || 0;
+            this.rawWpm = Math.round((total / 5) / timeElapsed) || 0;
 
             // Accuracy based on physical keystrokes (Monkeytype-style).
-            if (this.totalKeystrokes > 0) {
-                this.accuracy = Math.round((this.correctKeystrokes / this.totalKeystrokes) * 100);
+            if (total > 0) {
+                this.accuracy = Math.round((correct / total) * 100);
             } else {
                 this.accuracy = 0;
             }

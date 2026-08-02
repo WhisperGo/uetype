@@ -16,14 +16,28 @@
              already be spent. Bank whatever the resume restored -- but ONLY if there is
              something to bank.
 
-             `progress > 0` is the load-bearing half of this condition. Finishing an empty
+             `chars > 0` is the load-bearing half of this condition. Finishing an empty
              session submits zero keystrokes over zero seconds, which anti-cheat refuses as
              `no_input`, which redirects back into the same expired claim, which runs this
              again: an infinite loop the player sees as "rejected" with no way to type.
              Survival triggered it every single time, because survival never resumes and so
              never has anything to bank. mount() now sends that case to the war page before
              any of this renders; this condition is what stops it being recreated here. --}}
-        x-init="if (warAttempt?.expired && warAttempt?.progress > 0) { $nextTick(() => finish()); }"
+        x-init="if (warAttempt?.expired && warAttempt?.chars > 0) { $nextTick(() => finish()); }"
+        {{-- Three events, because no single one of them fires reliably everywhere and this is
+             the report that decides where the player comes back.
+
+             `pagehide` is the one that covers a refresh, the Back button and a tab close (and
+             fires for bfcache too, which `beforeunload` suppresses). `beforeunload` is the
+             fallback for browsers that skip pagehide. `visibilitychange` catches the case
+             neither sees at all: mobile Chrome discarding a backgrounded tab, which never
+             unloads it — it just stops existing, and on a phone that is the COMMON way a war
+             attempt gets interrupted.
+
+             All three are safe to fire together: the report is throttled by nothing when
+             forced, but the server only ever raises what it stores, so duplicates settle. --}}
+        @pagehide.window="reportWarProgress(true)"
+        @beforeunload.window="reportWarProgress(true)"
         @visibilitychange.window="if (document.visibilityState === 'hidden') reportWarProgress(true)"
         @keydown.window="
             syncCapsLock($event);

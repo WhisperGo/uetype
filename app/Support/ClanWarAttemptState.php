@@ -9,7 +9,7 @@ use Illuminate\Support\Carbon;
  *
  * A value object rather than loose properties on TypingEngine because these fields only make
  * sense together: `remainingSeconds` without `anchoredAt` is a number the client could have
- * invented, and `resumeProgress` without `isResume` reads as "start here" on a fresh attempt.
+ * invented, and `resumeChars` without `isResume` reads as "start here" on a fresh attempt.
  * Built in one place (ClanWarAttempt::open) so there is exactly one derivation of each.
  */
 final class ClanWarAttemptState
@@ -24,8 +24,24 @@ final class ClanWarAttemptState
         /** True when this mount is a re-entry (refresh, Back, or the grid's Resume button). */
         public readonly bool $isResume,
 
-        /** Percent of the text already confirmed typed; 0 for a fresh attempt and survival. */
-        public readonly int $resumeProgress,
+        /** Characters of the text already confirmed typed; 0 for a fresh attempt and survival. */
+        public readonly int $resumeChars,
+
+        /**
+         * Milliseconds of typing banked by sessions this attempt has already abandoned.
+         *
+         * Shipped to the client so the live WPM on screen counts the same work the result
+         * screen will. Without it a resumed player watches a number they know is wrong, then
+         * sees it jump at the end -- two sources of truth for one quantity, which is the exact
+         * habit the rest of this project spends its effort avoiding.
+         */
+        public readonly int $carriedMs,
+
+        /** Correct keystrokes banked by abandoned sessions. */
+        public readonly int $carriedCorrectChars,
+
+        /** Total keystrokes banked by abandoned sessions -- the accuracy denominator. */
+        public readonly int $carriedTotalChars,
 
         /** Seconds left on a `time` slot, counted from the anchor. Null for other modes. */
         public readonly ?int $remainingSeconds,
@@ -63,8 +79,9 @@ final class ClanWarAttemptState
      * Carries no timestamps: the client never needs the anchor itself, only what the server
      * derived from it, and shipping the anchor would invite a client to do its own arithmetic.
      *
-     * @return array{mode: string, config: string, resume: bool, progress: int,
-     *               remaining: int|null, budget: float|null, expired: bool}
+     * @return array{mode: string, config: string, resume: bool, chars: int, carriedMs: int,
+     *               carriedCorrect: int, carriedTotal: int, remaining: int|null,
+     *               budget: float|null, expired: bool}
      */
     public function toLockPayload(string $mode, string $config): array
     {
@@ -72,7 +89,10 @@ final class ClanWarAttemptState
             'mode' => $mode,
             'config' => $config,
             'resume' => $this->isResume,
-            'progress' => $this->resumeProgress,
+            'chars' => $this->resumeChars,
+            'carriedMs' => $this->carriedMs,
+            'carriedCorrect' => $this->carriedCorrectChars,
+            'carriedTotal' => $this->carriedTotalChars,
             'remaining' => $this->remainingSeconds,
             'budget' => $this->survivalBudgetRemaining,
             'expired' => $this->isExpired(),

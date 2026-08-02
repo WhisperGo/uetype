@@ -1,5 +1,5 @@
 /**
- * Rebuild a typing position from the coarse percentage the server saved for a Clan War attempt.
+ * Rebuild a typing position from the character count the server saved for a Clan War attempt.
  *
  * Extracted from typing-game.js as a pure function because it is the one piece of the resume
  * path that is pure arithmetic, and getting it wrong is silent: land a character early and the
@@ -8,24 +8,28 @@
  * the project runs no JavaScript in Pest.
  *
  * Only whole "word + space" spans are consumed, so the cursor always lands at the START of the
- * first unfinished word. A partial word is never restored: the saved percentage was derived
- * from committed words, so a prefix was never part of it, and inventing one would put
- * characters on screen the player never typed.
+ * first unfinished word. A partial word is never restored: the saved position was recorded on
+ * finished words, so a prefix was never part of it, and inventing one would put characters on
+ * screen the player never typed.
+ *
+ * The input used to be a PERCENT, and that cost a word before this function was even reached.
+ * On a ~280-character Words text one percent is nearly three characters, so the position was
+ * rounded once on the way into the database and again to a word boundary here. Rounding twice
+ * to solve a problem that only needs rounding once is how a player ends up several words behind
+ * where they stopped. Characters cost the same to store.
  *
  * @param {Array<{start: number, end: number, space: number|null}>} wordBounds
  * @param {number} totalChars  length of the full text
- * @param {number} progressPercent  0-100, as persisted on the claim
+ * @param {number} savedChars  characters confirmed typed, as persisted on the claim
  * @returns {{consumed: number, wordIndex: number}} characters to mark correct, and the word to
  *          resume on. `consumed` is 0 when there is nothing to restore.
  */
-export function resumePosition(wordBounds, totalChars, progressPercent) {
-    const percent = Math.max(0, Math.min(100, progressPercent || 0));
+export function resumePosition(wordBounds, totalChars, savedChars) {
+    const targetChars = Math.max(0, Math.min(totalChars, savedChars || 0));
 
-    if (!wordBounds.length || totalChars <= 0 || percent <= 0) {
+    if (!wordBounds.length || totalChars <= 0 || targetChars <= 0) {
         return { consumed: 0, wordIndex: 0 };
     }
-
-    const targetChars = Math.round((percent / 100) * totalChars);
 
     let consumed = 0;
     let wordIndex = 0;

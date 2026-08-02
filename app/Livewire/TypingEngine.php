@@ -75,16 +75,6 @@ class TypingEngine extends Component
     private const MAX_RESULTS_PER_MINUTE = 30;
 
     /**
-     * Clan War resume-position pings allowed per minute.
-     *
-     * An honest client sends one per completed word at most, throttled to one per 5 seconds --
-     * about 12 a minute. The limit bounds a scripted flood without ever reaching a real player,
-     * and dropping a ping is harmless: progress is monotonic, so the next one carries the
-     * latest position anyway. Same shape as the race path's rate limit.
-     */
-    private const MAX_WAR_PROGRESS_PINGS_PER_MINUTE = 60;
-
-    /**
      * Player-facing message per rejection reason, keyed by the reason passed to
      * rejectSubmission(). Anything not listed falls back to the generic "implausible" text.
      *
@@ -210,6 +200,15 @@ class TypingEngine extends Component
         if ($claim) {
             [$this->mainMode, $this->subMode] = $this->normalizeMode($claim->mode, $claim->mode_config);
 
+            // A page load is what ENDS a session, so it is where the session that was running
+            // gets sealed into the permanent ledger. Only here: open() also runs during
+            // saveResult(), and the submission there already reports the live session in full.
+            // Sealing at that moment would count the same keystrokes twice.
+            //
+            // Sealed BEFORE the attempt is opened, so the state handed to the client already
+            // carries the folded totals rather than a snapshot taken a line too early.
+            app(ClanWarAttempt::class)->sealLiveSession($claim);
+
             // Opening the page IS starting the attempt. Idempotent: a refresh, the Back button
             // and a second tab all land on the anchor written the first time, so none of them
             // buys a fresh clock or a fresh text. See ClanWarAttempt.
@@ -226,13 +225,20 @@ class TypingEngine extends Component
             // Not an early `return`: the rest of mount() still has to leave the component in a
             // renderable state (textToType is spread into Alpine unconditionally), and Livewire
             // honours the queued redirect either way.
-            if ($attempt->isExpired() && $attempt->resumeProgress <= 0) {
+            if ($attempt->isExpired() && $attempt->resumeChars <= 0) {
                 session()->flash('clan_war_claim_error', __('clan.error.attempt_expired'));
 
                 $this->redirect(route('clan-war.index'));
             }
 
-            $this->warLock = $attempt->toLockPayload($this->mainMode, $this->subMode);
+            // The claim id and the endpoint are added here rather than inside the state object:
+            // one is routing and the other is identity, and ClanWarAttemptState is about what
+            // the attempt IS. Handing the client the URL beats hardcoding it in JS -- the route
+            // stays named in exactly one place.
+            $this->warLock = $attempt->toLockPayload($this->mainMode, $this->subMode) + [
+                'claim' => $claim->id,
+                'report' => route('clan-war.attempt-progress'),
+            ];
         } else {
             $this->warClaimId = null;
 
@@ -433,37 +439,20 @@ class TypingEngine extends Component
         return $claim;
     }
 
-    /**
-     * Persist how far a Clan War attempt has got, so a reload resumes instead of restarting.
-     *
-     * The solo engine has no other mid-session chatter, and this is deliberately the cheapest
-     * possible channel: skipRender() because nothing server-rendered changes, and the client
-     * throttles hard because textToType is a public property that rides along on every round
-     * trip. Survival is excluded -- a stamina curve cannot be meaningfully resumed, so it
-     * restarts inside a shrinking budget instead (see ClanWarAttempt).
-     *
-     * Under-reporting only ever hurts the player who reloads, so a coarse cadence is safe.
-     */
-    public function reportWarProgress(int $percent): void
-    {
-        $this->skipRender();
-
-        $claim = $this->resolveWarClaim();
-
-        if (! $claim || ! $claim->attemptStarted() || $claim->mode === 'survival') {
-            return;
-        }
-
-        $rateKey = 'war-progress:'.Auth::id();
-
-        if (RateLimiter::tooManyAttempts($rateKey, self::MAX_WAR_PROGRESS_PINGS_PER_MINUTE)) {
-            return;
-        }
-
-        RateLimiter::hit($rateKey, 60);
-
-        app(ClanWarAttempt::class)->recordProgress($claim, $percent);
-    }
+    /*
+         * Progress reporting used to live here as a Livewire method, and that was the bug.
+         *
+         * A Livewire call is an XHR the browser CANCELS on unload, so the one ping that mattered
+         * most -- the one fired as the player pressed refresh -- never arrived. What the server had
+         * was the last routine ping, up to five seconds stale, which is why players landed several
+         * words behind where they stopped. It also had to be throttled hard, because textToType is
+         * a public property that rides along on every round trip.
+         *
+         * It now lives at App\Http\Controllers\ClanWarProgressController, reached by a keepalive
+         * fetch, exactly like the multiplayer leave-beacon that exists for the same reason. Off the
+         * Livewire queue the payload is a handful of integers, so it can report every finished word
+         * instead of every fifth second.
+         */
 
     /**
      * The attempt state for a claim, opened once per request and reused.
@@ -789,13 +778,28 @@ class TypingEngine extends Component
         // Duration comes from the SERVER, not the payload. In `time` mode the sub-mode
         // fixes it outright; the variable-length modes keep their (now bounded) claim.
         //
-        // War overrides it: a `words` attempt that spanned a refresh has to be scored over the
-        // wall clock it really consumed, or the wasted minutes simply vanish and the reload is
-        // free. See ClanWarAttempt::resolveDuration -- it can only ever LENGTHEN a duration,
-        // which is the safe direction (anti-cheat-wpm.md 7.4).
+        // War overrides it: an attempt that spanned a refresh reports only the session that is
+        // submitting, so the sessions it abandoned have to be added back or the run is scored
+        // over a fraction of the time it really took. See ClanWarAttempt::resolveDuration.
         $duration = $warClock !== null
             ? $warClock->resolveDuration($warClaim, $claimedDuration)
             : $guard->resolveDuration($claimedDuration, $this->mainMode, (string) $this->subMode);
+
+        // ...and the numerator has to span the same attempt as the denominator. This is the
+        // pair that has to move together, and the whole bug was that it did not: the client
+        // used to restore the previous sessions' characters into its own counters while its
+        // clock started fresh, so the characters of a whole attempt were divided by the
+        // seconds of its last minute. Now the client reports only what IT did, and both halves
+        // of the fraction are completed here, from a ledger the client cannot write.
+        //
+        // Correct is carried alongside total on purpose. Restoring the characters as if they
+        // had all been typed correctly was the quieter half of the same bug: every mistake made
+        // before a refresh vanished, and ClanWarScorer's accuracy multiplier (0.5-1.0x) paid
+        // for it. Errors are part of the work too.
+        $carried = $warClock?->carried($warClaim) ?? ['ms' => 0, 'correct' => 0, 'total' => 0];
+
+        $totalKeystrokes += $carried['total'];
+        $correctKeystrokes += $carried['correct'];
 
         // Character counts are bounded by what the issued text could physically produce in
         // that time, so an inflated count can no longer buy WPM, XP or a leaderboard slot.

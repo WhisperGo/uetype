@@ -139,16 +139,17 @@ it('still renders an expired attempt that has progress to bank', function () {
     [$player, $claim] = warAttemptScenario('time', '15');
 
     remountWarAttempt($player, $claim);
-    $claim->update(['attempt_started_at' => now()->subMinutes(5), 'attempt_progress' => 40]);
+    $claim->update(['attempt_started_at' => now()->subMinutes(5), 'attempt_chars' => 120]);
 
     $lock = remountWarAttempt($player, $claim)->get('warLock');
 
     // Tetap war-locked: melepas lock akan menjatuhkan pemain ke sesi solo gratis di URL
-    // ?war_claim=. Halaman ini dirender justru supaya 40% yang sudah diketik bisa dibukukan --
-    // yang TAK punya apa pun untuk dibukukan dipulangkan ke halaman war (test di atas).
+    // ?war_claim=. Halaman ini dirender justru supaya 120 karakter yang sudah diketik bisa
+    // dibukukan -- yang TAK punya apa pun untuk dibukukan dipulangkan ke halaman war (test
+    // di atas).
     expect($lock['remaining'])->toBe(0)
         ->and($lock['expired'])->toBeTrue()
-        ->and($lock['progress'])->toBe(40)
+        ->and($lock['chars'])->toBe(120)
         ->and($lock['mode'])->toBe('time');
 });
 
@@ -190,21 +191,39 @@ it('never lets a refresh buy characters beyond the attempt wall budget', functio
     expect($claim->refresh()->typing_result_id)->toBeNull();
 });
 
-it('counts wasted wall time in a resumed words duration', function () {
+it('counts every session of a resumed words attempt, and only the sessions', function () {
     [$player, $claim] = warAttemptScenario('words', '50');
 
-    $component = remountWarAttempt($player, $claim);
+    remountWarAttempt($player, $claim);
 
+    // Sesi 1: 60 detik mengetik, lalu ditinggalkan.
+    $claim->update(['attempt_started_at' => now()->subSeconds(62)]);
+    pingWarAttempt($player, $claim, chars: 150, typedMs: 60_000, totalKeystrokes: 150, correctKeystrokes: 148);
+
+    $resumed = remountWarAttempt($player, $claim);
+
+    // Lalu jangkarnya dibiarkan berjalan sampai 200 detik: 100+ detik terakhir tak ada yang
+    // mengetik sama sekali (tab terbuka, pemain pergi), dan 40 detik terakhir barulah sesi 2.
     app(SoloSessionGuard::class)->backdate(40);
     $claim->update(['attempt_started_at' => now()->subSeconds(200)]);
 
-    $component->call('saveResult', ['durationMs' => 40000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 295])
+    $resumed->call('saveResult', ['durationMs' => 40_000, 'totalKeystrokes' => 150, 'correctKeystrokes' => 147])
         ->assertRedirect(route('typing.result'));
 
-    // Claimed 40 seconds, but the attempt has held the clock for 200. Minus the 30-second
-    // grace that covers reading and page load, 170 seconds really passed -- and a WPM
-    // measured over 40 would price a refresh at nothing.
-    expect((float) TypingResult::latest('id')->first()->duration_seconds)->toBeGreaterThan(160.0);
+    // 100 detik: 60 dari sesi pertama + 40 dari sesi ini. BUKAN 200.
+    //
+    // Aturan ini SENGAJA diganti. Dulu durasinya adalah jam jangkar dikurangi grace 30 detik,
+    // jadi angka di atas akan terbaca 170 -- seluruh menit yang tak seorang pun mengetik ikut
+    // ditagihkan. Itu memang menghukum refresh, tapi ia menghukum tiap jeda lain dengan cara
+    // yang sama, dan grace 30 detiknya justru MENGHAPUS waktu mengetik sungguhan saat pemain
+    // benar-benar me-refresh (lihat ClanWarResumeLedgerTest). Menjumlahkan sesi menutup
+    // kebocoran itu tanpa menagih waktu yang tak pernah dipakai siapa pun.
+    //
+    // Yang hilang bersamanya: menunggu kini gratis. Itu tak membeli apa pun -- teks yang sama
+    // masih harus diketik dengan kecepatan yang sama, dan slotnya tetap terkunci selama itu.
+    expect((float) TypingResult::latest('id')->first()->duration_seconds)
+        ->toBeGreaterThanOrEqual(99.0)
+        ->toBeLessThanOrEqual(101.0);
 });
 
 it('leaves an honest single-session words duration exactly as claimed', function () {

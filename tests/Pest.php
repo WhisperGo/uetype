@@ -13,6 +13,8 @@ use App\Models\User;
 use App\Services\SoloSessionGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\GoogleProvider;
 use Laravel\Socialite\Two\User as SocialiteUser;
@@ -279,15 +281,20 @@ function fakeGoogleUser(string $id = 'g-12345', string $email = 'pemain@gmail.co
  */
 function warAttemptScenario(string $mode, string $config): array
 {
+    // Nama clan unik per pemanggilan: `clans.name` unik, jadi satu test yang perlu MEMBANDINGKAN
+    // dua attempt (mis. jalan sekali vs dipotong refresh) tak bisa memanggil helper ini dua kali
+    // dengan nama tetap. Angkanya tak pernah diassert di mana pun.
+    $suffix = Str::random(6);
+
     $leader = User::factory()->create();
-    $clan = Clan::create(['name' => 'Clan Attempt', 'leader_id' => $leader->id, 'power' => 1000]);
+    $clan = Clan::create(['name' => "Clan Attempt {$suffix}", 'leader_id' => $leader->id, 'power' => 1000]);
     ClanMember::create([
         'clan_id' => $clan->id, 'user_id' => $leader->id,
         'role' => ClanRole::Leader, 'status' => ClanMemberStatus::Active,
     ]);
 
     $rivalLeader = User::factory()->create();
-    $rivalClan = Clan::create(['name' => 'Clan Lawan', 'leader_id' => $rivalLeader->id, 'power' => 1000]);
+    $rivalClan = Clan::create(['name' => "Clan Lawan {$suffix}", 'leader_id' => $rivalLeader->id, 'power' => 1000]);
     ClanMember::create([
         'clan_id' => $rivalClan->id, 'user_id' => $rivalLeader->id,
         'role' => ClanRole::Leader, 'status' => ClanMemberStatus::Active,
@@ -346,6 +353,31 @@ function runWarAttemptClock(ClanWarModeClaim $claim, int $seconds = 30): void
     app(SoloSessionGuard::class)->backdate($seconds);
 
     $claim->update(['attempt_started_at' => now()->subSeconds($seconds + 5)]);
+}
+
+/**
+ * Kirim satu ping progres war persis seperti yang dilakukan klien saat mengetik.
+ *
+ * Ping ini bukan sekadar posisi: ia juga membawa buku besar sesi berjalan (waktu mengetik &
+ * jumlah keystroke), karena itulah satu-satunya cara server tahu apa yang terjadi di sesi yang
+ * ditinggalkan sebuah refresh. Dipakai lewat route, bukan lewat model, supaya yang diuji adalah
+ * jalur yang benar-benar dipakai beacon -- termasuk otorisasinya.
+ */
+function pingWarAttempt(
+    User $player,
+    ClanWarModeClaim $claim,
+    int $chars,
+    int $typedMs = 0,
+    int $totalKeystrokes = 0,
+    int $correctKeystrokes = 0,
+): TestResponse {
+    return test()->actingAs($player)->postJson(route('clan-war.attempt-progress'), [
+        'claim' => $claim->id,
+        'chars' => $chars,
+        'typedMs' => $typedMs,
+        'totalKeystrokes' => $totalKeystrokes,
+        'correctKeystrokes' => $correctKeystrokes,
+    ]);
 }
 
 function countQueries(Closure $callback): int

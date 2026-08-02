@@ -236,7 +236,10 @@ baris klaim, sekali saja (`lockForUpdate` + cek null, jadi dua tab pun mendarat 
 |---|---|
 | `attempt_started_at` | **jangkar jam milik server** — client tak pernah menulisnya, jadi refresh tak bisa me-reset-nya |
 | `attempt_text` | teks yang benar-benar diterbitkan, dibekukan untuk ketiga mode |
-| `attempt_progress` | posisi resume kasar (persen), pola yang sama dengan `room_members.progress_percent` di balapan |
+| `attempt_chars` | posisi resume dalam **karakter** |
+
+Plus **buku besar** (`attempt_carried_*` / `attempt_live_*`) yang menyimpan kerja tiap sesi —
+lihat §3.9.a, kolom-kolom itu yang membuat WPM sebuah attempt yang di-refresh tetap jujur.
 
 **Ya, `mount()` menulis di GET, dan itu disengaja.** Ping "aku mulai mengetik" dari client justru
 takkan dikirim oleh client yang sedang kita hadapi, jadi mount adalah satu-satunya jangkar yang tak
@@ -250,15 +253,17 @@ lalu client langsung `finish()` dan membukukan progress yang benar-benar diperol
 
 | Mode | Aturan | Kenapa |
 |---|---|---|
-| **time** | countdown = `subMode + 10 − elapsed`, di-clamp ke `subMode`. Durasi tersimpan tetap `subMode`. | Slotnya memang *n* detik wall-clock. Yang membuang 20 detik mengetik lebih sedikit di atas penyebut yang sama → WPM turun sendiri. |
-| **words** | `durasi = max(klaim, elapsed − 30)` | Tak ada timer, jadi durasi adalah seluruh skor. Waktu terbuang **harus** masuk hitungan, tapi grace 30 detik menyerap waktu **membaca** pemain jujur. |
+| **time** | countdown = `subMode + 10 − elapsed`, di-clamp ke `subMode`. Durasi = `max(subMode, waktu ketik terjumlah)`. | Slotnya memang *n* detik wall-clock. `max` menutup celah kecil dari `COUNTDOWN_GRACE`: attempt yang di-resume boleh melewati nominal, dan menilai 65 detik ketikan atas 60 adalah inflasi yang sama dalam skala kecil. |
+| **words** | `durasi = carried + klaim` (jumlah waktu ketik semua sesi) | Tak ada timer, jadi durasi adalah seluruh skor. Menjumlahkan sesi tak butuh grace sama sekali — waktu yang tak seorang pun mengetik memang tak pernah masuk penjumlahan. |
 | **survival** | **tidak resume.** Restart di dalam anggaran: `wasted + credited ≤ 120 detik` | Satu-satunya mode yang menilai **dari** jam, jadi jam kontinu justru **menghadiahi** refresh, sementara jam per-sesi mengizinkan retry tanpa batas. |
 
-**Dua grace yang berbeda, dan jangan disatukan.** `GRACE_SECONDS` (30) memaafkan detik-detik
-**membaca** sebelum keystroke pertama — karena itu ia longgar. `COUNTDOWN_GRACE_SECONDS` (10) hanya
-menanggung page load, karena satu-satunya saat ia berarti adalah **resume**, dan yang masuk ulang
-sudah membaca teksnya. Memakai grace 30 detik di countdown akan mengembalikan seluruh jam slot 30
-detik — refresh jadi restart gratis lagi.
+**`GRACE_SECONDS` (30) tidak lagi menentukan harga sebuah refresh.** Dulu ia iya —
+`durasi words = max(klaim, elapsed − 30)` — dan justru di situ letak bug-nya: 30 detik adalah
+kelonggaran yang pas untuk waktu **membaca** dan bencana untuk sebuah reload, karena ia menghapus
+setengah menit mengetik yang benar-benar terjadi. Sekarang ia kembali berarti persis seperti
+namanya. `COUNTDOWN_GRACE_SECONDS` (10) tetap terpisah dan tetap kecil: ia hanya menanggung page
+load, karena satu-satunya saat ia berarti adalah **resume**, dan yang masuk ulang sudah membaca
+teksnya.
 
 **Kredit survival dipotong hanya saat menilai war, tak pernah ke `TypingResult`.** Memendekkan
 durasi justru **menaikkan** WPM, dan `AntiCheatService::check()` membaca `duration_seconds`:
@@ -273,18 +278,72 @@ menerima dua parameter opsional (`$elapsedOverride`, `$windowSeconds`); jalur so
 keduanya dan perilakunya **byte-identical**. Slack tetap proporsional terhadap durasi, bukan
 terhadap window — kalau tidak, slot war justru dapat plafon lebih longgar daripada tes solo yang sama.
 
-#### Ping posisi resume
+### 3.9.a Buku besar attempt — kenapa refresh tak lagi menaikkan WPM
 
-`TypingEngine::reportWarProgress()`, di-throttle 5 detik di client (payload: `textToType` adalah
-properti Livewire publik, ikut bolak-balik tiap round trip) dan dibatasi 60/menit di server. Diikat
-tiga arah: **clamp** 0–100, **monoton** (mundur = bisa mengulang bagian yang sudah lewat), dan
-**batas fisik** (`elapsed × 20 cps ÷ panjang teks`) yang menahan `progress = 100` di *t* = 0.
+**Controller:** [`ClanWarProgressController`](../../app/Http/Controllers/ClanWarProgressController.php) ·
+**Test:** `ClanWarResumeLedgerTest`, `ClanWarProgressPingTest`
+
+Resume versi pertama memulihkan **posisi** pemain, lalu client mengkredit karakter yang dipulihkan
+itu ke penghitung keystroke-nya sendiri. Tapi jam client baru mulai pada keystroke pertama
+**setelah** reload. Jadi pembilangnya mencakup seluruh attempt sementara penyebutnya hanya sesi
+terakhir — dan karena poin war = `ceiling × (wpm / 150)`, **refresh membeli poin**.
+
+Kebocoran keduanya lebih senyap: karakter yang dipulihkan semuanya ditandai **benar**, jadi tiap
+kesalahan sebelum reload lenyap dan `accuracyMultiplier` (0,5–1,0×) ikut membayarnya. Refresh
+**mencuci akurasi**.
+
+Keduanya berbentuk sama — karakter dikreditkan atas waktu yang tidak — dan keduanya ditutup dengan
+**mengukur**, bukan menebak. Tiap sesi melaporkan waktu ketik & jumlah keystroke-nya sendiri; server
+menjumlahkan:
+
+| kolom | isi |
+|---|---|
+| `attempt_live_*` | sesi yang **sedang** berjalan, ditimpa tiap ping |
+| `attempt_carried_*` | seluruh sesi **sebelumnya**, disegel oleh page load berikutnya |
+
+Keduanya dipisah karena penghitung sesi baru mulai dari nol, dan itu tak bisa dibedakan dari
+"mundur" kalau disatukan — dan karena kiriman di akhir **sudah** memuat sesi live secara utuh, jadi
+menjumlahkan keduanya akan menghitungnya dua kali. Penyegelnya adalah `mount()` dan hanya `mount()`:
+page load justru *adalah* peristiwa yang mengakhiri sebuah sesi.
+
+Konsekuensi yang disengaja: **waktu menganggur tak lagi ditagih.** Aturan lama menagihnya (lewat
+jam jangkar), tapi menganggur tak membeli apa pun — teks yang sama tetap harus diketik dengan
+kecepatan yang sama, dan slotnya terkunci selama itu.
+
+#### Ping posisi & buku besar
+
+Sebuah **endpoint biasa** (`POST /clan-war/attempt-progress`), bukan method Livewire — dan itu
+perbaikan bug, bukan kerapian. Panggilan Livewire adalah XHR, dan browser **membatalkan** XHR saat
+halaman unload; jadi ping yang dikirim tepat ketika pemain menekan refresh — satu-satunya yang
+menentukan di mana ia kembali — tak pernah tiba. Yang tersimpan selalu ping berkala terakhir,
+sampai 5 detik basi, dan pemain mendarat beberapa kata di belakang. Kini dijangkau
+`fetch(..., { keepalive: true })`, pola yang sama dengan leave-beacon multiplayer, dipicu
+`pagehide` + `beforeunload` + `visibilitychange` (yang terakhir untuk tab yang dibuang Chrome
+mobile — di HP itu justru cara paling lazim sebuah attempt terputus).
+
+Lepas dari antrean Livewire, payload-nya tinggal lima integer, jadi throttle-nya turun **5 detik →
+1 detik** dan ia melapor tiap kata selesai. Batasnya 240/menit di route.
+
+Tiap angka diikat ke jam yang dipegang server: **batas fisik** (`elapsed × 20 cps`) untuk karakter,
+**elapsed** untuk waktu ketik, dan **monoton** untuk semuanya. Ping yang hilang aman justru karena
+ketiganya bergerak bersama — yang hilang adalah posisi *dan* waktu *dan* karakter sekaligus, jadi
+yang tersisa tetap satu run yang konsisten; pemain cuma resume sedikit lebih ke belakang.
 
 Client merekonstruksi posisinya dengan
 [`resumePosition()`](../../resources/js/war-resume.js) — hanya span "kata + spasi" **utuh**, tak
 pernah kata separuh, sama seperti `restoreProgress()` di `race-arena.js`. Diekstrak ke modulnya
 sendiri supaya bisa diuji Vitest (`war-resume.test.js`); salah satu karakter di sini **gagal
 diam-diam**, tak ada exception.
+
+Satuannya **karakter**, bukan persen. Persen dipinjam dari `room_members.progress_percent`, di mana
+ia hanya digambar sebagai bar; di sini ia aritmetika. Pada teks Words ~280 karakter, satu persen
+adalah tiga karakter, lalu client membulatkan **lagi** ke batas kata — dua kali pembulatan untuk
+masalah yang cuma butuh sekali. Karakter memakan ruang simpan yang sama.
+
+Karakter yang dipulihkan digambar sebagai sudah-benar (pemain harus melihat kerjanya masih ada) tapi
+**tidak** ditambahkan ke penghitung keystroke sesi ini. Sebagai gantinya buku besar `carried`
+ikut turun ke client, sehingga WPM live yang dilihat pemain setelah resume adalah angka yang sama
+dengan yang akan dinilai server — bukan angka lebih rendah yang melompat di akhir.
 
 ### 3.10 Cap klaim dinamis per ukuran clan
 

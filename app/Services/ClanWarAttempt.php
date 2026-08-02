@@ -29,6 +29,14 @@ class ClanWarAttempt
      * as SoloSessionGuard::DURATION_SLACK_SECONDS: one number to explain, not two.
      *
      * Re-tune from the rejection log (see anti-cheat-wpm.md 10.2b), not from intuition.
+     *
+     * NOTE: this no longer prices a refresh. It once did -- `words` duration was
+     * `max(claim, anchor elapsed - GRACE)` -- and that was a guess standing in for a
+     * measurement. Thirty seconds of forgiveness is right for reading time and wrong for typing
+     * time, and a reload turned the second into the first: refresh 25 seconds in and 25 real
+     * typing seconds were erased, so the same characters landed on a shorter clock and WPM rose.
+     * The ledger below measures each session instead, and this constant went back to meaning
+     * only what its name says.
      */
     public const GRACE_SECONDS = 30.0;
 
@@ -99,12 +107,16 @@ class ClanWarAttempt
 
         $isResume = ! $fresh->wasChanged('attempt_started_at');
         $elapsed = $this->elapsedSeconds($fresh);
+        $resumable = $fresh->mode !== 'survival';
 
         return new ClanWarAttemptState(
             text: (string) $fresh->attempt_text,
             anchoredAt: $fresh->attempt_started_at,
             isResume: $isResume,
-            resumeProgress: $fresh->mode === 'survival' ? 0 : (int) $fresh->attempt_progress,
+            resumeChars: $resumable ? (int) $fresh->attempt_chars : 0,
+            carriedMs: $resumable ? (int) $fresh->attempt_carried_ms : 0,
+            carriedCorrectChars: $resumable ? (int) $fresh->attempt_carried_correct_chars : 0,
+            carriedTotalChars: $resumable ? (int) $fresh->attempt_carried_total_chars : 0,
             remainingSeconds: $this->remainingSeconds($fresh, $elapsed),
             survivalBudgetRemaining: $this->survivalBudgetRemaining($fresh, $elapsed),
             wallBudgetSeconds: $this->wallBudgetSeconds($fresh),
@@ -112,40 +124,123 @@ class ClanWarAttempt
     }
 
     /**
-     * Persist a coarse resume position, bounded three ways.
+     * Seal the session that just ended into the carried ledger, and clear the live slot.
      *
-     * A resume position is client-reported, and that is new input -- but it is not a new attack
-     * surface, because the server never grants credit for it. The restored characters exist
-     * only in the browser; the scored numbers are still the keystroke counts submitted at
-     * finish, bounded by the same character ceiling as always. The worst a forged value buys is
-     * the ability to submit a large count, which a forged payload could always attempt, and the
-     * physical bound below makes even that cost real wall time.
+     * Called from mount() and nowhere else, because a page load is exactly what ends a session
+     * -- it is the one event that means "whatever was running is not running any more". open()
+     * cannot do this: it also runs during saveResult(), and the submission there already carries
+     * the live session in full, so folding at that moment would count it twice.
+     *
+     * Idempotent in the way that matters: sealing a live slot that is already zero adds zero.
+     * A player who opens the page and types nothing carries nothing.
      */
-    public function recordProgress(ClanWarModeClaim $claim, int $percent): void
+    public function sealLiveSession(ClanWarModeClaim $claim): void
     {
-        $percent = max(0, min(100, $percent));
+        if ($claim->mode === 'survival') {
+            return;
+        }
 
+        DB::transaction(function () use ($claim) {
+            /** @var ClanWarModeClaim $locked */
+            $locked = ClanWarModeClaim::whereKey($claim->id)->lockForUpdate()->first();
+
+            if ((int) $locked->attempt_live_ms === 0 && (int) $locked->attempt_live_total_chars === 0) {
+                return;
+            }
+
+            $locked->update([
+                'attempt_carried_ms' => (int) $locked->attempt_carried_ms + (int) $locked->attempt_live_ms,
+                'attempt_carried_correct_chars' => (int) $locked->attempt_carried_correct_chars + (int) $locked->attempt_live_correct_chars,
+                'attempt_carried_total_chars' => (int) $locked->attempt_carried_total_chars + (int) $locked->attempt_live_total_chars,
+                'attempt_live_ms' => 0,
+                'attempt_live_correct_chars' => 0,
+                'attempt_live_total_chars' => 0,
+            ]);
+        });
+
+        $claim->refresh();
+    }
+
+    /** Work banked by sessions this attempt has already abandoned. Zero for survival. */
+    public function carried(ClanWarModeClaim $claim): array
+    {
+        if ($claim->mode === 'survival') {
+            return ['ms' => 0, 'correct' => 0, 'total' => 0];
+        }
+
+        return [
+            'ms' => (int) $claim->attempt_carried_ms,
+            'correct' => (int) $claim->attempt_carried_correct_chars,
+            'total' => (int) $claim->attempt_carried_total_chars,
+        ];
+    }
+
+    /**
+     * Persist where the running session has got to AND what it has spent getting there.
+     *
+     * The position was always client-reported and was never worth credit: the restored
+     * characters live only in the browser. The ledger IS worth credit, so it is bounded the
+     * same way everything else in this project is -- against a clock the client cannot move.
+     *
+     * Three bounds, each closing a different forgery:
+     *
+     *  - Characters cannot exceed what the anchor's wall clock could physically produce
+     *    (SoloSessionGuard::MAX_CHARS_PER_SECOND). This is what stops `chars = 4000` at t = 0.
+     *  - Typing time cannot exceed the wall clock either. Over-reporting time would be the
+     *    honest direction (it lowers WPM), but an attempt that claims more time than has
+     *    passed is still describing something that did not happen.
+     *  - Nothing may fall. A session's counters only rise, so a decrease is either a stale
+     *    packet arriving late or a rewind to replay the easy stretch of the text; both are
+     *    served correctly by keeping the higher value.
+     *
+     * Under-reporting stays safe for a reason worth stating: a dropped ping loses the position
+     * AND the time AND the characters together, so what survives is still an internally
+     * consistent run. The player simply resumes a little further back than they really were.
+     */
+    public function recordProgress(ClanWarModeClaim $claim, int $chars, int $typedMs, int $totalChars, int $correctChars): void
+    {
         $textLength = mb_strlen((string) $claim->attempt_text);
 
         if ($textLength === 0) {
             return;
         }
 
-        // Physical bound: no more of the text can be confirmed than could have been typed in
-        // the wall clock so far. Same shape as SoloSessionGuard's ceiling, applied at ping time
-        // -- this is what stops `progress = 100` arriving at t = 0.
-        $maxChars = $this->elapsedSeconds($claim) * SoloSessionGuard::MAX_CHARS_PER_SECOND;
-        $percent = min($percent, (int) floor($maxChars / $textLength * 100));
+        $elapsed = $this->elapsedSeconds($claim);
+        $physicalChars = (int) floor($elapsed * SoloSessionGuard::MAX_CHARS_PER_SECOND);
 
-        if ($percent <= (int) $claim->attempt_progress) {
+        $chars = max(0, min($chars, $textLength, $physicalChars));
+        $totalChars = max(0, min($totalChars, $physicalChars));
+        $correctChars = max(0, min($correctChars, $totalChars));
+        $typedMs = max(0, min($typedMs, (int) round($elapsed * 1000)));
+
+        $updates = [];
+
+        if ($chars > (int) $claim->attempt_chars) {
+            $updates['attempt_chars'] = $chars;
+        }
+
+        // The ledger moves as one row, keyed on its total: correct and elapsed belong to the
+        // same snapshot, and letting them advance independently would let a client send its
+        // best correct count and its shortest clock from two different moments.
+        if ($totalChars > (int) $claim->attempt_live_total_chars) {
+            $updates['attempt_live_total_chars'] = $totalChars;
+            $updates['attempt_live_correct_chars'] = $correctChars;
+            $updates['attempt_live_ms'] = max($typedMs, (int) $claim->attempt_live_ms);
+        }
+
+        if ($updates === []) {
             return;
         }
 
-        // Conditional update: progress only ever rises. Accepting a decrease would let a client
-        // rewind to replay the easy stretch of the text.
+        // Conditional update rather than a lock: the ping is the hottest path here (one per
+        // finished word) and the condition below is the same monotonic rule, enforced by the
+        // database instead of by holding a row.
         ClanWarModeClaim::whereKey($claim->id)
-            ->where('attempt_progress', '<', $percent)
-            ->update(['attempt_progress' => $percent]);
+            ->where(function ($query) use ($updates) {
+                $query->where('attempt_chars', '<', $updates['attempt_chars'] ?? 0)
+                    ->orWhere('attempt_live_total_chars', '<', $updates['attempt_live_total_chars'] ?? 0);
+            })
+            ->update($updates);
     }
 
     /**
@@ -159,24 +254,35 @@ class ClanWarAttempt
      */
     public function resolveDuration(ClanWarModeClaim $claim, float $claimedSeconds): float
     {
-        // `time`: the slot IS n seconds of wall clock. Somebody who burned 20 of them types
-        // fewer characters over the same denominator, so WPM falls on its own -- no adjustment.
-        if ($claim->mode === 'time') {
-            return (float) $claim->mode_config;
-        }
-
-        // `survival`: the claim is already bounded by SoloSessionGuard::claimsMoreTimeThanElapsed
-        // against THIS session, and the war credit is capped separately (see scoredDuration).
-        // Lengthening it here would raise the score, which is the one thing survival must never
-        // reward.
+        // `survival`: never resumes, so it has no ledger. The claim is already bounded by
+        // SoloSessionGuard::claimsMoreTimeThanElapsed against THIS session, and the war credit
+        // is capped separately (see scoredDuration). Lengthening it here would raise the score,
+        // which is the one thing survival must never reward.
         if ($claim->mode === 'survival') {
             return $claimedSeconds;
         }
 
-        // `words`: no timer, so duration is the whole score and wasted wall clock must count.
-        // The grace absorbs an honest player's reading time, so a clean single-session run
-        // keeps its claim exactly; only genuinely burned minutes push past it.
-        return max($claimedSeconds, $this->elapsedSeconds($claim) - self::GRACE_SECONDS);
+        // Every second of typing this attempt has seen: the sessions it abandoned, plus the one
+        // submitting now. This is the whole fix -- the numerator below counts characters from
+        // the entire attempt, so the denominator must span it too.
+        $typedSeconds = ((int) $claim->attempt_carried_ms / 1000) + $claimedSeconds;
+
+        // `time`: the slot IS n seconds, and a single-session run is scored over exactly that
+        // however fast it finished. But a resumed run can exceed it -- COUNTDOWN_GRACE_SECONDS
+        // deliberately hands back a few seconds for the page load -- and scoring 65 seconds of
+        // typing over 60 is the same inflation in miniature. Take whichever is longer.
+        if ($claim->mode === 'time') {
+            return max((float) $claim->mode_config, $typedSeconds);
+        }
+
+        // `words`: no timer, so duration is the whole score.
+        //
+        // This used to read `max(claim, anchor elapsed - GRACE_SECONDS)` -- the anchor's wall
+        // clock, discounted by a guess. The guess was the leak: 30 seconds is a fair allowance
+        // for reading a text you have not seen, and a catastrophic one for a reload, where it
+        // erases half a minute of typing that genuinely happened. Summing the sessions needs no
+        // allowance at all, because time nobody was typing was never in the sum to begin with.
+        return $typedSeconds;
     }
 
     /**

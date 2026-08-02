@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AchievementController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\ClanWarProgressController;
 use App\Http\Controllers\FriendController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\LocaleController;
@@ -74,6 +75,18 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/clans', Clans::class)->name('clans.index');
     Route::get('/clan-war', ClanWar::class)->name('clan-war.index');
+
+    // Where a running Clan War attempt reports its position and its session ledger. Off the
+    // Livewire queue on purpose: a Livewire XHR is cancelled by page unload, so the ping fired
+    // as the player pressed refresh -- the only one that decides where they resume -- never
+    // arrived. Reached by a keepalive fetch, same as the multiplayer leave-beacon.
+    //
+    // Throttle 240/min: the client reports once per finished word, and a 120 WPM typist
+    // finishes two words a second. Generous enough never to cut off a fast player, and the
+    // endpoint writes nothing a flood could grow (every value is bounded and monotonic).
+    Route::post('/clan-war/attempt-progress', ClanWarProgressController::class)
+        ->middleware('throttle:240,1')
+        ->name('clan-war.attempt-progress');
     Route::get('/clan-leaderboard', ClanLeaderboard::class)->name('clan-leaderboard.index');
     Route::get('/clans/{clan}', ClanShow::class)->name('clans.show');
 
