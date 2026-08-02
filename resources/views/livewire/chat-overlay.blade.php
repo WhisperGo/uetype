@@ -152,7 +152,7 @@
                  is the prototype's, and each 44px button pulls its own click box back out of
                  the flow with `-my-2.5`. --}}
             <div class="flex items-center gap-1 p-3 border-b border-white/5 shrink-0">
-                <x-icon-button wire:click="backToPicker" class="-my-2.5 -ms-1" :label="__('chat.back_to_inbox')">
+                <x-icon-button wire:click="backToPicker" class="-my-2.5 -ms-1" :label="__('chat.back')">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                     </svg>

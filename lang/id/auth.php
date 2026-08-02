@@ -1,6 +1,9 @@
 <?php
 
 return [
+    // Tanpa panah di dalam string: chevron-nya markup (<x-header-link back>).
+    'back' => 'Kembali',
+
     'welcome' => 'Selamat datang',
     'mascot_alt' => 'Maskot UeType',
     'headline_start' => 'Mulai',

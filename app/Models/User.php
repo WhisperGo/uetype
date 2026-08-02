@@ -34,6 +34,21 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    /**
+     * There is no `password` column here: identity rests entirely on google_id.
+     *
+     * Returned as '' rather than the null Eloquent would give, because
+     * SessionGuard::queueRecallerCookie() feeds this straight into hash_hmac(), and a null
+     * $data is deprecated on PHP 8.1+ -- that would be one deprecation on every single
+     * sign-in now that remember-me is on. The value is never read back: a recaller is
+     * validated on id + remember_token alone (EloquentUserProvider::retrieveByToken), so ''
+     * costs nothing.
+     */
+    public function getAuthPassword(): string
+    {
+        return '';
+    }
+
     protected function casts(): array
     {
         return [

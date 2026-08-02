@@ -137,7 +137,11 @@ if (app()->environment('local')) {
             abort(404, "Dummy user '{$email}' not found. Run: php artisan db:seed --class=DummyUserSeeder");
         }
 
-        Auth::login($user);
+        // Same rule as GoogleAuthController::loginAndRegenerate() -- a dev shortcut is still
+        // a login path, and one that quietly skipped session rotation is exactly how such a
+        // rule erodes. remember: true so this behaves like the real thing too.
+        Auth::login($user, remember: true);
+        request()->session()->regenerate();
 
         return redirect('/typing');
     })->name('dev.login');

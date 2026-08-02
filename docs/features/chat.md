@@ -95,6 +95,38 @@ dari clan, lalu tekan tombol back atau buka bookmark lama. Tanpa penjaga ini hal
 cabang percakapan tanpa clan di belakangnya: thread kosong tanpa header dan tanpa jalan kembali,
 karena inbox yang memuat kartu "kamu belum punya clan" pun tak ikut digambar.
 
+### 2.6.a Tombol kembali menjawab dua pertanyaan berbeda
+
+Percakapan bisa dicapai dua cara, dan dulu hanya salah satunya yang dilayani. Tombol back-nya
+adalah `wire:click="closeConversation"` yang cuma men-set `activeMode = null` — jadi satu-satunya
+tujuan yang ia tahu adalah **inbox**. Masuk dari halaman clan lalu menekan back mendarat di daftar
+percakapan, bukan kembali ke clan.
+
+| Cara masuk | Arti "kembali" |
+|---|---|
+| Page load ber-`?mode=…` (hub clan, detail clan, "buka penuh" dari overlay) | kembali ke **halaman asal** |
+| `openDm` / `openClanChat` dari inbox di halaman yang sama | **tutup percakapan** — inbox memang tempat asalnya |
+
+Pembedanya: **apakah percakapan sudah terbuka saat komponen pertama kali `mount()`**. Kalau ya, ia
+dicapai lewat tautan, dan `Chat::$backUrl` diisi
+[`App\Support\BackLink`](../../app/Support/BackLink.php) dari `Referer` — helper yang sama dengan
+panah profil ([friends-presence.md](friends-presence.md) §3.8), beserta penjaga host dan daftar
+pengecualiannya (`/chat`, supaya tak ada loop). Kalau tidak, tombol lama tetap dirender apa adanya.
+
+**Kenapa Referer, bukan `?from=`:** tautan clan→chat diuji **verbatim** oleh `ChatTest`, jadi
+menambahkan parameter ke sana akan memecahkannya — dan itu memang sinyal yang benar: tautan yang
+harus membawa muatan navigasi demi halaman tujuan adalah tautan yang bocor tanggung jawab.
+
+**Ditangkap sekali di `mount()`**, karena hanya request itu yang membawa `Referer` sungguhan: setiap
+round-trip Livewire berikutnya membawa halaman chat itu sendiri. `#[Locked]` karena nilainya masuk
+ke `href` — client yang bisa memilihnya berarti bisa menjadikan halaman ini pengalih ke mana saja.
+
+Urutan di `mount()` penting: guard `?mode=clan` tanpa clan berjalan **lebih dulu**, supaya
+percakapan yang digugurkan tak mendapat tautan kembali untuk sesuatu yang tak dirender.
+
+**Overlay sengaja tak ikut.** Back miliknya (`backToPicker`) berarti "kembali ke daftar kontak tanpa
+menutup drawer" — pertanyaan yang berbeda, dan ia tak pernah punya halaman asal.
+
 ### 2.7 Body listener kosong memicu re-render
 
 Sama seperti Friends/Clans: `#[On('message-received')]` kosong — menerima event sudah cukup untuk

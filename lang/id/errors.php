@@ -14,6 +14,11 @@ return [
         'message' => 'Kamu tidak punya izin untuk membuka halaman ini.',
     ],
 
+    '419' => [
+        'title' => 'Halaman kedaluwarsa',
+        'message' => 'Halaman ini terlalu lama dibiarkan terbuka dan token keamanannya kedaluwarsa. Kembali ke beranda lalu coba lagi -- kamu hampir pasti masih masuk.',
+    ],
+
     '500' => [
         'title' => 'Ada yang rusak',
         'message' => 'Terjadi kesalahan tak terduga di sisi kami. Coba lagi sebentar.',

@@ -8,6 +8,7 @@ use App\Events\DirectMessageSent;
 use App\Events\MessageDeleted;
 use App\Events\MessageEdited;
 use App\Livewire\Chat;
+use App\Livewire\ChatOverlay;
 use App\Livewire\Clans;
 use App\Livewire\ClanShow;
 use App\Models\Clan;
@@ -665,3 +666,121 @@ it('validates the send endpoint payload', function () {
         ->postJson(route('chat.send'), ['mode' => 'invalid', 'body' => ''])
         ->assertStatus(422);
 });
+
+// ---- TUJUAN TOMBOL KEMBALI ----
+//
+// Percakapan bisa dicapai dua cara, dan cuma salah satunya yang dulu dilayani: masuk lewat
+// TAUTAN dari halaman lain (clan hub, detail clan, "buka penuh" dari overlay) tak pernah
+// didahului inbox, jadi menutupnya menjatuhkan pengunjung di halaman yang belum pernah ia
+// buka. Yang dibuka DARI inbox tetap harus kembali ke inbox -- itu perubahan state, bukan
+// navigasi.
+
+it('mengarahkan panah kembali ke halaman clan tempat pengunjung datang', function () {
+    [$clan, $members] = makeClanWithMembers(2);
+
+    $html = $this->actingAs($members[0])
+        ->get(route('chat.index', ['mode' => 'clan']), ['referer' => url('/clans/'.$clan->id)])
+        ->assertOk()
+        ->getContent();
+
+    expect(backArrowHref($html, __('chat.back')))->toBe('/clans/'.$clan->id);
+});
+
+it('mempertahankan query string halaman asal', function () {
+    [$clan, $members] = makeClanWithMembers(2);
+
+    $html = $this->actingAs($members[0])
+        ->get(route('chat.index', ['mode' => 'clan']), ['referer' => url('/clans/'.$clan->id.'?tab=roster')])
+        ->assertOk()
+        ->getContent();
+
+    expect(backArrowHref($html, __('chat.back')))->toBe('/clans/'.$clan->id.'?tab=roster');
+});
+
+it('jatuh ke inbox saat tak ada referer sama sekali', function () {
+    [$clan, $members] = makeClanWithMembers(2);
+
+    $html = $this->actingAs($members[0])
+        ->get(route('chat.index', ['mode' => 'clan']))
+        ->assertOk()
+        ->getContent();
+
+    expect(backArrowHref($html, __('chat.back')))->toBe(route('chat.index'));
+});
+
+it('menolak referer lintas host alih-alih menautinya (open redirect)', function () {
+    [$clan, $members] = makeClanWithMembers(2);
+
+    $response = $this->actingAs($members[0])
+        ->get(route('chat.index', ['mode' => 'clan']), ['referer' => 'https://evil.example.com/phish'])
+        ->assertOk();
+
+    $response->assertDontSee('evil.example.com');
+    expect(backArrowHref($response->getContent(), __('chat.back')))->toBe(route('chat.index'));
+});
+
+it('tak menunjuk balik ke halaman chat lain (tak ada loop)', function () {
+    [$clan, $members] = makeClanWithMembers(2);
+
+    $html = $this->actingAs($members[0])
+        ->get(route('chat.index', ['mode' => 'clan']), ['referer' => url('/chat?mode=dm&with=someone')])
+        ->assertOk()
+        ->getContent();
+
+    expect(backArrowHref($html, __('chat.back')))->toBe(route('chat.index'));
+});
+
+it('mendahulukan history.back() supaya posisi scroll halaman asal pulih', function () {
+    [$clan, $members] = makeClanWithMembers(2);
+
+    $html = $this->actingAs($members[0])
+        ->get(route('chat.index', ['mode' => 'clan']), ['referer' => url('/clans/'.$clan->id)])
+        ->assertOk()
+        ->getContent();
+
+    // Proyek ini tak menjalankan JS di test, jadi yang dikunci kontrak markup-nya.
+    expect($html)->toContain('window.history.back()')
+        // Penjaganya harus MENDAHULUI lompatannya: tanpa riwayat, href yang berlaku.
+        ->and(strpos($html, 'window.history.length > 1'))
+        ->toBeLessThan(strpos($html, 'window.history.back()'));
+});
+
+it('tetap menutup percakapan di tempat kalau dibuka dari inbox', function () {
+    [$me, $friend] = makeAcceptedFriends();
+
+    Livewire::actingAs($me)->test(Chat::class)
+        ->assertSet('backUrl', null)
+        ->call('openDm', $friend->username)
+        // Dibuka dari inbox: tak ada halaman asal, jadi tombolnya tetap aksi Livewire.
+        ->assertSet('backUrl', null)
+        ->assertSeeHtml('wire:click="closeConversation"');
+});
+
+it('tak memberi tautan kembali saat ?mode=clan digugurkan', function () {
+    $loner = User::factory()->create();
+
+    // Guard clan di mount() berjalan LEBIH DULU, jadi tak ada tautan kembali untuk
+    // percakapan yang memang tak dirender.
+    Livewire::actingAs($loner)
+        ->withQueryParams(['mode' => 'clan'])
+        ->test(Chat::class)
+        ->assertSet('activeMode', null)
+        ->assertSet('backUrl', null);
+});
+
+it('tak menyeret overlay ikut berubah', function () {
+    // Back milik overlay artinya "kembali ke daftar kontak tanpa menutup drawer" --
+    // pertanyaan yang berbeda, jadi ia tak boleh ikut punya state halaman asal.
+    expect(property_exists(ChatOverlay::class, 'backUrl'))->toBeFalse();
+});
+
+it('menolak backUrl yang dipilih client', function () {
+    [$clan, $members] = makeClanWithMembers(2);
+
+    // Nilainya masuk ke href; client yang bisa memilihnya berarti bisa menjadikan
+    // halaman ini pengalih ke mana saja.
+    Livewire::actingAs($members[0])
+        ->withQueryParams(['mode' => 'clan'])
+        ->test(Chat::class)
+        ->set('backUrl', 'https://evil.example.com');
+})->throws(Exception::class);

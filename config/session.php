@@ -32,7 +32,20 @@ return [
     |
     */
 
-    'lifetime' => (int) env('SESSION_LIFETIME', 120),
+    /*
+     * 14 days (20160 minutes), raised from Laravel's default 120.
+     *
+     * Google is the only sign-in path and there is no password column, so an idle timeout
+     * logs out nobody but the legitimate owner -- at the cost of a full OAuth round trip.
+     * Two hours was short enough that players were re-signing-in during a single evening.
+     *
+     * Because expire_on_close below is FALSE, this is not only a server-side idle window:
+     * the session COOKIE is issued with Max-Age = lifetime * 60, so raising it also keeps
+     * the browser sending the cookie across restarts. Remember-me
+     * (GoogleAuthController::loginAndRegenerate) is the belt to this suspenders -- it
+     * survives even the cookie itself expiring.
+     */
+    'lifetime' => (int) env('SESSION_LIFETIME', 20160),
 
     'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
 

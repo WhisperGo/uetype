@@ -84,11 +84,30 @@
                  pull their own click box back out of the flow with `-my-2`, so the row keeps
                  the height it always had. --}}
             <div class="flex items-center gap-3 p-4 border-b border-white/5 shrink-0">
-                <x-icon-button wire:click="closeConversation" class="-my-2 -ms-2" :label="__('chat.back_to_inbox')">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-                    </svg>
-                </x-icon-button>
+                {{-- Two controls, because "back" answers two different questions. Opened by
+                     LINK from another page (the clan hub is the common case), back means
+                     return THERE -- href carries the server-derived origin so this stays a
+                     real link (middle-click, open-in-new-tab, no-JS), while the handler
+                     prefers history.back() when there IS history, because only that restores
+                     the previous page's scroll position. Same contract as the profile arrow.
+                     Opened from the inbox on this page, back means close the conversation --
+                     a state change, not a navigation. --}}
+                @if ($backUrl)
+                    <x-icon-button as="a" :label="__('chat.back')" href="{{ $backUrl }}" wire:navigate
+                        class="-my-2 -ms-2"
+                        x-data
+                        @click="if (window.history.length > 1) { $event.preventDefault(); window.history.back() }">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </x-icon-button>
+                @else
+                    <x-icon-button wire:click="closeConversation" class="-my-2 -ms-2" :label="__('chat.back')">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </x-icon-button>
+                @endif
 
                 @if ($activeMode === 'dm' && $this->activeFriend)
                     <a href="{{ route('profile.show', $this->activeFriend) }}" wire:navigate class="flex items-center gap-3 min-w-0 flex-1">

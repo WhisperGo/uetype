@@ -27,6 +27,21 @@
             </div>
 
             <div class="relative w-full sm:max-w-md mt-6 px-6 py-8 bg-surface/80 backdrop-blur border border-white/10 shadow-glow overflow-hidden sm:rounded-2xl">
+                @if ($backUrl)
+                    {{-- A plain <a>, deliberately: this layout never loads @livewireScripts, and
+                         resources/js/app.js registers every Alpine component inside an
+                         alpine:init listener that therefore never fires here. The history.back()
+                         enhancement used on the profile arrow would be dead markup on this page,
+                         so the href IS the whole control. Do not "unify" the two.
+
+                         <x-header-link> rather than <x-icon-button>: a link WITH TEXT is the
+                         32px / WCAG 2.5.8 case, not the 44px icon-only one, and it already
+                         ships a focus-visible ring. --}}
+                    <div class="mb-6">
+                        <x-header-link back href="{{ $backUrl }}">{{ __('auth.back') }}</x-header-link>
+                    </div>
+                @endif
+
                 {{ $slot }}
             </div>
         </div>

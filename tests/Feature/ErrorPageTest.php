@@ -26,7 +26,7 @@ it('localizes the 404 page to the active locale', function () {
 });
 
 it('renders each error view with its status code', function () {
-    foreach (['404', '403', '500', '503'] as $code) {
+    foreach (['404', '403', '419', '500', '503'] as $code) {
         $html = view("errors.{$code}")->render();
         expect($html)->toContain($code)
             ->and($html)->toContain('UETYPE'); // shared branded layout is in use

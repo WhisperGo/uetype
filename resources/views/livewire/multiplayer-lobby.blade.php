@@ -130,14 +130,7 @@
                     {{ __('multiplayer.join_room') }}
                 </button>
 
-                @if (session()->has('error'))
-                    <p class="mt-4 flex items-center justify-center gap-1.5 font-mono text-xs text-danger">
-                        <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
-                        </svg>
-                        <span>{{ session('error') }}</span>
-                    </p>
-                @endif
+                <x-session-error class="mt-4" :message="session('error')" />
             </div>
         </div>
 

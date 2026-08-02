@@ -91,8 +91,14 @@
                  A lightweight ping to /heartbeat every ~30s marks the user as still
                  online (last_seen_at is updated). The server broadcasts to friends
                  only on the offline->online transition, so this ping is cheap.
-                 Paused while the tab is hidden (to save resources) and pings again
-                 immediately when the tab becomes visible so status recovers quickly. --}}
+
+                 The pause while the tab is hidden is PRESENCE semantics, not session
+                 semantics: a backgrounded tab must not report its owner as online to the
+                 friends list. Do not remove it to keep a session alive -- session liveness
+                 no longer depends on this ping at all (SESSION_LIFETIME is 14 days and
+                 sign-ins are remembered), so the trade would cost an accurate online dot
+                 and buy nothing. The immediate ping on visibilitychange is what restores
+                 the dot when the tab comes back. --}}
             <script>
                 if (!window.__presenceHeartbeatRegistered) {
                     window.__presenceHeartbeatRegistered = true;
@@ -131,6 +137,15 @@
         @endauth
     </div>
 
+    {{-- A 419 on a Livewire round-trip means this page's CSRF token no longer matches the
+         session. Reloading is the repair, and remember-me is what makes it a repair rather
+         than an ejection: the reloaded request carries a valid recaller cookie, the guard
+         re-authenticates, and the visitor lands back on the SAME url (query state and all)
+         still signed in, having noticed nothing. Before remember-me the same reload dropped
+         them at /login with no explanation.
+
+         Full-page POSTs (locale, logout, the username form) never reach this hook -- they
+         fall through to the exception handler and render errors/419.blade.php. --}}
     <script>
         document.addEventListener('livewire:init', () => {
             Livewire.hook('request', ({

@@ -71,43 +71,6 @@ it('builds the public profile url from the username, not the numeric id (anti-en
 // leaderboard. The arrow used to be hardcoded to Friends, so returning from a clan
 // member's profile dropped the visitor on a page they had never been on.
 
-/**
- * The href on the profile's back arrow, as rendered.
- *
- * Anchored on the aria-label, then the WHOLE opening tag is read, rather than matching
- * attributes in order: the tag also carries an Alpine @click containing "> 1", so any
- * `[^>]*` walking the tag stops at the wrong character. `(?:[^>"]|"[^"]*")*` skips over
- * anything inside a quoted value, so the `>` in that handler no longer ends the tag early.
- *
- * The tag is read whole rather than only up to the aria-label because the arrow is now an
- * <x-icon-button>, and ComponentAttributeBag::merge() emits the component's own defaults
- * (aria-label, title) BEFORE the call site's attributes -- so href sits after the label now.
- * The assertion itself is unchanged: the href must equal the page the visitor came from.
- */
-function backArrowHref(string $html): ?string
-{
-    $label = 'aria-label="'.__('profile.back').'"';
-    $labelPos = strpos($html, $label);
-
-    if ($labelPos === false) {
-        return null;
-    }
-
-    $tagStart = strrpos(substr($html, 0, $labelPos), '<a ');
-
-    if ($tagStart === false) {
-        return null;
-    }
-
-    if (! preg_match('/<a\s(?:[^>"]|"[^"]*")*>/', substr($html, $tagStart), $tag)) {
-        return null;
-    }
-
-    preg_match('/href="([^"]*)"/', $tag[0], $m);
-
-    return $m[1] ?? null;
-}
-
 it('points the back arrow at the page the visitor came from', function (string $from) {
     $me = User::factory()->create();
     $other = User::factory()->create(['username' => 'targetplayer']);
@@ -117,7 +80,7 @@ it('points the back arrow at the page the visitor came from', function (string $
         ->assertOk()
         ->getContent();
 
-    expect(backArrowHref($html))->toBe($from);
+    expect(backArrowHref($html, __('profile.back')))->toBe($from);
 })->with([
     'clan roster' => '/clans',
     'clan detail' => '/clans/1',
@@ -136,7 +99,7 @@ it('keeps the query string of the origin page', function () {
         ->assertOk()
         ->getContent();
 
-    expect(backArrowHref($html))->toBe('/chat?mode=dm&amp;with=someone');
+    expect(backArrowHref($html, __('profile.back')))->toBe('/chat?mode=dm&amp;with=someone');
 });
 
 it('falls back to friends when there is no referer', function () {
@@ -148,7 +111,7 @@ it('falls back to friends when there is no referer', function () {
         ->assertOk()
         ->getContent();
 
-    expect(backArrowHref($html))->toBe(route('friends.index'));
+    expect(backArrowHref($html, __('profile.back')))->toBe(route('friends.index'));
 });
 
 it('refuses an off-site referer rather than linking to it (open redirect)', function () {
@@ -162,7 +125,7 @@ it('refuses an off-site referer rather than linking to it (open redirect)', func
     // The Referer is client-controlled: echoing it into an href unchecked would turn
     // every profile page into a redirect to anywhere.
     $response->assertDontSee('evil.example.com');
-    expect(backArrowHref($response->getContent()))->toBe(route('friends.index'));
+    expect(backArrowHref($response->getContent(), __('profile.back')))->toBe(route('friends.index'));
 });
 
 it('does not point back at another profile page', function () {
@@ -176,7 +139,7 @@ it('does not point back at another profile page', function () {
         ->assertOk()
         ->getContent();
 
-    expect(backArrowHref($html))->toBe(route('friends.index'));
+    expect(backArrowHref($html, __('profile.back')))->toBe(route('friends.index'));
 });
 
 it('renders no back arrow on your own profile', function () {

@@ -3,6 +3,9 @@
 use App\Models\Message;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\GoogleProvider;
+use Laravel\Socialite\Two\User as SocialiteUser;
 use Tests\TestCase;
 
 /*
@@ -155,6 +158,98 @@ function bladeViews(): array
 function tanpaKomentarJs(string $source): string
 {
     return preg_replace(['#/\*.*?\*/#s', '#^\s*//.*$#m'], '', $source);
+}
+
+/**
+ * Href tombol "kembali" yang dirender, dicari lewat aria-label-nya.
+ *
+ * Ditambatkan pada aria-label lalu SELURUH tag pembukanya dibaca, bukan mencocokkan atribut
+ * secara berurutan: tag-nya juga membawa handler Alpine `@click` berisi `> 1`, jadi `[^>]*`
+ * mana pun yang menyusuri tag akan berhenti di karakter yang salah. `(?:[^>"]|"[^"]*")*`
+ * melompati apa pun di dalam nilai berkutip, sehingga `>` di handler itu tak lagi menutup
+ * tag lebih awal.
+ *
+ * Tag dibaca utuh, bukan cuma sampai posisi aria-label, karena panahnya kini <x-icon-button>
+ * dan ComponentAttributeBag::merge() memancarkan default milik komponen (aria-label, title)
+ * SEBELUM atribut pemanggil -- jadi href duduk setelah label.
+ *
+ * Tinggal di sini, bukan di berkas test yang memakainya: fungsi yang dideklarasikan di sebuah
+ * berkas test baru global saat suite dijalankan penuh, jadi menjalankan satu berkas sendirian
+ * akan fatal -- alasan yang sama persis dengan bladeViews() di atas.
+ */
+function backArrowHref(string $html, string $label): ?string
+{
+    $needle = 'aria-label="'.$label.'"';
+    $labelPos = strpos($html, $needle);
+
+    if ($labelPos === false) {
+        return null;
+    }
+
+    $tagStart = strrpos(substr($html, 0, $labelPos), '<a ');
+
+    if ($tagStart === false) {
+        return null;
+    }
+
+    if (! preg_match('/<a\s(?:[^>"]|"[^"]*")*>/', substr($html, $tagStart), $tag)) {
+        return null;
+    }
+
+    preg_match('/href="([^"]*)"/', $tag[0], $m);
+
+    return $m[1] ?? null;
+}
+
+/**
+ * Href tautan "kembali" di kepala layout tamu (/login, pilih-username).
+ *
+ * Regex sederhana `<a ... >` CUKUP di sini, dan itu bukan kebetulan: layout tamu tak memuat
+ *
+ * @livewireScripts, jadi Alpine tak pernah menyala dan tak ada handler @click berisi `> 1`
+ * yang memotong tag lebih awal seperti di panah profil. Kalau suatu saat Alpine masuk ke
+ * halaman tamu, test yang memakai ini akan gagal -- dan itu memang sinyal yang diinginkan:
+ * pindahkan pemanggilnya ke backArrowHref().
+ */
+function guestBackHref(string $html): ?string
+{
+    $labelPos = strpos($html, '>'.__('auth.back'));
+
+    if ($labelPos === false) {
+        return null;
+    }
+
+    $tagStart = strrpos(substr($html, 0, $labelPos), '<a ');
+
+    if ($tagStart === false) {
+        return null;
+    }
+
+    preg_match('/href="([^"]*)"/', substr($html, $tagStart, $labelPos - $tagStart), $m);
+
+    return $m[1] ?? null;
+}
+
+/**
+ * Palsukan balasan Google supaya callback bisa diuji tanpa keluar jaringan.
+ *
+ * Tinggal di sini, bukan di GoogleAuthFlowTest tempat ia lahir: StaySignedInTest memakainya
+ * juga, dan fungsi yang dideklarasikan di sebuah berkas test baru global saat suite
+ * dijalankan penuh -- alasan yang sama dengan bladeViews() dan backArrowHref().
+ */
+function fakeGoogleUser(string $id = 'g-12345', string $email = 'pemain@gmail.com'): SocialiteUser
+{
+    $googleUser = new SocialiteUser;
+    $googleUser->id = $id;
+    $googleUser->email = $email;
+    $googleUser->avatar = 'https://lh3.googleusercontent.com/a/foto';
+
+    $provider = Mockery::mock(GoogleProvider::class);
+    $provider->shouldReceive('user')->andReturn($googleUser);
+
+    Socialite::shouldReceive('driver')->with('google')->andReturn($provider);
+
+    return $googleUser;
 }
 
 function countQueries(Closure $callback): int

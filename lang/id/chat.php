@@ -27,7 +27,7 @@ return [
     'offline' => 'Offline',
     'last_seen' => 'terakhir dilihat :time',
 
-    'back_to_inbox' => 'Kembali',
+    'back' => 'Kembali',
 
     'open_full' => 'Buka penuh',
     'close' => 'Tutup',

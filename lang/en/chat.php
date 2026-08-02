@@ -27,7 +27,7 @@ return [
     'offline' => 'Offline',
     'last_seen' => 'last seen :time',
 
-    'back_to_inbox' => 'Back',
+    'back' => 'Back',
 
     'open_full' => 'Open full',
     'close' => 'Close',

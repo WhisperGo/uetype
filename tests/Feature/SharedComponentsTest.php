@@ -95,7 +95,7 @@ it('memakai satu desain XP bar di layar hasil solo maupun multiplayer', function
 });
 
 it('menyediakan komponen bersama yang diharapkan', function () {
-    foreach (['empty-state', 'btn-gold', 'btn-ghost', 'friend-avatar', 'toast-stack', 'room-invite-overlay', 'xp-bar', 'header-link'] as $name) {
+    foreach (['empty-state', 'btn-gold', 'btn-ghost', 'friend-avatar', 'toast-stack', 'room-invite-overlay', 'xp-bar', 'header-link', 'session-error'] as $name) {
         expect(file_exists(resource_path("views/components/{$name}.blade.php")))
             ->toBeTrue("Komponen {$name} hilang");
     }

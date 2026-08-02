@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\TypingResult;
 use App\Models\User;
+use App\Support\BackLink;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -30,47 +31,17 @@ class ProfileController extends Controller
 
         // array_merge, NOT `+`: `+` keeps the left side's value for an existing key, so the
         // payload's default backUrl would silently win.
+        //
+        // Profiles are reached from five places (clan roster, clan detail, friends, chat,
+        // leaderboard), so the arrow follows the Referer -- see App\Support\BackLink for why
+        // that beats a `?from=` param and which guards it applies.
+        //
+        // /users/ is excluded because hopping profile to profile would point the arrow at the
+        // profile just left instead of the list the visitor started from.
         return view('profile.show', array_merge(
             $this->profilePayload($user, public: true),
-            ['backUrl' => $this->backUrl($request)],
+            ['backUrl' => BackLink::from($request, route('friends.index'), ['/users/'])],
         ));
-    }
-
-    /**
-     * Where the profile's back arrow points: the page the visitor came from.
-     *
-     * Profiles are reached from five places (clan roster, clan detail, friends, chat,
-     * leaderboard). Read from the Referer, not a `?from=` param, so no caller has to pass
-     * anything and shared links still behave.
-     *
-     * The header is client-controlled, hence two guards: same host, or it is an open
-     * redirect; and not a profile page, or hopping profile to profile points the arrow at
-     * the one just left instead of the list it started from.
-     *
-     * Falls back to Friends when there is no usable referer.
-     */
-    private function backUrl(Request $request): string
-    {
-        $referer = $request->headers->get('referer');
-        $fallback = route('friends.index');
-
-        if (! $referer) {
-            return $fallback;
-        }
-
-        $parts = parse_url($referer);
-
-        if (! isset($parts['host']) || $parts['host'] !== $request->getHost()) {
-            return $fallback;
-        }
-
-        $path = $parts['path'] ?? '/';
-
-        if (str_starts_with($path, '/users/')) {
-            return $fallback;
-        }
-
-        return $path.(isset($parts['query']) ? '?'.$parts['query'] : '');
     }
 
     /**

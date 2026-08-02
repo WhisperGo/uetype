@@ -4,28 +4,14 @@ use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\GoogleProvider;
-use Laravel\Socialite\Two\User as SocialiteUser;
 
 /**
  * Setelah jalur password Breeze dihapus, GoogleAuthController adalah SATU-SATUNYA
  * kode login di aplikasi -- sebelumnya tak punya test sama sekali.
  */
 
-/** Palsukan balasan Google supaya callback bisa diuji tanpa keluar jaringan. */
-function fakeGoogleUser(string $id = 'g-12345', string $email = 'pemain@gmail.com'): SocialiteUser
-{
-    $googleUser = new SocialiteUser;
-    $googleUser->id = $id;
-    $googleUser->email = $email;
-    $googleUser->avatar = 'https://lh3.googleusercontent.com/a/foto';
-
-    $provider = Mockery::mock(GoogleProvider::class);
-    $provider->shouldReceive('user')->andReturn($googleUser);
-
-    Socialite::shouldReceive('driver')->with('google')->andReturn($provider);
-
-    return $googleUser;
-}
+// fakeGoogleUser() tinggal di tests/Pest.php: dua berkas test memakainya, dan fungsi yang
+// dideklarasikan di sebuah berkas test baru global saat suite dijalankan penuh.
 
 describe('session fixation', function () {
     /**
@@ -131,4 +117,79 @@ describe('pemilihan username', function () {
 
         $this->assertGuest();
     });
+});
+
+// ---- JALAN KELUAR & TUJUAN SETELAH DAFTAR ----
+
+it('mengantar user baru ke halaman yang tadi ingin dibuka, bukan selalu /typing', function () {
+    // Middleware auth menyimpan url.intended saat tamu ditolak dari /clans.
+    $this->get(route('clans.index'))->assertRedirect(route('login'));
+
+    fakeGoogleUser();
+    $this->get('/auth/google/callback');
+
+    $this->post('/auth/google/username', ['username' => 'pemainbaru'])
+        ->assertRedirect(route('clans.index'));
+});
+
+it('memakai tujuan yang sama untuk akun yang ternyata sudah ada', function () {
+    // Cabang "sudah ada" di storeUsername dulu juga hardcoded ke /typing.
+    $this->get(route('clans.index'))->assertRedirect(route('login'));
+
+    fakeGoogleUser();
+    $this->get('/auth/google/callback');
+
+    // Akun dengan google_id yang sama muncul di antara callback dan submit.
+    User::factory()->create(['google_id' => 'g-12345', 'email' => 'pemain@gmail.com']);
+
+    $this->post('/auth/google/username', ['username' => 'namalain'])
+        ->assertRedirect(route('clans.index'));
+});
+
+it('membersihkan data registrasi yang ditinggalkan saat tamu kembali ke login', function () {
+    fakeGoogleUser();
+    $this->get('/auth/google/callback');
+
+    expect(session('google_register_data'))->not->toBeNull();
+
+    // Cancel di halaman username mengembalikan tamu ke /login -- tanpa pembersihan,
+    // payload Google basi tetap tertinggal dan formulirnya masih bisa dibuka lagi.
+    $this->get('/login')->assertOk();
+
+    expect(session('google_register_data'))->toBeNull();
+    $this->get('/auth/google/username')->assertRedirect(route('login'));
+});
+
+it('memberi jalan keluar berlabel di halaman pilih username', function () {
+    fakeGoogleUser();
+    $this->get('/auth/google/callback');
+
+    $html = $this->get('/auth/google/username')->assertOk()->getContent();
+
+    expect(guestBackHref($html))->toBe(route('login'));
+});
+
+it('memasangkan setiap focus:outline-none dengan cincin fokus yang terlihat', function () {
+    // Tautan Cancel-nya dulu mematikan outline tanpa mengganti apa pun: pengguna keyboard
+    // kehilangan jejak fokusnya sama sekali.
+    $blade = file_get_contents(resource_path('views/auth/google-username.blade.php'));
+
+    preg_match_all('/class="([^"]*focus:outline-none[^"]*)"/', $blade, $m);
+
+    expect($m[1])->not->toBeEmpty();
+
+    foreach ($m[1] as $classes) {
+        expect($classes)->toContain('focus-visible:ring');
+    }
+});
+
+it('menampilkan alasan saat login Google gagal', function () {
+    // Pesannya sudah di-flash sejak controller ini ditulis, tapi login.blade.php cuma
+    // merender session('status') -- jadi kegagalan OAuth memantulkan tamu ke halaman
+    // KOSONG tanpa satu pun petunjuk.
+    Socialite::shouldReceive('driver')->with('google')->andThrow(new Exception('gagal'));
+
+    $this->get('/auth/google/callback')->assertRedirect(route('login'));
+
+    $this->get('/login')->assertOk()->assertSee(__('auth.google_failed'));
 });

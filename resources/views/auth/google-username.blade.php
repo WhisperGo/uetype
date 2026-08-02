@@ -1,5 +1,5 @@
 {{-- Onboarding step after Google sign-in: prompts the new user to choose a username. --}}
-<x-guest-layout>
+<x-guest-layout :back-url="$backUrl">
     <div class="flex flex-col items-center text-center">
         <img src="{{ asset('icon/uetype_mascot.png') }}" alt="{{ __('auth.mascot_alt') }}"
             class="h-20 w-20 object-contain drop-shadow-[0_0_18px_rgba(var(--color-brand)/0.35)]">
@@ -30,7 +30,9 @@
         </div>
 
         <div class="mt-6 flex items-center justify-end gap-4">
-            <a class="text-sm text-muted underline underline-offset-2 transition-colors hover:text-foreground rounded-md focus:outline-none"
+            {{-- focus:outline-none is never shipped alone (design-system): without the ring a
+                 keyboard user loses the focus indicator entirely on this link. --}}
+            <a class="text-sm text-muted underline underline-offset-2 transition-colors hover:text-foreground rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-border"
                 href="{{ route('login') }}">
                 {{ __('auth.username.cancel') }}
             </a>

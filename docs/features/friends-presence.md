@@ -67,6 +67,13 @@ di luar daftar teman. Multiplayer memakainya untuk menyapu member room yang "nya
 yang menutup tab tanpa klik Leave): user yang offline = yang benar-benar pergi. Satu sinyal
 presence, dua pemakai — lihat [multiplayer-race.md](multiplayer-race.md) §3.14.
 
+**Ping berhenti saat tab tersembunyi, dan itu memang disengaja.** Jeda ini **presence**, bukan sesi:
+tab latar tak boleh melaporkan pemiliknya online ke daftar teman. Jangan membuangnya demi menjaga
+sesi tetap hidup — keaktifan sesi tak lagi bergantung padanya sejak `SESSION_LIFETIME` jadi 14 hari
+dan sign-in diingat ([auth.md](auth.md) §3.6), jadi menukarnya hanya membayar titik online yang
+akurat untuk sesuatu yang sudah beres di lapisan yang benar. Ping langsung saat `visibilitychange`
+adalah yang memulihkan titiknya begitu tab kembali.
+
 ### 3.5 Broadcast presence hanya saat TRANSISI, bukan tiap heartbeat
 
 ```php
@@ -112,6 +119,12 @@ melempar pengguna ke halaman yang tak pernah ia buka — dan posisinya di roster
 Tujuannya kini diturunkan dari **`Referer`** di server, bukan parameter `?from=`, supaya tak ada
 pemanggil yang perlu mengirim apa pun dan tautan yang dibagikan tetap berperilaku benar.
 
+Logikanya tinggal di [`App\Support\BackLink`](../../app/Support/BackLink.php) dan kini dipakai
+**tiga** halaman — profil, chat ([chat.md](chat.md) §2.6.a), dan jalan keluar tamu di `/login`
+([auth.md](auth.md) §3.7). Sengaja generik (`from($request, $fallback, $except)`) alih-alih
+menawarkan `forProfile()`/`forChat()`: fallback dan daftar pengecualian adalah **kebijakan** milik
+tiap pemanggil, dan memindahkannya ke kelas Support akan membalik arah ketergantungan.
+
 `Referer` dikendalikan klien, jadi dijaga dua hal:
 
 | Penjaga | Justifikasi |
@@ -126,6 +139,10 @@ jatuh ke Friends — panah selalu mengarah ke suatu tempat yang masuk akal.
 dan render tanpa JS tetap jalan), sementara handler klik mendahulukan `history.back()` bila memang
 ada riwayat — itu **memulihkan posisi scroll** halaman sebelumnya. Kembali ke roster 20 orang di
 posisi paling atas, alih-alih di tempat yang sedang dibaca, adalah bentuk tersesat tersendiri.
+
+> **Peningkatan ini tak bisa dipakai ulang di halaman tamu.** `layouts.guest` tak pernah memuat
+> `@livewireScripts`, jadi Alpine tak menyala di sana dan `history.back()` akan jadi markup mati —
+> lihat [auth.md](auth.md) §3.7. Di halaman itu `href`-nya adalah keseluruhan kontrolnya.
 
 ## 4. Real-time Aman
 

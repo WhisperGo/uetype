@@ -1,6 +1,10 @@
 <?php
 
 return [
+    // No arrow in the string: the chevron is markup (<x-header-link back>), so it can be
+    // sized and hidden from screen readers.
+    'back' => 'Back',
+
     'welcome' => 'Welcome',
     'mascot_alt' => 'UeType mascot',
     'headline_start' => 'Start',

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Support\BackLink;
 use App\Support\UsernameRules;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,10 +19,36 @@ use Laravel\Socialite\Facades\Socialite;
  */
 class GoogleAuthController extends Controller
 {
+    /**
+     * Origins a guest must never be sent "back" to: /login is where they already are, and the
+     * OAuth pages are mid-flow steps that only make sense forward.
+     */
+    private const BACK_EXCEPT = ['/login', '/auth/google'];
+
     /** Login page: offers only "continue with Google". */
-    public function showLogin(): View
+    public function showLogin(Request $request): View
     {
-        return view('auth.login');
+        // Reaching the sign-in page means the visitor is not mid-registration. Without this a
+        // cancelled username step leaves google_register_data behind, and /auth/google/username
+        // keeps rendering for a registration nobody is completing.
+        $request->session()->forget('google_register_data');
+
+        // Remembered in the session, because the Referer does not survive the OAuth round trip
+        // (it becomes accounts.google.com) nor a cancelled username step (it becomes
+        // /auth/google/username, excluded above).
+        //
+        // Deliberately NOT url.intended: that holds where the guest was HEADED -- the
+        // auth-guarded page that bounced them here. Sending them "back" to it would bounce
+        // them straight back to this page.
+        $backUrl = BackLink::from(
+            $request,
+            $request->session()->get('auth_origin', route('typing')),
+            self::BACK_EXCEPT,
+        );
+
+        $request->session()->put('auth_origin', $backUrl);
+
+        return view('auth.login', ['backUrl' => $backUrl]);
     }
 
     /** Redirect the user to Google's OAuth consent screen. */
@@ -85,7 +112,9 @@ class GoogleAuthController extends Controller
             return redirect()->route('login');
         }
 
-        return view('auth.google-username');
+        // Back from a half-finished registration means abandoning it, and /login is where
+        // that lands -- showLogin() is what actually clears the pending Google data.
+        return view('auth.google-username', ['backUrl' => route('login')]);
     }
 
     /**
@@ -110,7 +139,7 @@ class GoogleAuthController extends Controller
             $request->session()->forget('google_register_data');
             $this->loginAndRegenerate($request, $existingUser);
 
-            return redirect('/typing');
+            return redirect()->intended('/typing');
         }
 
         // Validate the user's chosen username (must be unique). Same rules as
@@ -134,10 +163,14 @@ class GoogleAuthController extends Controller
         // Clear the Google session data.
         $request->session()->forget('google_register_data');
 
-        // Log them in automatically and send them to the game.
+        // Log them in automatically and send them where they were headed.
         $this->loginAndRegenerate($request, $user);
 
-        return redirect('/typing');
+        // intended(), matching the existing-user path in callback(): a guest bounced off
+        // /clans by the auth middleware finished registering IN ORDER to get there, and
+        // hardcoding /typing threw that away. session()->regenerate() migrates session data
+        // rather than dropping it, so url.intended survives loginAndRegenerate().
+        return redirect()->intended('/typing');
     }
 
     /** Mark the user offline, then log out and invalidate the session. */
@@ -156,15 +189,26 @@ class GoogleAuthController extends Controller
     }
 
     /**
-     * Log in + rotate the session ID. Auth::login() does NOT rotate the session ID
-     * itself, so without regenerate() a session held from before login stays valid
-     * afterward -- anyone who managed to plant a session ID in the victim's browser
-     * (shared machine, lab) is carried in too. Every login path must go through
-     * here; never call Auth::login() directly.
+     * Log in + rotate the session ID.
+     *
+     * `remember: true` is the product promise -- "signed in until you sign out". Google is
+     * the only sign-in path and there is no password column, so an expiring session buys no
+     * security at all: it costs the legitimate owner a full OAuth round trip and nothing
+     * else. Without it the recaller cookie was never issued (remember_token has existed
+     * since the first migration and was never once populated), so closing the browser or
+     * idling past SESSION_LIFETIME meant signing in again. Auth::logout() cycles the token
+     * AND forgets the cookie, and that is the only way out of the app.
+     *
+     * regenerate() is kept even though Laravel 12's SessionGuard::updateSession() now
+     * regenerates internally: that is a framework implementation detail, while the
+     * session-fixation guarantee is this method's own contract (GoogleAuthFlowTest). Without
+     * it a session ID held from before login stays valid afterward -- anyone who planted one
+     * in the victim's browser (shared machine, lab) is carried in too. Every login path must
+     * go through here; never call Auth::login() directly.
      */
     private function loginAndRegenerate(Request $request, User $user): void
     {
-        Auth::login($user);
+        Auth::login($user, remember: true);
 
         $request->session()->regenerate();
     }

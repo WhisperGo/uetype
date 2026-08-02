@@ -332,6 +332,10 @@ Dokumen terkait lain:
   `REVERB_HOST=127.0.0.1`, `REVERB_PORT=8080`, dicerminkan ke `VITE_REVERB_*`
   untuk frontend build (di-*bake* saat `npm run build` — lihat catatan penting di
   §12).
+- **Sesi:** `SESSION_LIFETIME=20160` (14 hari) dan sign-in **diingat** (`remember: true`)
+  — lihat [`features/auth.md`](features/auth.md) §3.6. Karena `.env` tak terlacak git,
+  salinan lama yang masih `SESSION_LIFETIME=120` tetap kedaluwarsa 2 jam meski kodenya
+  sudah diperbarui: `.env` menang atas default config.
 - **Composer script `dev`:** menjalankan `serve` + `queue:listen` + `pail` +
   `npm run dev` bersamaan.
 - **Seeder** (`database/seeders/`): `DatabaseSeeder` menjalankan `DummyDataSeeder` +
@@ -365,6 +369,13 @@ Dokumen terkait lain:
   tak menemukannya, cari komponen Livewire/Volt-nya, bukan mengira fiturnya hilang.
 - **`minimum-stability: dev`** di `composer.json` — perlu hati-hati saat
   `composer update`.
+- **Ganti host = ganti "toples" cookie, dan itu terlihat seperti ter-logout.**
+  `SESSION_DOMAIN=null` mengikat cookie ke host **persis** yang menerbitkannya, jadi
+  `127.0.0.1:8000`, `localhost:8000`, dan IP LAN adalah tiga sesi terpisah. Login di satu
+  lalu membuka yang lain akan terbaca sebagai "remember-me rusak" padahal cuma beda toples.
+  `GOOGLE_REDIRECT_URI` juga terpaku ke `APP_URL`, jadi menguji di IP LAN menuntut mengubah
+  `APP_URL` **dan** mendaftarkan redirect URI itu di Google console. Pilih satu host untuk
+  satu putaran pengujian penuh.
 
 ---
 
