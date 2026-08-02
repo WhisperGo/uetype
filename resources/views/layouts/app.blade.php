@@ -47,7 +47,11 @@
              to pb-6 once the FAB sits beside it at sm+); on desktop the links are right-aligned
              straight into the FAB's column, so the nav is pushed clear HORIZONTALLY (sm:me-20)
              with no extra empty space. --}}
-        <footer class="border-t border-white/5">
+        {{-- `focus-fade-full` opts the footer out of the touch-device exception: on a phone
+             the navbar only recedes to 25% (nothing there can hover it back), but a copyright
+             line and two legal links can disappear entirely without costing anyone a way
+             forward. It is the one part of the frame with nothing to get back to. --}}
+        <footer class="focus-fade focus-fade-full border-t border-white/5">
             <div class="max-w-7xl mx-auto pt-6 pb-24 sm:pb-6 px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-x-small text-muted">
                 <span>&copy; 2026 UeType</span>
                 <nav class="flex items-center gap-6 sm:me-20">

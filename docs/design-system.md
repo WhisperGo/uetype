@@ -176,6 +176,39 @@ destruktif. `group-hover:` boleh untuk **memperindah** elemen yang sudah terbaca
 Kalau sebuah elemen sengaja diredupkan dan dipulihkan lewat hover, sediakan pemulihan untuk pointer
 kasar juga (`[@media(pointer:coarse)]:opacity-100`) — lihat panel statistik di `typing-engine`.
 
+## Focus mode (saat pemain sedang mengetik)
+
+**Kelas:** `.focus-fade` (+ `.focus-fade-full`) di `resources/css/app.css` ·
+**Pemicu:** [`focus-mode.js`](../resources/js/focus-mode.js) lewat event `test-activity`
+
+Selama sesi ketik atau balapan berjalan, kerangka halaman menyingkir supaya yang bersaing
+dengan perhatian pemain tinggal teks dan jamnya. Sinyalnya event `test-activity` yang **sudah
+ada** — sama dengan yang dipakai tombol chat untuk menyembunyikan diri dan toast untuk
+**menahan** dirinya. Tambahkan pendengar ke sinyal itu, jangan membuat sinyal baru.
+
+Tiga aturan, dan ketiganya pernah jadi bug di proyek ini kalau dilanggar:
+
+1. **Redupkan dengan `opacity`, jangan `display` / `visibility`.** Kolom ketik itu `flex-1
+   justify-center` di dalam `min-h-screen flex flex-col`. Mengambil kembali 64px navbar akan
+   me-*center* ulang kolomnya dan menggeser teks di bawah jari pemain — gangguan yang lebih
+   besar daripada bar yang dihilangkan. Ruangnya tetap dipesan.
+
+2. **Jangan matikan `pointer-events` pada jalan keluar.** Mode `words` dan `survival` tak
+   berakhir sendiri, jadi navbar tetap harus bisa diklik oleh yang berubah pikiran. Ini
+   persis bug yang pernah terjadi pada link keluar Clan War — ia mewarisi
+   `pointer-events-none` dan menyisakan tombol Back browser sebagai satu-satunya pintu; ada
+   regression test yang menjaganya sekarang. **Tak terlihat boleh, tak terjangkau tidak.**
+
+3. **Sediakan pemulihan untuk pointer kasar.** Lihat §Hover — `:hover` tak berlaku di layar
+   sentuh, jadi elemen yang jadi `opacity-0` di sana adalah tautan yang bisa ditekan tapi tak
+   bisa dilihat. `.focus-fade` karena itu hanya turun ke `0.25` pada `pointer: coarse`.
+   `.focus-fade-full` adalah pengecualian yang harus **dibenarkan per kasus**: dipakai footer
+   saja, karena baris copyright dan dua tautan legal tak menahan siapa pun untuk melangkah.
+
+Pemulihan lewat `:hover` **dan** `:focus-within`. Tanpa yang kedua, Tab bisa mendaratkan fokus
+keyboard di elemen yang tak terlihat — jebakan yang lebih buruk daripada yang dihindari aturan
+pertama.
+
 ## Aturan pakai
 
 - **Komponen pakai token semantic**, bukan primitive atau hex mentah. Primitive hanya untuk

@@ -6,6 +6,7 @@ import typingGame from './typing-game';
 import chatOverlayDock from './chat-dock';
 import createChatRuntime from './chat-runtime';
 import { registerMultiplayerNav } from './multiplayer-nav';
+import { registerFocusMode } from './focus-mode';
 import './race-arena';
 import './race-echo';
 
@@ -52,6 +53,17 @@ try {
     registerMultiplayerNav();
 } catch (e) {
     console.error('registerMultiplayerNav failed:', e);
+}
+
+// Fades the page frame while a typing session or race runs. Guarded for the same reason as
+// the call above -- and with an extra one specific to this feature: it fails CLOSED. If the
+// listener never attaches, the class is never added and the frame simply stays visible, which
+// is the state the page renders in anyway. A focus mode that breaks costs a little polish;
+// there is no arrangement of this failing that can hide the navigation permanently.
+try {
+    registerFocusMode();
+} catch (e) {
+    console.error('registerFocusMode failed:', e);
 }
 
 // Alpine comes from @livewireScripts (not started manually here), so components are

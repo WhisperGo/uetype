@@ -114,6 +114,58 @@
         }
     }
 
+    /* ===== FOCUS MODE =====
+       While a typing session or a race is running, the page frame steps back so the only
+       things competing for attention are the text and the clock. Toggled by
+       resources/js/focus-mode.js off the existing `test-activity` event.
+
+       OPACITY, never display/visibility. The typing area is `flex-1 justify-center` inside a
+       `min-h-screen flex flex-col`, so removing the navbar's 64px and the footer's height
+       would re-centre the column and slide the text under the player's fingers mid-keystroke.
+       That is a worse distraction than the bar it removed. Reserving the space is the same
+       rule the mode-control bar on the typing page already follows, for the same reason.
+
+       Pointer events stay ALIVE on the navbar. `pointer-events: none` here would be the
+       third time this project trapped somebody behind an invisible exit: `words` and
+       `survival` do not end on their own, so a player who starts one and changes their mind
+       would have nothing left to click. Invisible is fine; unreachable is not. */
+    body.is-typing .focus-fade {
+        opacity: 0;
+        transition: opacity 500ms ease;
+    }
+
+    /* Bring it back the moment the cursor goes looking for it. Hover on the element itself
+       rather than a mousemove listener: no JS runs during the run, and the reveal is exactly
+       as fast as the pointer.
+
+       :focus-within is the keyboard half of the same promise. Tabbing into the navbar must
+       show it -- otherwise focus lands somewhere invisible, which is a worse trap than the
+       one the pointer rule avoids. */
+    body.is-typing .focus-fade:hover,
+    body.is-typing .focus-fade:focus-within {
+        opacity: 1;
+    }
+
+    /* Touch has no hover, so "invisible until you hover" would leave real links that can be
+       tapped but not seen. Recede instead of vanish -- the same pointer query, and the same
+       decision, as the restart row on the typing page.
+
+       The footer is exempt: it is a copyright line and two legal links, so nothing is lost by
+       fading it out entirely even where nothing can hover it back. */
+    @media (pointer: coarse) {
+        body.is-typing .focus-fade:not(.focus-fade-full) {
+            opacity: 0.25;
+        }
+    }
+
+    /* Motion is a preference, not a decoration: with reduced motion the frame still fades,
+       it just arrives without the half-second travel. */
+    @media (prefers-reduced-motion: reduce) {
+        body.is-typing .focus-fade {
+            transition: none;
+        }
+    }
+
     /* ===== CHAT FAB: MICRO-INTERACTION =====
        The FAB used to be draggable, sold as "more feel". That put the delight budget on
        the button's POSITION -- the one property a user needs to stay predictable, and it

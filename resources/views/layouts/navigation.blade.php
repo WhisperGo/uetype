@@ -22,7 +22,15 @@
      contain the hamburger, so an outside-click handler placed there would fire on the very
      tap that opens it and close it again in the same frame. The <nav> wraps both the trigger
      and the panel, which is the same arrangement dropdown.blade.php relies on. --}}
-<nav x-data="navBadges({{ $pendingFriendRequests }})" @click.outside="open = false" class="{{ request()->is('typing') || request()->is('/') ? '' : 'sticky top-0' }} z-40 border-b border-white/5 bg-background/80 backdrop-blur-md">
+{{-- `focus-fade`: while a typing session or race runs, this bar fades out and comes back on
+     hover or keyboard focus (resources/css/app.css, driven by resources/js/focus-mode.js).
+
+     Opacity only -- the bar keeps its 64px, because the typing column is vertically centred
+     and reclaiming that height would slide the text under the player's fingers mid-keystroke.
+     Pointer events stay alive for the same reason the war exit link is dimmed rather than
+     disabled: `words` and `survival` do not end by themselves, so this has to remain the way
+     out for somebody who changes their mind. Invisible, never unreachable. --}}
+<nav x-data="navBadges({{ $pendingFriendRequests }})" @click.outside="open = false" class="focus-fade {{ request()->is('typing') || request()->is('/') ? '' : 'sticky top-0' }} z-40 border-b border-white/5 bg-background/80 backdrop-blur-md">
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
             <div class="flex">
