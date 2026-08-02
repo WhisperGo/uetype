@@ -213,7 +213,26 @@ class TypingEngine extends Component
             // Opening the page IS starting the attempt. Idempotent: a refresh, the Back button
             // and a second tab all land on the anchor written the first time, so none of them
             // buys a fresh clock or a fresh text. See ClanWarAttempt.
-            $this->warLock = $this->warAttempt($claim)->toLockPayload($this->mainMode, $this->subMode);
+            $attempt = $this->warAttempt($claim);
+
+            // An attempt whose clock ran out with NOTHING to bank is over, and rendering a
+            // typing page for it is worse than useless -- it is a trap. The client used to be
+            // asked to finish() such a session, which submitted zero keystrokes over zero
+            // seconds, which anti-cheat correctly refused as `no_input`, which redirected
+            // straight back into the same expired claim, which asked the client to finish()
+            // again. Survival hit this every time, because survival never resumes and so
+            // never has anything to bank. Send the player somewhere real instead.
+            //
+            // Not an early `return`: the rest of mount() still has to leave the component in a
+            // renderable state (textToType is spread into Alpine unconditionally), and Livewire
+            // honours the queued redirect either way.
+            if ($attempt->isExpired() && $attempt->resumeProgress <= 0) {
+                session()->flash('clan_war_claim_error', __('clan.error.attempt_expired'));
+
+                $this->redirect(route('clan-war.index'));
+            }
+
+            $this->warLock = $attempt->toLockPayload($this->mainMode, $this->subMode);
         } else {
             $this->warClaimId = null;
 
@@ -1133,6 +1152,18 @@ class TypingEngine extends Component
         ], $context));
 
         session()->flash('result_rejected', __(self::REJECTION_MESSAGES[$reason] ?? 'typing.result_rejected'));
+
+        // Re-locking an EXPIRED attempt is a loop, not a courtesy: there is no time left to
+        // retry in, so the player lands on a page that can only reject them again. Send them
+        // back to the war instead. This is the cut point for the whole class of bug -- even if
+        // some future path auto-submits into a spent attempt, it can never bounce twice.
+        $claim = $this->resolveWarClaim();
+
+        if ($claim && $this->warAttempt($claim)->isExpired()) {
+            session()->flash('clan_war_claim_error', __('clan.error.attempt_expired'));
+
+            return $this->redirect(route('clan-war.index'));
+        }
 
         // A rejected WAR attempt never filled its claim, so the slot is still ours and
         // unplayed. Keep the war_claim on the redirect so the player lands back inside the

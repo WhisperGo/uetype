@@ -2,6 +2,7 @@
 
 use App\Livewire\ClanWar;
 use App\Models\ClanWarModeClaim;
+use App\Models\TypingResult;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -43,7 +44,16 @@ it('refuses to open a claim that already scored', function () {
     [$player, $claim] = warAttemptScenario('words', '25');
 
     remountWarAttempt($player, $claim);
-    $claim->forceFill(['typing_result_id' => 1])->save();
+
+    // Baris hasil yang SUNGGUHAN: typing_result_id punya foreign key, jadi id karangan ditolak
+    // constraint sebelum test sempat menguji apa pun.
+    $result = TypingResult::create([
+        'user_id' => $player->id, 'mode' => 'words', 'mode_config' => '25',
+        'net_wpm' => 60, 'raw_wpm' => 65, 'accuracy' => 95,
+        'correct_chars' => 290, 'incorrect_chars' => 10, 'duration_seconds' => 30, 'xp_earned' => 10,
+    ]);
+
+    $claim->forceFill(['typing_result_id' => $result->id])->save();
 
     Livewire::actingAs($player)->test(ClanWar::class)
         ->call('startAttempt', $claim->id)

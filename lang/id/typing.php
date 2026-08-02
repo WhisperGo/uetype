@@ -23,7 +23,10 @@ return [
     'then' => 'lalu',
     'war_locked_restart' => 'ulangi dikunci (clan war)',
     'war_lock_label' => 'Clan War',
-    'war_lock_cancel' => 'Batalkan & kembali ke Clan War',
+    // Sengaja BUKAN "batalkan": keluar tak lagi membatalkan apa pun. Percobaannya ditambatkan
+    // begitu halaman dibuka dan jamnya terus berjalan, jadi label yang menjanjikan sebaliknya
+    // akan membujuk pemain melepas slot yang ia kira sedang dikembalikan.
+    'war_lock_leave' => 'Kembali ke Clan War (percobaanmu tetap berjalan)',
 
     'caps_lock' => 'Caps Lock aktif',
 

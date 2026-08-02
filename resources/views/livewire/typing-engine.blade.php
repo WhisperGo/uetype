@@ -13,9 +13,17 @@
         ...typingGame(@js($textToType), @js($warLock))
     }"
         {{-- A reloaded war attempt keeps the SERVER's clock, so its remaining seconds may
-             already be spent. Bank whatever the resume restored rather than leaving the slot
-             a permanent zero, and flush the resume position before the tab goes away. --}}
-        x-init="if (warAttempt?.expired) { $nextTick(() => finish()); }"
+             already be spent. Bank whatever the resume restored -- but ONLY if there is
+             something to bank.
+
+             `progress > 0` is the load-bearing half of this condition. Finishing an empty
+             session submits zero keystrokes over zero seconds, which anti-cheat refuses as
+             `no_input`, which redirects back into the same expired claim, which runs this
+             again: an infinite loop the player sees as "rejected" with no way to type.
+             Survival triggered it every single time, because survival never resumes and so
+             never has anything to bank. mount() now sends that case to the war page before
+             any of this renders; this condition is what stops it being recreated here. --}}
+        x-init="if (warAttempt?.expired && warAttempt?.progress > 0) { $nextTick(() => finish()); }"
         @visibilitychange.window="if (document.visibilityState === 'hidden') reportWarProgress(true)"
         @keydown.window="
             syncCapsLock($event);
@@ -72,8 +80,13 @@
 
             @if ($warLock)
                 {{-- WAR-LOCK: the mode is locked by a Clan War claim; mode controls are hidden (the server also rejects setMode). --}}
-                <div class="flex flex-col items-center gap-2 mb-2 transition-opacity duration-500"
-                    :class="isStarted ? 'opacity-0 pointer-events-none' : 'opacity-100'">
+                <div class="flex flex-col items-center gap-2 mb-2">
+                    {{-- Only the BADGE fades while typing. The exit link below used to sit inside
+                         this wrapper and inherited `pointer-events-none`, so from the first
+                         keystroke onwards the one labelled way out of a war attempt could not be
+                         clicked at all -- leaving the browser Back button as the only exit. --}}
+                    <div class="transition-opacity duration-500"
+                        :class="isStarted ? 'opacity-0 pointer-events-none' : 'opacity-100'">
                     <div class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold/10 border border-gold/40">
                         <svg class="w-4 h-4 text-gold shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -89,10 +102,16 @@
                             @endif
                         </span>
                     </div>
+                    </div>
                     {{-- WITHOUT wire:navigate: the only SPA exit from /typing while war-locked;
-                         Back from it would restore a broken typing-engine snapshot. A full load is safe. --}}
-                    <a href="{{ route('clan-war.index') }}" class="text-x-small font-mono text-muted hover:text-foreground transition">
-                        ← {{ __('typing.war_lock_cancel') }}
+                         Back from it would restore a broken typing-engine snapshot. A full load is safe.
+
+                         Dimmed while typing rather than hidden: it must stay reachable, but it
+                         should not compete with the text for attention. --}}
+                    <a href="{{ route('clan-war.index') }}"
+                        class="text-x-small font-mono text-muted hover:text-foreground transition-opacity duration-500"
+                        :class="isStarted ? 'opacity-30 hover:opacity-100' : 'opacity-100'">
+                        ← {{ __('typing.war_lock_leave') }}
                     </a>
                 </div>
             @else

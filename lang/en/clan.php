@@ -205,6 +205,7 @@ return [
         'max_members' => 'Clan has reached the maximum of :max members.',
         'mode_taken' => 'This mode was just taken by another member.',
         'max_claims' => 'You have already claimed all :max of your slots in this war.',
+        'attempt_expired' => 'That attempt ran out of time. A war slot gets one attempt, and its clock keeps running once opened.',
         'disband_during_war' => 'A clan cannot be disbanded while a Clan War is running. Finish the war first.',
         'disband_name_mismatch' => 'The clan name does not match.',
     ],

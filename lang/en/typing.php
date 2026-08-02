@@ -23,7 +23,10 @@ return [
     'then' => 'then',
     'war_locked_restart' => 'restart locked (clan war)',
     'war_lock_label' => 'Clan War',
-    'war_lock_cancel' => 'Cancel & back to Clan War',
+    // Deliberately NOT "cancel": leaving no longer cancels anything. The attempt is anchored
+    // the moment the page opens and its clock keeps running, so a label promising otherwise
+    // would talk a player into losing a slot they thought they were handing back.
+    'war_lock_leave' => 'Back to Clan War (your attempt keeps running)',
 
     'caps_lock' => 'Caps Lock is on',
 

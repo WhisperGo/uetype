@@ -68,18 +68,87 @@ it('shrinks the remaining time on a resumed time attempt', function () {
         ->and($lock['expired'])->toBeFalse();
 });
 
-it('reports an expired attempt once its wall budget is spent', function () {
+/**
+ * REGRESI: attempt kedaluwarsa yang tak punya apa pun untuk dibukukan adalah LOOP, bukan sesi.
+ *
+ * Dulu halaman ketik tetap dirender lalu meminta klien `finish()`. Sesi kosong itu (0 keystroke,
+ * 0 detik) ditolak anti-cheat sebagai `no_input`, penolakannya me-redirect balik ke klaim yang
+ * sama, klaimnya masih kedaluwarsa, dan `finish()` dipanggil lagi -- tanpa henti. Pemain melihat
+ * "ditolak validasi server" dan tak bisa mengetik sama sekali.
+ *
+ * Survival kena SETIAP kali, karena survival tak pernah resume sehingga tak pernah punya
+ * progress untuk dibukukan.
+ */
+it('sends an expired attempt with nothing to bank back to the war page', function () {
+    [$player, $claim] = warAttemptScenario('survival', 'hard');
+
+    remountWarAttempt($player, $claim);
+
+    // Anggaran survival (120 dtk) jauh terlampaui.
+    $claim->update(['attempt_started_at' => now()->subMinutes(10)]);
+
+    remountWarAttempt($player, $claim)->assertRedirect(route('clan-war.index'));
+});
+
+it('refuses to re-lock a rejected submission into an expired attempt', function () {
+    [$player, $claim] = warAttemptScenario('time', '15');
+
+    $component = remountWarAttempt($player, $claim);
+
+    $claim->update(['attempt_started_at' => now()->subMinutes(10)]);
+
+    // Jaring pengaman lapis kedua: apa pun yang menyubmit ke attempt yang sudah habis, ia
+    // memantul KELUAR -- tak pernah kembali ke halaman yang cuma bisa menolaknya lagi.
+    $component->call('saveResult', ['durationMs' => 0, 'totalKeystrokes' => 0, 'correctKeystrokes' => 0])
+        ->assertRedirect(route('clan-war.index'));
+});
+
+/**
+ * REGRESI: satu-satunya jalan keluar berlabel dari sebuah war attempt pernah mati saat mengetik.
+ *
+ * Tautannya duduk di dalam pembungkus yang ber-`:class="isStarted ? 'opacity-0
+ * pointer-events-none' : ...'"`, jadi sejak keystroke PERTAMA ia tak bisa diklik sama sekali --
+ * menyisakan tombol Back browser sebagai satu-satunya cara keluar. Badge-nya boleh memudar
+ * (itu chrome); tautannya tidak.
+ */
+it('keeps the war exit link clickable once typing has started', function () {
+    [$player, $claim] = warAttemptScenario('time', '30');
+
+    $html = tanpaKomentarBlade(remountWarAttempt($player, $claim)->html());
+
+    $linkPos = strpos($html, route('clan-war.index'));
+
+    expect($linkPos)->not->toBeFalse();
+
+    // Tak ada pointer-events-none di antara pembuka <a> dan href-nya: itu justru atribut yang
+    // dulu ikut terwarisi dan mematikan tautannya.
+    $tagStart = strrpos(substr($html, 0, $linkPos), '<a ');
+
+    expect(substr($html, $tagStart, $linkPos - $tagStart))->not->toContain('pointer-events-none');
+});
+
+it('does not promise that leaving cancels the attempt', function () {
+    [$player, $claim] = warAttemptScenario('time', '30');
+
+    // Keluar tak membatalkan apa pun -- jamnya sudah ditambatkan dan terus berjalan. Label
+    // yang menjanjikan sebaliknya membujuk pemain melepas slot yang ia kira dikembalikan.
+    remountWarAttempt($player, $claim)->assertSee(__('typing.war_lock_leave'));
+});
+
+it('still renders an expired attempt that has progress to bank', function () {
     [$player, $claim] = warAttemptScenario('time', '15');
 
     remountWarAttempt($player, $claim);
-    $claim->update(['attempt_started_at' => now()->subMinutes(5)]);
+    $claim->update(['attempt_started_at' => now()->subMinutes(5), 'attempt_progress' => 40]);
 
     $lock = remountWarAttempt($player, $claim)->get('warLock');
 
-    // Still war-locked -- dropping the lock would drop the player into a free solo session
-    // on a ?war_claim= URL, which is the reroll being closed.
+    // Tetap war-locked: melepas lock akan menjatuhkan pemain ke sesi solo gratis di URL
+    // ?war_claim=. Halaman ini dirender justru supaya 40% yang sudah diketik bisa dibukukan --
+    // yang TAK punya apa pun untuk dibukukan dipulangkan ke halaman war (test di atas).
     expect($lock['remaining'])->toBe(0)
         ->and($lock['expired'])->toBeTrue()
+        ->and($lock['progress'])->toBe(40)
         ->and($lock['mode'])->toBe('time');
 });
 
@@ -106,10 +175,14 @@ it('never lets a refresh buy characters beyond the attempt wall budget', functio
 
     $component = remountWarAttempt($player, $claim);
 
-    // A very old anchor must not become a licence to claim anything: the window is capped at
-    // the slot's own length plus grace, so the ceiling stops growing with the wait.
+    // Menunggu lebih lama tak boleh jadi lisensi mengklaim apa pun: window-nya dibatasi
+    // panjang slot + grace, jadi plafonnya berhenti tumbuh mengikuti waktu tunggu.
+    //
+    // 35 detik, bukan 600: di atas ~40 detik slot time/30 sudah kedaluwarsa dan memantul ke
+    // halaman war, yang berarti test ini akan lulus karena alasan yang salah -- tak pernah
+    // menyentuh plafonnya sama sekali.
     app(SoloSessionGuard::class)->backdate(30);
-    $claim->update(['attempt_started_at' => now()->subSeconds(600)]);
+    $claim->update(['attempt_started_at' => now()->subSeconds(35)]);
 
     $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 4000, 'correctKeystrokes' => 4000])
         ->assertRedirect(route('typing', ['war_claim' => $claim->id]));

@@ -204,6 +204,7 @@ return [
         'max_members' => 'Clan sudah mencapai batas maksimal :max anggota.',
         'mode_taken' => 'Mode ini baru saja diambil oleh anggota lain.',
         'max_claims' => 'Kamu sudah mengambil semua :max slot jatahmu di war ini.',
+        'attempt_expired' => 'Waktu percobaan itu sudah habis. Satu slot war dapat satu percobaan, dan jamnya terus berjalan begitu dibuka.',
         'disband_during_war' => 'Clan tidak bisa dibubarkan selama masih ada Clan War berjalan. Selesaikan war-nya dulu.',
         'disband_name_mismatch' => 'Nama clan tidak cocok.',
     ],
