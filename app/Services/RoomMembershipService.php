@@ -119,35 +119,46 @@ class RoomMembershipService
     public function sweepOfflineMembers(?int $exceptUserId = null): void
     {
         $this->sweepStaleWaitingMembers($exceptUserId);
-        $this->sweepAbandonedRaces($exceptUserId);
+        $this->sweepDeadRooms($exceptUserId);
     }
 
     /**
-     * Delete races that every single member has walked away from.
+     * Delete rooms in a POST-LOBBY status that every single member has walked away from.
      *
-     * checkSuddenDeath() is only ever TRIGGERED by a client (lockRace() in race-arena.js);
-     * the server is its gate, never its trigger. So when the last tab in a race closes,
-     * nothing is left to close the race -- the room sits in 'racing' forever, out of reach
-     * of the waiting-only sweep above, holding rows no one can ever clear.
+     * Covers both 'racing' and 'finished' in ONE query. They arrive here for different
+     * reasons but obey the same rule and take the same action, and running them as two
+     * near-identical correlated-subquery sweeps only costs a second query on every lobby load:
      *
-     * ALL-OR-NOTHING on purpose: a room keeps every member as long as ONE of them is still
-     * present, because pulling an individual racer out mid-race would corrupt the finish
-     * and placement accounting -- the same reason leave and kick are blocked once racing
-     * starts. Once nobody is left, there is no placement left to corrupt.
+     *  - 'racing': checkSuddenDeath() is only ever TRIGGERED by a client (lockRace() in
+     *    race-arena.js); the server is its gate, never its trigger. When the last tab closes,
+     *    nothing is left to close the race and the room sits in 'racing' forever.
+     *  - 'finished': this status used to be swept by NOBODY -- the waiting sweep filters
+     *    'waiting' and this one used to filter 'racing', so the single most ordinary way a race
+     *    ends (everyone closing their tab on the result screen) left the room and all its
+     *    member rows behind forever, and a player returning the next day was restored straight
+     *    back into a stale result modal.
      *
-     * Deleted rather than finalized: nobody completed the race, so there are no standings
-     * worth writing. Recording half-typed runs would drag real averages down, exactly the
-     * reason a DNF never enters permanent history either.
+     * ALL-OR-NOTHING on purpose, and the reason survives the merge because it is the same
+     * shape in both cases: one person still present is reason enough to keep the whole room.
+     * Mid-race, pulling an individual racer out would corrupt the finish and placement
+     * accounting -- the same reason leave and kick are blocked once racing starts. On the
+     * result screen, the board is still doing its job for whoever is reading it. Once nobody
+     * is left there is no placement to corrupt and no board to empty.
+     *
+     * Deleted rather than finalized: an unfinished race has no standings worth writing (and
+     * recording half-typed runs would drag real averages down, exactly why a DNF never enters
+     * permanent history), while a finished one already wrote its multiplayer_match_history
+     * rows and XP in finalizeRace(). Nothing is lost either way.
      *
      * No broadcast: every member is gone by definition, and the caller is excluded below,
      * so there is nobody subscribed to tell.
      */
-    private function sweepAbandonedRaces(?int $exceptUserId = null): void
+    private function sweepDeadRooms(?int $exceptUserId = null): void
     {
         $cutoff = now()->subSeconds(User::ONLINE_THRESHOLD_SECONDS);
 
         $abandoned = Room::query()
-            ->where('status', 'racing')
+            ->whereIn('status', ['racing', 'finished'])
             // "Has no member who is still here". A room with no members at all also matches,
             // which is correct -- that is orphan data with nothing left to protect.
             ->whereDoesntHave('members', function ($member) use ($cutoff, $exceptUserId) {

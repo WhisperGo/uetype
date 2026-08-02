@@ -46,6 +46,17 @@ return [
     'play_again_title' => 'Play Again',
     'next_test_title' => 'Next Test',
     'retry_title' => 'Retry Test',
+    'back_to_war' => 'Back to Clan War',
+
+    'war' => [
+        'heading' => 'War Contribution',
+        'points' => ':points / :ceiling pts',
+        'factor_pace_wpm' => 'pace :value wpm → :ratio× of :scale',
+        'factor_pace_survival' => 'survived :value s → :ratio× of :scale s',
+        'factor_accuracy' => 'accuracy :value% → :multiplier×',
+        'not_counted_title' => 'Not counted toward the war',
+        'not_counted_body' => 'This slot was already submitted, or the war ended before you finished. Your typing result is still saved.',
+    ],
 
     'error_heatmap' => 'error heatmap',
     'miss_count' => ':count wrong',

@@ -8,6 +8,8 @@ use App\Events\DirectMessageSent;
 use App\Events\MessageDeleted;
 use App\Events\MessageEdited;
 use App\Livewire\Chat;
+use App\Livewire\Clans;
+use App\Livewire\ClanShow;
 use App\Models\Clan;
 use App\Models\ClanMember;
 use App\Models\Friendship;
@@ -70,7 +72,7 @@ it('shows the clan chat link on the clan hub for a member', function () {
     [$clan, $members] = makeClanWithMembers(2);
 
     Livewire::actingAs($members[1])
-        ->test(App\Livewire\Clans::class)
+        ->test(Clans::class)
         ->assertSee(__('clan.chat'))
         ->assertSeeHtml('href="'.route('chat.index', ['mode' => 'clan']).'"');
 });
@@ -79,13 +81,13 @@ it('shows the clan chat link on the clan detail page only to its own members', f
     [$clan, $members] = makeClanWithMembers(2);
 
     Livewire::actingAs($members[0])
-        ->test(App\Livewire\ClanShow::class, ['clan' => $clan])
+        ->test(ClanShow::class, ['clan' => $clan])
         ->assertSee(__('clan.chat'));
 
     // An outsider viewing this public page would otherwise be offered a link that
     // resolves to their own clan, or to nothing at all.
     Livewire::actingAs(User::factory()->create())
-        ->test(App\Livewire\ClanShow::class, ['clan' => $clan])
+        ->test(ClanShow::class, ['clan' => $clan])
         ->assertDontSee(__('clan.chat'));
 });
 

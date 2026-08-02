@@ -75,6 +75,12 @@ jobs:
       - name: Audit JS dependencies
         run: npm audit --audit-level=high || true
 
+      # The JS unit tests (Vitest) had no CI step at all, so resources/js/*.test.js was
+      # written but never executed anywhere -- it guarded nothing. Runs before the build so a
+      # broken race/typing mechanic fails fast rather than after a full asset compile.
+      - name: Run JS unit tests (Vitest)
+        run: npm test
+
       - name: Build frontend assets
         run: npm run build
 

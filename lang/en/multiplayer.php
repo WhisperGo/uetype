@@ -31,6 +31,7 @@ return [
     'invite_in_room' => 'In room',
     'invite_online' => 'Online',
     'invite_offline' => 'Offline',
+    'invite_busy' => 'In another room',
     'invite_offline_hint' => 'This friend is offline and cannot be invited right now.',
     'invite_no_friends' => "You don't have any friends to invite yet.",
     'invite_find_friends' => 'Find friends',
@@ -48,6 +49,8 @@ return [
     'leave_room' => 'Leave Room',
 
     'sudden_death' => 'Sudden Death',
+    'start_typing_now' => 'Start typing',
+    'race_time_left' => 'Time left',
     'room_label' => 'Room',
     'race_starting' => 'The Race is Starting',
     'mascot_track' => 'Mascot Race Track',
@@ -98,6 +101,7 @@ return [
     'error_room_full' => 'Room is full! Maximum 5 players and 5 spectators.',
     'error_players_full' => 'All 5 player slots are taken.',
     'error_spectators_full' => 'All 5 spectator slots are taken.',
+    'error_leave_race_first' => 'You are in the middle of a race. Finish it or leave before joining another room.',
     'error_not_enough_players' => 'You need at least 2 players to start the race. Spectators don\'t count.',
 
     'become_spectator' => 'Spectate',
@@ -132,4 +136,10 @@ return [
     'leave_confirm_body' => 'Leaving this page removes you from the room. You will need the room code to join again.',
     'leave_confirm_ok' => 'Leave room',
     'leave_confirm_cancel' => 'Stay',
+
+    'switch_confirm_title' => 'Leave your current room?',
+    'switch_confirm_body' => 'You are still in room :from. Joining :to will remove you from it.',
+    'switch_confirm_body_create' => 'You are still in room :from. Creating a new room will remove you from it.',
+    'switch_confirm_ok' => 'Leave and go',
+    'switch_confirm_cancel' => 'Stay here',
 ];

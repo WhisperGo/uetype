@@ -12,10 +12,12 @@ use App\Models\ClanWar as ClanWarModel;
 use App\Models\ClanWarModeClaim;
 use App\Services\ClanWarModeCatalog;
 use App\Services\ClanWarResolver;
+use App\Support\ClanWarBroadcast;
 use App\Support\SafeBroadcast;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -44,6 +46,23 @@ class ClanWar extends Component
     {
         $resolver->resolveDue();
     }
+
+    /**
+     * Echo listener for clan.{me}: raised by the bridge script at the foot of clan-war.blade.php
+     * whenever toasts.js sees a `.clan.updated` on our channel (a teammate claimed a slot, the
+     * opposing clan scored, a challenge was answered).
+     *
+     * Deliberately EMPTY, and that is the whole fix. Every datum on this page comes from a
+     * legacy getXProperty() computed property, which Livewire memoises in the per-component
+     * store -- a store rebuilt from the snapshot on every round-trip. Merely HANDLING the event
+     * therefore re-runs every query. (Clans::refreshClan() has a body only because that
+     * component uses #[Computed] and mutates the same data inside one request.)
+     *
+     * The bridge existed long before this method did; without a listener the dispatch landed
+     * nowhere and the page only ever changed on a full reload.
+     */
+    #[On('clan-updated')]
+    public function refreshWar(): void {}
 
     // ---- DATA (computed) ----
 
@@ -192,6 +211,30 @@ class ClanWar extends Component
             ->sum('points');
     }
 
+    /**
+     * The opposing clan's total points so far (only submitted modes) -- the missing half of
+     * the scoreboard: a war you can't see the enemy's score in is just solo practice with a
+     * countdown. Same "submitted only" rule as our own total, so both sides are compared on
+     * the same footing (a locked-but-unplayed slot is worth 0 for either clan).
+     */
+    public function getOpponentClanPointsProperty(): float
+    {
+        $war = $this->myActiveWar;
+
+        if (! $war || ! $this->myClan) {
+            return 0.0;
+        }
+
+        $opponentClanId = $war->challenger_clan_id === $this->myClan->id
+            ? $war->opponent_clan_id
+            : $war->challenger_clan_id;
+
+        return (float) ClanWarModeClaim::where('clan_war_id', $war->id)
+            ->where('clan_id', $opponentClanId)
+            ->whereNotNull('typing_result_id')
+            ->sum('points');
+    }
+
     // ---- ACTIONS ----
 
     /**
@@ -255,6 +298,11 @@ class ClanWar extends Component
             return;
         }
 
+        // The grid is shared state: this slot just stopped being available to everyone else in
+        // the clan, and the opposing side's view of the war changed too. Broadcast BEFORE the
+        // redirect -- after it this component is gone.
+        ClanWarBroadcast::refresh($war);
+
         $this->redirect(route('typing', ['war_claim' => $claim->id]), navigate: true);
     }
 
@@ -280,6 +328,11 @@ class ClanWar extends Component
         }
 
         $claim->delete();
+
+        // The slot is open again -- a teammate staring at a grey "claimed" tile would otherwise
+        // keep seeing it until they reloaded. myActiveWar is already memoised from the guards
+        // above, so this costs no extra query (unlike $claim->war).
+        ClanWarBroadcast::refresh($this->myActiveWar);
     }
 
     public function challengeClan(int $opponentClanId): void
@@ -309,6 +362,11 @@ class ClanWar extends Component
             'type' => 'war-challenge',
             'message' => __('clan.notify.war_challenged', ['clan' => $this->myClan->name]),
         ]);
+
+        // Our own members' pages just gained a "waiting for a response" panel, and the opposing
+        // clan's members gained an incoming challenge. The opposing LEADER is excluded because
+        // the toast above already carries them through the same refresh path in toasts.js.
+        ClanWarBroadcast::refresh($war, exceptUserIds: [$opponent->leader_id]);
     }
 
     public function acceptChallenge(int $warId): void
@@ -330,6 +388,11 @@ class ClanWar extends Component
             'type' => 'war-accepted',
             'message' => __('clan.notify.war_accepted', ['clan' => $war->opponent->name]),
         ]);
+
+        // The leader is not the only person staring at "waiting for a response": every ordinary
+        // member of BOTH clans is on a page whose entire branch just changed (waiting -> ongoing
+        // on one side, incoming challenge -> ongoing on the other).
+        ClanWarBroadcast::refresh($war, exceptUserIds: [$war->challenger->leader_id]);
     }
 
     public function declineChallenge(int $warId): void
@@ -345,6 +408,10 @@ class ClanWar extends Component
             'type' => 'war-declined',
             'message' => __('clan.notify.war_declined', ['clan' => $war->opponent->name]),
         ]);
+
+        // Same defect class as accept: without this, the challenger clan's ordinary members keep
+        // the "waiting for a response" panel for a war that no longer exists.
+        ClanWarBroadcast::refresh($war, exceptUserIds: [$war->challenger->leader_id]);
     }
 
     /** A Pending war where our clan is the opponent and we're its leader. */

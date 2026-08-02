@@ -70,3 +70,47 @@ it('membulatkan poin ke dua desimal', function () {
 
     expect($score)->toBe(round($score, 2));
 });
+
+/*
+|--------------------------------------------------------------------------
+| breakdown(): faktor-faktor yang DIKALIKAN score(), supaya layar hasil bisa
+| menjelaskan kenapa sebuah attempt bernilai segitu tanpa menghitung ulang
+| rumusnya sendiri (yang akan jadi sumber kebenaran kedua, bebas menyimpang
+| dari angka yang benar-benar ditulis ke clan_war_mode_claims.points).
+|--------------------------------------------------------------------------
+*/
+
+it('membeberkan faktor yang menghasilkan poin', function () {
+    // ceiling 100; WPM 75 = separuh skala -> 0.5; akurasi 96 -> 0.98.
+    $b = ClanWarScorer::breakdown('time', '60', scoreResult(96.0, 75.0, 60.0));
+
+    expect($b['ceiling'])->toBe(100)
+        ->and($b['basis'])->toBe('wpm')
+        ->and($b['basis_value'])->toBe(75.0)
+        ->and($b['basis_scale'])->toBe(150)
+        ->and($b['performance_ratio'])->toBe(0.5)
+        ->and($b['accuracy_multiplier'])->toBe(0.98)
+        ->and($b['points'])->toBe(49.0);
+});
+
+it('memakai durasi, bukan wpm, sebagai dasar rincian survival', function () {
+    // Kalau layar hasil menulis "kecepatan ... wpm" untuk survival, ia menyatakan sesuatu
+    // yang salah tentang mode ber-ceiling tertinggi di game ini.
+    $b = ClanWarScorer::breakdown('survival', 'hard', scoreResult(100.0, 0.0, 45.0));
+
+    expect($b['basis'])->toBe('duration')
+        ->and($b['basis_value'])->toBe(45.0)
+        ->and($b['basis_scale'])->toBe(90)
+        ->and($b['performance_ratio'])->toBe(0.5);
+});
+
+it('mengembalikan null untuk mode yang bukan war mode', function () {
+    expect(ClanWarScorer::breakdown('words', '999', scoreResult(100.0, 150.0, 60.0)))->toBeNull();
+});
+
+it('menjaga score() dan breakdown() tak pernah berbeda', function () {
+    $result = scoreResult(93.0, 77.0, 60.0);
+
+    expect(ClanWarScorer::score('time', '60', $result))
+        ->toBe(ClanWarScorer::breakdown('time', '60', $result)['points']);
+});

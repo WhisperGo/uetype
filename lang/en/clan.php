@@ -6,8 +6,10 @@ return [
     'leaderboard_title' => 'CLAN LEADERBOARD',
 
     'leaderboard' => 'Leaderboard',
-    'back_to_clan' => '← Back to Clan',
-    'back_to_clan_plain' => 'Back to Clan',
+    // No arrow in the string: the chevron is markup (<x-header-link back>), so it can be sized
+    // and hidden from screen readers. A literal arrow here is untranslatable typography that
+    // gets read aloud as a word.
+    'back_to_clan' => 'Back to Clan',
     'clan_war' => 'Clan War',
     'chat' => 'Clan Chat',
 
@@ -99,6 +101,7 @@ return [
         'vs_suffix' => '(power :power)',
         'ends_at' => 'Ends :time',
         'your_points' => 'Your Points',
+        'opponent_points' => 'Opponent',
         'modes_heading' => 'War Modes',
         'modes_hint' => 'Claim an open mode and play it. Each mode can only be done once by your clan.',
         'mode_label' => ':mode · :config',

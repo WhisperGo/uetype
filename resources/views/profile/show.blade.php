@@ -28,14 +28,17 @@
                          middle-click, open-in-new-tab and no-JS all work. The handler
                          prefers history.back() when there IS history, because only that
                          restores the previous page's scroll position. --}}
-                    <a href="{{ $backUrl }}" wire:navigate
+                    {{-- x-icon-button, not x-header-link: this control has NO text, so it gets
+                         its size from the glyph alone -- the 44px case (WCAG 2.5.5). The row is
+                         `items-center` beside a fluid-title h1, which is taller than 44px, so
+                         the bigger box needs no negative margin here. --}}
+                    <x-icon-button as="a" :label="__('profile.back')" href="{{ $backUrl }}" wire:navigate
                         x-data
-                        @click="if (window.history.length > 1) { $event.preventDefault(); window.history.back() }"
-                        class="text-muted hover:text-foreground transition" aria-label="{{ __('profile.back') }}">
+                        @click="if (window.history.length > 1) { $event.preventDefault(); window.history.back() }">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                         </svg>
-                    </a>
+                    </x-icon-button>
                 @endif
                 <h1 class="font-display text-fluid-title tracking-wide text-foreground">
                     {{ $isPublic ? __('profile.header_public') : __('profile.header') }}

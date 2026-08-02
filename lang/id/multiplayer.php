@@ -31,6 +31,7 @@ return [
     'invite_in_room' => 'Di ruang',
     'invite_online' => 'Online',
     'invite_offline' => 'Offline',
+    'invite_busy' => 'Di room lain',
     'invite_offline_hint' => 'Teman ini sedang offline dan tidak bisa diundang sekarang.',
     'invite_no_friends' => 'Kamu belum punya teman untuk diundang.',
     'invite_find_friends' => 'Cari teman',
@@ -48,6 +49,8 @@ return [
     'leave_room' => 'Keluar Ruang',
 
     'sudden_death' => 'Sudden Death',
+    'start_typing_now' => 'Mulai mengetik',
+    'race_time_left' => 'Sisa waktu',
     'room_label' => 'Ruang',
     'race_starting' => 'Balapan Dimulai',
     'mascot_track' => 'Lintasan Balap Maskot',
@@ -98,6 +101,7 @@ return [
     'error_room_full' => 'Kamar sudah penuh! Maksimal 5 pemain dan 5 penonton.',
     'error_players_full' => 'Semua 5 slot pemain sudah terisi.',
     'error_spectators_full' => 'Semua 5 slot penonton sudah terisi.',
+    'error_leave_race_first' => 'Kamu sedang balapan. Selesaikan atau keluar dulu sebelum masuk room lain.',
     'error_not_enough_players' => 'Butuh minimal 2 pemain untuk memulai balapan. Penonton tidak dihitung.',
 
     'become_spectator' => 'Jadi Penonton',
@@ -132,4 +136,10 @@ return [
     'leave_confirm_body' => 'Meninggalkan halaman ini akan mengeluarkanmu dari room. Kamu perlu kode room untuk bergabung lagi.',
     'leave_confirm_ok' => 'Keluar room',
     'leave_confirm_cancel' => 'Tetap di sini',
+
+    'switch_confirm_title' => 'Keluar dari room sekarang?',
+    'switch_confirm_body' => 'Kamu masih di room :from. Masuk ke :to akan mengeluarkanmu dari sana.',
+    'switch_confirm_body_create' => 'Kamu masih di room :from. Membuat room baru akan mengeluarkanmu dari sana.',
+    'switch_confirm_ok' => 'Keluar dan pindah',
+    'switch_confirm_cancel' => 'Tetap di sini',
 ];

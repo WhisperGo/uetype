@@ -337,10 +337,33 @@ Pengecualian terdokumentasi: di atas cap 500 event titik akan undercount sementa
 tidak; dan heatmap membuang karakter di luar 3 baris QWERTY-nya (praktis tak terjangkau —
 wordlist en/id murni `a-z`; hanya `ClanWarFixedText` yang bisa membawa karakter lain).
 
+### 3.8 Tab di layar hasil menuju `[data-result-primary]`, bukan `#restartButton`
+
+Handler-nya dulu berbunyi `preventDefault()` **lalu**
+`document.getElementById('restartButton').focus()` — tanpa guard, tanpa `?.`. Di hasil **Clan War**
+aksi utamanya `<x-result-back-to-war />` yang tak ber-`id`, jadi tiap tekan Tab melempar
+`TypeError` **setelah** tombolnya sudah ditelan: fokus tak ke mana-mana, tak ada satu pun elemen
+yang bisa dicapai keyboard, dan console kotor tiap penekanan.
+
+Dua hal yang mudah salah diperbaiki di sini:
+
+1. **Urutannya, bukan cuma `?.`.** Menambal optional chaining saja akan menyisakan Tab yang
+   tertelan diam-diam — bug yang sama berbaju lain. Target dicari **dulu**, dan tombolnya hanya
+   ditelan kalau target itu ada.
+2. **Atribut, bukan `id`.** Aksi utamanya "kembali ke war" di satu cabang dan "tes berikutnya" di
+   cabang lain; sebuah id bernama `restartButton` tak bisa jujur menamai keduanya.
+
+Karena `querySelector` mengambil yang **pertama**, dua target di satu layar berarti Tab diam-diam
+memfokuskan yang salah — `ResultTabTargetTest` karena itu menguntut **tepat satu** per cabang
+(dihitung sebagai atribut, bukan substring: selektor di dalam handler-nya sendiri juga memuat
+kata itu).
+
 ## 4. Integrasi dengan Fitur Lain
 
 - **Ghost Mode** (`?ghost=...`): deep-link dari leaderboard memasang lawan ghost. Lihat
   [ghost-mode.md](ghost-mode.md).
 - **Clan War** (`?war_claim=...`): sesi ini bisa "dikunci" jadi war attempt. Mode dipaksa ke
-  klaim, restart/reroll diblokir. Lihat [clan-war.md](clan-war.md).
+  klaim, restart/reroll diblokir. Payload session `typing_result` membawa `war.score` — rincian
+  poin yang benar-benar diterima war, atau `null` kalau attempt itu tak mengisi claim mana pun.
+  Lihat [clan-war.md](clan-war.md) §3.8.
 - **EXP**: `saveResult` memanggil `User::addExp()`. Lihat [level-exp.md](level-exp.md).

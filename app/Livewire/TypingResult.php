@@ -65,6 +65,19 @@ class TypingResult extends Component
     public $afk = false;
 
     /**
+     * War context when this result came from a Clan War attempt, null for an ordinary solo run.
+     * Drives the "Back to Clan War" action in place of the solo Next Test / Retry buttons: a war
+     * attempt is one-shot, so replaying it is meaningless and the only sensible next step is
+     * returning to the war page.
+     *
+     * `score` is the breakdown the war actually received, or null when this attempt filled no
+     * claim -- two different screens (see result-war-points), never a zero standing in for both.
+     *
+     * @var array{mode: string, config: string, score: array<string, mixed>|null}|null
+     */
+    public $war = null;
+
+    /**
      * Achievement KEYS unlocked by this very session, straight from
      * AchievementService::syncUnlocks(). Titles are resolved in the view from the lang
      * files -- the only place they live. Empty for guests and for abandoned runs.
@@ -109,6 +122,15 @@ class TypingResult extends Component
         $this->afk = $result['afk'] ?? false;
         // `?? []` on purpose: a session stored before this key existed must still render.
         $this->newAchievements = $result['newAchievements'] ?? [];
+        // `?? null`: solo runs (and pre-deploy sessions) simply have no war context.
+        $this->war = $result['war'] ?? null;
+
+        // Normalised HERE, not in the view: a session stored before this deploy carries only
+        // mode+config, and an undefined index in Blade is a 500 on a screen the player has
+        // already earned.
+        if ($this->war !== null) {
+            $this->war['score'] = $this->war['score'] ?? null;
+        }
     }
 
     /**

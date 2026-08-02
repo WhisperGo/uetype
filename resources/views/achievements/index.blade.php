@@ -11,13 +11,9 @@
         <div class="max-w-5xl px-4 mx-auto space-y-6 sm:px-6 lg:px-8">
 
             <!-- Back to Profile -->
-            <a href="{{ route('profile.me') }}"
-                class="inline-flex items-center gap-1.5 font-mono text-sm text-muted hover:text-foreground transition-colors">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
+            <x-header-link back href="{{ route('profile.me') }}">
                 {{ __('achievements.back_to_profile') }}
-            </a>
+            </x-header-link>
 
             <!-- Heading + progress -->
             <div class="space-y-3">

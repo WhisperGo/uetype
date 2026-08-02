@@ -56,13 +56,28 @@ class MultiplayerLobby extends Component
 
     public array $resultSnapshot = [];
 
+    /**
+     * A room change waiting on the player's answer: ['from' => current code, 'to' => target
+     * code or null for "create a new room"]. Null when nothing is pending.
+     *
+     * Deliberately a Livewire PROPERTY rather than a dispatched browser event, because the
+     * case that matters most arrives on a FRESH PAGE LOAD: accepting an invite navigates to
+     * /multiplayer?invite=CODE, so the question has to exist from the first render. An event
+     * fired during mount() would have nothing listening yet.
+     */
+    public ?array $pendingRoomSwitch = null;
+
     // Sudden death duration (seconds). Single constant shared by checkSuddenDeath()
     // and getSuddenDeathRemainingProperty() so they never drift apart.
     private const SUDDEN_DEATH_SECONDS = 15;
 
     // Initial race countdown ("3, 2, 1, GO!"). Server sets race_starts_at = now() + this
     // so all clients stay in sync.
-    private const COUNTDOWN_SECONDS = 3;
+    //
+    // Public because it is not only a countdown length: it is the reason race_starts_at sits
+    // in the FUTURE for the first few seconds of a 'racing' room, which is the window every
+    // clock derived from race_starts_at has to survive (see RaceDeadlineTest).
+    public const COUNTDOWN_SECONDS = 3;
 
     // Separate capacities: racers and spectators are each capped at 5. Single constants
     // so join/toggle/guard don't scatter magic numbers.
@@ -85,6 +100,43 @@ class MultiplayerLobby extends Component
      * capping a scripted flood (each accepted update also broadcasts to the whole room).
      */
     private const MAX_PROGRESS_UPDATES_PER_SECOND = 20;
+
+    /**
+     * Seconds after GO before a racer who has typed NOTHING is dropped as DNF.
+     *
+     * Until this existed, sudden death was the only thing that could ever end a race -- and
+     * it only starts once someone finishes with a valid result. If nobody ever finished, the
+     * room sat in 'racing' forever. sweepAbandonedRaces() was no help: it requires EVERY
+     * member to be offline, and a player idling in the arena keeps sending the presence
+     * heartbeat, so they stay "online" indefinitely. Nothing anywhere put a clock on
+     * starting, which is exactly why a player had no reason to begin typing.
+     *
+     * "Has not started" is read as progress_percent === 0, and the race text is what makes
+     * that safe: RACE_WORD_COUNT is 45 words (~250-290 characters) and the client floors the
+     * percentage, so 0% means FEWER THAN ~3 characters typed. Twenty seconds in, even a
+     * 5-WPM beginner has typed ~8 characters (~3%) and is never touched. The margin is in the
+     * text length -- shorten the race text or raise this value and the guarantee weakens, so
+     * RaceDeadlineTest pins the slow-but-started case.
+     *
+     * Public so the view can render the same number it is judged by.
+     *
+     * Like every other threshold in this project, this is a first guess to be re-tuned from
+     * real play data -- not intuition. See the history of MAX_CHARS_PER_SECOND and
+     * IMPOSSIBLE_CONSISTENCY in docs/features/anti-cheat-wpm.md for why that matters.
+     */
+    public const START_GRACE_SECONDS = 20;
+
+    /**
+     * Hard ceiling on a race: at this point it closes, whoever is still typing.
+     *
+     * The start deadline above only catches players who never BEGAN. Someone who types a few
+     * words and then walks away clears it, and without this second bound their race hangs
+     * just as badly. A finisher would trigger sudden death, but there may not be one.
+     *
+     * 180s is generous by design: the slowest plausible run of a 45-word text (~15 WPM) lands
+     * near 100 seconds, so this only ever fires on a race nobody is really running.
+     */
+    public const MAX_RACE_SECONDS = 180;
 
     /**
      * Restore the caller straight into their room on load (no re-entering the code).
@@ -112,12 +164,17 @@ class MultiplayerLobby extends Component
         // and subscribed, so we return -- avoiding a redundant second restore + subscribe. A
         // bad/expired code just flashes an error and falls through to the choose screen.
         $inviteCode = request()->query('invite', $invite);
-
-        if (is_string($inviteCode) && strlen($inviteCode) === 6 && $this->joinRoomByCode(strtoupper($inviteCode))) {
-            return;
-        }
+        $inviteCode = is_string($inviteCode) && strlen($inviteCode) === 6 ? strtoupper($inviteCode) : null;
 
         $member = RoomMember::where('user_id', Auth::id())->first();
+
+        // Only auto-join straight from the link when there is no room to lose. When there IS
+        // one, the join runs anyway but stops at the switch guard below, which records the
+        // question instead of performing the move -- so the player lands back in their own
+        // room with a confirmation rather than finding themselves silently relocated.
+        if ($inviteCode !== null && ! $member && $this->joinRoomByCode($inviteCode)) {
+            return;
+        }
 
         if (! $member) {
             return; // No membership -> stay on the create/join "choose" screen.
@@ -134,20 +191,39 @@ class MultiplayerLobby extends Component
         // 'finished' shows the result panel; 'waiting'/'racing' show lobby/arena.
         $this->step = $room->status === 'finished' ? 'racing' : $room->status;
 
+        // Lazy backstop for the race deadlines, mirroring the stale-member sweep above: a race
+        // whose clock ran out while every tab was closed is settled by whoever opens the lobby
+        // next, so nobody comes back to a room still pretending to race. Set roomCode/step
+        // first -- the resolver captures the result snapshot, which reads them.
+        //
+        // Ceiling only, no start-grace: this is a PAGE LOAD, and the player has not had a
+        // chance to type yet on it. The grace rule belongs to the live arena that actually
+        // watched them sit idle (checkRaceDeadline), not to the moment their page arrives.
+        if ($room->status === 'racing'
+            && $this->resolveRaceDeadlinesIfElapsed($room, includeStartGrace: false)) {
+            $room->refresh();
+        }
+
         if ($room->status === 'finished') {
             $this->showResultModal = true;
             $this->captureResultSnapshot();
         } elseif ($room->status === 'racing') {
             // Derive finish state from the DB so a mid-race refresh doesn't hand a finished
             // player their typing input back. (hasFinished/hasGivenUp default to false.)
-            $this->hasGivenUp = $member->isDnf();
-            $this->hasFinished = ! is_null($member->finished_time_seconds) && ! $member->isDnf();
+            $this->syncRaceOutcomeFromDb($member);
         }
 
         $this->forgetRoomCache();
 
         // Re-subscribe to the room/race Echo channels after the reload.
         $this->dispatch('subscribe-room', room: $room->code);
+
+        // Restored first, asked second: the player is back in the room they actually belong
+        // to, and only then does the invite raise its question on top of it. Cancelling
+        // therefore needs no undo -- nothing has moved.
+        if ($inviteCode !== null && $inviteCode !== $room->code) {
+            $this->joinRoomByCode($inviteCode);
+        }
     }
 
     /**
@@ -183,9 +259,92 @@ class MultiplayerLobby extends Component
         SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
     }
 
-    /** Create a fresh room, make the caller its host, and subscribe to its channel. */
-    public function createRoom(): void
+    /**
+     * Decide whether the caller may enter another room, given the one they are in now.
+     *
+     * The gate lives on the SERVER, not in the lobby's JS, because a player can be a member
+     * of a room while looking at a completely different page -- the [data-mp-flags] element
+     * the nav interceptor reads only exists on /multiplayer. The same reason the rest of this
+     * component re-checks everything the UI already appears to enforce.
+     *
+     * $targetCode is null for "create a new room".
+     *
+     * @return bool true if the caller may proceed with the join/create
+     */
+    private function mayLeaveCurrentRoom(?string $targetCode, bool $confirmed): bool
     {
+        $member = RoomMember::where('user_id', Auth::id())->first();
+
+        if (! $member) {
+            return true; // nothing to leave
+        }
+
+        $current = Room::find($member->room_id);
+
+        if (! $current || $current->code === $targetCode) {
+            return true; // nothing to protect, or they are already here
+        }
+
+        // Mid-race the answer is no, not "are you sure": leaving takes the player's own race
+        // away AND deletes a competitor out of a race the others are still running. An invite
+        // arriving at the wrong moment must not be able to do that at all.
+        if ($current->status === 'racing') {
+            session()->flash('error', __('multiplayer.error_leave_race_first'));
+
+            return false;
+        }
+
+        if ($confirmed) {
+            return true;
+        }
+
+        // 'finished' asks too. It is tempting to wave it through -- no race is lost -- but the
+        // result screen is where people press Play Again together, and a rule that says "you
+        // are in a room, leaving it is a decision" is only trustworthy if it holds in every
+        // status. One consistent rule beats one exception that has to be explained.
+        $this->pendingRoomSwitch = ['from' => $current->code, 'to' => $targetCode];
+
+        return false;
+    }
+
+    /** Accept the pending room change and carry out the join/create it was holding. */
+    public function confirmRoomSwitch(): void
+    {
+        $pending = $this->pendingRoomSwitch;
+        $this->pendingRoomSwitch = null;
+
+        if (! $pending) {
+            return;
+        }
+
+        if ($pending['to'] === null) {
+            $this->createRoom(confirmed: true);
+
+            return;
+        }
+
+        $this->joinRoomByCode($pending['to'], confirmed: true);
+    }
+
+    /**
+     * Decline the pending room change. Nothing to undo: the guard refuses BEFORE any
+     * membership is touched, so the player never left in the first place.
+     */
+    public function cancelRoomSwitch(): void
+    {
+        $this->pendingRoomSwitch = null;
+    }
+
+    /** Create a fresh room, make the caller its host, and subscribe to its channel. */
+    public function createRoom(bool $confirmed = false): void
+    {
+        // Creating a room silently abandons the current one exactly like joining does -- the
+        // reported bug arrived through invites, but all three doors lead to the same
+        // departCurrentRooms() call.
+        if (! $this->mayLeaveCurrentRoom(null, $confirmed)) {
+            return;
+        }
+
         $user = Auth::user();
         $code = strtoupper(Str::random(6));
 
@@ -257,13 +416,19 @@ class MultiplayerLobby extends Component
      * join-code form (joinRoom) and the invite deep link (mount's ?invite handler).
      * Returns true on success; on failure it flashes an error and returns false.
      */
-    private function joinRoomByCode(string $code): bool
+    private function joinRoomByCode(string $code, bool $confirmed = false): bool
     {
         $room = Room::where('code', $code)->where('status', 'waiting')->first();
 
         if (! $room) {
             session()->flash('error', __('multiplayer.error_room_not_found'));
 
+            return false;
+        }
+
+        // Checked AFTER the room is known to exist, so a dead invite code reports itself as
+        // dead rather than asking the player to abandon their room for nothing.
+        if (! $this->mayLeaveCurrentRoom($code, $confirmed)) {
             return false;
         }
 
@@ -380,6 +545,24 @@ class MultiplayerLobby extends Component
         if ($room->status === 'waiting' && $this->step === 'racing') {
             $this->step = 'waiting';
             $this->resetRaceOutcome();
+        }
+
+        // A race can now end for ONE player without that player doing anything -- the start
+        // grace drops whoever never began, and the write happens inside whichever client
+        // asked first. For everyone else this broadcast is the only notice they get, so their
+        // own outcome has to be re-read here. Without it a dropped player kept a live typing
+        // box whose every keystroke the server silently refused.
+        //
+        // After the branches above on purpose: a room that just re-entered 'racing' has had its
+        // outcome reset for the NEW race, and this then re-derives against that same race.
+        if ($room->status === 'racing') {
+            $member = RoomMember::where('room_id', $room->id)
+                ->where('user_id', Auth::id())
+                ->first();
+
+            if ($member) {
+                $this->syncRaceOutcomeFromDb($member);
+            }
         }
     }
 
@@ -545,13 +728,26 @@ class MultiplayerLobby extends Component
             ? $this->roomData->members->pluck('user_id')->all()
             : [];
 
-        return $friendships
+        $friends = $friendships
             ->map(fn (Friendship $f) => $f->requester_id === $me ? $f->addressee : $f->requester)
-            ->filter() // guard against a soft-missing side
+            ->filter(); // guard against a soft-missing side
+
+        // Friends who are in some OTHER room right now. Without this the picker only knew
+        // about this room, so inviting looked equally harmless whether the friend was idle or
+        // three words from winning somebody else's race -- and the invite they received asked
+        // them to walk out of it. One query for the whole list, keyed by user id.
+        $elsewhereIds = $friends->isEmpty() ? [] : RoomMember::query()
+            ->whereIn('user_id', $friends->pluck('id'))
+            ->when($this->roomData, fn ($q) => $q->where('room_id', '!=', $this->roomData->id))
+            ->pluck('user_id')
+            ->all();
+
+        return $friends
             ->map(fn ($user) => [
                 'user' => $user,
                 'online' => $user->isOnline(),
                 'in_room' => in_array($user->id, $memberIds, true),
+                'busy' => in_array($user->id, $elsewhereIds, true),
             ])
             // Online-and-invitable first, then online in-room, then offline; alphabetical within.
             ->sortBy(fn ($row) => [$row['in_room'] ? 1 : 0, $row['online'] ? 0 : 1, mb_strtolower($row['user']->username)])
@@ -683,6 +879,39 @@ class MultiplayerLobby extends Component
     }
 
     /**
+     * Re-derive THIS player's own race outcome from their room_members row.
+     *
+     * $hasGivenUp is what swaps the typing box for the result panel, and for a long time only
+     * giveUp() and mount() ever set it -- both paths where the player themselves acted. The
+     * start-grace rule broke that assumption: it ends a player's race from the outside, and
+     * nothing told them. Their input stayed live, the cursor kept blinking, words kept
+     * highlighting as they typed, and every progress emit was silently refused by
+     * updateRaceProgress (finished_time_seconds is already set). They found out when the race
+     * ended, or when they reloaded. Dropping someone without telling them is barely different
+     * from not dropping them at all.
+     *
+     * Derived from the database rather than set at the drop site because the drop is a bulk
+     * conditional update that may run in ANOTHER player's request: the resolution is idempotent
+     * and race-safe, so exactly one caller writes and everyone else only ever hears about it
+     * through the RoomUpdated broadcast. A player must be able to learn their own outcome from
+     * a room update they did not cause -- in a room of five, that is the common case.
+     *
+     * force-finish is dispatched only on the TRANSITION, so the arena locks once rather than on
+     * every subsequent room update, and only for a player whose race actually just ended.
+     */
+    private function syncRaceOutcomeFromDb(RoomMember $member): void
+    {
+        $wasOut = $this->hasGivenUp || $this->hasFinished;
+
+        $this->hasGivenUp = $member->isDnf();
+        $this->hasFinished = ! is_null($member->finished_time_seconds) && ! $member->isDnf();
+
+        if (! $wasOut && ($this->hasGivenUp || $this->hasFinished)) {
+            $this->dispatch('force-finish');
+        }
+    }
+
+    /**
      * Integrity note: the client's $liveWpm is DELIBERATELY not used for official
      * numbers. The server recomputes Net WPM itself (correct chars / time) via
      * AntiCheatService -- aligned with solo mode (TypingEngine::saveResult) -- so that
@@ -710,6 +939,20 @@ class MultiplayerLobby extends Component
         // so resolution is server-authoritative and real time -- it no longer waits on that
         // one client's local timer to fire checkSuddenDeath(). Idempotent & race-safe.
         if ($this->resolveSuddenDeathIfElapsed($room)) {
+            return;
+        }
+
+        // Same real-time enforcement for the hard ceiling: a still-typing player's own emits
+        // close the race the instant it passes. Placed after sudden death because that window
+        // is the tighter one whenever it is running.
+        //
+        // The start-grace rule is deliberately EXCLUDED here, and the reason is not a detail:
+        // this method runs BEFORE the caller's own progress is written, so the rule would judge
+        // the emitter against the stale zero their in-flight update is about to replace. A
+        // player who finally starts typing at second 19.9 would be killed by their own first
+        // keystroke. It is also simply unnecessary -- someone emitting progress is, by
+        // definition, not the idle player that rule exists to remove.
+        if ($this->resolveRaceDeadlinesIfElapsed($room, includeStartGrace: false)) {
             return;
         }
 
@@ -955,6 +1198,47 @@ class MultiplayerLobby extends Component
     }
 
     /**
+     * Client-timer gate for the race deadlines (start grace + hard ceiling).
+     *
+     * This is the path that matters most for these two, and it is the mirror image of
+     * checkSuddenDeath(): the progress path can only enforce a deadline while SOMEONE is
+     * still emitting progress, and the whole point here is the case where nobody is typing
+     * at all. The client watches the same server-issued countdown and calls this once it
+     * reaches zero; the server re-decides everything (see resolveRaceDeadlinesIfElapsed).
+     */
+    public function checkRaceDeadline(): void
+    {
+        if (! $this->roomCode || $this->step !== 'racing') {
+            return;
+        }
+
+        $room = Room::where('code', $this->roomCode)->first();
+        if (! $room) {
+            return;
+        }
+
+        // A true return means this call CLOSED the race, and closeRaceNow has already locked
+        // the arena and opened the result panel for everyone. Nothing left to derive.
+        if ($this->resolveRaceDeadlinesIfElapsed($room)) {
+            return;
+        }
+
+        // The race continues, but it may no longer include the caller: this is the timer of
+        // someone sitting at 0%, so they are the likeliest player to have just been dropped.
+        // Read their own outcome back on the same round-trip. Not merely faster than waiting
+        // for the broadcast to come back around -- SafeBroadcast lets a race carry on when the
+        // WebSocket server is unreachable, so on a deployment where Reverb is down this is the
+        // ONLY notice the dropped player would ever get.
+        $member = RoomMember::where('room_id', $room->id)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if ($member) {
+            $this->syncRaceOutcomeFromDb($member);
+        }
+    }
+
+    /**
      * Finalize the race if the sudden-death window has elapsed. THE single place the deadline
      * is decided, called from BOTH updateRaceProgress() (real time, driven by a still-typing
      * player's own emits ~8x/second) and checkSuddenDeath() (a paused player's client timer).
@@ -978,6 +1262,143 @@ class MultiplayerLobby extends Component
             return false;
         }
 
+        return $this->closeRaceNow($room);
+    }
+
+    /**
+     * Enforce the two race deadlines: the start grace window and the hard ceiling.
+     *
+     * Companion to resolveSuddenDeathIfElapsed() and deliberately built the same way -- one
+     * place decides, an atomic conditional update makes exactly one caller finalize, and it
+     * is reached from both the progress path (real time, driven by whoever is still typing)
+     * and a client timer (the only signal available when EVERYONE has stopped).
+     *
+     * $includeStartGrace is false everywhere EXCEPT the client timer, and that asymmetry is
+     * the point rather than an optimisation. The ceiling and the no-racers case end the race
+     * for everyone, so any caller may decide them. Dropping an individual idle player is a
+     * judgement about ONE person, and only the live arena that watched them sit through the
+     * countdown has the standing to make it:
+     *
+     *   - from updateRaceProgress() it would judge the caller on the stale zero their own
+     *     in-flight update is about to replace -- killing a player with their first keystroke;
+     *   - from mount() it would judge a player on a page that has only just arrived.
+     *
+     * Returns true only on the call that actually closed the race.
+     */
+    private function resolveRaceDeadlinesIfElapsed(Room $room, bool $includeStartGrace = true): bool
+    {
+        if ($room->status !== 'racing') {
+            return false;
+        }
+
+        // A race with no racers left cannot finish itself: finalizeRace is only ever reached
+        // from a finish or a give-up, and there is nobody left to produce either. This happens
+        // for real -- the last racer may leave mid-race through the leave-confirm overlay --
+        // and it strands any spectators in an empty arena forever. Checked before the clocks
+        // below because it is true the moment it happens, not after a delay.
+        if ($room->players()->count() === 0) {
+            return $this->closeRaceNow($room);
+        }
+
+        // Both deadlines hang off race_starts_at, which startRace() always sets. Without it
+        // there is no clock to measure against, so nothing is enforced (rather than guessing
+        // from updated_at, which any progress write would move).
+        if (! $room->race_starts_at) {
+            return false;
+        }
+
+        // Signed, and shared with the two accessors the player actually sees: race_starts_at
+        // sits in the FUTURE for the length of the 3-2-1 countdown, and an absolute diff turns
+        // that into elapsed time the race has not spent yet. Latent here rather than active --
+        // an absolute pre-start value never exceeds COUNTDOWN_SECONDS, so it could not reach
+        // either threshold -- but the only thing making it safe is that the countdown happens
+        // to be short, and that is not an invariant written down anywhere.
+        $elapsed = $this->raceElapsedSeconds($room);
+
+        // The CEILING -- and only the ceiling -- stands down once sudden death is running.
+        //
+        // Otherwise the two clocks race each other and the shorter one silently wins: a player
+        // finishing at second 170 opens a window to 185, but the ceiling at 180 would close the
+        // room with five seconds still on the countdown the remaining player can see. That is
+        // the same failure §3.3/§3.4 were written about -- showing someone a window they do not
+        // actually have -- arriving from the opposite direction.
+        //
+        // Standing down is safe rather than merely kind: a running sudden death is PROOF the
+        // race is not hung (somebody finished), and it is guaranteed to close within
+        // SUDDEN_DEATH_SECONDS. The ceiling exists to catch races that hang; this is not one.
+        // The bound it gives up is small and known: MAX_RACE_SECONDS + SUDDEN_DEATH_SECONDS.
+        if (! $room->countdown_started_at && $elapsed >= self::MAX_RACE_SECONDS) {
+            return $this->closeRaceNow($room);
+        }
+
+        // The START GRACE, by contrast, keeps running THROUGH sudden death.
+        //
+        // It used to stand down here too, and that quietly broke the promise the rule exists to
+        // make. A fast opponent finishing at second 8 opened a sudden-death window to 23, and
+        // from that moment the idle player was no longer judged by this rule at all -- their
+        // window became min(20, first_finish + 15) instead of the 20 seconds they were shown.
+        // Twenty seconds has to mean twenty seconds, or it is not a rule players can act on.
+        //
+        // Safe to run alongside sudden death because the two never contradict each other: this
+        // one only ever touches racers still sitting at 0%, and sudden death closes the race
+        // for everyone. Whichever expires first is the one that decides, and the banner shows
+        // exactly that minimum (see startPromptRemaining in race-arena.js) so the number on
+        // screen is always the real one.
+        if (! $includeStartGrace || $elapsed < self::START_GRACE_SECONDS) {
+            return false;
+        }
+
+        // Drop the racers who never started. One conditional statement rather than a
+        // read-then-write: a player typing their first character at this exact moment either
+        // lands before it (progress > 0, so excluded) or after it (their row already carries
+        // the sentinel, and updateRaceProgress refuses a finished member). Neither order can
+        // DNF someone who did type.
+        $dropped = RoomMember::where('room_id', $room->id)
+            ->where('role', RoomMember::ROLE_PLAYER)
+            ->whereNull('finished_time_seconds')
+            ->where('progress_percent', '<=', 0)
+            ->update([
+                'finished_time_seconds' => RoomMember::DNF_SENTINEL_SECONDS,
+                'place' => null,
+            ]);
+
+        if ($dropped === 0) {
+            return false;
+        }
+
+        $this->forgetRoomCache();
+
+        // Everyone idled out -> nobody is left to finish, so close now rather than leaving a
+        // race of pure DNFs running to the hard ceiling.
+        $stillRacing = RoomMember::where('room_id', $room->id)
+            ->where('role', RoomMember::ROLE_PLAYER)
+            ->whereNull('finished_time_seconds')
+            ->count();
+
+        if ($stillRacing === 0) {
+            return $this->closeRaceNow($room);
+        }
+
+        // The race continues for whoever is genuinely typing; the others just see the dropped
+        // players marked DNF.
+        SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
+
+        return false;
+    }
+
+    /**
+     * Close a running race right now: DNF everyone unfinished, finalize, and tell every client.
+     *
+     * Extracted because THREE deadlines end a race the same way (sudden death, the start
+     * grace window, the hard ceiling) and they must not drift into three subtly different
+     * definitions of "the race is over".
+     *
+     * Race safe: the conditional `where('status', 'racing')` update means exactly ONE caller
+     * -- of any number of concurrent progress emits and timer pings -- performs the finalize;
+     * every other no-ops. Returns true only on the call that actually closed the race.
+     */
+    private function closeRaceNow(Room $room): bool
+    {
         // Atomic racing -> finished: only the winner of this update runs the finalize below.
         $claimed = Room::where('id', $room->id)
             ->where('status', 'racing')
@@ -1021,6 +1442,11 @@ class MultiplayerLobby extends Component
                 'status' => 'waiting',
                 // Reset so checkSuddenDeath() doesn't auto-finish immediately off the old race timer.
                 'countdown_started_at' => null,
+                // race_starts_at is deliberately NOT cleared here. startRace() is the single
+                // writer of that column (locked by RaceTrackDesignTest, because a second write
+                // mid-race would reset every mascot), and the deadline resolver already refuses
+                // any room that is not 'racing' -- so the stale value is unreachable, and
+                // clearing it would cost more than it protects.
                 // Rematch keeps the room's language.
                 'text_to_type' => $this->generateRaceText($room->language),
             ]);

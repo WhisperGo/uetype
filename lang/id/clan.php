@@ -6,8 +6,9 @@ return [
     'leaderboard_title' => 'PAPAN PERINGKAT CLAN',
 
     'leaderboard' => 'Papan Peringkat',
-    'back_to_clan' => '← Kembali ke Clan',
-    'back_to_clan_plain' => 'Kembali ke Clan',
+    // Tanpa panah di dalam string: chevron-nya markup (<x-header-link back>), jadi bisa diatur
+    // ukurannya dan disembunyikan dari screen reader.
+    'back_to_clan' => 'Kembali ke Clan',
     'clan_war' => 'Clan War',
     'chat' => 'Chat Clan',
 
@@ -99,6 +100,7 @@ return [
         'vs_suffix' => '(power :power)',
         'ends_at' => 'Berakhir :time',
         'your_points' => 'Poin Kamu',
+        'opponent_points' => 'Lawan',
         'modes_heading' => 'Mode War',
         'modes_hint' => 'Klaim mode kosong lalu kerjakan. Tiap mode hanya bisa dikerjakan sekali oleh clan-mu.',
         'mode_label' => ':mode · :config',

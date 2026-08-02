@@ -137,23 +137,34 @@ spam sebagai strategi optimal. Ia **bukan** batas keamanan: penegakannya di clie
 palsu tetap mungkin dan tetap ditahan gerbang server yang sudah ada (`MAX_RACE_WPM`, cross-check
 akurasi/progres, progres monoton, gerbang countdown, rate limit) — lihat §3.6.
 
-**Penolakan karakter saat diketik (lapisan lebih ketat).** Di atas word-lock tingkat-spasi,
-`checkInput()` kini **menolak setiap karakter salah pada saat diketik**: begitu `typedText`
-berhenti menjadi prefiks kata target, karakter pelanggar itu **langsung dibuang** dari field
-(`typedText.slice(0, prevTypedLength)`) dan `nudgeBlocked()` dipicu. Artinya kata yang sedang
-diketik **tak pernah bisa menampung huruf salah** sama sekali — satu-satunya jalan maju adalah
-mengetik prefiks yang persis benar. Backspace tetap bebas (memperpendek `typedText` selalu valid),
-dan **akurasi tetap jujur**: percobaan yang ditolak tetap dihitung `totalMistakes`, jadi angka
-akurasi tak melonjak palsu ke 100%.
+**Penguncian ada di tingkat KATA, bukan karakter.** Huruf salah **tetap masuk** ke field dan
+ditandai error; yang tak pernah lewat adalah **spasinya**. Evaluasinya diekstrak ke satu fungsi
+murni [`evaluateTyping()`](../../resources/js/word-mechanic.js) yang menjawab tiga hal sekaligus
+— apakah ketikan masih prefiks kata target (`hasError`), apakah ini karakter **baru** (bukan
+hasil backspace, satu-satunya yang boleh menaikkan hitungan), dan apakah ia sebuah kesalahan.
 
-Konsekuensi UX yang disengaja: kata yang salah **tidak menjebak** — huruf salah cukup diabaikan
-(tak masuk), dan biayanya hanya waktu. Penolakan (huruf salah maupun spasi yang belum sah) diberi
-sinyal lewat flag `justBlocked`: **warna merah** pada kata aktif & input, plus baris
-`multiplayer.word_must_match`. (Efek getar `race-typo` sebelumnya **sudah dilepas** — warna merah
-jadi satu-satunya isyarat.) Karena karakter salah tak pernah masuk lagi, `hasError` praktis selalu
-`false`; `justBlocked` yang menjadi pemicu utama warna merah, termasuk saat spasi ditolak padahal
-ketikan masih prefiks benar (ketik `"the"` untuk `"then"` lalu spasi — layar tetap memberi sinyal
-ditahan).
+> **Sempat lebih ketat, lalu dikembalikan (2026-07-30, commit `89cbdeb`).** Versi sebelumnya
+> menolak **setiap karakter salah pada saat diketik** — karakter pelanggar dibuang dari field
+> (`typedText.slice(0, prevTypedLength)`), sehingga kata yang sedang diketik tak pernah bisa
+> menampung huruf salah sama sekali. Itu dilepas: pemain tak bisa **melihat** apa yang baru saja
+> ia ketik salah, sehingga koreksi jadi menebak-nebak. Dokumen ini sempat tertinggal menjelaskan
+> perilaku lama — termasuk klaim `hasError` "praktis selalu `false`", yang kini justru terbalik.
+
+**Akurasi tetap jujur**: karakter salah dihitung `totalMistakes` pada saat diketik, jadi
+memperbaikinya lewat backspace tak mengembalikan angka akurasi ke 100%. Backspace sendiri tak
+pernah dihitung sebagai keystroke baru (`isNewChar`), sehingga mengoreksi tak menggelembungkan
+`totalKeystrokes`.
+
+Penolakan spasi diberi sinyal lewat flag `justBlocked`: **warna merah** pada kata aktif & input,
+plus baris `multiplayer.word_must_match`. (Efek getar `race-typo` sebelumnya **sudah dilepas** —
+warna merah jadi satu-satunya isyarat.) `justBlocked` diperlukan **terpisah dari `hasError`**
+karena keduanya menjawab pertanyaan berbeda: ketik `"the"` untuk `"then"` lalu spasi — ketikan
+masih prefiks yang sah (`hasError` false) tapi spasinya ditolak, dan tanpa flag itu pemain hanya
+melihat spacebar yang mati.
+
+Ini juga satu-satunya logika JS di proyek yang punya unit test sendiri
+([`word-mechanic.test.js`](../../resources/js/word-mechanic.test.js), Vitest) — dijalankan lewat
+`npm test`.
 
 ### 3.3 Countdown sinkron pakai durasi RELATIF, bukan jam server absolut
 
@@ -167,6 +178,175 @@ klien akan **menghitung latensi jaringan sebagai selisih jam**, dan `toIso8601St
 milidetik (galat hingga 1 detik). Dengan mengirim **durasi relatif** ("hitung mundur sekian ms
 sejak halaman ini diterima"), jam & zona waktu klien tak lagi relevan — semua klien countdown-nya
 sinkron tanpa peduli seberapa akurat jam mereka.
+
+### 3.3.a Batas waktu race: deadline mulai & plafon keras
+
+**Sudden death bukan lagi satu-satunya penutup race.** Sampai sebelum ini ia satu-satunya —
+dan karena ia hanya menyala setelah ada **finisher valid pertama** (§3.4), race yang tak
+pernah diselesaikan siapa pun tinggal di status `racing` **selamanya**. Sapuan §3.14 tak
+menolong: ia menuntut **seluruh** member offline, sedangkan pemain yang duduk diam di arena
+tetap mengirim heartbeat presence tiap 30 detik sehingga ia "online" tanpa batas.
+
+Akibat yang dirasakan pemain lebih sederhana dari itu: **tak ada apa pun yang memberi alasan
+untuk mulai mengetik.**
+
+| Konstanta | Nilai | Aturan |
+|---|---|---|
+| `START_GRACE_SECONDS` | 20 dtk | racer yang `progress_percent` masih **0** → DNF |
+| `MAX_RACE_SECONDS` | 180 dtk | seluruh racer yang belum selesai → DNF, race ditutup |
+
+Keduanya diturunkan dari `rooms.race_starts_at` yang **sudah ada** — tanpa kolom maupun
+migrasi baru.
+
+**Kenapa `progress_percent === 0` aman sebagai penanda "belum mulai".** Justru karena teks
+race panjang: `RACE_WORD_COUNT` = 45 kata (±250–290 karakter) dan klien memakai
+`Math.floor()`, jadi 0% berarti **kurang dari ~3 karakter** diketik. Setelah 20 detik, pemula
+5 WPM sekalipun sudah mengetik ~8 karakter (±3%) dan tak pernah tersentuh. **Marginnya ada di
+panjang teks** — memendekkan teks race atau menaikkan ambang ini akan menggerusnya, dan
+`RaceDeadlineTest` mengunci kasus "lambat tapi sudah mulai" persis untuk itu.
+
+**Penegakan.** `resolveRaceDeadlinesIfElapsed()` dibangun sama persis dengan
+`resolveSuddenDeathIfElapsed()`: satu tempat memutuskan, update bersyarat
+`where('status','racing')` membuat **tepat satu** pemanggil yang memfinalisasi, dan ia dicapai
+dari **tiga** titik — jalur progres (real time, dari pemain yang masih mengetik),
+`checkRaceDeadline()` (timer klien; satu-satunya sinyal saat **tak ada** yang mengetik), dan
+`mount()` sebagai backstop malas. Ketiga deadline (sudden death + dua ini) kini berbagi satu
+`closeRaceNow()`, jadi tak ada tiga definisi "race sudah selesai" yang bisa menyimpang.
+
+**Tapi ketiganya tidak menegakkan hal yang sama, dan asimetri itu disengaja**
+(`$includeStartGrace`). Plafon keras dan kasus "tanpa racer" **menutup race untuk semua
+orang**, jadi pemanggil mana pun boleh memutuskannya. Menjatuhkan **satu** pemain yang diam
+adalah penilaian tentang **satu orang**, dan hanya arena hidup yang benar-benar menyaksikannya
+duduk diam sepanjang countdown yang berhak melakukannya — jadi grace **hanya** ditegakkan dari
+`checkRaceDeadline()`:
+
+- Dari `updateRaceProgress()` ia akan menilai si pemanggil memakai **nol yang basi**, yang
+  justru sedang digantikan oleh update yang sama itu — pemain yang akhirnya mulai mengetik di
+  detik 19,9 akan dibunuh oleh keystroke pertamanya sendiri. Ia juga tak perlu: yang sedang
+  mengirim progres, menurut definisi, bukan pemain diam yang dituju aturan ini.
+- Dari `mount()` ia akan menilai pemain pada halaman yang **baru saja tiba**.
+
+Ini ditemukan lewat regresi suite, bukan lewat pembacaan kode: lima test tampering/integritas
+yang sudah ada membangun room "berjalan 60 detik" dengan member di 0% lalu mengirim progres —
+persis bentuk yang salah dihukum versi pertama.
+
+**Room `racing` tanpa satu pun racer ikut ditutup di sini.** Racer terakhir boleh keluar
+mid-race lewat leave-confirm (§3.12), dan kalau yang tersisa hanya penonton maka tak ada lagi
+yang bisa memicu finish/giveUp — satu-satunya jalur menuju `finalizeRace()`. Dicek sebelum
+kedua jam di atas karena kondisinya benar **saat itu juga**, bukan setelah menunggu.
+
+**Deadline-nya terlihat, dan itu bukan hiasan.** Banner countdown "Mulai mengetik — 20s"
+muncul di atas kotak input, hanya untuk racer yang `progressPercent === 0` — **kuantitas yang
+sama dengan yang dihakimi server**, bukan `totalKeystrokes` (dua salah ketik menaikkan
+keystroke tapi progres tetap 0, dan pemain yang diperingatkan oleh satu aturan tapi dijatuhkan
+oleh aturan lain akan merasa dicurangi). Warnanya emas lalu naik ke merah di bawah 5 detik;
+merah penuh disimpan untuk sudden death, yang **mengalahkan** banner ini bila keduanya hidup
+bersamaan (pengetik cepat bisa menyelesaikan 45 kata di dalam jendela 20 detik).
+
+Sisa waktu dikirim sebagai **durasi relatif** dari server dan disimpan di store Alpine pada
+jam **monotonic** — dua pelajaran yang sudah dibayar mahal di §3.3 dan §3.4, diterapkan sejak
+awal di sini.
+
+**Sudden death menang atas plafon keras.** Kedua jam bisa hidup bersamaan: pemain pertama
+finish di detik 170 membuka jendela sampai detik 185, sementara plafon jatuh di detik 180.
+Tanpa penjaga, jam yang lebih pendek menang diam-diam — pemain yang tersisa cuma dapat 10 dari
+15 detik, **dan banner di layarnya masih menunjukkan sisa 5 detik** saat server sudah menutup
+race. Itu kegagalan yang sama dengan §3.3/§3.4 (memperlihatkan jendela yang tak benar-benar
+dimiliki), datang dari arah sebaliknya.
+
+Karena itu **begitu `countdown_started_at` terisi, plafon keras berhenti** dan sudden death yang
+memiliki akhir race. Ini aman, bukan sekadar murah hati: sudden death yang berjalan adalah
+**bukti** race ini tidak menggantung (ada yang finish) dan ia pasti menutup dalam ≤15 detik.
+Batas yang dilepas kecil dan diketahui: `MAX_RACE_SECONDS + SUDDEN_DEATH_SECONDS`.
+
+**Aturan mulai justru sebaliknya — ia menembus sudden death.** Versi pertama membuatnya ikut
+berhenti, dan itu diam-diam membatalkan janji yang jadi alasan aturan ini ada: lawan cepat yang
+finish di detik 8 membuka jendela sampai detik 23, dan sejak saat itu pemain yang diam **tak
+pernah lagi dinilai aturan 20 detik**. Jendelanya berubah jadi `min(20, waktu_finish + 15)`
+padahal layarnya menjanjikan 20. Dua puluh detik harus berarti dua puluh detik, atau ia bukan
+aturan yang bisa dijadikan pegangan pemain.
+
+Keduanya bisa berjalan bersamaan tanpa bertabrakan: aturan mulai **hanya** menyentuh racer yang
+masih di 0%, sudden death menutup race untuk semua. Yang lebih dulu habis, itulah yang menentukan
+— dan **banner menampilkan persis minimum itu** (`startPromptRemaining`), sehingga angka di layar
+selalu angka yang sungguhan. Menampilkan grace saja akan menjanjikan waktu yang akan dirampas
+sudden death; menampilkan sudden death saja menjanjikan waktu yang akan dirampas grace. Banner
+sudden death mundur untuk pemain itu (`!showStartPrompt`) supaya tak ada dua timer bertumpuk yang
+salah satunya keliru untuknya.
+
+**Plafon 180 detik ditampilkan** sebagai jam `m:ss` di header arena — header yang sama dipakai
+racer **dan penonton**, karena penonton pun menonton race yang bisa berakhir oleh jam itu dan
+arena tak memberi mereka isyarat lain. Sengaja tenang (kecil, `text-muted`, baru memerah di bawah
+30 detik): ini sebuah **batas**, bukan ancaman — dua timer yang keras tetap di tempat keputusan
+sesungguhnya, yaitu di atas kotak input. Jam ini **disembunyikan saat sudden death** karena di
+situ plafonnya memang berhenti berlaku, dan menghitung mundur ke tenggat yang tak lagi mengatur
+apa pun adalah kebohongan yang sama sekali lagi.
+
+**Kedua jam mulai di `race_starts_at`, bukan saat arena dirender.** Ini pelajaran ketiga dari
+keluarga yang sama dengan §3.3 dan §3.4, dan ia sempat lolos ke produksi. `startRace()` menulis
+`status = 'racing'` **dalam update yang sama** dengan `race_starts_at = now() + COUNTDOWN_SECONDS`,
+jadi selama hitung mundur 3-2-1 garis start berada di **masa depan**. `diffInSeconds($absolute: true)`
+membacanya sebagai tiga detik yang **sudah** berlalu, lalu memotong kedua jam sebanyak itu:
+pemain menerima 17 dan 177, bukan 23 dan 183.
+
+Kerusakannya bukan kosmetik, dan bentuknya **per-pemain**. Klien mengunci deadline dari sisa
+detik yang dilaporkan server **saat halaman ITU dirender** (`armRaceDeadlines`, earliest-wins),
+dan tiap pemain merender terpaut milidetik: host yang menekan Start mengunci detik 14, pemain
+lain yang menerima broadcast mengunci detik 15, dan pemain yang reload di tengah race justru
+satu-satunya yang mengunci detik 20 yang benar. Satu tenggat bersama, angka berbeda di tiap
+layar. Karena `arm()` earliest-wins, morph berikutnya **mengunci nilai terpendek yang salah**
+alih-alih mengoreksinya.
+
+Lalu kerusakan kedua menyusul: klien yang mengunci terlalu pendek bertanya ke server di detik 14,
+server menjawab "belum 20", dan — karena pemicunya dulu `$watch` yang hanya menyala pada
+**perubahan** nilai, sedangkan nilainya lalu diam di 0 selamanya — **tak ada yang pernah bertanya
+lagi**. Jalur progres pun tak menolong (`$includeStartGrace: false`). Hasil bersihnya: aturan 20
+detik tak pernah menjatuhkan siapa pun, dan yang tersisa hanya banner yang hilang enam detik lebih
+awal. Kalau **semua** pemain berhenti mengetik, plafon 180 detik jatuh dalam lubang yang sama dan
+race menggantung — persis bug yang jadi alasan §3.3.a ini ditulis.
+
+Dua perbaikan, keduanya sekaligus menghapus satu asumsi diam-diam:
+
+- `ReadsRoomState::raceElapsedSeconds()` — satu definisi elapsed **bertanda** (negatif selama
+  hitung mundur), dipakai bersama oleh kedua accessor dan `resolveRaceDeadlinesIfElapsed()`,
+  sehingga tandanya tak bisa menyimpang lagi di salah satunya. Jawabannya sebenarnya sudah ada
+  di berkas yang sama sejak lama: `getRaceStartsInMsProperty()` selalu memakai bentuk bertanda,
+  dan komentarnya sudah menulis *"May be negative"*.
+- Pemicu klien menumpang **tick 1 detik milik store** (`_clockTick`), di-throttle 5 detik, bukan
+  `$watch` pada jam yang menghitung mundur. Sebuah tenggat harus bisa **ditanyakan ulang**: satu
+  request yang hilang, satu tab yang di-throttle browser, atau satu pertanyaan yang datang terlalu
+  cepat tidak boleh berarti race menggantung selamanya. Guard sudden death kini membungkus
+  **plafon saja** — sesuai pembagian di sisi server, di mana grace memang menembus sudden death.
+
+**Pemain yang dijatuhkan harus diberi tahu, dan itu ternyata jalur yang terpisah.** `$hasGivenUp`
+— satu-satunya hal yang menukar kotak ketik dengan panel hasil — dulu hanya pernah diisi oleh
+`giveUp()` dan `mount()`, keduanya jalur di mana **pemainnya sendiri yang bertindak**. Aturan grace
+mematahkan asumsi itu: ia mengakhiri race seseorang **dari luar**. Akibatnya kotak ketiknya tetap
+menyala, kata-katanya tetap menyorot saat diketik, dan setiap emit progres ditolak diam-diam di
+`updateRaceProgress()` (`finished_time_seconds` sudah terisi) tanpa satu pun umpan balik — ia baru
+tahu saat race berakhir atau saat halaman dimuat ulang. Menjatuhkan pemain tanpa memberitahunya
+nyaris sama saja dengan tidak menjatuhkannya.
+
+`syncRaceOutcomeFromDb()` menurunkan outcome itu **dari baris `room_members` miliknya**, bukan
+menyetelnya di tempat penjatuhan, karena penjatuhannya adalah update bersyarat massal yang bisa
+berjalan **di request pemain lain**: resolusinya idempoten, jadi tepat satu klien yang menulis dan
+sisanya hanya mendengar lewat siaran `RoomUpdated`. Karena itu ia dipanggil dari tiga tempat —
+`mount()`, `roomUpdated()` (room yang masih `racing`), dan `checkRaceDeadline()` — dan `force-finish`
+hanya dikirim pada **transisinya**, jadi arena terkunci sekali, bukan tiap siaran.
+
+Jalur `checkRaceDeadline()` bukan sekadar mempercepat: `SafeBroadcast` membuat race tetap jalan saat
+server WebSocket tak terjangkau, jadi **di deployment yang Reverb-nya mati, itulah satu-satunya
+pemberitahuan** yang akan pernah diterima si pemain.
+
+Seluruh suite hijau saat bug ini hidup, dan alasannya layak dicatat: setiap test memanggil
+`checkRaceDeadline()` pada race yang **sudah** berjalan, jadi tak satu pun pernah melewati jendela
+pra-start. `RaceDeadlineTest` sekarang mengunci ketiga titik jam itu — pra-start, garis start, dan
+sesudahnya — beserta syarat bahwa bertanya terlalu cepat tak boleh melumpuhkan aturannya.
+
+> **Kalibrasi:** 20 dtk dan 180 dtk adalah **tebakan awal**. Setel ulang dari data permainan
+> nyata, **bukan** intuisi — pola yang sudah tiga kali menghukum pemain jujur di proyek ini
+> (`MAX_CHARS_PER_SECOND`, `IMPOSSIBLE_CONSISTENCY`, rate limit hasil solo; lihat
+> [anti-cheat-wpm.md](anti-cheat-wpm.md) §7.5 & §10.2).
 
 ### 3.4 Sudden Death (15 detik) setelah pemain pertama finish **valid**
 
@@ -397,6 +577,37 @@ di-restore. Tapi kalau mereka **tutup tab / koneksi putus / pergi** tanpa kembal
 menggantung selamanya — menahan slot, dan (sebagai host) membuat room tak bisa dimulai/dibersihkan.
 Ini ditutup oleh **sweep member basi**, lihat §3.14.
 
+#### 3.12.a Keanggotaan tak boleh melampaui sesi login
+
+Restore di atas punya batas yang dulu tak ada: **sesi login**. Tanpa itu, pemain yang
+meninggalkan situs terbuka, menutup browser, lalu **login lagi keesokan harinya** mendarat
+kembali di dalam room kemarin.
+
+**Dua** mekanisme menyembunyikan keusangan itu, dan **masing-masing sendirian sudah cukup**
+menyebabkannya:
+
+1. `sweepOfflineMembers($exceptUserId)` **tak pernah menilai si pemanggil** (§3.14). Alasannya
+   benar untuk tujuan aslinya — heartbeat yang belum mendarat, hitungan **detik** — tapi efek
+   sampingnya membuat baris milik sendiri yang berumur **sehari** ikut kebal.
+2. Heartbeat presence **nge-ping segera saat halaman dimuat**, jadi `last_seen_at` sudah segar
+   sebelum `mount()` sempat menilainya. **Bukti keabsenannya dihancurkan sebelum dibaca.**
+
+Karena itu perbaikannya **tidak bisa** berupa aturan `last_seen_at` yang lain — sinyal itu
+sudah lenyap saat dibutuhkan. Yang dipakai adalah **batas sesi**:
+[`DepartRoomsOnAuthChange`](../../app/Listeners/DepartRoomsOnAuthChange.php) memanggil
+`RoomMembershipService::depart()` pada event `Login` **dan** `Logout`.
+
+| Keputusan | Alasan |
+|---|---|
+| Hook di **event auth**, bukan di `GoogleAuthController` | menutup semua jalur sekaligus (callback Google, `/dev-login`, apa pun yang ditambah nanti) — satu definisi, tanpa drift |
+| Didaftarkan **eksplisit** di `AppServiceProvider` | `bootstrap/app.php` tak memanggil `withEvents()`, jadi listener yang cuma diletakkan di `app/Listeners` **tak akan pernah jalan** dan kegagalannya senyap |
+| Lewat `depart()`, bukan hapus baris langsung | host handoff, hapus-room-kosong, dan broadcast ke roommate ikut berjalan persis seperti leave biasa |
+| **Logout juga** | `markOffline()` sudah ada tapi hanya membersihkan presence — ia tak pernah melepas room, sehingga logout eksplisit pun meninggalkan host hantu |
+
+**Refresh halaman tidak terpengaruh**: me-refresh bukan login ulang, jadi seluruh perilaku
+restore di tabel §3.12 (termasuk melanjutkan race dari progress terakhir) tetap utuh — dikunci
+eksplisit oleh `RoomSessionLifecycleTest`.
+
 ### 3.13 Pilihan bahasa ketikan (host-only, di dalam room)
 
 Bahasa teks race (EN/ID) dipilih **di dalam waiting room**, di header sebelah kode room —
@@ -439,7 +650,8 @@ menyapunya:
 | **Kapan jalan** | **Lazy saat lobby di-load** (`mount()`), bukan cron | Pola sama seperti [`ClanWarResolver`](../../app/Services/ClanWarResolver.php) — proyek tak punya scheduler. Setiap ada yang membuka `/multiplayer`, room hantu ikut dibersihkan. |
 | **Cakupan** | Room **`waiting`** per-member; room **`racing`** hanya kalau **seluruh** member hilang | Mencabut **satu** peserta di tengah race merusak placement, jadi satu pemain yang masih online melindungi seluruh room. Tapi kalau tak ada siapa-siapa lagi, race tak bisa menutup dirinya sendiri (§3.4: server gerbang, bukan pemicu) — room-nya **dihapus**, tanpa finalisasi, tanpa baris history, tanpa XP. Balapan yang tak diselesaikan siapa pun tak menghasilkan hasil yang layak disimpan, sejalan dengan aturan "DNF tak pernah dicatat". |
 | **Host tersapu** | **Handoff** ke member tersisa (racer diprioritaskan), atau room dihapus kalau semua tersapu | Memakai ulang `settleAbandonedRoom()`/`reassignHostIfNeeded()` yang sama dengan leave/kick — satu definisi. Sisa member disiarkan `RoomUpdated` agar slot bebas/host baru langsung ter-render. |
-| **Pemanggil dikecualikan** | `exceptUserId` = user yang halamannya baru load | Ia provably hadir; heartbeat-nya mungkin belum mendarat pada fresh load, jadi jangan sampai menyapu diri sendiri. |
+| **Pemanggil dikecualikan** | `exceptUserId` = user yang halamannya baru load | Ia provably hadir; heartbeat-nya mungkin belum mendarat pada fresh load, jadi jangan sampai menyapu diri sendiri. **Batasnya:** pengecualian ini juga membuat baris **basi milik sendiri** kebal, dan itu bukan tugas sapuan ini untuk menutupnya — lihat §3.12.a. |
+| **Room `finished`** | Dihapus kalau **seluruh** member offline — satu query bersama room `racing` (`sweepDeadRooms`) | Dulu status ini **tak disapu siapa pun**: sapuan pertama memfilter `waiting`, kedua memfilter `racing`, jadi room `finished` jatuh di antaranya. Akibatnya cara paling **biasa** sebuah race berakhir — semua orang menutup tab di layar hasil — meninggalkan room beserta seluruh barisnya **selamanya**, dan pemain yang kembali besoknya di-restore ke modal hasil basi. All-or-nothing seperti race: layar hasil masih menjalankan tugasnya selama masih ada **satu** orang yang membacanya. Tak ada data yang hilang — `finalizeRace()` sudah menulis `multiplayer_match_history` dan XP jauh sebelum room bisa mencapai status ini. |
 
 **Catatan test:** `UserFactory` kini default **online** (`last_seen_at = now()`) karena akun uji
 merepresentasikan user aktif; test yang butuh user absen memakai state `->offline()`. Test
@@ -465,6 +677,46 @@ terlihat tapi disabled, yang sudah di room ditandai "Di ruang") → klik Undang 
 | **Auto-join** | `mount()` membaca `request()->query('invite')` | Livewire hanya inject route param ke `mount()`, bukan query param — jadi dibaca eksplisit. `joinRoomByCode()` (di-extract dari `joinRoom()`) dipakai bersama form kode manual & deep-link. |
 | **Anti-spam** | Rate-limit **10/menit per pengundang** (server) + cooldown **5 dtk per teman** (klien) | Undangan bisa jadi vektor spam toast. Cooldown klien: setelah mengundang, tombol teman itu menghitung mundur lalu bisa lagi — **tanpa refresh**. Rate-limit server = backstop sebenarnya. |
 | **Penjaga** | Hanya room `waiting`, hanya **teman Accepted** (bukan ID acak), bukan yang sudah di room, bukan diri sendiri | Otorisasi di server, bukan sekadar menyembunyikan tombol. |
+| **Teman di room lain ditandai** | Badge "Di room lain" (`invite_busy`) di picker | Dulu picker hanya tahu room **ini**, jadi mengundang terlihat sama tak berbahayanya baik teman itu menganggur maupun tinggal tiga kata dari memenangkan balapan orang lain. Fakta itulah yang mengubah **arti** mengundang. Satu query `whereIn` untuk seluruh daftar, jadi budget query tak tumbuh per teman. |
+
+#### 3.15.a Menerima undangan tak lagi menculik pemain dari room lain
+
+`joinRoomByCode()` dan `createRoom()` sama-sama memanggil `departCurrentRooms()` **tanpa
+syarat**, jadi masuk ke room baru membuang keanggotaan lama **diam-diam**. Yang paling terasa
+lewat undangan: tombol **Terima** membuka `/multiplayer?invite=CODE` dan `mount()` ikut
+auto-join, sehingga pemain terlempar keluar dari room tempat ia sedang menunggu.
+
+Overlay leave-confirm §3.12 **tidak** menangkapnya, karena **dua** sebab yang berdiri sendiri:
+
+1. Interceptor di [`multiplayer-nav.js`](../../resources/js/multiplayer-nav.js) hanya memantau
+   klik `<a href>`; tombol Terima adalah `<button>` yang menyetel `window.location.href`.
+2. Interceptor **sengaja melewatkan** tujuan yang tetap berada di `/multiplayer` — dan tujuan
+   undangan justru `/multiplayer`.
+
+**Gerbangnya di server, bukan klien.** Seorang pemain bisa berada di sebuah room sambil membuka
+`/stats` di tab lain, dan di sana atribut `[data-mp-flags]` milik lobby **tidak ada sama
+sekali** — jadi klien secara struktural tak bisa jadi gerbang di sini. `mayLeaveCurrentRoom()`
+berlaku untuk **ketiga pintu** (undangan, kode manual, Create Room), karena menutup undangan
+saja akan meninggalkan gejala yang sama hidup lewat pintu sebelah:
+
+| Status room sekarang | Perilaku |
+|---|---|
+| `racing` | **Ditolak** (`error_leave_race_first`) — keluar mid-race membuang race sendiri **dan** menghapus satu peserta dari balapan yang masih dijalankan lawan |
+| lainnya (`waiting`, `finished`) | **Konfirmasi** lewat modal `confirm-room-switch`, menyebut **kode room lama dan tujuannya** |
+
+`finished` ikut dikonfirmasi walau tak ada race yang hilang: layar hasil adalah tempat orang
+menekan **Main Lagi** bersama, dan aturan "kamu sedang di sebuah room, meninggalkannya adalah
+keputusan" hanya bisa dipercaya kalau ia berlaku di semua status.
+
+**State-nya properti Livewire (`$pendingRoomSwitch`), bukan event browser.** Kasus yang paling
+penting tiba pada **page load baru**, jadi pertanyaannya harus sudah ada sejak render pertama —
+event yang di-`dispatch` di dalam `mount()` belum punya pendengar. `wire:key` pada modal ikut
+berubah bersama state itu supaya Livewire mengganti subtree-nya dan `<x-modal>` mendapat
+instance Alpine baru dengan `show` yang benar; tanpa itu modal terbuka saat page load tapi
+tak pernah in-page, karena `x-data` hanya diinisialisasi sekali dan morph tak menjalankannya lagi.
+
+Membatalkan **tak perlu undo**: gerbangnya menolak **sebelum** keanggotaan disentuh, jadi
+pemain memang tak pernah keluar.
 
 ### 3.16 Mengetik lewat keyboard layar (HP)
 
