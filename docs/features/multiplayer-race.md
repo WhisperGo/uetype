@@ -318,6 +318,26 @@ Dua perbaikan, keduanya sekaligus menghapus satu asumsi diam-diam:
   cepat tidak boleh berarti race menggantung selamanya. Guard sudden death kini membungkus
   **plafon saja** — sesuai pembagian di sisi server, di mana grace memang menembus sudden death.
 
+**Pemain yang dijatuhkan harus diberi tahu, dan itu ternyata jalur yang terpisah.** `$hasGivenUp`
+— satu-satunya hal yang menukar kotak ketik dengan panel hasil — dulu hanya pernah diisi oleh
+`giveUp()` dan `mount()`, keduanya jalur di mana **pemainnya sendiri yang bertindak**. Aturan grace
+mematahkan asumsi itu: ia mengakhiri race seseorang **dari luar**. Akibatnya kotak ketiknya tetap
+menyala, kata-katanya tetap menyorot saat diketik, dan setiap emit progres ditolak diam-diam di
+`updateRaceProgress()` (`finished_time_seconds` sudah terisi) tanpa satu pun umpan balik — ia baru
+tahu saat race berakhir atau saat halaman dimuat ulang. Menjatuhkan pemain tanpa memberitahunya
+nyaris sama saja dengan tidak menjatuhkannya.
+
+`syncRaceOutcomeFromDb()` menurunkan outcome itu **dari baris `room_members` miliknya**, bukan
+menyetelnya di tempat penjatuhan, karena penjatuhannya adalah update bersyarat massal yang bisa
+berjalan **di request pemain lain**: resolusinya idempoten, jadi tepat satu klien yang menulis dan
+sisanya hanya mendengar lewat siaran `RoomUpdated`. Karena itu ia dipanggil dari tiga tempat —
+`mount()`, `roomUpdated()` (room yang masih `racing`), dan `checkRaceDeadline()` — dan `force-finish`
+hanya dikirim pada **transisinya**, jadi arena terkunci sekali, bukan tiap siaran.
+
+Jalur `checkRaceDeadline()` bukan sekadar mempercepat: `SafeBroadcast` membuat race tetap jalan saat
+server WebSocket tak terjangkau, jadi **di deployment yang Reverb-nya mati, itulah satu-satunya
+pemberitahuan** yang akan pernah diterima si pemain.
+
 Seluruh suite hijau saat bug ini hidup, dan alasannya layak dicatat: setiap test memanggil
 `checkRaceDeadline()` pada race yang **sudah** berjalan, jadi tak satu pun pernah melewati jendela
 pra-start. `RaceDeadlineTest` sekarang mengunci ketiga titik jam itu — pra-start, garis start, dan

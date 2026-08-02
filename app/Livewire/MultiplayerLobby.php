@@ -210,8 +210,7 @@ class MultiplayerLobby extends Component
         } elseif ($room->status === 'racing') {
             // Derive finish state from the DB so a mid-race refresh doesn't hand a finished
             // player their typing input back. (hasFinished/hasGivenUp default to false.)
-            $this->hasGivenUp = $member->isDnf();
-            $this->hasFinished = ! is_null($member->finished_time_seconds) && ! $member->isDnf();
+            $this->syncRaceOutcomeFromDb($member);
         }
 
         $this->forgetRoomCache();
@@ -547,6 +546,24 @@ class MultiplayerLobby extends Component
             $this->step = 'waiting';
             $this->resetRaceOutcome();
         }
+
+        // A race can now end for ONE player without that player doing anything -- the start
+        // grace drops whoever never began, and the write happens inside whichever client
+        // asked first. For everyone else this broadcast is the only notice they get, so their
+        // own outcome has to be re-read here. Without it a dropped player kept a live typing
+        // box whose every keystroke the server silently refused.
+        //
+        // After the branches above on purpose: a room that just re-entered 'racing' has had its
+        // outcome reset for the NEW race, and this then re-derives against that same race.
+        if ($room->status === 'racing') {
+            $member = RoomMember::where('room_id', $room->id)
+                ->where('user_id', Auth::id())
+                ->first();
+
+            if ($member) {
+                $this->syncRaceOutcomeFromDb($member);
+            }
+        }
     }
 
     /** Toggle the caller's ready flag (non-host racers only) and broadcast the change. */
@@ -862,6 +879,39 @@ class MultiplayerLobby extends Component
     }
 
     /**
+     * Re-derive THIS player's own race outcome from their room_members row.
+     *
+     * $hasGivenUp is what swaps the typing box for the result panel, and for a long time only
+     * giveUp() and mount() ever set it -- both paths where the player themselves acted. The
+     * start-grace rule broke that assumption: it ends a player's race from the outside, and
+     * nothing told them. Their input stayed live, the cursor kept blinking, words kept
+     * highlighting as they typed, and every progress emit was silently refused by
+     * updateRaceProgress (finished_time_seconds is already set). They found out when the race
+     * ended, or when they reloaded. Dropping someone without telling them is barely different
+     * from not dropping them at all.
+     *
+     * Derived from the database rather than set at the drop site because the drop is a bulk
+     * conditional update that may run in ANOTHER player's request: the resolution is idempotent
+     * and race-safe, so exactly one caller writes and everyone else only ever hears about it
+     * through the RoomUpdated broadcast. A player must be able to learn their own outcome from
+     * a room update they did not cause -- in a room of five, that is the common case.
+     *
+     * force-finish is dispatched only on the TRANSITION, so the arena locks once rather than on
+     * every subsequent room update, and only for a player whose race actually just ended.
+     */
+    private function syncRaceOutcomeFromDb(RoomMember $member): void
+    {
+        $wasOut = $this->hasGivenUp || $this->hasFinished;
+
+        $this->hasGivenUp = $member->isDnf();
+        $this->hasFinished = ! is_null($member->finished_time_seconds) && ! $member->isDnf();
+
+        if (! $wasOut && ($this->hasGivenUp || $this->hasFinished)) {
+            $this->dispatch('force-finish');
+        }
+    }
+
+    /**
      * Integrity note: the client's $liveWpm is DELIBERATELY not used for official
      * numbers. The server recomputes Net WPM itself (correct chars / time) via
      * AntiCheatService -- aligned with solo mode (TypingEngine::saveResult) -- so that
@@ -1167,7 +1217,25 @@ class MultiplayerLobby extends Component
             return;
         }
 
-        $this->resolveRaceDeadlinesIfElapsed($room);
+        // A true return means this call CLOSED the race, and closeRaceNow has already locked
+        // the arena and opened the result panel for everyone. Nothing left to derive.
+        if ($this->resolveRaceDeadlinesIfElapsed($room)) {
+            return;
+        }
+
+        // The race continues, but it may no longer include the caller: this is the timer of
+        // someone sitting at 0%, so they are the likeliest player to have just been dropped.
+        // Read their own outcome back on the same round-trip. Not merely faster than waiting
+        // for the broadcast to come back around -- SafeBroadcast lets a race carry on when the
+        // WebSocket server is unreachable, so on a deployment where Reverb is down this is the
+        // ONLY notice the dropped player would ever get.
+        $member = RoomMember::where('room_id', $room->id)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if ($member) {
+            $this->syncRaceOutcomeFromDb($member);
+        }
     }
 
     /**

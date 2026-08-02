@@ -522,6 +522,112 @@ it('keeps asking about the start grace while sudden death runs, but not about th
         ->not->toContain('&& !this.suddenDeathActive && this.$wire');
 });
 
+// ===== PEMAIN YANG DIJATUHKAN HARUS DIBERI TAHU =====
+
+/**
+ * MENJATUHKAN PEMAIN TANPA MEMBERI TAHU DIA SAMA SAJA DENGAN TIDAK MENJATUHKANNYA.
+ *
+ * Server menandai racer yang diam sebagai DNF, tapi `$hasGivenUp` — satu-satunya hal yang
+ * mengganti kotak ketik dengan panel hasil — hanya pernah diisi oleh giveUp() dan oleh
+ * mount(). Jadi pemain yang baru saja dijatuhkan tetap melihat kotak ketiknya menyala,
+ * kursornya berkedip, dan kata-katanya menyorot saat diketik: setiap emit progres yang ia
+ * kirim diam-diam ditolak di updateRaceProgress() (`finished_time_seconds` sudah terisi)
+ * tanpa satu pun umpan balik. Ia baru tahu ketika race berakhir, atau saat halaman dimuat
+ * ulang.
+ *
+ * Ada dua jalan berbeda menuju keadaan itu, dan keduanya harus ditutup:
+ *
+ *   1. pemain itu sendiri yang bertanya (checkRaceDeadline miliknya yang menjatuhkannya);
+ *   2. KLIEN LAIN yang bertanya lebih dulu. Resolusinya idempoten dan race-safe, jadi hanya
+ *      SATU pemanggil yang benar-benar menulis — semua klien lain hanya menerima siaran
+ *      RoomUpdated, dan penanganannya tak pernah menyentuh outcome untuk room yang masih
+ *      `racing`. Jalur inilah yang paling sering terjadi di ruangan berisi banyak orang.
+ */
+it('tells a player straight away when their own check is what dropped them', function () {
+    $diam = User::factory()->create();
+    $ngetik = User::factory()->create();
+
+    $room = deadlineRoom('DL0030', $ngetik, MultiplayerLobby::START_GRACE_SECONDS + 1);
+    deadlineRacer($room, $diam);
+    deadlineRacer($room, $ngetik, progress: 30);
+
+    Livewire::actingAs($diam)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'DL0030')
+        ->set('step', 'racing')
+        ->call('checkRaceDeadline')
+        // Panel hasil menggantikan kotak ketik...
+        ->assertSet('hasGivenUp', true)
+        // ...dan arena Alpine ikut dikunci, supaya ketikan tak lagi masuk ke ruang hampa.
+        ->assertDispatched('force-finish');
+});
+
+it('tells a player dropped by someone else’s check as soon as the room updates', function () {
+    $diam = User::factory()->create();
+    $ngetik = User::factory()->create();
+
+    $room = deadlineRoom('DL0031', $ngetik, MultiplayerLobby::START_GRACE_SECONDS + 1);
+    $member = deadlineRacer($room, $diam);
+    deadlineRacer($room, $ngetik, progress: 30);
+
+    // Klien LAIN yang memicu resolusinya; race tetap berjalan untuk yang masih mengetik.
+    Livewire::actingAs($ngetik)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'DL0031')
+        ->set('step', 'racing')
+        ->call('checkRaceDeadline');
+
+    expect($member->fresh()->finished_time_seconds)->toBe(RoomMember::DNF_SENTINEL_SECONDS)
+        ->and($room->fresh()->status)->toBe('racing');
+
+    Livewire::actingAs($diam)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'DL0031')
+        ->set('step', 'racing')
+        ->set('hasGivenUp', false)
+        ->call('roomUpdated')
+        ->assertSet('hasGivenUp', true)
+        ->assertDispatched('force-finish');
+});
+
+/** Kebalikannya sama pentingnya: yang masih balapan tak boleh kehilangan kotak ketiknya. */
+it('leaves a racer who is still going alone when the room updates', function () {
+    $a = User::factory()->create();
+    $b = User::factory()->create();
+
+    $room = deadlineRoom('DL0032', $a, 5);
+    deadlineRacer($room, $a, progress: 12);
+    deadlineRacer($room, $b, progress: 30);
+
+    Livewire::actingAs($a)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'DL0032')
+        ->set('step', 'racing')
+        ->call('roomUpdated')
+        ->assertSet('hasGivenUp', false)
+        ->assertSet('hasFinished', false)
+        ->assertNotDispatched('force-finish');
+});
+
+/**
+ * Seorang penonton tak pernah balapan, jadi ia tak bisa DNF — dan panel "kamu menyerah" akan
+ * mengambil alih layar tontonannya kalau outcome ini salah diturunkan untuknya.
+ */
+it('never derives an outcome for a spectator', function () {
+    $racer = User::factory()->create();
+    $penonton = User::factory()->create();
+
+    $room = deadlineRoom('DL0033', $racer, MultiplayerLobby::START_GRACE_SECONDS + 1);
+    deadlineRacer($room, $racer, progress: 30);
+    RoomMember::create([
+        'room_id' => $room->id, 'user_id' => $penonton->id, 'role' => RoomMember::ROLE_SPECTATOR,
+        'is_ready' => true, 'progress_percent' => 0, 'wpm' => 0, 'accuracy' => 100,
+    ]);
+
+    Livewire::actingAs($penonton)->test(MultiplayerLobby::class)
+        ->set('roomCode', 'DL0033')
+        ->set('step', 'racing')
+        ->call('roomUpdated')
+        ->assertSet('hasGivenUp', false)
+        ->assertSet('hasFinished', false);
+});
+
 // ===== KONSEKUENSI HASIL =====
 
 /**
