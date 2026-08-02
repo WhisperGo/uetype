@@ -278,11 +278,17 @@ harus disentuh dulu: caret berkedip seolah sudah siap menerima ketikan.
 > sehingga ref-nya dibuat baru). Petunjuk tap muncul kembali, jadi jalannya jelas — tapi ini
 > tetap satu sentuhan ekstra yang idealnya hilang.
 
-Perilaku ini **tak tertutup test otomatis**: proyek tak menjalankan JavaScript di test sama
-sekali (lihat `TypingEngineAssetTest`). `MobileTypingInputTest` mengunci **kontrak markup &
+Perilaku ini **tak tertutup test otomatis**: tak ada satu pun test yang menjalankan halaman ini di
+browser (lihat `TypingEngineAssetTest`). `MobileTypingInputTest` mengunci **kontrak markup &
 modulnya** — keberadaan input, atribut platformnya, ketiga pengait event, dan bahwa jalurnya
 lewat `handleInput()`. Bahwa keyboardnya benar-benar terbuka dan karakternya benar tetap harus
 diverifikasi manual di Android dan iOS.
+
+> Kalimat ini dulu berbunyi "proyek tak menjalankan JavaScript di test sama sekali". Itu **sudah
+> tidak benar**: Vitest berjalan atas `resources/js/*.test.js` dan dijalankan CI sebelum build. Yang
+> tetap benar adalah alasan sesungguhnya di sini — logika ini hidup di dalam komponen Alpine yang
+> menyentuh DOM, jadi ia tak bisa diuji tanpa browser. Logika yang **bisa** dipisahkan jadi fungsi
+> murni memang sebaiknya dipisahkan lalu diuji (lihat `word-mechanic.js`, `war-resume.js`).
 
 ## 3.x Stream Error (penanda error di grafik hasil)
 
@@ -358,6 +364,31 @@ memfokuskan yang salah — `ResultTabTargetTest` karena itu menguntut **tepat sa
 (dihitung sebagai atribut, bukan substring: selektor di dalam handler-nya sendiri juga memuat
 kata itu).
 
+### 3.9 `typingGame(text, warAttempt)` — argumen kedua & jam yang bukan milik client
+
+Komponen Alpine dulu menerima satu argumen. Sekarang ada yang kedua: `warAttempt`, isi
+`TypingEngine::$warLock` (`mode`, `config`, `resume`, `progress`, `remaining`, `budget`, `expired`).
+
+Tiga konsekuensi yang mudah salah diperbaiki:
+
+1. **Countdown membaca `timerStart`, bukan `parseInt(currentSub)`.** Pada war attempt yang di-resume
+   keduanya **berbeda**, dan `resetProgress()` sudah memendekkan jamnya — membaca sub-mode di dalam
+   `setInterval` akan diam-diam memulihkan panjang tes penuh satu detik kemudian.
+2. **`warLock` diberi `#[Locked]`.** `remaining` menggerakkan countdown, jadi client yang bisa
+   menaikkannya akan mengetik 45 detik nyata sementara server menyimpan durasi 30 detik — WPM gratis
+   1,5×. Atribut ini juga menjaga `isAfkSession()`, yang melewati cek AFK setiap kali war lock ada.
+3. **Posisi resume dipulihkan per KATA UTUH**, lewat
+   [`resumePosition()`](../../resources/js/war-resume.js) — pola yang sama dengan `restoreProgress()`
+   di `race-arena.js`. Persennya diturunkan dari kata yang sudah di-commit, jadi kata separuh memang
+   tak pernah jadi bagiannya; mengarangnya akan menaruh karakter di layar yang tak pernah diketik.
+
+Berbeda dari sisa mesin ini, aritmetika resume-nya **bisa** diuji: ia diekstrak ke modulnya sendiri
+dan dikunci `war-resume.test.js` (Vitest, dijalankan CI). Itu disengaja — salah satu karakter di
+sini gagal **diam-diam**, tak ada exception, cuma caret di tempat yang keliru.
+
+> Catatan: §3.7.a dulu menyatakan "proyek tak menjalankan JavaScript di test sama sekali". Itu tak
+> lagi benar sejak Vitest masuk (`resources/js/*.test.js`, dijalankan di CI sebelum build).
+
 ## 4. Integrasi dengan Fitur Lain
 
 - **Ghost Mode** (`?ghost=...`): deep-link dari leaderboard memasang lawan ghost. Lihat
@@ -366,4 +397,7 @@ kata itu).
   klaim, restart/reroll diblokir. Payload session `typing_result` membawa `war.score` — rincian
   poin yang benar-benar diterima war, atau `null` kalau attempt itu tak mengisi claim mana pun.
   Lihat [clan-war.md](clan-war.md) §3.8.
+  **Membuka halaman ini dengan `?war_claim=` adalah tindakan MEMULAI percobaan** — jangkar jam dan
+  teksnya ditulis ke baris klaim saat itu juga, sehingga refresh/Back melanjutkan attempt yang sama
+  alih-alih memulai yang baru. Semantik jam per mode ada di [clan-war.md](clan-war.md) §3.9.
 - **EXP**: `saveResult` memanggil `User::addExp()`. Lihat [level-exp.md](level-exp.md).

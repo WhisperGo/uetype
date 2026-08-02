@@ -41,9 +41,34 @@ poin = ceiling × performanceRatio × accuracyMultiplier
 Saat mengerjakan klaim, `TypingEngine` memaksa mode ke klaim, **memblokir ganti mode & reroll teks**.
 
 **Justifikasi:** menutup celah "refresh sampai dapat kata pendek" atau pindah ke mode termudah.
-Sekali klaim = satu kesempatan pada mode yang ditentukan. War mode Words bahkan pakai **teks TETAP**
-(`ClanWarFixedText`, identik untuk semua pemain di config yang sama) demi keadilan — bukan dirakit
-acak. Semua ini gerbang **server-side**, bukan sekadar menyembunyikan tombol.
+Sekali klaim = satu kesempatan pada mode yang ditentukan. Semua ini gerbang **server-side**, bukan
+sekadar menyembunyikan tombol.
+
+> **Diperbaiki 2026-08-02 — kuncinya benar, tapi hanya di satu arah.**
+>
+> `restart()` dan `setContentLang()` memang diblokir, tapi aturan "satu klaim, satu percobaan"
+> ditegakkan **hanya di satu tempat, dan tempat itu akhir sesi**: update bersyarat
+> `whereNull('typing_result_id')` di `attachToWarClaim()`. Di antara klaim dan submit, baris klaim
+> **tak menyimpan state apa pun** — jadi klaim adalah tiket yang bisa diputar ulang:
+>
+> | Jalur | Mekanisme |
+> |---|---|
+> | **Refresh (F5)** | full page load → `mount()` → `tabKey` UUID baru → `generateText()` → sesi guard baru dengan `started_at` baru |
+> | **Tombol Back** | jalur kode yang sama — guard bfcache di `typing-engine.blade.php` memaksa `location.reload()`, jadi Back **selalu** mount penuh |
+> | **Tombol Play di grid** | `<a wire:navigate>` biasa, bisa diklik tanpa batas selama klaim belum terisi |
+> | **Cancel + klaim ulang** | `cancelClaim()` hanya menolak klaim yang **sudah submit** |
+>
+> Dua hal memperparahnya, ke arah berlawanan. Di **Words** teksnya beku, jadi tiap pengulangan
+> adalah latihan pada soal yang persis akan dinilai. Di **time/survival** justru tak ada teks beku
+> sama sekali, jadi tiap mount **me-reroll teks acak** — reroll yang sama yang sudah dilarang
+> `restart()`.
+>
+> Sekarang klaim jadi **attempt berjangkar** ([`ClanWarAttempt`](../../app/Services/ClanWarAttempt.php)),
+> dan teks dibekukan ke baris klaim untuk **ketiga** mode. Detail semantik jamnya di §3.9.
+
+`ClanWarFixedText` tetap ada, tapi perannya turun jadi **sumber pembekuan** — dibaca sekali saat
+attempt dibuka, bukan tiap mount. Efek samping yang bagus: mengedit fixed text di tengah war tak
+lagi bisa mengubah soal attempt yang sedang berjalan.
 
 ### 3.2 Klaim mode race-safe (unique constraint + transaksi + update bersyarat)
 
@@ -56,6 +81,28 @@ acak. Semua ini gerbang **server-side**, bukan sekadar menyembunyikan tombol.
 cek dalam transaksi, lalu **unique constraint DB** sebagai jaring pengaman terakhir (menangkap
 `QueryException`). Saat submit hasil, update bersyarat `whereNull('typing_result_id')` mencegah dua
 submit paralel mengisi klaim yang sama. Ini pola **optimistic concurrency** yang benar.
+
+#### 3.2.a Tiga umur klaim: dipesan → berjalan → selesai
+
+Klaim dulu punya dua keadaan (`claimed` / `done`) dan `claimMode()` langsung **redirect** ke mesin
+ketik — artinya klaim dan percobaan adalah satu tindakan. Begitu *membuka halaman* jadi saat
+percobaan dimulai (§3.9), itu tak bisa dipertahankan: satu salah-klik akan membakar slot, dan
+`cancelClaim()` jadi kode yang tak pernah terjangkau.
+
+| Status | Arti | Bisa di-cancel? |
+|---|---|---|
+| `claimed` | **dipesan** — slot dipegang, percobaan belum dibuka | ✅ |
+| `in_progress` | percobaan **sudah dibuka**; masuk ulang melanjutkannya | ❌ |
+| `done` | hasil sudah disubmit | ❌ |
+
+Jadi klaim sekarang hanya **memesan**. Tombol **"Start Attempt"** terpisah, dengan modal konfirmasi
+— konfirmasinya sengaja ditaruh di langkah yang **tak bisa dibatalkan**, bukan di langkah yang bisa.
+
+**Cancel berhenti di "pernah dibuka", bukan di "sudah disubmit".** Kalau tidak, cancel + klaim ulang
+adalah jalan **ketiga** untuk restart, dan di Words itu latihan tanpa batas pada teks yang sudah
+dibaca. Biayanya nyata dan disengaja: anggota yang membuka attempt lalu menghilang meninggalkan slot
+mati bernilai 0. §3.5 membuat itu berhenti menjebak clan lawan, tapi slotnya sendiri tak bisa
+diselamatkan.
 
 ### 3.3 Power pakai Elo (zero-sum, asimetris)
 
@@ -82,10 +129,28 @@ war yang lewat waktu diselesaikan **saat ada yang membuka halaman Clan War**. In
 ditampilkan selalu terkini tanpa infrastruktur tambahan. Command `clan-war:resolve` memanggil method
 yang sama untuk pemakaian manual/terjadwal bila diinginkan — jadi tetap fleksibel.
 
-### 3.5 Early finish: war beres lebih cepat kalau kedua clan tuntas 9 mode
+### 3.5 Early finish: war beres begitu **tak ada lagi yang bisa dimainkan**
 
 **Justifikasi:** tak perlu menunggu penuh 3 hari kalau kompetisi sudah selesai secara efektif —
-lebih responsif bagi pemain. Dicek lewat `bothClansFinishedAllModes()`.
+lebih responsif bagi pemain.
+
+> **Diperbaiki 2026-08-02.** Syaratnya dulu **9/9 di kedua sisi**
+> (`bothClansFinishedAllModes()`), dan itu menggantung war selamanya. Clan yang **tak sanggup**
+> mencapai 9 — rosternya menyusut, atau seorang anggota membuka percobaan lalu menghilang — tak
+> akan pernah memenuhinya, sehingga clan **lawan** yang sudah mengerjakan semuanya tetap wajib
+> menunggu tiga hari penuh. Hukumannya jatuh ke pihak yang tak melakukan kesalahan apa pun.
+
+Sekarang `bothClansHaveNothingLeftToPlay()`. Satu clan dianggap selesai bila **9 slot tersubmit**,
+**atau** tak ada lagi yang tertunda **dan** kuota klaimnya habis (`remainingClaimQuota() === 0`).
+
+**Clan yang malas tetap tak bisa memicunya**, karena kemalasan selalu terbaca sebagai *pending*:
+- klaim yang **belum pernah dibuka** → pending selamanya;
+- attempt yang **sedang berjalan** → pending sampai melewati `ClanWarAttempt::STALE_MINUTES` (15 menit,
+  lebih panjang dari slot mana pun).
+
+Mengecilkan roster untuk memaksa early finish pun hanya menguntungkan clan yang **sudah unggul** —
+dan early finish tetap menuntut **lawan** juga selesai, jadi ia cuma mempercepat hasil yang sudah
+ditentukan, dengan mengorbankan poin anggota yang dikeluarkan.
 
 ### 3.6 `ClanWarScorer` fungsi murni, memakai ulang rumus akurasi EXP
 
@@ -159,6 +224,106 @@ lebih dulu, dan war tak menerima apa pun dari run ini. Layar lalu menampilkan
 `result.war.not_counted_title` (emas, sama seperti banner AFK — ini bukan tuduhan, cuma kerja yang
 tak mendarat), bukan "0 poin" yang tak akan pernah cocok dengan scoreboard mana pun.
 
+### 3.9 Resume, jangkar jam, dan semantik per mode
+
+**Service:** [`ClanWarAttempt`](../../app/Services/ClanWarAttempt.php) ·
+**State:** [`ClanWarAttemptState`](../../app/Support/ClanWarAttemptState.php)
+
+Membuka `/typing?war_claim=N` **adalah** tindakan memulai percobaan. `open()` menulis tiga hal ke
+baris klaim, sekali saja (`lockForUpdate` + cek null, jadi dua tab pun mendarat di jangkar yang sama):
+
+| kolom | peran |
+|---|---|
+| `attempt_started_at` | **jangkar jam milik server** — client tak pernah menulisnya, jadi refresh tak bisa me-reset-nya |
+| `attempt_text` | teks yang benar-benar diterbitkan, dibekukan untuk ketiga mode |
+| `attempt_progress` | posisi resume kasar (persen), pola yang sama dengan `room_members.progress_percent` di balapan |
+
+**Ya, `mount()` menulis di GET, dan itu disengaja.** Ping "aku mulai mengetik" dari client justru
+takkan dikirim oleh client yang sedang kita hadapi, jadi mount adalah satu-satunya jangkar yang tak
+bisa dilewati.
+
+**Attempt yang kedaluwarsa tetap war-locked.** Melepas lock akan menjatuhkan pemain ke sesi solo
+gratis di URL `?war_claim=` — persis reroll yang sedang ditutup. Kondisi `expired` dibawa di state,
+lalu client langsung `finish()` dan membukukan progress yang benar-benar diperolehnya.
+
+#### Ketiga mode tak bisa diperlakukan sama
+
+| Mode | Aturan | Kenapa |
+|---|---|---|
+| **time** | countdown = `subMode + 10 − elapsed`, di-clamp ke `subMode`. Durasi tersimpan tetap `subMode`. | Slotnya memang *n* detik wall-clock. Yang membuang 20 detik mengetik lebih sedikit di atas penyebut yang sama → WPM turun sendiri. |
+| **words** | `durasi = max(klaim, elapsed − 30)` | Tak ada timer, jadi durasi adalah seluruh skor. Waktu terbuang **harus** masuk hitungan, tapi grace 30 detik menyerap waktu **membaca** pemain jujur. |
+| **survival** | **tidak resume.** Restart di dalam anggaran: `wasted + credited ≤ 120 detik` | Satu-satunya mode yang menilai **dari** jam, jadi jam kontinu justru **menghadiahi** refresh, sementara jam per-sesi mengizinkan retry tanpa batas. |
+
+**Dua grace yang berbeda, dan jangan disatukan.** `GRACE_SECONDS` (30) memaafkan detik-detik
+**membaca** sebelum keystroke pertama — karena itu ia longgar. `COUNTDOWN_GRACE_SECONDS` (10) hanya
+menanggung page load, karena satu-satunya saat ia berarti adalah **resume**, dan yang masuk ulang
+sudah membaca teksnya. Memakai grace 30 detik di countdown akan mengembalikan seluruh jam slot 30
+detik — refresh jadi restart gratis lagi.
+
+**Kredit survival dipotong hanya saat menilai war, tak pernah ke `TypingResult`.** Memendekkan
+durasi justru **menaikkan** WPM, dan `AntiCheatService::check()` membaca `duration_seconds`:
+pasangan 900 karakter / 55 detik akan terbaca 196 WPM dan menabrak gerbang mustahil. Rekor solo
+tetap jujur ("kamu memang bertahan 90 detik"); yang dibatasi cuma kredit war-nya, lewat
+`ClanWarScorer::breakdown($..., $durationOverride)`.
+
+**Plafon karakter diukur dari jangkar, bukan dari mount.** `SoloSessionGuard` mengukur elapsed
+**per tab**, dan refresh mencetak `tabKey` baru — jadi pemain yang resume dengan ratusan karakter
+jujur akan dinilai terhadap jam yang baru mulai, lalu **ditolak**. `maxPlausibleChars()` karena itu
+menerima dua parameter opsional (`$elapsedOverride`, `$windowSeconds`); jalur solo tak mengirim
+keduanya dan perilakunya **byte-identical**. Slack tetap proporsional terhadap durasi, bukan
+terhadap window — kalau tidak, slot war justru dapat plafon lebih longgar daripada tes solo yang sama.
+
+#### Ping posisi resume
+
+`TypingEngine::reportWarProgress()`, di-throttle 5 detik di client (payload: `textToType` adalah
+properti Livewire publik, ikut bolak-balik tiap round trip) dan dibatasi 60/menit di server. Diikat
+tiga arah: **clamp** 0–100, **monoton** (mundur = bisa mengulang bagian yang sudah lewat), dan
+**batas fisik** (`elapsed × 20 cps ÷ panjang teks`) yang menahan `progress = 100` di *t* = 0.
+
+Client merekonstruksi posisinya dengan
+[`resumePosition()`](../../resources/js/war-resume.js) — hanya span "kata + spasi" **utuh**, tak
+pernah kata separuh, sama seperti `restoreProgress()` di `race-arena.js`. Diekstrak ke modulnya
+sendiri supaya bisa diuji Vitest (`war-resume.test.js`); salah satu karakter di sini **gagal
+diam-diam**, tak ada exception.
+
+### 3.10 Cap klaim dinamis per ukuran clan
+
+Batas klaim per anggota dulu **tetap 4**. 9 slot ÷ 4 = butuh **3 anggota** — aturan yang tertulis di
+[anti-cheat-wpm.md §10.3](anti-cheat-wpm.md) tapi **tak pernah ditegakkan di kode dan tak pernah
+diberitahukan ke pemain**. Clan 2 orang boleh menerima war, mengklaim 8 slot, lalu menatap slot ke-9
+yang tak bisa diambil siapa pun.
+
+```php
+// ClanWarModeCatalog
+public static function claimCapFor(int $activeMembers): int
+{
+    return max(self::MIN_CLAIMS_PER_MEMBER, (int) ceil(count(self::MODES) / max(1, $activeMembers)));
+}
+```
+
+| anggota aktif | cap | kapasitas |
+|---|---|---|
+| 1 | 9 | 9 ✅ |
+| 2 | 5 | 10 ✅ |
+| 3+ | 4 | ≥12 ✅ |
+
+**Kenapa melonggar hanya untuk clan kecil.** "Satu akun menentukan war sendirian" adalah risiko
+nyata di clan beranggota lima; di clan beranggota dua itu memang **seluruh clan-nya**, dan mengunci
+mereka dari fitur bukan perlindungan. Lantai 4 menjaga temuan F-03 tetap tertutup persis di tempat
+ia berarti.
+
+**Di-snapshot saat `acceptChallenge()`**, di `update()` yang sama dengan angka power dan untuk alasan
+yang sama: keduanya menggambarkan war *sebagaimana disepakati*, dan tak boleh bergerak selagi war
+berjalan. Formula live akan mengizinkan clan **menendang anggota di tengah war** untuk menaikkan
+capnya sendiri — konsentrasi yang justru dicegah capnya. Kolomnya nullable dengan fallback
+hitung-live, supaya war lama tetap jalan.
+
+**Pesan errornya ikut diperbaiki.** Ketiga jalur gagal `claimMode()` dulu runtuh ke
+`clan.error.mode_taken` ("baru saja diambil anggota lain") — **keliru secara fakta** untuk kasus
+kuota habis, dan menyuruh pemain mencari rekan yang tak ada. Sekarang closure transaksinya
+mengembalikan **alasan**, bukan `null`. Grid pun berhenti menawarkan tombol Claim begitu kuota
+habis, dan `clan.war.modes_hint` menyebut angka capnya.
+
 ## 4. Integritas
 
 Poin war hanya dihitung dari `ClanWarModeClaim` yang **sudah disubmit** (`typing_result_id` terisi).
@@ -180,3 +345,31 @@ Penjaganya ada di [`SoloSessionGuard`](../../app/Services/SoloSessionGuard.php):
 diukur dari waktu yang **benar-benar berlalu di server**, bukan durasi nominal, dan klaim durasi
 yang melebihi umur sesi ditolak. Detail & angka kalibrasi:
 [`anti-cheat-wpm.md`](anti-cheat-wpm.md) §9.
+
+### 4.1 Posisi resume: input baru, tapi bukan permukaan serangan baru
+
+`attempt_progress` dilaporkan **client**, dan itu memang input baru. Yang membuatnya aman bukan
+validasinya, melainkan bahwa **server tak pernah memberi kredit atasnya**: karakter yang dipulihkan
+hanya hidup di browser, dan angka yang dinilai tetap `totalKeystrokes`/`correctKeystrokes` yang
+dikirim saat finish — dibatasi plafon karakter seperti biasa, dan kini plafon itu diukur dari
+**jangkar**, yang sepanjang umur attempt justru **lebih ketat** daripada jam per-mount yang
+digantikannya.
+
+Yang paling buruk bisa dibeli sebuah `attempt_progress` palsu adalah kemampuan *mengirim* jumlah
+karakter besar — yang memang sudah selalu bisa dicoba payload palsu — dan batas fisik di
+`recordProgress()` membuat itu pun menuntut waktu nyata.
+
+### 4.2 Yang masih terbuka (sengaja ditunda)
+
+Dua hal berikut **belum** ditutup, dan sebaiknya dikerjakan berikutnya:
+
+1. **`resolveWarClaim()` mencocokkan `clan_id`, bukan `user_id`.** Siapa pun anggota clan yang
+   memegang URL `?war_claim=N` bisa mengerjakan slot rekannya. Dengan adanya resume, dampaknya
+   naik: ia kini bisa **melanjutkan** attempt yang sedang berjalan milik orang lain, bukan sekadar
+   memulai yang baru.
+2. **`attachToWarClaim()` menimpa `user_id`** saat mengisi klaim, sehingga batas klaim per anggota
+   (dihitung atas `user_id` saat klaim) bisa dilewati diam-diam. Ini makin relevan sejak capnya
+   di-snapshot per war (§3.10).
+
+Keduanya berbagi satu akar — kepemilikan klaim tak pernah diikat ke satu pemain — jadi sebaiknya
+diperbaiki bersama, bukan sepotong-sepotong.

@@ -4,11 +4,11 @@ namespace App\Livewire;
 
 use App\Enums\ClanWarStatus;
 use App\Models\ClanWar as ClanWarModel;
-use App\Models\ClanWarFixedText;
 use App\Models\ClanWarModeClaim;
 use App\Models\TypingResult;
 use App\Services\AchievementService;
 use App\Services\AntiCheatService;
+use App\Services\ClanWarAttempt;
 use App\Services\ClanWarScorer;
 use App\Services\GhostResolver;
 use App\Services\KeystrokeAnalyzer;
@@ -16,6 +16,7 @@ use App\Services\LongitudinalBaseline;
 use App\Services\SoloSessionGuard;
 use App\Services\TextGeneratorService;
 use App\Services\TypingErrorInspector;
+use App\Support\ClanWarAttemptState;
 use App\Support\ClanWarBroadcast;
 use App\Support\SoloSessionPayload;
 use App\Support\TypingLanguage;
@@ -72,6 +73,16 @@ class TypingEngine extends Component
      * intuition -- and the rejection log now records this reason so that is possible.
      */
     private const MAX_RESULTS_PER_MINUTE = 30;
+
+    /**
+     * Clan War resume-position pings allowed per minute.
+     *
+     * An honest client sends one per completed word at most, throttled to one per 5 seconds --
+     * about 12 a minute. The limit bounds a scripted flood without ever reaching a real player,
+     * and dropping a ping is harmless: progress is monotonic, so the next one carries the
+     * latest position anyway. Same shape as the race path's rate limit.
+     */
+    private const MAX_WAR_PROGRESS_PINGS_PER_MINUTE = 60;
 
     /**
      * Player-facing message per rejection reason, keyed by the reason passed to
@@ -147,8 +158,27 @@ class TypingEngine extends Component
     #[Url(as: 'war_claim')]
     public ?int $warClaimId = null;
 
-    // War claim mode detail (mode+config) for the view banner. Null when not war-locked.
+    /**
+     * War attempt detail for the view banner and the Alpine engine: mode/config, whether this
+     * mount is a resume, the saved progress, and the clock the SERVER says is left.
+     *
+     * #[Locked] is load-bearing, not decoration. `remaining` drives the countdown, so a client
+     * able to raise it could type 45 real seconds while the server stores a 30-second duration
+     * -- a free 1.5x on WPM. It also guards `isAfkSession()`, which skips the AFK check whenever
+     * a war lock is present.
+     */
+    #[Locked]
     public ?array $warLock = null;
+
+    /**
+     * This request's attempt state (text, anchor, remaining clock), memoised.
+     *
+     * A private property, so it is rebuilt per request rather than round-tripped through the
+     * client -- the anchor is the one fact a tampered payload must never be able to restate.
+     * That also means it is NOT carried from mount() into the submit request, which is why
+     * warAttempt() re-opens rather than reads.
+     */
+    private ?ClanWarAttemptState $warAttempt = null;
 
     // Ghost deep-link from the leaderboard: ?ghost=<user_id>&mode=<time|words>&config=<sub>.
     // The opponent's WPM is re-derived from the DB (not from the client), same as GhostPicker.
@@ -167,13 +197,23 @@ class TypingEngine extends Component
         // guard can keep this tab's issued text separate from any other tab's.
         $this->tabKey = (string) Str::uuid();
 
-        // War-lock is checked first: valid -> mode is forced to the claim; invalid ->
+        // Content language is restored FIRST: war only locks mode/config, not language, and
+        // opening a war attempt freezes a text that has to be assembled in the right language.
+        if (session()->has('typing_preferences')) {
+            $this->contentLang = TypingLanguage::resolve(session('typing_preferences')['contentLang'] ?? null);
+        }
+
+        // War-lock is checked next: valid -> mode is forced to the claim; invalid ->
         // reset to null and behave as a normal solo session (fail-safe).
         $claim = $this->resolveWarClaim();
 
         if ($claim) {
             [$this->mainMode, $this->subMode] = $this->normalizeMode($claim->mode, $claim->mode_config);
-            $this->warLock = ['mode' => $this->mainMode, 'config' => $this->subMode];
+
+            // Opening the page IS starting the attempt. Idempotent: a refresh, the Back button
+            // and a second tab all land on the anchor written the first time, so none of them
+            // buys a fresh clock or a fresh text. See ClanWarAttempt.
+            $this->warLock = $this->warAttempt($claim)->toLockPayload($this->mainMode, $this->subMode);
         } else {
             $this->warClaimId = null;
 
@@ -183,11 +223,6 @@ class TypingEngine extends Component
                 $prefs = session('typing_preferences');
                 [$this->mainMode, $this->subMode] = $this->normalizeMode($prefs['mode'] ?? 'time', $prefs['subMode'] ?? '30');
             }
-        }
-
-        // Content language is restored separately: war only locks mode/config, not language.
-        if (session()->has('typing_preferences')) {
-            $this->contentLang = TypingLanguage::resolve(session('typing_preferences')['contentLang'] ?? null);
         }
 
         // Ghost is processed after war-lock so war still wins; it applies only to solo
@@ -380,6 +415,52 @@ class TypingEngine extends Component
     }
 
     /**
+     * Persist how far a Clan War attempt has got, so a reload resumes instead of restarting.
+     *
+     * The solo engine has no other mid-session chatter, and this is deliberately the cheapest
+     * possible channel: skipRender() because nothing server-rendered changes, and the client
+     * throttles hard because textToType is a public property that rides along on every round
+     * trip. Survival is excluded -- a stamina curve cannot be meaningfully resumed, so it
+     * restarts inside a shrinking budget instead (see ClanWarAttempt).
+     *
+     * Under-reporting only ever hurts the player who reloads, so a coarse cadence is safe.
+     */
+    public function reportWarProgress(int $percent): void
+    {
+        $this->skipRender();
+
+        $claim = $this->resolveWarClaim();
+
+        if (! $claim || ! $claim->attemptStarted() || $claim->mode === 'survival') {
+            return;
+        }
+
+        $rateKey = 'war-progress:'.Auth::id();
+
+        if (RateLimiter::tooManyAttempts($rateKey, self::MAX_WAR_PROGRESS_PINGS_PER_MINUTE)) {
+            return;
+        }
+
+        RateLimiter::hit($rateKey, 60);
+
+        app(ClanWarAttempt::class)->recordProgress($claim, $percent);
+    }
+
+    /**
+     * The attempt state for a claim, opened once per request and reused.
+     *
+     * Re-opens rather than reads a stored value because $warAttempt is private and therefore
+     * gone by the time the finished session is submitted. That is safe precisely because
+     * open() is idempotent: the anchor and the frozen text are written on first contact and
+     * never moved, so calling it again during saveResult() reads the same attempt the player
+     * has been sitting in, with the clock that has really run.
+     */
+    private function warAttempt(ClanWarModeClaim $claim): ClanWarAttemptState
+    {
+        return $this->warAttempt ??= app(ClanWarAttempt::class)->open($claim, $this->contentLang);
+    }
+
+    /**
      * Link the typing result to the war claim (re-validated, never trusting the client's
      * $warClaimId). The conditional update `whereNull('typing_result_id')` prevents two
      * parallel submits from filling the same claim. Called inside saveResult()'s DB::transaction.
@@ -401,7 +482,15 @@ class TypingEngine extends Component
             return null;
         }
 
-        $breakdown = ClanWarScorer::breakdown($claim->mode, $claim->mode_config, $typingResult);
+        // Survival credit is capped by whatever wall budget the attempt had left, so an
+        // abandoned run cannot be retried into a better one. Never applied to the stored
+        // result -- see ClanWarScorer::breakdown for why that direction is unsafe.
+        $breakdown = ClanWarScorer::breakdown(
+            $claim->mode,
+            $claim->mode_config,
+            $typingResult,
+            app(ClanWarAttempt::class)->scoredDuration($claim, (float) $typingResult->duration_seconds),
+        );
 
         if ($breakdown === null) {
             return null;
@@ -579,19 +668,15 @@ class TypingEngine extends Component
             return;
         }
 
-        // Clan War Words mode uses FIXED text (identical for all players on the same config)
-        // for fairness, not random assembly. Time/Survival war just have restart blocked.
-        if ($this->warClaimId !== null && $this->resolveWarClaim()) {
-            if ($this->mainMode === 'words') {
-                $fixed = ClanWarFixedText::forWords($this->subMode);
+        // Clan War: the text was frozen onto the claim when the attempt was opened, so every
+        // re-entry serves the identical paper. This covers all THREE war modes. Words alone
+        // used to be fixed (clan_war_fixed_texts, for cross-clan fairness); time and survival
+        // fell through to random assembly, so every mount re-rolled them -- the very reroll
+        // restart() and setContentLang() are blocked from performing.
+        if ($this->warAttempt !== null) {
+            $this->textToType = $this->warAttempt->text;
 
-                // Fall back to normal generation if no fixed row exists (screen is never blank).
-                if ($fixed !== null) {
-                    $this->textToType = $fixed;
-
-                    return;
-                }
-            }
+            return;
         }
 
         // Time/words/survival: text assembled randomly from the wordlist per content language.
@@ -676,17 +761,38 @@ class TypingEngine extends Component
             ]);
         }
 
+        // A Clan War attempt is measured against the CLAIM's clock, not this tab's. Both gates
+        // below need it, so it is resolved once here; null for every solo session.
+        $warClaim = $this->resolveWarClaim();
+        $warAttempt = $warClaim ? $this->warAttempt($warClaim) : null;
+        $warClock = $warClaim ? app(ClanWarAttempt::class) : null;
+
         // Duration comes from the SERVER, not the payload. In `time` mode the sub-mode
         // fixes it outright; the variable-length modes keep their (now bounded) claim.
-        $duration = $guard->resolveDuration(
-            $claimedDuration,
-            $this->mainMode,
-            (string) $this->subMode
-        );
+        //
+        // War overrides it: a `words` attempt that spanned a refresh has to be scored over the
+        // wall clock it really consumed, or the wasted minutes simply vanish and the reload is
+        // free. See ClanWarAttempt::resolveDuration -- it can only ever LENGTHEN a duration,
+        // which is the safe direction (anti-cheat-wpm.md 7.4).
+        $duration = $warClock !== null
+            ? $warClock->resolveDuration($warClaim, $claimedDuration)
+            : $guard->resolveDuration($claimedDuration, $this->mainMode, (string) $this->subMode);
 
         // Character counts are bounded by what the issued text could physically produce in
         // that time, so an inflated count can no longer buy WPM, XP or a leaderboard slot.
-        $maxChars = $guard->maxPlausibleChars($this->mainMode, $duration, $this->tabKey);
+        //
+        // For a war attempt the window is the ATTEMPT's, not this mount's: the guard measures
+        // elapsed per tab, and a refresh mints a new tab key, so a resumed player carrying
+        // hundreds of genuinely typed characters would be judged against a clock reading zero.
+        // Anchored elapsed only ever grows, so this is stricter over the attempt's life than
+        // the per-mount clock it replaces -- it just stops punishing the honest resumer.
+        $maxChars = $guard->maxPlausibleChars(
+            $this->mainMode,
+            $duration,
+            $this->tabKey,
+            $warClock?->elapsedSeconds($warClaim),
+            $warAttempt?->wallBudgetSeconds,
+        );
 
         if ($maxChars !== null && $totalKeystrokes > $maxChars) {
             // A payload this far past the physical ceiling is fabricated, not merely noisy.

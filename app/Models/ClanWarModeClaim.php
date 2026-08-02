@@ -14,6 +14,9 @@ class ClanWarModeClaim extends Model
         'user_id',
         'mode',
         'mode_config',
+        'attempt_started_at',
+        'attempt_text',
+        'attempt_progress',
         'typing_result_id',
         'points',
         'claimed_at',
@@ -22,6 +25,8 @@ class ClanWarModeClaim extends Model
     protected $casts = [
         'points' => 'decimal:2',
         'claimed_at' => 'datetime',
+        'attempt_started_at' => 'datetime',
+        'attempt_progress' => 'integer',
     ];
 
     /** The war this claim is part of. */
@@ -48,9 +53,28 @@ class ClanWarModeClaim extends Model
         return $this->belongsTo(TypingResult::class);
     }
 
-    /** Whether the claim is played; null result = locked but not yet done (cancellable). */
+    /** Whether the claim is played; null result = locked but not yet done. */
     public function isSubmitted(): bool
     {
         return $this->typing_result_id !== null;
+    }
+
+    /**
+     * Whether the one attempt this claim is worth has been opened.
+     *
+     * The dividing line for cancelling: a RESERVED slot (claimed, never opened) may be handed
+     * back, but an OPENED one is spent whatever it produced. Without that rule, cancel and
+     * re-claim is a third way to restart -- and in Words mode, where the text is frozen and
+     * identical for everyone on that config, it is unlimited practice on a memorised paper.
+     */
+    public function attemptStarted(): bool
+    {
+        return $this->attempt_started_at !== null;
+    }
+
+    /** Opened but not yet submitted: somebody is (or was) mid-attempt on this slot. */
+    public function isInFlight(): bool
+    {
+        return $this->attemptStarted() && ! $this->isSubmitted();
     }
 }

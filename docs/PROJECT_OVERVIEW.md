@@ -115,9 +115,14 @@ Dua pola arsitektur yang berulang di seluruh proyek (detail alasan ada di
   `emblem`/`emblem_color`/`description`.
 - **`clan_members`** — pivot dengan `role` (leader/member) & `status` (pending/active).
 - **`clan_wars`** — `challenger_clan_id`/`opponent_clan_id`, `status`,
-  power before/delta kedua sisi, `accept_deadline_at`, `started_at`, `ends_at`.
+  power before/delta kedua sisi, `accept_deadline_at`, `started_at`, `ends_at`, plus
+  `challenger_max_claims`/`opponent_max_claims` (snapshot cap klaim per anggota, diambil saat
+  war diterima — lihat [clan-war.md](features/clan-war.md) §3.10).
 - **`clan_war_mode_claims`** — satu baris per slot mode yang diklaim pemain di grid
-  9-mode; unik per `(clan_war_id, mode, mode_config, clan_id)`.
+  9-mode; unik per `(clan_war_id, mode, mode_config, clan_id)`. Kolom `attempt_started_at` /
+  `attempt_text` / `attempt_progress` menjadikannya **satu percobaan yang bisa dilanjutkan**
+  alih-alih tiket yang bisa diputar ulang oleh refresh
+  ([clan-war.md](features/clan-war.md) §3.9).
 - **`clan_war_fixed_texts`** — teks Words-mode yang dibekukan (di-seed langsung di
   migrasi) supaya semua pemain dapat teks identik per konfigurasi.
 
@@ -259,7 +264,8 @@ Livewire/Volt, jadi tak ada lagi controller kosong yang menyesatkan.
 | `TextGeneratorService` | Rakit teks latihan dari wordlist JSON — satu sumber untuk solo **dan** multiplayer (menggantikan tabel `texts`) |
 | `TypingErrorInspector` | Ubah stream error mentah klien jadi view-model penanda error di layar hasil (`sanitize()` = trust boundary, `inspect()` = pemetaan ke chart) |
 | `EloCalculator` | Rating Elo untuk Clan War (K=32) |
-| `ClanWarModeCatalog` | Definisi 9 mode wajib Clan War + skala poin |
+| `ClanWarAttempt` | Jangkar jam & teks beku satu percobaan Clan War — bikin refresh/Back melanjutkan attempt yang sama, bukan memulai yang baru ([clan-war.md](features/clan-war.md) §3.9) |
+| `ClanWarModeCatalog` | Definisi 9 mode wajib Clan War + skala poin + cap klaim dinamis per ukuran clan |
 | `ClanWarScorer` | Skor hasil ketik untuk satu slot Clan War |
 | `ClanWarResolver` | Resolusi war yang selesai/kadaluarsa (lazy, dipicu saat halaman dibuka) |
 

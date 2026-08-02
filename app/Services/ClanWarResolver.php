@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use App\Enums\ClanMemberStatus;
 use App\Enums\ClanWarStatus;
 use App\Events\ClanUpdated;
+use App\Models\ClanMember;
 use App\Models\ClanWar;
 use App\Models\ClanWarModeClaim;
 use App\Support\SafeBroadcast;
+use Illuminate\Support\Collection;
 
 /**
  * Settles due Clan Wars: expires unaccepted challenges and scores finished wars
@@ -37,7 +40,7 @@ class ClanWarResolver
         $ongoing = ClanWar::where('status', ClanWarStatus::Ongoing)->get();
 
         foreach ($ongoing as $war) {
-            if (! $war->ends_at?->isPast() && ! $this->bothClansFinishedAllModes($war)) {
+            if (! $war->ends_at?->isPast() && ! $this->bothClansHaveNothingLeftToPlay($war)) {
                 continue;
             }
 
@@ -107,22 +110,73 @@ class ClanWarResolver
         return ($n >= 0 ? '+' : '').$n;
     }
 
-    /** True once both clans submitted all 9 modes, allowing an early finish before ends_at. */
-    private function bothClansFinishedAllModes(ClanWar $war): bool
+    /** True once NEITHER clan has anything left to play, allowing an early finish before ends_at. */
+    private function bothClansHaveNothingLeftToPlay(ClanWar $war): bool
+    {
+        return $this->clanHasNothingLeftToPlay($war, $war->challenger_clan_id)
+            && $this->clanHasNothingLeftToPlay($war, $war->opponent_clan_id);
+    }
+
+    /**
+     * Has this clan finished everything it is CAPABLE of finishing?
+     *
+     * This used to be "9 of 9 submitted", which quietly held wars open forever. A clan that
+     * cannot reach 9 -- because its roster shrank, or because a member opened an attempt and
+     * abandoned it -- never satisfied it, so the OPPOSING clan was kept waiting out the full
+     * three days having done everything right. The penalty landed on the side at no fault.
+     *
+     * A lazy clan still cannot trigger an early finish, because idleness always reads as
+     * PENDING: an unclaimed slot is pending forever, and an open attempt is pending until it
+     * goes stale. Only a clan that literally cannot claim or play anything more counts as done.
+     */
+    private function clanHasNothingLeftToPlay(ClanWar $war, int $clanId): bool
     {
         $target = count(ClanWarModeCatalog::MODES);
 
-        return $this->submittedCount($war->id, $war->challenger_clan_id) >= $target
-            && $this->submittedCount($war->id, $war->opponent_clan_id) >= $target;
+        $claims = ClanWarModeClaim::where('clan_war_id', $war->id)
+            ->where('clan_id', $clanId)
+            ->get(['user_id', 'typing_result_id', 'attempt_started_at']);
+
+        if ($claims->whereNotNull('typing_result_id')->count() >= $target) {
+            return true;
+        }
+
+        $staleBefore = now()->subMinutes(ClanWarAttempt::STALE_MINUTES);
+
+        $hasPending = $claims->contains(fn (ClanWarModeClaim $c) => $c->typing_result_id === null
+            && ($c->attempt_started_at === null || $c->attempt_started_at->gt($staleBefore)));
+
+        if ($hasPending) {
+            return false;
+        }
+
+        // Every slot is spoken for; the unsubmitted ones are dead attempts worth 0.
+        if ($claims->count() >= $target) {
+            return true;
+        }
+
+        return $this->remainingClaimQuota($war, $clanId, $claims) === 0;
     }
 
-    /** How many modes a clan has actually submitted (played) in a war. */
-    private function submittedCount(int $clanWarId, int $clanId): int
+    /**
+     * How many more slots this clan's members could still claim between them.
+     *
+     * Zero means the grid is unreachable for them -- the honest definition of "finished
+     * everything it is able to". Uses the war's SNAPSHOT cap, so a clan cannot shrink its own
+     * roster to reach zero faster than the members it dropped would have scored.
+     *
+     * @param  Collection<int, ClanWarModeClaim>  $claims
+     */
+    private function remainingClaimQuota(ClanWar $war, int $clanId, $claims): int
     {
-        return ClanWarModeClaim::where('clan_war_id', $clanWarId)
+        $cap = $war->maxClaimsFor($clanId);
+        $held = $claims->countBy('user_id');
+
+        return ClanMember::query()
             ->where('clan_id', $clanId)
-            ->whereNotNull('typing_result_id')
-            ->count();
+            ->where('status', ClanMemberStatus::Active)
+            ->pluck('user_id')
+            ->sum(fn (int $userId) => max(0, $cap - ($held[$userId] ?? 0)));
     }
 
     /** A clan's total war points: sum of submitted claims' points (locked-but-unplayed = 0). */

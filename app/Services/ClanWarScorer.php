@@ -15,9 +15,9 @@ use App\Models\TypingResult;
 class ClanWarScorer
 {
     /** Points earned by a result for a war mode/config (0 if not a valid mode). */
-    public static function score(string $mode, string $config, TypingResult $result): float
+    public static function score(string $mode, string $config, TypingResult $result, ?float $durationOverride = null): float
     {
-        return static::breakdown($mode, $config, $result)['points'] ?? 0.0;
+        return static::breakdown($mode, $config, $result, $durationOverride)['points'] ?? 0.0;
     }
 
     /**
@@ -36,11 +36,18 @@ class ClanWarScorer
      * The two displayed factors are rounded, but `points` multiplies the UNROUNDED ratio -- the
      * stored score must not change because a screen wanted a shorter number.
      *
+     * $durationOverride lets Clan War credit a survival attempt with less than it really
+     * survived, when the attempt already burned wall clock on an abandoned run
+     * (ClanWarAttempt::scoredDuration). It is passed here rather than applied to the stored
+     * TypingResult on purpose: shortening duration_seconds RAISES wpm, and AntiCheatService
+     * reads that column, so a capped 900-char/55s pair would read as 196 WPM and be refused as
+     * impossible. The solo record stays truthful; only the war credit is capped.
+     *
      * @return array{ceiling: int, basis: 'wpm'|'duration', basis_value: float, basis_scale: int,
      *               performance_ratio: float, accuracy_multiplier: float, points: float}|null
      *               null when the mode/config is not one of the nine war modes.
      */
-    public static function breakdown(string $mode, string $config, TypingResult $result): ?array
+    public static function breakdown(string $mode, string $config, TypingResult $result, ?float $durationOverride = null): ?array
     {
         $ceiling = ClanWarModeCatalog::ceilingFor($mode, $config);
 
@@ -51,7 +58,8 @@ class ClanWarScorer
         $accuracyMultiplier = 0.5 + 0.5 * (max(0, min(100, (float) $result->accuracy)) / 100);
 
         $isSurvival = $mode === 'survival';
-        $basisValue = $isSurvival ? (float) $result->duration_seconds : (float) $result->net_wpm;
+        $duration = $durationOverride ?? (float) $result->duration_seconds;
+        $basisValue = $isSurvival ? $duration : (float) $result->net_wpm;
         $basisScale = $isSurvival
             ? ClanWarModeCatalog::SURVIVAL_SECONDS_SCALE
             : ClanWarModeCatalog::WPM_SCALE;

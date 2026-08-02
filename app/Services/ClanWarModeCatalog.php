@@ -29,6 +29,37 @@ class ClanWarModeCatalog
     /** Survival: survived duration (seconds) at which points hit the full ceiling. */
     public const SURVIVAL_SECONDS_SCALE = 90;
 
+    /**
+     * Floor under the per-member claim cap.
+     *
+     * A war is meant to be a clan effort: without a cap one account can claim every slot and
+     * decide the outcome alone, which also means a single cheating or compromised member is
+     * enough to win (pentest finding F-03). Four keeps that true for any clan big enough for
+     * it to mean something.
+     */
+    public const MIN_CLAIMS_PER_MEMBER = 4;
+
+    /**
+     * How many of the 9 slots one member may claim, given the clan's active roster.
+     *
+     * The cap used to be a flat 4, which quietly made 3 members a REQUIREMENT nobody enforced
+     * and nothing told you about: a 2-member clan could claim 8 of 9 slots and then sat in
+     * front of a grid it could never finish. Because early finish demands 9/9 from both sides,
+     * it stranded the opposing clan for the full 3 days as well -- a penalty paid by the side
+     * that did nothing wrong.
+     *
+     * Raising the cap only for clans that need it keeps F-03 closed where it actually matters.
+     * "One account decides the war" is a real risk in a clan of five; in a clan of two it is
+     * simply what a clan of two IS, and refusing to let them play is not protection.
+     *
+     * Callers must read the war's SNAPSHOT (ClanWar::maxClaimsFor), not call this live for an
+     * ongoing war -- otherwise kicking members mid-war would raise your own cap.
+     */
+    public static function claimCapFor(int $activeMembers): int
+    {
+        return max(self::MIN_CLAIMS_PER_MEMBER, (int) ceil(count(self::MODES) / max(1, $activeMembers)));
+    }
+
     /** The point ceiling for a mode/config, or null if not a valid war mode. */
     public static function ceilingFor(string $mode, string $config): ?int
     {

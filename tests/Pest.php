@@ -1,11 +1,23 @@
 <?php
 
+use App\Enums\ClanMemberStatus;
+use App\Enums\ClanRole;
+use App\Enums\ClanWarStatus;
+use App\Livewire\TypingEngine;
+use App\Models\Clan;
+use App\Models\ClanMember;
+use App\Models\ClanWar;
+use App\Models\ClanWarModeClaim;
 use App\Models\Message;
+use App\Models\User;
+use App\Services\SoloSessionGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\GoogleProvider;
 use Laravel\Socialite\Two\User as SocialiteUser;
+use Livewire\Features\SupportTesting\Testable;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /*
@@ -250,6 +262,90 @@ function fakeGoogleUser(string $id = 'g-12345', string $email = 'pemain@gmail.co
     Socialite::shouldReceive('driver')->with('google')->andReturn($provider);
 
     return $googleUser;
+}
+
+/**
+ * Dua clan, satu war Ongoing, dan satu klaim mode yang siap dimainkan.
+ *
+ * Tinggal di sini, bukan di berkas test tempat ia lahir: fungsi yang dideklarasikan di sebuah
+ * berkas test baru global saat suite dijalankan PENUH, jadi berkas kedua yang memakainya akan
+ * fatal saat dijalankan sendirian -- alasan yang sama persis dengan bladeViews() di atas.
+ *
+ * Klaimnya sengaja dibuat langsung lewat model, bukan lewat ClanWar::claimMode(): yang diuji
+ * pemakainya adalah apa yang terjadi SESUDAH slot dipegang, dan menempuh alur klaim akan
+ * menyeret batas kuota per anggota ke dalam test yang tak ada urusannya dengan itu.
+ *
+ * @return array{0: User, 1: ClanWarModeClaim}
+ */
+function warAttemptScenario(string $mode, string $config): array
+{
+    $leader = User::factory()->create();
+    $clan = Clan::create(['name' => 'Clan Attempt', 'leader_id' => $leader->id, 'power' => 1000]);
+    ClanMember::create([
+        'clan_id' => $clan->id, 'user_id' => $leader->id,
+        'role' => ClanRole::Leader, 'status' => ClanMemberStatus::Active,
+    ]);
+
+    $rivalLeader = User::factory()->create();
+    $rivalClan = Clan::create(['name' => 'Clan Lawan', 'leader_id' => $rivalLeader->id, 'power' => 1000]);
+    ClanMember::create([
+        'clan_id' => $rivalClan->id, 'user_id' => $rivalLeader->id,
+        'role' => ClanRole::Leader, 'status' => ClanMemberStatus::Active,
+    ]);
+
+    $war = ClanWar::create([
+        'challenger_clan_id' => $clan->id,
+        'opponent_clan_id' => $rivalClan->id,
+        'status' => ClanWarStatus::Ongoing,
+        'accept_deadline_at' => now()->subDay(),
+        'challenger_power_before' => 1000,
+        'opponent_power_before' => 1000,
+        'started_at' => now()->subHours(2),
+        'ends_at' => now()->addDays(3),
+    ]);
+
+    $claim = ClanWarModeClaim::create([
+        'clan_war_id' => $war->id,
+        'clan_id' => $clan->id,
+        'user_id' => $leader->id,
+        'mode' => $mode,
+        'mode_config' => $config,
+        'claimed_at' => now(),
+    ]);
+
+    return [$leader, $claim];
+}
+
+/**
+ * Mount ulang klaim yang sama, persis seperti yang dilakukan F5 atau tombol Back.
+ *
+ * war_claim adalah #[Url(as: 'war_claim')], jadi ia masuk lewat query param -- bukan parameter
+ * mount. Melewatkannya sebagai parameter akan melewati justru jalur yang sedang diuji.
+ */
+function remountWarAttempt(User $player, ClanWarModeClaim $claim): Testable
+{
+    return Livewire::actingAs($player)
+        ->withQueryParams(['war_claim' => $claim->id])
+        ->test(TypingEngine::class);
+}
+
+/**
+ * Buat sebuah war attempt tampak seperti benar-benar dijalankan selama $seconds detik.
+ *
+ * Test menyubmit seketika, sementara pemain sungguhan menghabiskan slotnya mengetik -- tanpa
+ * ini plafon karakter membaca kiriman jujur sebagai pemalsuan otomatis.
+ *
+ * DUA jam harus digeser, dan itu bukan kelalaian desain melainkan intinya. backdate() menggeser
+ * sesi per-tab milik SoloSessionGuard, tapi sebuah war attempt diukur terhadap jangkar milik
+ * KLAIM -- yang justru dibuat supaya tak ada refresh yang bisa mengembalikannya, jadi tak ada
+ * pula yang bisa digeser komponen. Jangkarnya diberi kelonggaran ekstra karena ia juga menanggung
+ * page load, sama seperti ClanWarAttempt::GRACE_SECONDS di sisi produksi.
+ */
+function runWarAttemptClock(ClanWarModeClaim $claim, int $seconds = 30): void
+{
+    app(SoloSessionGuard::class)->backdate($seconds);
+
+    $claim->update(['attempt_started_at' => now()->subSeconds($seconds + 5)]);
 }
 
 function countQueries(Closure $callback): int

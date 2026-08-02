@@ -10,7 +10,6 @@ use App\Models\ClanWar as ClanWarModel;
 use App\Models\ClanWarModeClaim;
 use App\Models\TypingResult;
 use App\Models\User;
-use App\Services\SoloSessionGuard;
 use Livewire\Livewire;
 
 /**
@@ -107,7 +106,7 @@ it('still scores an honest war attempt', function () {
 
     // A real player spends the slot typing; the test submits instantly, which the
     // elapsed-time guard would otherwise read as an automated forgery.
-    app(SoloSessionGuard::class)->backdate(30);
+    runWarAttemptClock($claim);
 
     $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290])
         ->assertRedirect(route('typing.result'));

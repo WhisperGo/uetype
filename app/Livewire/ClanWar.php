@@ -33,13 +33,27 @@ class ClanWar extends Component
     public const ACCEPT_WINDOW_HOURS = 1;
 
     /**
-     * Slots one member may claim in a single war, out of the 9 available.
+     * Claims this member may still make in the current war.
      *
-     * A war is meant to be a clan effort. Without a cap, one account can claim every slot
-     * and decide the outcome alone -- which also means a single cheating or compromised
-     * member is enough to win, and the damage lands on the opposing clan.
+     * The cap is per-war and per-side (ClanWar::maxClaimsFor), so it has to be read from the
+     * war rather than from a constant here -- a flat 4 is what made a 2-member clan unable to
+     * fill 9 slots at all. Memoised by Livewire so the grid and this share one pair of queries.
      */
-    public const MAX_CLAIMS_PER_MEMBER = 4;
+    public function getMyRemainingClaimsProperty(): int
+    {
+        $war = $this->myActiveWar;
+
+        if (! $war || $war->status !== ClanWarStatus::Ongoing || ! $this->myClan) {
+            return 0;
+        }
+
+        $held = ClanWarModeClaim::where('clan_war_id', $war->id)
+            ->where('clan_id', $this->myClan->id)
+            ->where('user_id', Auth::id())
+            ->count();
+
+        return max(0, $war->maxClaimsFor($this->myClan->id) - $held);
+    }
 
     /** Close overdue wars (expire Pending, resolve Ongoing) before computed properties read data. */
     public function mount(ClanWarResolver $resolver): void
@@ -160,7 +174,12 @@ class ClanWar extends Component
 
     /**
      * The 9-mode grid required for an Ongoing war. Each entry: mode/config/ceiling +
-     * status ('open' | 'claimed' | 'done') plus the claim row if any.
+     * status ('open' | 'claimed' | 'in_progress' | 'done') plus the claim row if any.
+     *
+     * 'in_progress' exists because a claim now has three lives, not two: RESERVED (claimed,
+     * never opened, still cancellable), IN PROGRESS (the one attempt has been opened, so it
+     * is spent whatever happens), and DONE. Without the middle state the screen would offer
+     * Cancel on a slot that has already been played.
      */
     public function getModeGridProperty()
     {
@@ -183,7 +202,11 @@ class ClanWar extends Component
 
             $status = 'open';
             if ($claim) {
-                $status = $claim->isSubmitted() ? 'done' : 'claimed';
+                $status = match (true) {
+                    $claim->isSubmitted() => 'done',
+                    $claim->attemptStarted() => 'in_progress',
+                    default => 'claimed',
+                };
             }
 
             return [
@@ -238,7 +261,13 @@ class ClanWar extends Component
     // ---- ACTIONS ----
 
     /**
-     * Claim one of the 9 modes, then redirect to the typing engine with the mode locked.
+     * RESERVE one of the 9 modes for this member. It does not start playing it.
+     *
+     * Claiming used to redirect straight into the typing engine, which made claim and attempt
+     * the same act -- and once opening the page became the moment the one attempt starts, that
+     * would have burned a slot on a misclick and left cancelClaim() unreachable. Reserving and
+     * starting are now separate steps, with the confirmation on the one that cannot be undone.
+     *
      * The DB unique constraint is the last safety net against two members claiming at once.
      */
     public function claimMode(string $mode, string $config): void
@@ -254,7 +283,11 @@ class ClanWar extends Component
         }
 
         try {
-            $claim = DB::transaction(function () use ($war, $mode, $config) {
+            // The closure returns a REASON on failure rather than a bare null: all three ways
+            // to fail used to collapse into "this mode was just taken by another member",
+            // which is simply false for a member who has run out of quota -- and it sent them
+            // looking for a teammate who did not exist.
+            $outcome = DB::transaction(function () use ($war, $mode, $config) {
                 // First check this clan hasn't already claimed this slot.
                 $existing = ClanWarModeClaim::where('clan_war_id', $war->id)
                     ->where('clan_id', $this->myClan->id)
@@ -263,19 +296,20 @@ class ClanWar extends Component
                     ->first();
 
                 if ($existing) {
-                    return null;
+                    return 'mode_taken';
                 }
 
-                // One member may not hold every slot. A war is meant to be a clan effort,
-                // and concentrating all 9 slots in one account makes a single compromised
-                // or cheating player able to decide the whole war by themselves.
+                // One member may not hold every slot: a war is meant to be a clan effort, and
+                // concentrating all 9 in one account lets a single compromised or cheating
+                // player decide it alone. The cap scales with the roster the war was accepted
+                // with, so a small clan can still fill the grid (ClanWarModeCatalog).
                 $mine = ClanWarModeClaim::where('clan_war_id', $war->id)
                     ->where('clan_id', $this->myClan->id)
                     ->where('user_id', Auth::id())
                     ->count();
 
-                if ($mine >= self::MAX_CLAIMS_PER_MEMBER) {
-                    return null;
+                if ($mine >= $war->maxClaimsFor($this->myClan->id)) {
+                    return 'max_claims';
                 }
 
                 return ClanWarModeClaim::create([
@@ -288,25 +322,35 @@ class ClanWar extends Component
                 ]);
             });
         } catch (QueryException $e) {
-            // Unique violation: another member just took this slot.
-            $claim = null;
+            // Unique violation: another member really did just take this slot.
+            $outcome = 'mode_taken';
         }
 
-        if (! $claim) {
-            session()->flash('clan_war_claim_error', __('clan.error.mode_taken'));
+        if (! $outcome instanceof ClanWarModeClaim) {
+            session()->flash('clan_war_claim_error', $outcome === 'max_claims'
+                ? __('clan.error.max_claims', ['max' => $war->maxClaimsFor($this->myClan->id)])
+                : __('clan.error.mode_taken'));
 
             return;
         }
 
         // The grid is shared state: this slot just stopped being available to everyone else in
-        // the clan, and the opposing side's view of the war changed too. Broadcast BEFORE the
-        // redirect -- after it this component is gone.
+        // the clan, and the opposing side's view of the war changed too.
         ClanWarBroadcast::refresh($war);
-
-        $this->redirect(route('typing', ['war_claim' => $claim->id]), navigate: true);
     }
 
-    /** Cancel an unsubmitted claim (the mode reopens); the claimer themselves or a leader. */
+    /**
+     * Hand back a RESERVED claim (the mode reopens); the claimer themselves or a leader.
+     *
+     * Only a claim whose attempt was never opened. An opened attempt is spent whatever it
+     * produced, because the alternative is a third way to restart: cancel, re-claim, play
+     * again -- and in Words mode the text is frozen and identical for everyone on that config,
+     * so that is unlimited practice on a paper the player has already read.
+     *
+     * The cost is real and deliberate: a member who opens an attempt and vanishes leaves a
+     * dead slot worth 0. ClanWarResolver stops that trapping the opposing clan, but the slot
+     * itself is not recoverable.
+     */
     public function cancelClaim(int $claimId): void
     {
         if (! $this->myClan) {
@@ -316,6 +360,7 @@ class ClanWar extends Component
         $claim = ClanWarModeClaim::where('id', $claimId)
             ->where('clan_id', $this->myClan->id)
             ->whereNull('typing_result_id')
+            ->whereNull('attempt_started_at')
             ->first();
 
         if (! $claim) {
@@ -380,6 +425,12 @@ class ClanWar extends Component
             'status' => ClanWarStatus::Ongoing,
             'challenger_power_before' => $war->challenger->power,
             'opponent_power_before' => $war->opponent->power,
+            // Claim caps are SNAPSHOTTED here, alongside the power figures and for the same
+            // reason: both describe the war as agreed, and neither may move while it runs.
+            // Recomputing the cap live would let a clan kick members mid-war to raise its own
+            // cap and pile every slot onto one account -- the concentration the cap prevents.
+            'challenger_max_claims' => ClanWarModeCatalog::claimCapFor($war->challenger->activeMembers()->count()),
+            'opponent_max_claims' => ClanWarModeCatalog::claimCapFor($war->opponent->activeMembers()->count()),
             'started_at' => now(),
             'ends_at' => now()->addDays(self::WAR_DURATION_DAYS),
         ]);

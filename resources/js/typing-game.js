@@ -57,8 +57,37 @@ function survivalConfig(difficulty) {
     return SURVIVAL_PRESETS[difficulty] || SURVIVAL_PRESETS.medium;
 }
 
-export default function typingGame(initialText) {
+/**
+ * How often a Clan War attempt reports its resume position, in milliseconds.
+ *
+ * Chosen for payload rather than precision: textToType is a public Livewire property, so every
+ * round trip carries the whole text both ways. At 5 seconds a two-minute slot costs ~24 trips.
+ * Reporting coarsely can only ever cost the player who reloads -- they resume slightly further
+ * back than they really were -- so erring towards fewer pings is the safe direction.
+ */
+const WAR_PROGRESS_MIN_INTERVAL_MS = 5000;
+
+/**
+ * Mirrors race-arena.js restoreProgress(): rebuild a word position from a saved percentage.
+ * Lives in its own module so Vitest can cover the arithmetic directly -- see war-resume.js.
+ */
+import { resumePosition } from './war-resume';
+
+/**
+ * @param {string} initialText  the text to type.
+ * @param {object|null} warAttempt  Clan War attempt state from the server (TypingEngine::$warLock):
+ *   { mode, config, resume, progress, remaining, budget, expired }. Null for a solo session.
+ *   Every clock in it is the SERVER's: a refresh must not be able to wind one back.
+ */
+export default function typingGame(initialText, warAttempt = null) {
     return {
+        warAttempt,
+        // Seconds the countdown starts from. Normally the sub-mode, but a RESUMED war attempt
+        // gets whatever the server says is left of its slot -- that is what makes reloading
+        // cost real time instead of handing back a full test.
+        timerStart: 0,
+        _warProgressSentAt: 0,
+        _warProgressLast: -1,
         targetArray: initialText.split(''),
         currentIndex: 0,
         inputResults: [],
@@ -232,7 +261,13 @@ export default function typingGame(initialText) {
 
             // Reset (e.g. restart / mode change mid-session) -> the chat overlay shows again.
             window.dispatchEvent(new CustomEvent('test-activity', { detail: { active: false } }));
-            this.timer = (this.currentMain === 'time') ? parseInt(this.currentSub) : 0;
+            // A resumed war slot starts from the server's remaining seconds, not the sub-mode:
+            // 25 seconds into a 30-second slot the countdown must read 5, or the reload the
+            // whole attempt system exists to price would simply hand back a fresh test.
+            this.timerStart = (this.currentMain === 'time')
+                ? (this.warAttempt?.remaining ?? parseInt(this.currentSub))
+                : 0;
+            this.timer = this.timerStart;
             this.wpm = 0;
             this.rawWpm = 0;
             this.accuracy = 0;
@@ -309,6 +344,11 @@ export default function typingGame(initialText) {
 
                 return { chars, spaceIndex: b.space };
             });
+
+            // AFTER wordBounds/renderWords are built (it reads both) and BEFORE the caret draw
+            // below, so the retry loop places the caret and the scroll window at the resumed
+            // line for free rather than flashing at word one first.
+            this.restoreWarProgress();
 
             this.caretInstant = true;
             this.caretDrawn = false;
@@ -398,6 +438,11 @@ export default function typingGame(initialText) {
         // Score one completed word. A dirty word takes the stamina penalty just once (per-word
         // cap, idempotent if re-committed); a clean word takes nothing.
         completeWord(wordIndex) {
+            // Every path that finishes a word passes through here, which is exactly why the
+            // resume ping hangs off it: one hook instead of three, and it can never drift out
+            // of step with what the player actually completed.
+            this.reportWarProgress();
+
             if (this.currentMain !== 'survival') return;
 
             const isDirty = this.currentWordDirty;
@@ -418,6 +463,74 @@ export default function typingGame(initialText) {
             }
 
             this.committedWordResults[wordIndex] = 'clean';
+        },
+
+        /**
+         * Tell the server how far this Clan War attempt has got, so a reload resumes here.
+         *
+         * Throttled hard (see WAR_PROGRESS_MIN_INTERVAL_MS) and skipped entirely when the
+         * percentage has not moved. Survival never reports: a stamina curve cannot be resumed,
+         * so it restarts inside a shrinking wall budget instead.
+         *
+         * Best-effort by design -- the server clamps, bounds and only ever raises the stored
+         * value, so a dropped ping costs nothing but a slightly earlier resume point.
+         */
+        reportWarProgress(force = false) {
+            if (!this.warAttempt || this.currentMain === 'survival' || !this.isStarted) return;
+
+            const total = this.targetArray.length;
+            if (!total) return;
+
+            const percent = Math.max(0, Math.min(100, Math.floor((this.currentIndex / total) * 100)));
+
+            if (percent === this._warProgressLast) return;
+
+            const now = Date.now();
+            if (!force && now - this._warProgressSentAt < WAR_PROGRESS_MIN_INTERVAL_MS) return;
+
+            this._warProgressSentAt = now;
+            this._warProgressLast = percent;
+
+            // The component may be gone (navigating away); losing the ping is acceptable.
+            this.$wire?.reportWarProgress(percent);
+        },
+
+        /**
+         * Rebuild the word position from the server's saved percentage (a reloaded attempt).
+         *
+         * Mirrors race-arena.js restoreProgress(): convert the percentage back to a character
+         * count and consume whole "word + space" spans until the next word would not fit, so
+         * the cursor lands at the START of the first unfinished word. A partial word is never
+         * restored -- the percentage was derived from committed words, so a prefix was never
+         * part of it, and inventing one would put characters on screen the player never typed.
+         *
+         * The restored characters are marked correct locally so live WPM reads sensibly, but
+         * they are NOT credit: the server bounds the submitted totals against the attempt's
+         * own clock either way (SoloSessionGuard::maxPlausibleChars).
+         */
+        restoreWarProgress() {
+            const progress = this.warAttempt?.progress ?? 0;
+
+            if (!this.warAttempt || progress <= 0 || this.currentMain === 'survival') return;
+
+            const { consumed, wordIndex } = resumePosition(
+                this.wordBounds,
+                this.targetArray.length,
+                progress
+            );
+
+            if (consumed <= 0) return;
+
+            this.currentWordIndex = wordIndex;
+            this.currentIndex = consumed;
+
+            for (let i = 0; i < consumed; i++) {
+                this.inputResults[i] = true;
+            }
+
+            this.totalKeystrokes = consumed;
+            this.correctKeystrokes = consumed;
+            this._warProgressLast = progress;
         },
 
         // Backspacing into the previous word: undo its last commit scoring. The 'dirty'
@@ -904,11 +1017,22 @@ export default function typingGame(initialText) {
                 this.timerInterval = setInterval(() => {
                     const timeElapsed = Math.floor((Date.now() - this.startTime) / 1000);
                     if (this.currentMain === 'time') {
-                        let remaining = parseInt(this.currentSub) - timeElapsed;
+                        // timerStart, not the sub-mode: on a resumed war slot they differ, and
+                        // reading the sub-mode here would quietly restore the full test length
+                        // one second after resetProgress() shortened it.
+                        let remaining = this.timerStart - timeElapsed;
                         this.timer = remaining > 0 ? remaining : 0;
                         if (this.timer <= 0) this.finish();
                     } else {
                         this.timer = timeElapsed;
+
+                        // Survival war slots run inside a wall budget that shrinks with every
+                        // abandoned attempt, so stop at it rather than letting the player type
+                        // seconds the war will not credit.
+                        if (this.currentMain === 'survival' && this.warAttempt?.budget != null
+                            && timeElapsed >= this.warAttempt.budget) {
+                            this.finish();
+                        }
                     }
                     this.calculateStats();
 

@@ -397,6 +397,38 @@ yang sama:
 merusak kepercayaan daripada meloloskan satu cheater. Ia hanya **menandai untuk review manusia**.
 Hanya riwayat `clear`/`approved` yang jadi pembanding (hasil pending/rejected tak mencemari baseline).
 
+### 7.7d Aturan durasi & plafon khusus Clan War
+
+Sebuah war attempt bisa **sah-sah saja melintasi beberapa mount** (refresh, tombol Back). Itu
+menabrak dua asumsi kelas ini secara langsung, dan keduanya harus ditangani ke arah yang berbeda.
+
+**Plafon karakter diukur dari JANGKAR attempt, bukan dari mount ini.** `SoloSessionGuard` mengukur
+elapsed **per tab**, dan refresh mencetak `tabKey` baru — jadi pemain yang resume sambil membawa
+ratusan karakter jujur akan dinilai terhadap jam yang baru mulai, lalu **ditolak**. `maxPlausibleChars()`
+karena itu menerima `$elapsedOverride` dan `$windowSeconds` opsional; jalur solo tak mengirim keduanya
+dan perilakunya **byte-identical**. Elapsed berjangkar hanya bisa **naik**, dibatasi window sebesar
+durasi nominal + grace, jadi ini **lebih ketat** sepanjang umur attempt — ia cuma berhenti menghukum
+pemain yang jujur.
+
+> **Kenapa ini BUKAN pengulangan kesalahan §7.4.** Yang terbukti salah di sana adalah
+> `min(klaim, elapsed server)`: elapsed server adalah batas **atas** sesi jujur, jadi mengambil
+> `min` memangkas 30 detik jadi 3 dan melambungkan WPM ke 557. Aturan durasi `words` di war adalah
+> `max(klaim, elapsed berjangkar − 30)` — ia hanya bisa **memperpanjang**, dan durasi yang lebih
+> panjang cuma menurunkan WPM. Arahnya berlawanan, justru karena alasan yang sama.
+
+**Survival adalah inversinya, dan diperlakukan terpisah.** Poinnya `duration_seconds / 90`, jadi jam
+berjangkar yang kontinu malah **menghadiahi** refresh, sementara jam per-sesi mengizinkan retry tanpa
+batas. Survival karena itu **tidak resume**: ia restart di dalam anggaran wall-clock yang menyusut
+(`wasted + credited ≤ 120 detik`). Pemotongannya diterapkan **hanya saat menilai klaim war**, tak
+pernah ke `TypingResult` — memendekkan durasi **menaikkan** WPM, dan `check()` membaca kolom itu,
+jadi hasil jujur bisa ikut ditolak sebagai mustahil.
+
+Konstanta baru (`ClanWarAttempt::GRACE_SECONDS` 30, `COUNTDOWN_GRACE_SECONDS` 10,
+`SURVIVAL_BUDGET_SECONDS` 120, `STALE_MINUTES` 15) tunduk pada aturan §10.2b yang sama: **setel ulang
+dari log penolakan, bukan dari intuisi.**
+
+Detail per mode dan alasannya ada di [`clan-war.md`](clan-war.md) §3.9.
+
 ### 7.8 Antrean review admin (`review_status`)
 
 Sinyal §7.7c yang menandai membuat hasil disimpan sebagai **`pending`**, bukan ditolak. Kolom
@@ -587,9 +619,20 @@ apa pun di dokumen ini dari log tersebut**, bukan dari intuisi.
 ### 10.3 Batas klaim slot war per anggota
 
 Satu akun sebelumnya bisa mengklaim **ke-9 slot** dan menentukan hasil war sendirian.
-Sekarang dibatasi **4 slot** (`ClanWar::MAX_CLAIMS_PER_MEMBER`), jadi butuh minimal 3 anggota
-berbeda. Ini menutup rekomendasi pentester "batasi kontribusi per anggota" dan sekaligus
-memperkecil dampak satu akun yang diretas.
+Sekarang dibatasi lewat `ClanWarModeCatalog::claimCapFor()`, dengan **lantai 4 slot**
+(`MIN_CLAIMS_PER_MEMBER`). Ini menutup rekomendasi pentester "batasi kontribusi per anggota" dan
+sekaligus memperkecil dampak satu akun yang diretas.
+
+> **Diperbaiki 2026-08-02 — angka 4 yang datar punya biaya yang tak pernah dicatat.**
+>
+> Kalimat di dokumen ini dulu berbunyi "jadi butuh minimal 3 anggota berbeda". Itu **benar secara
+> aritmetika** (9 ÷ 4) tapi **tak pernah ditegakkan di kode maupun diberitahukan ke pemain**: clan
+> 2 orang tetap boleh menerima war, mengklaim 8 slot, lalu menatap slot ke-9 yang tak bisa diambil
+> siapa pun. Karena early finish menuntut 9/9 di kedua sisi, clan **lawan** ikut terkunci 3 hari.
+>
+> Capnya kini `max(4, ceil(9 / anggota aktif))` dan **di-snapshot saat war diterima**, jadi
+> menendang anggota di tengah war tak bisa menaikkannya. Clan 3+ tetap 4 — proteksi F-03 utuh persis
+> di tempat ia berarti. Lihat [`clan-war.md`](clan-war.md) §3.10.
 
 ### 10.4 Privasi IP (UU PDP / GDPR)
 

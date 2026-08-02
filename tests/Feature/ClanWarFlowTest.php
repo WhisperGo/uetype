@@ -12,7 +12,6 @@ use App\Models\ClanWar as ClanWarModel;
 use App\Models\ClanWarModeClaim;
 use App\Models\TypingResult as TypingResultModel;
 use App\Models\User;
-use App\Services\SoloSessionGuard;
 use Livewire\Livewire;
 
 /**
@@ -105,7 +104,7 @@ it('sends an honest war attempt back to the clan war page, not solo', function (
 
     $component = Livewire::actingAs($leaderA)->test(TypingEngine::class, ['warClaimId' => $claim->id]);
 
-    app(SoloSessionGuard::class)->backdate(30);
+    runWarAttemptClock($claim);
 
     $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290])
         ->assertRedirect(route('typing.result'));

@@ -124,7 +124,10 @@
             @endif
 
             <p class="font-mono text-xs uppercase tracking-widest text-muted mb-1">{{ __('clan.war.modes_heading') }}</p>
-            <p class="font-mono text-xs text-muted mb-3">{{ __('clan.war.modes_hint') }}</p>
+            {{-- The hint states the per-member cap because the grid used to give no clue it
+                 existed: every open slot showed "Claim & Play" regardless of quota, and running
+                 out told you the mode "was just taken by another member". --}}
+            <p class="font-mono text-xs text-muted mb-3">{{ __('clan.war.modes_hint', ['max' => $this->myActiveWar?->maxClaimsFor($this->myClan->id) ?? 0]) }}</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
                 @foreach ($this->modeGrid as $slot)
                     @php
@@ -150,18 +153,30 @@
 
                         @switch($slot['status'])
                             @case('open')
-                                <x-btn-gold size="px-3 py-2 text-xs" class="w-full"
-                                    wire:click="claimMode('{{ $slot['mode'] }}', '{{ $slot['config'] }}')">
-                                    {{ __('clan.war.claim_play') }}
-                                </x-btn-gold>
+                                {{-- Out of quota: say so on the tile instead of offering a button
+                                     that can only fail. --}}
+                                @if ($this->myRemainingClaims <= 0)
+                                    <p class="w-full px-3 py-2 text-center font-mono text-[0.7rem] text-muted border border-white/5 rounded-lg">
+                                        {{ __('clan.war.no_quota') }}
+                                    </p>
+                                @else
+                                    <x-btn-gold size="px-3 py-2 text-xs" class="w-full"
+                                        wire:click="claimMode('{{ $slot['mode'] }}', '{{ $slot['config'] }}')">
+                                        {{ __('clan.war.claim_play') }}
+                                    </x-btn-gold>
+                                @endif
                                 @break
 
                             @case('claimed')
+                                {{-- RESERVED: held, never opened. Still cancellable, and starting
+                                     is behind a confirmation because it is the irreversible step:
+                                     opening the attempt starts a clock that no reload can wind back. --}}
                                 <div class="flex items-center justify-between gap-2">
                                     <span class="font-mono text-[0.7rem] text-muted truncate">{{ __('clan.war.claimed_by', ['name' => $slot['claim']->user->username]) }}</span>
                                     @if ($slot['claim']->user_id === auth()->id())
-                                        <x-btn-gold as="a" size="xs" class="shrink-0" wire:navigate
-                                            href="{{ route('typing', ['war_claim' => $slot['claim']->id]) }}">{{ __('clan.war.play') }}</x-btn-gold>
+                                        <x-btn-gold as="a" size="xs" class="shrink-0"
+                                            @click.prevent="$dispatch('open-modal', { name: 'confirm-start-attempt', href: @js(route('typing', ['war_claim' => $slot['claim']->id])), label: @js($labelMode.' '.$labelConfig) })"
+                                            href="{{ route('typing', ['war_claim' => $slot['claim']->id]) }}">{{ __('clan.war.start_attempt') }}</x-btn-gold>
                                     @endif
                                 </div>
                                 @if ($slot['claim']->user_id === auth()->id() || $this->isLeader)
@@ -171,6 +186,20 @@
                                         {{ __('clan.war.cancel_claim') }}
                                     </button>
                                 @endif
+                                @break
+
+                            @case('in_progress')
+                                {{-- The one attempt is already open, so there is nothing left to
+                                     cancel: re-entering resumes it, it does not restart it. No
+                                     Cancel button here -- cancel + re-claim would be a third way
+                                     to restart, on a Words text the player has already read. --}}
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="font-mono text-[0.7rem] text-muted truncate">{{ __('clan.war.in_progress') }} · {{ $slot['claim']->user->username }}</span>
+                                    @if ($slot['claim']->user_id === auth()->id())
+                                        <x-btn-gold as="a" size="xs" class="shrink-0" wire:navigate
+                                            href="{{ route('typing', ['war_claim' => $slot['claim']->id]) }}">{{ __('clan.war.resume') }}</x-btn-gold>
+                                    @endif
+                                </div>
                                 @break
 
                             @default
@@ -277,6 +306,34 @@
                             class="px-4 py-2 font-mono text-xs font-bold text-foreground bg-danger hover:bg-danger/80 rounded-lg transition">
                             {{ __('clan.modal.cancel_claim_confirm') }}
                         </button>
+                    </div>
+                </div>
+            </x-modal>
+        </div>
+
+        {{-- Starting an attempt is the irreversible step, so the confirmation sits HERE rather
+             than on claiming: opening the page anchors a clock the player cannot wind back, and
+             a misclick would otherwise burn the slot with nothing typed.
+
+             A plain <a>, not wire:navigate: the typing engine must be entered by a FULL page
+             load. An SPA navigation leaves the previous component's Alpine state in place, and
+             this page is the one that has to hand over a freshly anchored attempt. --}}
+        <div x-data="{ startHref: '', startLabel: '' }"
+            @open-modal.window="if ($event.detail?.name === 'confirm-start-attempt') { startHref = $event.detail.href; startLabel = $event.detail.label; $dispatch('open-modal', 'confirm-start-attempt') }">
+            <x-modal name="confirm-start-attempt" maxWidth="md">
+                <div class="p-6">
+                    <p class="font-mono text-sm font-bold text-foreground">{{ __('clan.war.confirm_start_title') }}</p>
+                    <p class="font-mono text-xs text-gold mt-1" x-text="startLabel"></p>
+                    <p class="font-mono text-xs text-muted mt-2">{{ __('clan.war.confirm_start_body') }}</p>
+                    <div class="flex justify-end gap-3 mt-6">
+                        <button type="button" @click="$dispatch('close-modal', 'confirm-start-attempt')"
+                            class="px-4 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                            {{ __('clan.modal.cancel') }}
+                        </button>
+                        <a :href="startHref"
+                            class="px-4 py-2 font-mono text-xs font-bold text-background bg-gold hover:bg-gold/80 rounded-lg transition">
+                            {{ __('clan.war.start_attempt') }}
+                        </a>
                     </div>
                 </div>
             </x-modal>

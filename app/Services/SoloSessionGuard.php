@@ -95,7 +95,7 @@ class SoloSessionGuard
      * query the p99.9 of net_wpm and re-tune. Do NOT tighten this again on intuition -- that
      * is exactly what produced the bug above.
      */
-    private const MAX_CHARS_PER_SECOND = 20.0;
+    public const MAX_CHARS_PER_SECOND = 20.0;
 
     /**
      * Slack (seconds) allowed between the server's own elapsed clock and the duration a
@@ -260,14 +260,29 @@ class SoloSessionGuard
      * the session open, not the nominal duration. Otherwise a 120-second war slot submitted
      * the instant it opened would allow 1800 characters "typed" in no real time at all --
      * exactly 150 WPM, which is the ratio that maxes out a Clan War point ceiling.
+     *
+     * $elapsedOverride and $windowSeconds exist for Clan War, where a session may legitimately
+     * span several mounts. This class measures elapsed per TAB, and a refresh mints a new tab
+     * key -- so on a resumed attempt the tab clock reads near zero while the player carries
+     * hundreds of genuinely typed characters, and an honest resumer would be refused. The war
+     * path passes the seconds since the ATTEMPT was anchored (which only ever grows) and that
+     * attempt's total wall budget in place of the nominal duration. Solo passes neither and is
+     * byte-for-byte unaffected.
      */
-    public function maxPlausibleChars(string $mode, float $durationSeconds, string $tabKey = 'default'): ?int
-    {
+    public function maxPlausibleChars(
+        string $mode,
+        float $durationSeconds,
+        string $tabKey = 'default',
+        ?float $elapsedOverride = null,
+        ?float $windowSeconds = null,
+    ): ?int {
         $session = $this->current($tabKey);
 
         if ($session === null) {
             return null;
         }
+
+        $window = $windowSeconds ?? $durationSeconds;
 
         // The window is bounded by real elapsed time PLUS slack, so an automated client
         // cannot claim a full-length session that never actually ran. The slack keeps
@@ -275,12 +290,15 @@ class SoloSessionGuard
         // but it is capped at a FRACTION of the session: a flat 30 seconds is most of a
         // 30-second test, which left ~500 characters claimable and a forged 200 WPM
         // reachable. Proportional slack keeps short sessions tight and long ones forgiving.
-        $elapsed = $this->elapsedSeconds($tabKey);
+        // Slack stays proportional to the SCORED duration, never to the window: the window is
+        // only a cap on how much wall clock the attempt may span, and letting it widen the
+        // slack too would hand a war slot a looser ceiling than the same solo test gets.
+        $elapsed = $elapsedOverride ?? $this->elapsedSeconds($tabKey);
         $slack = min(self::DURATION_SLACK_SECONDS, $durationSeconds * self::SLACK_FRACTION);
 
         $realSeconds = $elapsed === null
-            ? $durationSeconds
-            : min($durationSeconds, $elapsed + $slack);
+            ? $window
+            : min($window, $elapsed + $slack);
 
         $physical = (int) ceil($realSeconds * self::MAX_CHARS_PER_SECOND) + self::CHAR_TOLERANCE;
 

@@ -11,7 +11,6 @@ use App\Models\ClanWar as ClanWarModel;
 use App\Models\ClanWarModeClaim;
 use App\Models\TypingResult as TypingResultModel;
 use App\Models\User;
-use App\Services\SoloSessionGuard;
 use Livewire\Livewire;
 
 /**
@@ -69,7 +68,7 @@ it('membawa poin yang benar-benar diberikan ke session hasil', function () {
     ]);
 
     $component = Livewire::actingAs($me)->test(TypingEngine::class, ['warClaimId' => $claim->id]);
-    app(SoloSessionGuard::class)->backdate(30);
+    runWarAttemptClock($claim);
     $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290]);
 
     $score = session('typing_result')['war']['score'];
@@ -101,7 +100,7 @@ it('tidak melaporkan poin apa pun kalau slotnya sudah diisi rekan sekelompok', f
     ]);
     $claim->update(['typing_result_id' => $theirs->id, 'points' => 44.0]);
 
-    app(SoloSessionGuard::class)->backdate(30);
+    runWarAttemptClock($claim);
     $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290]);
 
     expect(session('typing_result')['war']['score'])->toBeNull()
@@ -118,7 +117,7 @@ it('tak pernah membuang war attempt sebagai sesi yang ditinggalkan', function ()
     ]);
 
     $component = Livewire::actingAs($me)->test(TypingEngine::class, ['warClaimId' => $claim->id]);
-    app(SoloSessionGuard::class)->backdate(30);
+    runWarAttemptClock($claim);
 
     // Jeda 25 detik dari sesi 30 detik: jauh di atas ambang AFK biasa. Di war ini SENGAJA
     // tidak menolak -- hasil yang ditolak tak mengisi claim, jadi berhenti mengetik akan jadi
@@ -210,7 +209,7 @@ it('tak memberi tamu konteks war sama sekali', function () {
 
     // Tamu memakai war_claim milik orang lain: resolveWarClaim() menolak, warLock tetap null.
     $component = Livewire::test(TypingEngine::class, ['warClaimId' => $claim->id]);
-    app(SoloSessionGuard::class)->backdate(30);
+    runWarAttemptClock($claim);
     $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290]);
 
     expect(session('typing_result')['war'])->toBeNull();

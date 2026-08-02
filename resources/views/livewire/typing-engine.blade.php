@@ -10,8 +10,13 @@
     <div wire:key="typing-app-{{ $mainMode }}-{{ $subMode }}" class="flex flex-col flex-1 justify-center min-h-0" x-data="{
         currentMain: @entangle('mainMode'),
         currentSub: @entangle('subMode'),
-        ...typingGame(@js($textToType))
+        ...typingGame(@js($textToType), @js($warLock))
     }"
+        {{-- A reloaded war attempt keeps the SERVER's clock, so its remaining seconds may
+             already be spent. Bank whatever the resume restored rather than leaving the slot
+             a permanent zero, and flush the resume position before the tab goes away. --}}
+        x-init="if (warAttempt?.expired) { $nextTick(() => finish()); }"
+        @visibilitychange.window="if (document.visibilityState === 'hidden') reportWarProgress(true)"
         @keydown.window="
             syncCapsLock($event);
             const ae = document.activeElement;

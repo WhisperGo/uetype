@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ClanMemberStatus;
 use App\Enums\ClanWarStatus;
+use App\Services\ClanWarModeCatalog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -16,6 +17,8 @@ class ClanWar extends Model
         'status',
         'challenger_power_before',
         'opponent_power_before',
+        'challenger_max_claims',
+        'opponent_max_claims',
         'challenger_power_delta',
         'opponent_power_delta',
         'result',
@@ -41,6 +44,35 @@ class ClanWar extends Model
     public function opponent(): BelongsTo
     {
         return $this->belongsTo(Clan::class, 'opponent_clan_id');
+    }
+
+    /**
+     * How many of the 9 slots one member of $clanId may claim in this war.
+     *
+     * Reads the snapshot taken when the challenge was accepted, so the cap cannot move while
+     * the war runs -- a live formula would let a clan kick members to raise its own cap and
+     * concentrate every slot in one account, which is the finding the cap exists to close.
+     *
+     * Falls back to the current roster when there is no snapshot: wars predating the column,
+     * and every test that inserts an Ongoing war directly. A missing snapshot must not mean
+     * "no cap", and it must not mean "cannot claim" either.
+     */
+    public function maxClaimsFor(int $clanId): int
+    {
+        $snapshot = $clanId === $this->challenger_clan_id
+            ? $this->challenger_max_claims
+            : $this->opponent_max_claims;
+
+        if ($snapshot !== null) {
+            return (int) $snapshot;
+        }
+
+        $activeMembers = ClanMember::query()
+            ->where('clan_id', $clanId)
+            ->where('status', ClanMemberStatus::Active)
+            ->count();
+
+        return ClanWarModeCatalog::claimCapFor($activeMembers);
     }
 
     /**

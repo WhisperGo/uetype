@@ -12,7 +12,6 @@ use App\Models\ClanWar as ClanWarModel;
 use App\Models\ClanWarModeClaim;
 use App\Models\TypingResult;
 use App\Models\User;
-use App\Services\SoloSessionGuard;
 use App\Support\ClanWarBroadcast;
 use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
@@ -211,7 +210,7 @@ it('menyuruh kedua clan me-refresh saat sebuah war attempt disubmit', function (
     Event::fake([ClanUpdated::class]);
 
     $component = Livewire::actingAs($leaderA)->test(TypingEngine::class, ['warClaimId' => $claim->id]);
-    app(SoloSessionGuard::class)->backdate(30);
+    runWarAttemptClock($claim);
     $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290]);
 
     Event::assertDispatchedTimes(ClanUpdated::class, 2);
@@ -235,7 +234,7 @@ it('tidak menyiarkan apa pun kalau attempt-nya tak mengisi claim mana pun', func
 
     Event::fake([ClanUpdated::class]);
 
-    app(SoloSessionGuard::class)->backdate(30);
+    runWarAttemptClock($claim);
     $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290]);
 
     Event::assertNotDispatched(ClanUpdated::class);
