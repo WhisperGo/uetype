@@ -23,9 +23,22 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <!-- DB sengaja TIDAK dipatok di sini: koneksinya diambil dari .env masing-masing
-             developer/CI. Proyek ini berjalan di MySQL; driver lain akan gagal saat
-             migrasi (CHECK constraint), dan itu memang sinyal yang diinginkan. -->
+        <!-- DB_CONNECTION sengaja TIDAK dipatok di sini: koneksinya diambil dari .env
+             masing-masing developer/CI. Proyek ini berjalan di MySQL; driver lain akan gagal
+             saat migrasi (CHECK constraint), dan itu memang sinyal yang diinginkan.
+
+             Yang DIPATOK hanyalah nama databasenya. RefreshDatabase menjalankan
+             `migrate:fresh`, yang menghapus setiap tabel lebih dulu, jadi tanpa baris ini
+             suite mengarah ke DB_DATABASE milik .env: database dev itu sendiri. Satu kali
+             `php artisan test` menghapus seluruh data lokal (seeder, akun dev, room dan war
+             yang sedang diuji manual). Mode paralel kebetulan aman karena Laravel membuat
+             `nama_test_1..N` sendiri, sehingga perintah yang lebih polos justru yang merusak.
+
+             Menimpa NAMA saja, bukan koneksinya, menjaga niat di atas tetap utuh: driver yang
+             salah tetap gagal saat migrasi, hanya sasarannya yang berpindah menjauh dari
+             database dev. Database ini dibuat sekali per mesin
+             (`CREATE DATABASE uetype_test;`); lihat README bagian Testing. -->
+        <env name="DB_DATABASE" value="uetype_test"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>

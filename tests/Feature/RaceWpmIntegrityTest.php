@@ -36,6 +36,20 @@ function integrityMember(Room $room, User $user, int $progress = 0): RoomMember
     ]);
 }
 
+/**
+ * Jam dibekukan untuk SETIAP test di berkas ini, bukan per test.
+ *
+ * Semua yang diperiksa di sini adalah WPM, dan server menghitungnya sebagai
+ * karakter / (now() - race_starts_at): tiap detik NYATA yang lewat antara penyiapan room dan
+ * pemanggilan ikut masuk ke penyebut. Toleransinya sempit -- pada kasus 60 detik cukup ~3
+ * detik untuk menjatuhkan 10 menjadi 9, dan pada kasus "1 detik lalu" beberapa detik saja
+ * mengubah klaim mustahil menjadi wajar sehingga test berhenti membuktikan apa pun.
+ *
+ * Di beforeEach karena sifat itu milik BERKAS ini, bukan milik satu test: menaruhnya per test
+ * berarti test berikutnya yang ditambahkan orang lain akan lahir tanpa perlindungan yang sama.
+ */
+beforeEach(fn () => test()->freezeTime());
+
 it('ignores the client wpm and stores the server-computed net wpm instead', function () {
     $user = User::factory()->create();
     $room = integrityRoom($user, startedSecondsAgo: 60);

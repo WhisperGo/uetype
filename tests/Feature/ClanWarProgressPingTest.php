@@ -65,6 +65,12 @@ it('refuses progress that outruns the physical character ceiling', function () {
 });
 
 it('never records more typing time than the attempt has existed', function () {
+    // Dibekukan seperti test di atas, dan karena alasan yang sama: batasnya diikat ke jam
+    // jangkar, jadi tiap milidetik nyata yang lewat selama request ikut terhitung. Dengan
+    // toleransi hanya 1 detik, eksekusi yang sedikit lebih lambat membuat test ini gagal pada
+    // 21019 ms -- kegagalan yang tak mengatakan apa pun tentang aturan yang sedang diuji.
+    $this->freezeSecond();
+
     [$player, $claim] = warProgressClaim();
 
     $claim->update(['attempt_started_at' => now()->subSeconds(20)]);

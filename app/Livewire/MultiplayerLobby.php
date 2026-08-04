@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Enums\FriendshipStatus;
+use App\Enums\RoomStatus;
 use App\Events\RaceProgressUpdated;
 use App\Events\RoomInvitationSent;
 use App\Events\RoomMessageSent;
@@ -102,6 +103,21 @@ class MultiplayerLobby extends Component
     private const MAX_PROGRESS_UPDATES_PER_SECOND = 20;
 
     /**
+     * Lobby chat messages one player may send per minute.
+     *
+     * Every accepted message fans out over the WebSocket to every member of the room, so one
+     * request buys N deliveries -- the same amplification shape that made invitePlayer() and
+     * updateRaceProgress() worth limiting. This one had no limit at all, and the reason is
+     * instructive: it is a Livewire ACTION, and the project's throttling all lives on routes
+     * (`ThrottleTest` locks a limit on every write endpoint). A Livewire action never passes
+     * through that middleware, so it simply did not look like an endpoint.
+     *
+     * 20/minute is a third of the global chat's 60: a lobby message is typed between races,
+     * not in a burst, and the panel is hidden entirely once racing starts.
+     */
+    private const MAX_ROOM_MESSAGES_PER_MINUTE = 20;
+
+    /**
      * Seconds after GO before a racer who has typed NOTHING is dropped as DNF.
      *
      * Until this existed, sudden death was the only thing that could ever end a race -- and
@@ -189,7 +205,11 @@ class MultiplayerLobby extends Component
         $this->roomCode = $room->code;
 
         // 'finished' shows the result panel; 'waiting'/'racing' show lobby/arena.
-        $this->step = $room->status === 'finished' ? 'racing' : $room->status;
+        //
+        // ->value, because $step is NOT the room status: it is client view state that also has
+        // a 'choose' value, and a finished room deliberately shows the racing step so the
+        // result panel can render over the arena. The two only happen to share two words.
+        $this->step = $room->status === RoomStatus::Finished ? 'racing' : $room->status->value;
 
         // Lazy backstop for the race deadlines, mirroring the stale-member sweep above: a race
         // whose clock ran out while every tab was closed is settled by whoever opens the lobby
@@ -199,15 +219,15 @@ class MultiplayerLobby extends Component
         // Ceiling only, no start-grace: this is a PAGE LOAD, and the player has not had a
         // chance to type yet on it. The grace rule belongs to the live arena that actually
         // watched them sit idle (checkRaceDeadline), not to the moment their page arrives.
-        if ($room->status === 'racing'
+        if ($room->status === RoomStatus::Racing
             && $this->resolveRaceDeadlinesIfElapsed($room, includeStartGrace: false)) {
             $room->refresh();
         }
 
-        if ($room->status === 'finished') {
+        if ($room->status === RoomStatus::Finished) {
             $this->showResultModal = true;
             $this->captureResultSnapshot();
-        } elseif ($room->status === 'racing') {
+        } elseif ($room->status === RoomStatus::Racing) {
             // Derive finish state from the DB so a mid-race refresh doesn't hand a finished
             // player their typing input back. (hasFinished/hasGivenUp default to false.)
             $this->syncRaceOutcomeFromDb($member);
@@ -239,7 +259,7 @@ class MultiplayerLobby extends Component
     {
         $room = Room::where('code', $this->roomCode)->first();
 
-        if (! $room || $room->host_id !== Auth::id() || $room->status !== 'waiting') {
+        if (! $room || $room->host_id !== Auth::id() || $room->status !== RoomStatus::Waiting) {
             return;
         }
 
@@ -288,7 +308,7 @@ class MultiplayerLobby extends Component
         // Mid-race the answer is no, not "are you sure": leaving takes the player's own race
         // away AND deletes a competitor out of a race the others are still running. An invite
         // arriving at the wrong moment must not be able to do that at all.
-        if ($current->status === 'racing') {
+        if ($current->status === RoomStatus::Racing) {
             session()->flash('error', __('multiplayer.error_leave_race_first'));
 
             return false;
@@ -360,7 +380,7 @@ class MultiplayerLobby extends Component
             $room = Room::create([
                 'code' => $code,
                 'host_id' => $user->id,
-                'status' => 'waiting',
+                'status' => RoomStatus::Waiting,
                 'language' => $language,
                 'text_to_type' => $this->generateRaceText($language),
             ]);
@@ -418,7 +438,7 @@ class MultiplayerLobby extends Component
      */
     private function joinRoomByCode(string $code, bool $confirmed = false): bool
     {
-        $room = Room::where('code', $code)->where('status', 'waiting')->first();
+        $room = Room::where('code', $code)->where('status', RoomStatus::Waiting)->first();
 
         if (! $room) {
             session()->flash('error', __('multiplayer.error_room_not_found'));
@@ -517,7 +537,7 @@ class MultiplayerLobby extends Component
         // this). Scoped to the waiting lobby -- the only phase kick happens -- so a player
         // who left AFTER finishing and is still viewing the result modal isn't dragged
         // away from their results.
-        if ($room->status === 'waiting') {
+        if ($room->status === RoomStatus::Waiting) {
             $stillMember = RoomMember::where('room_id', $room->id)
                 ->where('user_id', Auth::id())
                 ->exists();
@@ -532,17 +552,17 @@ class MultiplayerLobby extends Component
             }
         }
 
-        if ($room->status === 'racing' && $this->step !== 'racing') {
+        if ($room->status === RoomStatus::Racing && $this->step !== 'racing') {
             $this->step = 'racing';
             $this->resetRaceOutcome();
         }
 
-        if ($room->status === 'finished') {
+        if ($room->status === RoomStatus::Finished) {
             $this->showResultModal = true;
             $this->captureResultSnapshot();
         }
 
-        if ($room->status === 'waiting' && $this->step === 'racing') {
+        if ($room->status === RoomStatus::Waiting && $this->step === 'racing') {
             $this->step = 'waiting';
             $this->resetRaceOutcome();
         }
@@ -555,7 +575,7 @@ class MultiplayerLobby extends Component
         //
         // After the branches above on purpose: a room that just re-entered 'racing' has had its
         // outcome reset for the NEW race, and this then re-derives against that same race.
-        if ($room->status === 'racing') {
+        if ($room->status === RoomStatus::Racing) {
             $member = RoomMember::where('room_id', $room->id)
                 ->where('user_id', Auth::id())
                 ->first();
@@ -599,7 +619,7 @@ class MultiplayerLobby extends Component
     {
         $room = Room::where('code', $this->roomCode)->first();
 
-        if (! $room || $room->status !== 'waiting') {
+        if (! $room || $room->status !== RoomStatus::Waiting) {
             return;
         }
 
@@ -672,7 +692,7 @@ class MultiplayerLobby extends Component
         $room = Room::where('code', $this->roomCode)->first();
 
         // Only the host may kick, only in the waiting lobby, and never themselves.
-        if (! $room || $room->status !== 'waiting'
+        if (! $room || $room->status !== RoomStatus::Waiting
             || $room->host_id !== Auth::id()
             || $userId === Auth::id()) {
             return;
@@ -768,7 +788,7 @@ class MultiplayerLobby extends Component
         $room = Room::where('code', $this->roomCode)->first();
 
         // Only from inside a waiting room, and never invite yourself.
-        if (! $room || $room->status !== 'waiting' || $friendId === Auth::id()) {
+        if (! $room || $room->status !== RoomStatus::Waiting || $friendId === Auth::id()) {
             return;
         }
 
@@ -826,7 +846,7 @@ class MultiplayerLobby extends Component
 
         $room = Room::where('code', $this->roomCode)->first();
 
-        if (! $room || $room->status === 'racing') {
+        if (! $room || $room->status === RoomStatus::Racing) {
             return;
         }
 
@@ -838,6 +858,17 @@ class MultiplayerLobby extends Component
         if (! $isMember) {
             return;
         }
+
+        // Checked AFTER membership so a stranger poking at the action can't learn anything
+        // from being rate limited rather than ignored, and keyed per user so one flooder
+        // cannot mute the room for everyone else.
+        $rateKey = 'room-message:'.Auth::id();
+
+        if (RateLimiter::tooManyAttempts($rateKey, self::MAX_ROOM_MESSAGES_PER_MINUTE)) {
+            return;
+        }
+
+        RateLimiter::hit($rateKey, 60);
 
         $user = Auth::user();
 
@@ -921,7 +952,7 @@ class MultiplayerLobby extends Component
     public function updateRaceProgress(int $progressPercent, int $liveWpm = 0, int $accuracy = 100): void
     {
         $room = Room::where('code', $this->roomCode)->first();
-        if (! $room || $room->status !== 'racing') {
+        if (! $room || $room->status !== RoomStatus::Racing) {
             return;
         }
 
@@ -1123,7 +1154,7 @@ class MultiplayerLobby extends Component
                 ->count();
 
             if ($unfinished === 0) {
-                $room->update(['status' => 'finished']);
+                $room->update(['status' => RoomStatus::Finished]);
                 $this->finalizeRace($room->id);
                 $this->captureResultSnapshot();
             }
@@ -1136,7 +1167,7 @@ class MultiplayerLobby extends Component
     public function giveUp(): void
     {
         $room = Room::where('code', $this->roomCode)->first();
-        if (! $room || $room->status !== 'racing') {
+        if (! $room || $room->status !== RoomStatus::Racing) {
             return;
         }
 
@@ -1168,7 +1199,7 @@ class MultiplayerLobby extends Component
             ->count();
 
         if ($unfinished === 0) {
-            $room->update(['status' => 'finished']);
+            $room->update(['status' => RoomStatus::Finished]);
             $this->finalizeRace($room->id);
             $this->showResultModal = true;
             $this->captureResultSnapshot();
@@ -1251,7 +1282,7 @@ class MultiplayerLobby extends Component
      * makes the still-typing player's own keystrokes close the race the instant time runs out.
      *
      * Always measured from countdown_started_at on the SERVER clock, never a client's. Race
-     * safe: the conditional `where('status', 'racing')` update means exactly ONE caller -- of
+     * safe: the conditional `where('status', RoomStatus::Racing)` update means exactly ONE caller -- of
      * any number of concurrent progress emits and timer pings -- performs the finalize; every
      * other no-ops. Returns true only on the call that actually closed the race.
      */
@@ -1287,7 +1318,7 @@ class MultiplayerLobby extends Component
      */
     private function resolveRaceDeadlinesIfElapsed(Room $room, bool $includeStartGrace = true): bool
     {
-        if ($room->status !== 'racing') {
+        if ($room->status !== RoomStatus::Racing) {
             return false;
         }
 
@@ -1393,7 +1424,7 @@ class MultiplayerLobby extends Component
      * grace window, the hard ceiling) and they must not drift into three subtly different
      * definitions of "the race is over".
      *
-     * Race safe: the conditional `where('status', 'racing')` update means exactly ONE caller
+     * Race safe: the conditional `where('status', RoomStatus::Racing)` update means exactly ONE caller
      * -- of any number of concurrent progress emits and timer pings -- performs the finalize;
      * every other no-ops. Returns true only on the call that actually closed the race.
      */
@@ -1401,8 +1432,8 @@ class MultiplayerLobby extends Component
     {
         // Atomic racing -> finished: only the winner of this update runs the finalize below.
         $claimed = Room::where('id', $room->id)
-            ->where('status', 'racing')
-            ->update(['status' => 'finished']);
+            ->where('status', RoomStatus::Racing)
+            ->update(['status' => RoomStatus::Finished]);
 
         if (! $claimed) {
             return false;
@@ -1439,7 +1470,7 @@ class MultiplayerLobby extends Component
         $room = Room::where('code', $this->roomCode)->first();
         if ($room && $room->host_id === Auth::id()) {
             $room->update([
-                'status' => 'waiting',
+                'status' => RoomStatus::Waiting,
                 // Reset so checkSuddenDeath() doesn't auto-finish immediately off the old race timer.
                 'countdown_started_at' => null,
                 // race_starts_at is deliberately NOT cleared here. startRace() is the single
@@ -1517,7 +1548,7 @@ class MultiplayerLobby extends Component
         ]);
 
         $room->update([
-            'status' => 'racing',
+            'status' => RoomStatus::Racing,
             // Defense in depth: ensure the sudden death timer is clean for each new race.
             'countdown_started_at' => null,
             // Start is set by the server: now() + 3 seconds; all clients count down to this

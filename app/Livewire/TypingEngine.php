@@ -14,6 +14,7 @@ use App\Services\GhostResolver;
 use App\Services\KeystrokeAnalyzer;
 use App\Services\LongitudinalBaseline;
 use App\Services\SoloSessionGuard;
+use App\Services\SurvivalPlausibility;
 use App\Services\TextGeneratorService;
 use App\Services\TypingErrorInspector;
 use App\Support\ClanWarAttemptState;
@@ -88,9 +89,26 @@ class TypingEngine extends Component
     ];
 
     /**
-     * Whether keystroke-timing flags REJECT a run, or are only logged (§7.1). Kept false for
-     * the first rollout: collect logs, confirm no honest player is flagged, THEN flip to true.
-     * Rejecting on day one risks locking out players whose cached bundle sends no intervals.
+     * Whether keystroke-timing flags REJECT a run, or are only logged (§7.1).
+     *
+     * A fail-safe rollout was the right call: rejecting on day one risks locking out players
+     * whose cached bundle sends no intervals at all. But "flip it once the logs look safe" is
+     * not a criterion, it is an intention — and an anti-cheat layer that never gets switched on
+     * is an anti-cheat layer that does not exist. So the bar is written down instead:
+     *
+     *   FLIP TO true WHEN, over at least 14 days of production traffic, the
+     *   'Keystroke timing flagged' warning appears for FEWER THAN 1 IN 500 saved results, AND
+     *   no flagged run belongs to a player whose history is otherwise unremarkable (check the
+     *   flagged user ids against /review-queue and their own profiles).
+     *
+     *   IF THE BAR IS NOT MET, the analyzer's thresholds are wrong, not the players — tune
+     *   KeystrokeAnalyzer and restart the window rather than shipping it as-is.
+     *
+     * Review date: 2026-09-01. If nobody has looked by then, the honest move is to say so in
+     * the anti-cheat doc rather than let this comment quietly become permanent.
+     *
+     * The same applies to MAX_CHARS_PER_SECOND and IMPOSSIBLE_CONSISTENCY, whose own comments
+     * call their calibration overdue: see docs/features/anti-cheat-wpm.md §7.
      */
     private const KEYSTROKE_TIMING_ENFORCED = false;
 
@@ -1050,14 +1068,22 @@ class TypingEngine extends Component
                 'isSurvivalPersonalBest' => $isSurvivalPersonalBest,
             ] = $this->resolvePersonalBest($user->id, $duration, $finalNetWpm);
 
-            // Longitudinal review (§7.5): a run that clears every hard gate but is far out of
-            // line with this player's own history is HELD for review, not rejected -- real
-            // players improve. `pending` rows still save and show on the player's profile but
-            // stay off the public leaderboard and don't advance highest_wpm until approved.
-            // Survival is excluded (its board metric is duration, not WPM). Computed BEFORE the
-            // transaction so it doesn't compare the row against itself.
+            // Review (§7.5): a run that clears every hard gate but still doesn't add up is HELD
+            // for review, not rejected -- real players improve, and a wrong rejection costs more
+            // trust than a delayed record. `pending` rows still save and show on the player's own
+            // profile but stay off the public leaderboard and don't advance highest_wpm until a
+            // human approves. Computed BEFORE the transaction so it doesn't compare the row
+            // against itself.
+            //
+            // The two modes ask different questions, because they are scored on different
+            // things. Time/words are scored on WPM, so the question is whether this speed fits
+            // the player's own history. Survival is scored on DURATION, and its stamina
+            // simulation runs entirely in the browser -- so the question is whether the player
+            // typed enough to have stayed alive that long at all.
             $reviewReason = $this->mainMode === 'survival'
-                ? null
+                ? app(SurvivalPlausibility::class)->reviewReasonFor(
+                    (string) $this->subMode, $duration, $correctKeystrokes
+                )
                 : app(LongitudinalBaseline::class)->reviewReasonFor(
                     $user->id, $this->mainMode, (string) $this->subMode, $finalNetWpm
                 );
@@ -1099,16 +1125,11 @@ class TypingEngine extends Component
                 // is still saved normally whatever the outcome).
                 $warScore = $this->attachToWarClaim($typingResult);
 
-                // WPM record only from the measured time/words modes; survival is excluded
-                // (achieved under stamina pressure, not apples-to-apples, just a side stat).
-                // A run held for review does NOT advance the PB -- that would leak a flagged
-                // number onto the profile/leaderboard before a human clears it.
-                if ($this->mainMode !== 'survival'
-                    && $reviewStatus === TypingResult::REVIEW_CLEAR
-                    && $finalNetWpm > (float) $user->highest_wpm) {
-                    $user->highest_wpm = $finalNetWpm;
-                    $user->save();
-                }
+                // What counts as a personal best is defined once, on the model: survival is
+                // excluded, a run held for review does not advance the PB, and it has to beat
+                // the current record. ReviewQueue::approve() calls the same method when a held
+                // run is later cleared -- the two used to carry separate copies of the rule.
+                $user->recordPersonalBest($typingResult);
             });
 
             // Both clans' scoreboards just moved. Broadcast AFTER the transaction, never inside

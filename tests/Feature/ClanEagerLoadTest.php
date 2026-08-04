@@ -13,24 +13,8 @@ use App\Models\User;
  *   1. tak ada cache  -> query berulang tiap kali properti dibaca
  *   2. tak bisa with() -> N+1 mustahil dihindari di daftar user mana pun
  */
-function userInClan(?string $clanName = null): array
-{
-    $user = User::factory()->create();
-    $clan = Clan::create([
-        'name' => $clanName ?? 'Clan '.uniqid('', true),
-        'tag' => 'TAG',
-        'leader_id' => $user->id,
-        'power' => 1000,
-    ]);
-    ClanMember::create([
-        'clan_id' => $clan->id,
-        'user_id' => $user->id,
-        'role' => ClanRole::Leader,
-        'status' => ClanMemberStatus::Active,
-    ]);
-
-    return [$user, $clan];
-}
+// userInClan() kini tinggal di tests/Pest.php: berkas kedua yang memakainya membuat suite
+// penuh fatal karena nama fungsi test bersifat global.
 
 test('clan bisa di-eager-load lewat with()', function () {
     [$user, $clan] = userInClan('Clan Eager');

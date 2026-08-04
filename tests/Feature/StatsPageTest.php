@@ -128,9 +128,17 @@ it('only aggregates the signed in users own results', function () {
     makeResult($me, ['mode' => 'words', 'mode_config' => '15', 'net_wpm' => 80]);
     makeResult($other, ['mode' => 'words', 'mode_config' => '15', 'net_wpm' => 199]);
 
-    Livewire::actingAs($me)->test(Stats::class)
-        ->assertSee('80')
-        ->assertDontSee('199');
+    // Diperiksa pada data terstruktur, bukan lewat assertDontSee('199').
+    //
+    // assertDontSee mencari SUBSTRING di seluruh HTML yang dirender, termasuk bagian yang
+    // tak deterministik: snapshot & checksum Livewire, dan username hasil faker. Angka '199'
+    // yang muncul kebetulan di sana menggagalkan test tanpa ada yang salah pada agregatnya --
+    // dan itu benar-benar terjadi, berpindah-pindah berkas tiap kali suite dijalankan.
+    //
+    // Membandingkan seluruh array juga menguji lebih banyak: bukan cuma "199 tak terlihat",
+    // tapi "tepat satu rekor, milik saya, dengan nilai ini".
+    expect(Livewire::actingAs($me)->test(Stats::class)->viewData('bestWords'))
+        ->toBe(['15' => 80.0]);
 });
 
 it('limits the chart series to the selected day range', function () {
@@ -148,6 +156,32 @@ it('limits the chart series to the selected day range', function () {
 
     $component->call('setRange', '30');
     expect($component->viewData('series')['wpm'])->toBe([55.0, 77.0]);
+});
+
+it('charts the most recent results once the cap is reached, not the oldest', function () {
+    $user = User::factory()->create();
+
+    // Satu lebih banyak dari plafon grafik. WPM dibuat sama dengan urutannya supaya titik
+    // mana pun bisa dikenali dari nilainya sendiri.
+    $cap = Stats::SERIES_LIMIT;
+
+    foreach (range(1, $cap + 1) as $i) {
+        $row = makeResult($user, ['net_wpm' => $i]);
+        // created_at menaik: hasil ke-1 paling tua, hasil ke-(cap+1) paling baru.
+        $row->created_at = now()->subMinutes($cap + 1 - $i);
+        $row->save();
+    }
+
+    $series = Livewire::actingAs($user)->test(Stats::class, ['range' => 'all'])
+        ->viewData('series');
+
+    // Titik terakhir grafik HARUS sesi terbaru. `orderBy()->take()` yang lama mengurutkan
+    // menaik lalu memotong, jadi yang tersisa adalah 200 hasil PALING TUA: begitu pemain
+    // melewati plafon, grafiknya membeku dan tak pernah lagi memuat sesi barunya.
+    expect(end($series['wpm']))->toBe((float) ($cap + 1))
+        ->and($series['wpm'])->toHaveCount($cap)
+        // ...dan tetap kronologis: yang terpotong adalah ujung yang tua.
+        ->and($series['wpm'][0])->toBe(2.0);
 });
 
 it('rejects an out of range value from the query string', function () {

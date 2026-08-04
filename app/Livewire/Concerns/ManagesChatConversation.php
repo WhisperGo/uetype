@@ -10,6 +10,7 @@ use App\Models\Message;
 use App\Models\MessageClear;
 use App\Models\MessageDelete;
 use App\Models\User;
+use App\Support\ChatAccess;
 use App\Support\SafeBroadcast;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -155,31 +156,23 @@ trait ManagesChatConversation
         $this->replyingToId = null;
     }
 
-    /** A valid reply_to_id for the active conversation that the user may see, or null. */
+    /**
+     * A valid reply_to_id for the active conversation, or null.
+     *
+     * Delegates to App\Support\ChatAccess so this and ChatController answer the same question
+     * with the same code -- the two used to re-implement it side by side.
+     */
     private function resolveReplyTargetId(): ?int
     {
-        if (! $this->replyingToId) {
-            return null;
-        }
-
-        $target = Message::find($this->replyingToId);
-
-        if (! $target || ! $this->canSeeMessage($target)) {
-            return null;
-        }
-
-        // Make sure the replied-to message belongs to the same conversation.
         if ($this->activeMode === 'clan') {
-            return $target->clan_id === $this->myClan?->id ? $target->id : null;
+            $clan = $this->myClan;
+
+            return $clan ? ChatAccess::clanReplyTarget($this->replyingToId, $clan->id) : null;
         }
 
         $friend = $this->activeFriend;
 
-        return $friend && ! $target->isClanMessage()
-            && in_array($friend->id, [$target->sender_id, $target->recipient_id], true)
-            && in_array(Auth::id(), [$target->sender_id, $target->recipient_id], true)
-            ? $target->id
-            : null;
+        return $friend ? ChatAccess::dmReplyTarget($this->replyingToId, Auth::id(), $friend->id) : null;
     }
 
     private function sendDm(string $body, ?int $replyToId = null): void

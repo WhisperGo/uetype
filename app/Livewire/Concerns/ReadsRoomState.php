@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Enums\RoomStatus;
 use App\Livewire\MultiplayerLobby;
 use App\Models\Room;
 use App\Models\RoomMember;
@@ -294,7 +295,7 @@ trait ReadsRoomState
     {
         $room = $this->roomData;
 
-        return (bool) ($room && $room->status === 'racing' && $room->countdown_started_at);
+        return (bool) ($room && $room->status === RoomStatus::Racing && $room->countdown_started_at);
     }
 
     /** Sudden-death time left as a countdown in seconds (15 -> 0), not elapsed. */
@@ -327,7 +328,7 @@ trait ReadsRoomState
     {
         $room = $this->roomData;
 
-        if (! $room || ! $room->race_starts_at || $room->status !== 'racing') {
+        if (! $room || ! $room->race_starts_at || $room->status !== RoomStatus::Racing) {
             return 0;
         }
 
@@ -339,7 +340,7 @@ trait ReadsRoomState
     {
         $room = $this->roomData;
 
-        if (! $room || ! $room->race_starts_at || $room->status !== 'racing') {
+        if (! $room || ! $room->race_starts_at || $room->status !== RoomStatus::Racing) {
             return 0;
         }
 

@@ -692,6 +692,34 @@ describe('multiplayer room chat', function () {
 
         Event::assertNotDispatched(RoomMessageSent::class);
     });
+
+    it('caps how many messages one player can flood into the room', function () {
+        Event::fake([RoomMessageSent::class]);
+
+        $host = User::factory()->create();
+        $room = Room::create([
+            'code' => 'CHAT06',
+            'host_id' => $host->id,
+            'status' => 'waiting',
+            'text_to_type' => 'the quick brown fox',
+        ]);
+        RoomMember::create(['room_id' => $room->id, 'user_id' => $host->id, 'role' => 'player', 'is_ready' => true]);
+
+        $component = Livewire::actingAs($host)->test(MultiplayerLobby::class)
+            ->set('roomCode', 'CHAT06')
+            ->set('step', 'waiting');
+
+        // Tiap pesan yang diterima disiarkan ke SETIAP anggota room, jadi satu request membeli
+        // N pengiriman. Semua jalur panas lain sudah dibatasi (invite 10/menit, progress per
+        // detik, /chat/send 60/menit); yang ini luput justru karena ia aksi Livewire, bukan
+        // route -- middleware `throttle` tak pernah melihatnya.
+        foreach (range(1, 25) as $i) {
+            $component->call('sendRoomMessage', "spam {$i}");
+        }
+
+        // Yang diuji: batasnya ADA dan longgar untuk pemakaian wajar -- bukan angka persisnya.
+        Event::assertDispatchedTimes(RoomMessageSent::class, 20);
+    });
 });
 
 describe('multiplayer room presence', function () {

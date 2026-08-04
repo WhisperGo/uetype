@@ -126,6 +126,7 @@ return [
         'not_in_war' => 'Clan-mu sedang tidak berperang. Minta leader-mu menantang clan lain.',
         'history_heading' => 'Riwayat War',
         'history_vs' => 'vs :name',
+        'opponent_disbanded' => 'clan yang sudah bubar',
         'match_history' => 'Riwayat Pertandingan',
         'vs_label' => 'vs',
     ],

@@ -193,6 +193,14 @@ class Clan extends Model
             $result = $war->result === 'win' ? 'loss' : 'win';
         }
 
-        return ['result' => $result, 'opponent' => $opponent, 'delta' => (int) $delta];
+        // 'opponent' is null once that clan has disbanded -- the war row now survives them
+        // (see the 2026_08_03 migration), so callers must not assume a model is there.
+        // 'opponent_name' is always present for display; only the link needs the model.
+        return [
+            'result' => $result,
+            'opponent' => $opponent,
+            'opponent_name' => $war->opponentNameFor($this->id),
+            'delta' => (int) $delta,
+        ];
     }
 }

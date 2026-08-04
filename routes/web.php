@@ -26,6 +26,7 @@ use App\Livewire\TypingResult;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Livewire\Volt\Volt;
 
 Route::redirect('/', '/typing')->name('home');
@@ -144,6 +145,17 @@ if (app()->environment('local')) {
 
     Route::get('/dev-login', function () {
         $email = request('email', 'dummy@uetype.test');
+
+        // Restricted to the seeder's own domains. The environment check above already keeps
+        // this off production, but the realistic accident is closer to home: a production dump
+        // restored locally to reproduce a bug turns this shortcut into "log in as any real
+        // user", including theirs. Dev convenience should not reach real people's accounts.
+        $allowedDomains = ['@uetype.test', '@example.com'];
+
+        if (! Str::endsWith($email, $allowedDomains)) {
+            abort(404, 'dev-login only accepts seeded accounts ('.implode(', ', $allowedDomains).').');
+        }
+
         $user = User::where('email', $email)->first();
 
         if (! $user) {

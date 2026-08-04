@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\RoomStatus;
 use Binafy\LaravelUserMonitoring\Traits\Actionable;
 use Illuminate\Database\Eloquent\Model;
 
@@ -17,6 +18,10 @@ class Room extends Model
     // strings. Without this, after refresh()/query they come back as strings and
     // ->copy()/->diffInSeconds() fail ("Call to a member function copy() on string").
     protected $casts = [
+        // waiting | racing | finished. Cast so a comparison against a value that isn't one of
+        // the three is a hard error instead of a branch that silently never runs -- these were
+        // the most-repeated literals in the codebase, in its busiest path.
+        'status' => RoomStatus::class,
         'countdown_started_at' => 'datetime',
         'race_starts_at' => 'datetime',
     ];

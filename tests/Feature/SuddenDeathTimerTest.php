@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\RoomStatus;
 use App\Events\RaceProgressUpdated;
 use App\Events\RoomUpdated;
 use App\Events\SuddenDeathTriggered;
@@ -105,7 +106,7 @@ test('giveUp does not start sudden death (only a valid finish does)', function (
     // Conceding is not a finish: the clock must stay off so the remaining player keeps
     // racing until someone actually finishes with a valid result.
     expect($room->fresh()->countdown_started_at)->toBeNull()
-        ->and($room->fresh()->status)->toBe('racing');
+        ->and($room->fresh()->status)->toBe(RoomStatus::Racing);
 });
 
 /**
@@ -315,7 +316,7 @@ test('a still-typing player closes the race in real time once the window elapses
         ->call('updateRaceProgress', 45, 60, 100)
         ->assertSet('showResultModal', true);
 
-    expect($room->fresh()->status)->toBe('finished')
+    expect($room->fresh()->status)->toBe(RoomStatus::Finished)
         ->and($typing->fresh()->finished_time_seconds)->toBe(RoomMember::DNF_SENTINEL_SECONDS);
 });
 
@@ -344,5 +345,5 @@ test('checkSuddenDeath menutup race setelah 15 detik', function () {
         ->call('checkSuddenDeath')
         ->assertSet('showResultModal', true);
 
-    expect($room->fresh()->status)->toBe('finished');
+    expect($room->fresh()->status)->toBe(RoomStatus::Finished);
 });

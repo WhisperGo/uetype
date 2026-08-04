@@ -281,7 +281,10 @@
                 @foreach ($this->warHistory as $war)
                     @php
                         $isChallenger = $war->challenger_clan_id === $this->myClan->id;
+                        // Bisa null: clan lawan yang sudah bubar tak lagi punya baris sendiri,
+                        // sementara perangnya tetap ada. Namanya diambil dari snapshot.
                         $opponent = $isChallenger ? $war->opponent : $war->challenger;
+                        $opponentName = $war->opponentNameFor($this->myClan->id) ?: __('clan.war.opponent_disbanded');
                         $myDelta = $isChallenger ? $war->challenger_power_delta : $war->opponent_power_delta;
 
                         // 'result' is stored from the challenger's point of view; flip it if we're the opponent.
@@ -300,7 +303,7 @@
                         </span>
                         <x-clan-emblem :clan="$opponent" size="sm" />
                         <div class="flex-1 min-w-0">
-                            <p class="font-mono text-sm text-foreground truncate">{{ __('clan.war.history_vs', ['name' => $opponent->name]) }}</p>
+                            <p class="font-mono text-sm text-foreground truncate">{{ __('clan.war.history_vs', ['name' => $opponentName]) }}</p>
                         </div>
                         <span class="font-mono text-sm font-bold tabular-nums {{ $myDelta >= 0 ? 'text-gold' : 'text-danger' }}">
                             {{ $myDelta >= 0 ? '+' : '' }}{{ $myDelta }}

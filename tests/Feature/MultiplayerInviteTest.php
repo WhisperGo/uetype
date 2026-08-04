@@ -26,10 +26,8 @@ function inviteRoom(string $code, User $host, string $status = 'waiting'): Room
     ]);
 }
 
-function befriend(User $a, User $b): void
-{
-    Friendship::create(['requester_id' => $a->id, 'addressee_id' => $b->id, 'status' => FriendshipStatus::Accepted]);
-}
+// befriend() kini tinggal di tests/Pest.php: berkas kedua yang memakainya (ChatAccessParityTest)
+// membuat suite penuh fatal karena nama fungsi test bersifat global.
 
 it('broadcasts an invitation to an accepted friend', function () {
     Event::fake([RoomInvitationSent::class]);

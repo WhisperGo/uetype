@@ -3,20 +3,22 @@
 namespace App\Livewire\Concerns;
 
 use App\Enums\ClanMemberStatus;
-use App\Enums\FriendshipStatus;
 use App\Events\ClanMessageSent;
 use App\Events\DirectMessageSent;
 use App\Models\ClanMember;
 use App\Models\Message;
+use App\Support\ChatAccess;
 use App\Support\SafeBroadcast;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Shared security gate & message sending for the chat components (the full-page Chat
- * and the ChatOverlay drawer). Extracted so the "who may DM / see whose messages" rules
- * live in one place for both Livewire components — ChatController stays separate (for
- * latency reasons, see its class doc comment) and, not being a Livewire class, doesn't
- * use this trait.
+ * Message sending for the chat components (the full-page Chat and the ChatOverlay drawer),
+ * plus the Livewire-shaped wrappers around the access rules.
+ *
+ * The rules THEMSELVES live in App\Support\ChatAccess, not here: ChatController needs the
+ * same answers and cannot use a Livewire trait, so keeping them in a trait is exactly what
+ * made them get written twice. This trait now only adapts them to what a component has on
+ * hand (Auth::id(), $this->myClan).
  */
 trait GuardsChatAccess
 {
@@ -36,21 +38,13 @@ trait GuardsChatAccess
     /** Accepted friends only; re-checked server-side on every action. */
     private function isAcceptedFriend(int $otherId): bool
     {
-        $friendship = Auth::user()->friendshipWith($otherId);
-
-        return $friendship?->status === FriendshipStatus::Accepted;
+        return ChatAccess::isAcceptedFriend(Auth::id(), $otherId);
     }
 
     /** May see (and "delete for me") a message: a DM involving them, or their active clan's. */
     private function canSeeMessage(Message $message): bool
     {
-        $me = Auth::id();
-
-        if ($message->isClanMessage()) {
-            return $this->myClan && $message->clan_id === $this->myClan->id;
-        }
-
-        return $message->sender_id === $me || $message->recipient_id === $me;
+        return ChatAccess::canSeeMessage($message, Auth::id(), $this->myClan?->id);
     }
 
     private function markDmAsRead(int $friendId): void

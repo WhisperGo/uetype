@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\RoomStatus;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Services\RoomMembershipService;
@@ -37,7 +38,7 @@ class MultiplayerPresenceController extends Controller
             $room = Room::find($member->room_id);
             $isHost = $room && $room->host_id === Auth::id();
 
-            if ($room && $room->status === 'waiting' && ! $isHost && ! $member->is_ready) {
+            if ($room && $room->status === RoomStatus::Waiting && ! $isHost && ! $member->is_ready) {
                 $memberships->depart(Auth::id());
             }
         }

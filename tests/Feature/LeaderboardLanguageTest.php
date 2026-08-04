@@ -3,6 +3,7 @@
 use App\Livewire\TypingEngine;
 use App\Models\TypingResult;
 use App\Models\User;
+use App\Services\SoloSessionGuard;
 use Livewire\Livewire;
 use Livewire\Volt\Volt;
 
@@ -60,10 +61,18 @@ function langResult(User $user, string $lang, string $mode = 'time', string $con
 test('saveResult menyimpan bahasa konten yang aktif ke typing_results', function () {
     $user = User::factory()->create();
 
-    Livewire::actingAs($user)->test(TypingEngine::class)
+    $component = Livewire::actingAs($user)->test(TypingEngine::class)
         ->call('setMode', 'words', '25')
-        ->call('setContentLang', 'id')
-        ->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 150, 'correctKeystrokes' => 140, 'wpmHistory' => [40, 42], 'rawHistory' => [45, 47]]);
+        ->call('setContentLang', 'id');
+
+    // Pemain sungguhan menghabiskan 30 detik itu untuk mengetik; sebuah test memanggil
+    // saveResult seketika. Sejak kelonggaran durasi dibuat proporsional (min(30, durasi x
+    // 0.35) alih-alih 30 detik datar), klaim 30 detik atas sesi yang baru berumur nol ditolak
+    // sebagai waktu yang tak pernah berlalu -- dan itu memang yang seharusnya terjadi. Yang
+    // diuji berkas ini adalah bahasanya, jadi jamnya digeser seperti di SoloResultTamperingTest.
+    app(SoloSessionGuard::class)->backdate(30);
+
+    $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 150, 'correctKeystrokes' => 140, 'wpmHistory' => [40, 42], 'rawHistory' => [45, 47]]);
 
     expect(TypingResult::first()->language)->toBe('id');
 });

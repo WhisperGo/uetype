@@ -113,6 +113,46 @@ it('summarizes a war from the clan perspective correctly (challenger vs opponent
     expect($summaryB['opponent']->id)->toBe($clanA->id);
 });
 
+it('counts wins in the database, so the page does not grow with war history', function () {
+    $me = User::factory()->create();
+    [, $clanA] = makeClan('Counter A', 1000);
+    [, $clanB] = makeClan('Counter B', 1000);
+
+    $finishedWar = fn () => ClanWar::create([
+        'challenger_clan_id' => $clanA->id, 'opponent_clan_id' => $clanB->id,
+        'status' => ClanWarStatus::Finished, 'result' => 'win',
+        'accept_deadline_at' => now()->subDays(4), 'challenger_power_before' => 1000,
+        'opponent_power_before' => 1000, 'challenger_power_delta' => 16, 'opponent_power_delta' => -16,
+        'started_at' => now()->subDays(4), 'ends_at' => now()->subDays(1),
+    ]);
+
+    foreach (range(1, 3) as $ignored) {
+        $finishedWar();
+    }
+
+    $render = fn () => Livewire::actingAs($me)->test(ClanLeaderboard::class)->get('ranking');
+
+    // Render sekali sebelum mengukur. `Livewire::actingAs($me)` memakai ULANG objek $me yang
+    // sama, jadi relasi clan-nya ter-memoize pada instance itu setelah pemakaian pertama:
+    // tanpa pemanasan ini, pengukuran pertama menghitung satu query yang tak akan pernah
+    // muncul lagi di pengukuran kedua, dan test gagal karena artefaknya sendiri.
+    $render();
+
+    $withThreeWars = countQueries($render);
+
+    foreach (range(1, 20) as $ignored) {
+        $finishedWar();
+    }
+
+    // Jumlah query TIDAK boleh berubah, dan itu proksi untuk hal yang sebenarnya dijaga:
+    // agregasi terjadi di DB. Implementasi lama memang cuma satu query -- tapi query itu
+    // menarik SETIAP baris clan_wars yang pernah selesai ke memori PHP lalu menghitungnya
+    // dengan foreach, jadi biayanya tumbuh selamanya sementara jumlah query terlihat sehat.
+    // Karena itu barisnya juga diperiksa: hasilnya harus tetap benar setelah 23 perang.
+    expect(countQueries($render))->toBe($withThreeWars)
+        ->and($render()->firstWhere('clan.id', $clanA->id)['wins'])->toBe(23);
+});
+
 it('requires authentication to view the clan leaderboard and detail pages', function () {
     [, $clan] = makeClan('Alpha', 1000);
 

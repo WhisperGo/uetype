@@ -38,6 +38,12 @@ function racingMember(User $user): RoomMember
 }
 
 it('updates wpm on the server without moving progress', function () {
+    // Jam dibekukan: server menghitung Net WPM dari (karakter / (now() - race_starts_at)), jadi
+    // tiap detik nyata yang lewat selama test ikut menambah penyebutnya. Room ini mulai 60
+    // detik lalu dan hasilnya diassert persis 8 -- cukup ~4 detik saja untuk menjatuhkannya ke
+    // 7 dan membuat test gagal karena kecepatan mesin, bukan karena kodenya.
+    $this->freezeTime();
+
     $user = User::factory()->create();
     $member = racingMember($user);
 

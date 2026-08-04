@@ -1,6 +1,6 @@
 # UeType — Dokumentasi Proyek Menyeluruh
 
-**Dibuat:** 2026-07-13 · **Diperbarui:** 2026-07-21
+**Dibuat:** 2026-07-13 · **Diperbarui:** 2026-08-03
 **Cakupan:** Gambaran arsitektur, database, seluruh route, dan tooling di satu tempat.
 Untuk detail *cara kerja & justifikasi* per fitur, dokumen ini merujuk ke
 [`docs/features/`](features/README.md) yang sudah ada — tidak diduplikasi di sini.
@@ -75,7 +75,7 @@ Dua pola arsitektur yang berulang di seluruh proyek (detail alasan ada di
 
 ## 4. Skema Database
 
-42 migrasi di `database/migrations/`. Dikelompokkan per domain:
+50 migrasi di `database/migrations/`. Dikelompokkan per domain:
 
 > **Tabel legacy sudah dibuang.** Migrasi
 > `2026_07_20_110000_drop_legacy_match_and_text_tables.php` men-*drop*
@@ -234,27 +234,40 @@ Sumber: `routes/web.php`, `routes/auth.php`, `routes/channels.php`.
 
 **Autentikasi:**
 - `POST /locale` → ganti bahasa UI
+- `GET /login` (guest-only), `POST /logout`
 - `GET /auth/google`, `GET /auth/google/callback` → OAuth Google
 - `GET|POST /auth/google/username` → pilih username pasca-OAuth
-- Route Breeze standar di `routes/auth.php` (register/login/reset password/verify email)
+
+> **Autentikasi kini Google-only.** `routes/auth.php` beserta seluruh route Breeze
+> (register/login-password/reset password/verify email) **sudah tidak ada** — dikunci oleh
+> `tests/Feature/Auth/GoogleOnlyAuthTest.php`. Nama route `login` wajib dipertahankan karena
+> middleware `auth` bawaan Laravel mengarahkan tamu ke nama itu.
 
 **Lokal saja** (`app()->environment('local')`):
 - `/style-guide` — referensi design system hidup
 - `/dev-login` (opsional `?email=...`) — login instan sebagai user dummy dari seeder
 
-**Catatan controller:** hanya 7 controller yang tersisa (`AchievementController`,
-`ChatController`, `GoogleAuthController`, `LocaleController`, `PresenceController`,
-`ProfileController`, + base `Controller`). Kontroler-kontroler stub versi lama
-(`MatchController`, `TextController`, `UserController`, `ShopController`,
-`LeaderboardController`) **sudah dihapus** — logika sesungguhnya berada di komponen
-Livewire/Volt, jadi tak ada lagi controller kosong yang menyesatkan.
+**Catatan controller:** ada **10 file** di `app/Http/Controllers/` (9 controller + base
+`Controller`): `AchievementController`, `ChatController`, `ClanWarProgressController`,
+`FriendController`, `GoogleAuthController`, `LocaleController`,
+`MultiplayerPresenceController`, `PresenceController`, `ProfileController`.
+Kontroler-kontroler stub versi lama (`MatchController`, `TextController`, `UserController`,
+`ShopController`, `LeaderboardController`) **sudah dihapus** — logika sesungguhnya berada di
+komponen Livewire/Volt, jadi tak ada lagi controller kosong yang menyesatkan.
+
+Empat yang terbaru sengaja berupa endpoint tipis di luar Livewire, bukan kelalaian: XHR
+Livewire dibatalkan browser saat halaman di-unload, sedangkan ping yang paling menentukan
+justru yang dikirim tepat saat pemain menekan refresh. `ClanWarProgressController` dan
+`MultiplayerPresenceController` dijangkau lewat `fetch(..., { keepalive: true })` supaya
+selamat melewati unload; `FriendController` melayani nav yang berupa partial statis.
 
 ## 8. Services & Events
 
-### Services (`app/Services/`, 13 file)
+### Services (`app/Services/`, 15 file)
 | Service | Peran |
 |---|---|
 | `AntiCheatService` | Hitung ulang & validasi WPM/akurasi server-side — trust boundary utama |
+| `SurvivalPlausibility` | Lantai fisik Survival: minimum karakter yang bisa menopang durasi yang diklaim. Stamina disimulasikan di klien, jadi ini satu-satunya cara server memeriksa durasi Survival — hasil di bawah lantai **ditahan** (`pending`), tidak ditolak |
 | `SoloSessionGuard` | Acuan sesi solo di server (mode/panjang teks/waktu mulai); plafon karakter & anti-replay — lihat [anti-cheat-wpm.md](features/anti-cheat-wpm.md) §7 |
 | `KeystrokeAnalyzer` | Analisis distribusi timing antar-keystroke (deteksi bot) — §7.7b |
 | `LongitudinalBaseline` | Bandingkan hasil vs riwayat pemain; tandai lonjakan untuk review — §7.7c |
@@ -277,6 +290,7 @@ Livewire/Volt, jadi tak ada lagi controller kosong yang menyesatkan.
 | `SuddenDeathTriggered` | `race.{code}` |
 | `RoomMessageSent` | `room.{code}` (chat lobby, broadcast-only) |
 | `RoomPresenceChanged` | `room.{code}` (notif join/leave) |
+| `RoomInvitationSent` | `friends.{friendId}` — undangan room sebagai toast, membawa deep link `?invite=CODE` |
 | `DirectMessageSent` | `chat.{recipientId}` |
 | `ClanMessageSent` | `clan-chat.{clanId}` |
 | `MessageEdited` / `MessageDeleted` | `chat.{id}` atau `clan-chat.{id}` |
@@ -312,9 +326,34 @@ Dokumen terkait lain:
 
 ## 10. Testing
 
-- **Framework:** Pest v4 (`tests/Pest.php`), gaya fungsional (`it('...', fn () => ...)`).
-- **Struktur:** `tests/Unit` (9 file) + `tests/Feature` (64 file top-level + 2 di `Auth/`).
-- **Total:** 75 file test, ±526 kasus `it()`/`test()`.
+- **Framework:** Pest v4 (`tests/Pest.php`), gaya fungsional (`it('...', fn () => ...)`),
+  ditambah **Vitest** untuk logika klien murni (`resources/js/*.test.js`, dijalankan
+  `npm test` dan ikut dieksekusi CI sebelum build aset).
+- **Struktur:** `tests/Unit` (10 file) + `tests/Feature` (122 file top-level + 4 di `Auth/`).
+- **Total:** 136 file test, ±1.117 kasus `it()`/`test()`.
+- **Database test terpisah.** `phpunit.xml` mematok `DB_DATABASE=uetype_test`; buat sekali per
+  mesin (`CREATE DATABASE uetype_test;`). Tanpa itu `RefreshDatabase` menjalankan
+  `migrate:fresh` terhadap database dev di `.env` dan menghapus seluruh data lokal — mode
+  `--parallel` kebetulan aman karena Laravel membuat `uetype_test_1..N` sendiri, sehingga
+  perintah yang lebih polos justru yang merusak. Dikunci `TestDatabaseIsolationTest`.
+- **Test harus deterministik.** Dua pola pernah membuat suite merah berpindah-pindah tanpa ada
+  perubahan kode: assertion yang terikat jam nyata (bekukan dengan
+  `freezeTime()`/`freezeSecond()`/`travelTo()`) dan `assertDontSee('<angka>')` yang mencari
+  substring di seluruh HTML — termasuk snapshot & checksum Livewire. Untuk yang kedua, periksa
+  `viewData()` alih-alih markup.
+
+  Aturan praktis dari penyisiran 2026-08-03: yang berbahaya **bukan** `now()->sub` di setup
+  (41 berkas memakainya dan hampir semuanya aman), melainkan **apa yang diassert**. Nilai yang
+  *disimpan* aman — `finished_time_seconds` yang ditulis langsung ke baris, `wpm` yang disalin
+  apa adanya oleh `finalizeRace()`. Nilai yang *diturunkan dari jam* tidak: WPM race
+  (`karakter / (now() − race_starts_at)`), `attempt_live_ms`, `raceStartsInMs`,
+  `suddenDeathRemaining`. Kalau assertion-nya menyentuh yang kedua, bekukan jamnya — dan
+  bekukan di `beforeEach` kalau seluruh berkas memang tentang besaran itu
+  (lihat `RaceWpmIntegrityTest`), supaya test yang ditambahkan besok lahir ikut terlindungi.
+
+  **Padding bukan solusi.** Melonggarkan ambang (`toBeLessThanOrEqual(11_000)` untuk batas 10
+  detik) hanya memindahkan titik gagalnya; di bawah beban paralel ia tetap terlampaui. Dengan
+  jam beku, ambangnya bisa dikembalikan ke nilai sebenarnya dan testnya justru lebih tajam.
 - **Konvensi:** `RefreshDatabase`, pola
   `Livewire::actingAs($user)->test(Component::class)->call(...)->assertDispatched(...)`,
   fixture via factory (`UserFactory` — satu-satunya factory di proyek).

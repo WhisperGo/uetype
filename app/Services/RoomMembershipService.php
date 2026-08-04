@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\RoomStatus;
 use App\Events\RoomPresenceChanged;
 use App\Events\RoomUpdated;
 use App\Models\Room;
@@ -158,7 +159,7 @@ class RoomMembershipService
         $cutoff = now()->subSeconds(User::ONLINE_THRESHOLD_SECONDS);
 
         $abandoned = Room::query()
-            ->whereIn('status', ['racing', 'finished'])
+            ->whereIn('status', [RoomStatus::Racing, RoomStatus::Finished])
             // "Has no member who is still here". A room with no members at all also matches,
             // which is correct -- that is orphan data with nothing left to protect.
             ->whereDoesntHave('members', function ($member) use ($cutoff, $exceptUserId) {
@@ -194,7 +195,7 @@ class RoomMembershipService
         $stale = RoomMember::query()
             ->join('rooms', 'rooms.id', '=', 'room_members.room_id')
             ->join('users', 'users.id', '=', 'room_members.user_id')
-            ->where('rooms.status', 'waiting')
+            ->where('rooms.status', RoomStatus::Waiting)
             ->when($exceptUserId, fn ($q) => $q->where('room_members.user_id', '!=', $exceptUserId))
             ->where(fn ($q) => $q->whereNull('users.last_seen_at')->orWhere('users.last_seen_at', '<', $cutoff))
             ->select('room_members.id', 'room_members.room_id', 'room_members.user_id')

@@ -102,7 +102,8 @@ class SoloSessionGuard
      * client claims, covering latency and the gap between the last keystroke and the
      * request landing. Beyond this the claim describes time that never passed.
      *
-     * Capped further by SLACK_FRACTION so it stays proportional to the session.
+     * Capped further by SLACK_FRACTION so it stays proportional to the session — see
+     * slackFor(), which both gates now go through.
      */
     private const DURATION_SLACK_SECONDS = 30.0;
 
@@ -294,7 +295,7 @@ class SoloSessionGuard
         // only a cap on how much wall clock the attempt may span, and letting it widen the
         // slack too would hand a war slot a looser ceiling than the same solo test gets.
         $elapsed = $elapsedOverride ?? $this->elapsedSeconds($tabKey);
-        $slack = min(self::DURATION_SLACK_SECONDS, $durationSeconds * self::SLACK_FRACTION);
+        $slack = self::slackFor($durationSeconds);
 
         $realSeconds = $elapsed === null
             ? $window
@@ -329,7 +330,26 @@ class SoloSessionGuard
             return false;
         }
 
-        return $claimedSeconds > $elapsed + self::DURATION_SLACK_SECONDS;
+        return $claimedSeconds > $elapsed + self::slackFor($claimedSeconds);
+    }
+
+    /**
+     * The allowance a claim of this length gets over the server's own clock.
+     *
+     * ONE definition for both gates. It used to be two: maxPlausibleChars() capped the slack
+     * at a fraction of the session while this gate used the flat 30 seconds, so a `words/10`
+     * run that had really been open 15 seconds could still claim 45 -- three times its length.
+     * The constant's own doc comment said it was "capped further by SLACK_FRACTION", which was
+     * true of the character path and only of that one; the prose had quietly become a
+     * description of half the code.
+     *
+     * Solo barely notices (a longer duration only lowers WPM), but Clan War survival scores
+     * BY duration, and it is the highest-ceiling slot on the grid — so the looser half of the
+     * definition was attached to the one place the extra seconds are worth points.
+     */
+    private static function slackFor(float $seconds): float
+    {
+        return min(self::DURATION_SLACK_SECONDS, $seconds * self::SLACK_FRACTION);
     }
 
     /** Seconds the server has actually held this session open, or null if none is active. */

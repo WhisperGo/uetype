@@ -27,6 +27,15 @@ class Stats extends Component
     /** Range whitelist; anything outside it is treated as '7'. */
     private const RANGES = ['7', '30', 'all'];
 
+    /**
+     * Most data points one chart may carry, so the 'all' range can't pull thousands of rows.
+     *
+     * Public because the test that guards WHICH end of the history survives the cap has to
+     * cross it deliberately -- hard-coding the number there would let the two drift apart and
+     * quietly stop testing the boundary.
+     */
+    public const SERIES_LIMIT = 200;
+
     /** Set the chart range, ignoring values outside the whitelist. */
     public function setRange(string $range): void
     {
@@ -71,7 +80,12 @@ class Stats extends Component
 
     /**
      * Chart series (WPM & accuracy) for the active range, in chronological order.
-     * Taken ascending then capped so the 'all' range doesn't pull thousands of rows.
+     *
+     * The cap exists so the 'all' range doesn't pull thousands of rows -- but WHICH end it
+     * keeps is the whole point, and it used to keep the wrong one. `orderBy('created_at')`
+     * then `take()` sorts ascending and cuts from the bottom, so a player past the cap got
+     * their FIRST 200 sessions forever: the chart froze, and it froze hardest for the players
+     * who type most. Take the newest, then restore chronological order for the chart.
      *
      * @return array{labels: list<string>, wpm: list<float>, accuracy: list<float>}
      */
@@ -83,9 +97,11 @@ class Stats extends Component
             $query->where('created_at', '>=', Carbon::now()->subDays((int) $this->range));
         }
 
-        $rows = $query->orderBy('created_at')
-            ->take(200)
-            ->get(['net_wpm', 'accuracy', 'created_at']);
+        $rows = $query->latest('created_at')
+            ->take(self::SERIES_LIMIT)
+            ->get(['net_wpm', 'accuracy', 'created_at'])
+            ->reverse()
+            ->values();
 
         return [
             'labels' => $rows->map(fn ($r) => $r->created_at->format('M j'))->all(),

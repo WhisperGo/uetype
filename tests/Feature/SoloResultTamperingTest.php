@@ -125,6 +125,38 @@ it('still accepts an honest session', function () {
         ->and((float) $result->net_wpm)->toBeLessThan(120.0);
 });
 
+it('refuses a duration far longer than the session has been open', function () {
+    $user = User::factory()->create();
+
+    // Sesi `words/10` yang benar-benar baru berjalan 15 detik, mengklaim 45.
+    $component = playSolo($user, 'words', '10');
+    app(SoloSessionGuard::class)->backdate(15);
+
+    $component->call('saveResult', ['durationMs' => 45000, 'totalKeystrokes' => 60, 'correctKeystrokes' => 60])
+        ->assertRedirect(route('typing'));
+
+    // Kelonggarannya dulu 30 detik DATAR, jadi 45 > 15 + 30 bernilai false dan klaim ini lolos:
+    // tiga kali panjang sesi sesungguhnya. Di solo itu nyaris tak berarti (durasi lebih panjang
+    // justru menurunkan WPM), tapi Clan War survival menilai JUSTRU dari durasi -- dan itu slot
+    // berplafon tertinggi di grid. Sekarang kelonggarannya proporsional, sama seperti gerbang
+    // karakter: min(30, 45 x 0.35) = 15,75 detik.
+    expect(TypingResult::where('user_id', $user->id)->count())->toBe(0);
+});
+
+it('still accepts a duration that merely lags behind the clock a little', function () {
+    $user = User::factory()->create();
+
+    // Sesi 30 detik yang dikirim beberapa detik setelah ketukan terakhir: pemain jujur yang
+    // requestnya mendarat telat tak boleh ikut tersapu oleh gerbang di atas.
+    $component = playSolo($user, 'words', '25');
+    app(SoloSessionGuard::class)->backdate(30);
+
+    $component->call('saveResult', ['durationMs' => 33000, 'totalKeystrokes' => 150, 'correctKeystrokes' => 148])
+        ->assertRedirect(route('typing.result'));
+
+    expect(TypingResult::where('user_id', $user->id)->count())->toBe(1);
+});
+
 it('does not let a client rewrite the issued text', function () {
     $user = User::factory()->create();
 

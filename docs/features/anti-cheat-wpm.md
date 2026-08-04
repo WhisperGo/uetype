@@ -272,6 +272,16 @@ Karena arah yang menguntungkan pemalsu adalah **mengecilkan** durasi, dan itu su
 plafon karakter, durasi kedua mode ini cukup diterima apa adanya (durasi lebih panjang
 hanya menurunkan WPM sendiri).
 
+> **Koreksi 2026-08-03 — kelonggarannya dulu ada dua definisi.** Kalimat "durasi lebih panjang
+> hanya menurunkan WPM sendiri" benar untuk solo, tapi **tidak** untuk Clan War survival, yang
+> justru menilai dari durasi. Gerbang `claimsMoreTimeThanElapsed()` memakai kelonggaran **30
+> detik datar**, sementara jalur karakter (`maxPlausibleChars()`) memakai
+> `min(30, durasi × 0.35)` — sehingga sesi `words/10` yang baru berjalan 15 detik masih bisa
+> mengklaim 45 detik, tiga kali panjang sesungguhnya. Ironisnya komentar konstanta itu sendiri
+> sudah menyatakan ia "dibatasi `SLACK_FRACTION`", yang hanya benar untuk separuh kodenya.
+> Sekarang keduanya melewati `SoloSessionGuard::slackFor()` — satu definisi, dikunci
+> `SoloResultTamperingTest`.
+
 ### 7.5 Toleransi untuk pemain jujur
 
 Mengetik bukan satu tombol satu karakter: salah ketik, backspace, dan mengulang kata
@@ -428,6 +438,46 @@ Konstanta baru (`ClanWarAttempt::GRACE_SECONDS` 30, `COUNTDOWN_GRACE_SECONDS` 10
 dari log penolakan, bukan dari intuisi.**
 
 Detail per mode dan alasannya ada di [`clan-war.md`](clan-war.md) §3.9.
+
+### 7.7e Lantai fisik Survival (`SurvivalPlausibility`) — ditambahkan 2026-08-03
+
+Tiga lapisan di atas semuanya menilai **kecepatan**. Survival tidak dinilai dari kecepatan
+melainkan dari **durasi**, dan durasinya adalah satu-satunya besaran berskor yang tak pernah bisa
+dihitung ulang server: simulasi staminanya berjalan **sepenuhnya di browser**
+(`resources/js/typing-game.js`). Server hanya diberi tahu berapa lama pemain bertahan, tak pernah
+menyaksikannya bertahan hidup — jadi klien yang menghapus kondisi matinya sendiri bebas melaporkan
+durasi apa pun.
+
+Di solo itu nyaris tak berarti (durasi lebih panjang justru menurunkan WPM). Di **Clan War** ia
+hadiah utamanya: `survival/hard` berplafon poin tertinggi di grid (**150**) dan poinnya naik
+seiring durasi sampai 90 detik. Poin termurah di seluruh permainan duduk persis di balik satu
+angka yang tak bisa diperiksa server.
+
+**Yang dihitung bukan simulasi, melainkan LANTAI FISIK.** Stamina terkuras oleh waktu dan terisi
+per karakter benar, jadi bertahan lebih lama menuntut mengetik lebih banyak — dan batas bawahnya
+bisa dihitung, apa pun yang terjadi di antaranya:
+
+```
+minChars = (0.35 × ∫drain − staminaAwal) / refillPerKarakter
+```
+
+Setiap suku sengaja condong ke pihak pemain: drain selama grace diabaikan **sepenuhnya**, sisanya
+diambil pada laju terbaik yang mungkin diberikan burst shield (`SHIELD_DRAIN_FACTOR` 0.35 —
+padahal menahan shield terus-menerus menuntut ~7,1 karakter/detik, sekitar 85 WPM berkelanjutan),
+stamina awal dianggap habis terpakai, dan **cap** stamina diabaikan meski di permainan nyata ia
+membuang refill di atas `sMax` sehingga kebutuhan sebenarnya lebih tinggi. Ditambah toleransi 10%
+lagi sebelum apa pun ditandai.
+
+**Ditahan, bukan ditolak** — sama seperti §7.7c. Barisnya tetap tersimpan dan terlihat di profil
+pemain sendiri, hanya tak ikut papan publik sampai ada manusia yang meloloskannya
+(`review_reason = 'survival_impossible'`). Lantai fisik yang salah tembak pada satu pemain jujur
+lebih mahal daripada poin yang ia jaga.
+
+> **Preset stamina disalin ke PHP, dan salinan bisa hanyut.** Alternatifnya lebih buruk: klien
+> butuh angka itu tiap frame, server butuh untuk membatasi klaim, dan mengirimkannya dari klien
+> berarti terdakwa yang menentukan hukumnya. Salinannya dipatok `SurvivalPlausibilityTest`, yang
+> membaca berkas JS dan membandingkannya — berubah di sisi mana pun, suite yang merah, bukan
+> lantai yang diam-diam melonggar.
 
 ### 7.8 Antrean review admin (`review_status`)
 

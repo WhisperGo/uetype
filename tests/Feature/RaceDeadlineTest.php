@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\RoomStatus;
 use App\Events\RoomUpdated;
 use App\Livewire\MultiplayerLobby;
 use App\Models\MultiplayerMatchHistory;
@@ -85,7 +86,7 @@ it('marks a racer who never started typing as DNF once the grace window elapses'
     // Tak seorang pun memulai -> keduanya DNF dan race ditutup, bukan menggantung selamanya.
     expect($memberA->fresh()->finished_time_seconds)->toBe(RoomMember::DNF_SENTINEL_SECONDS)
         ->and($memberB->fresh()->finished_time_seconds)->toBe(RoomMember::DNF_SENTINEL_SECONDS)
-        ->and($room->fresh()->status)->toBe('finished');
+        ->and($room->fresh()->status)->toBe(RoomStatus::Finished);
 });
 
 /**
@@ -113,7 +114,7 @@ it('never DNFs a slow racer who has genuinely started (1% is started)', function
         ->call('checkRaceDeadline');
 
     expect($memberLambat->fresh()->finished_time_seconds)->toBeNull()
-        ->and($room->fresh()->status)->toBe('racing');
+        ->and($room->fresh()->status)->toBe(RoomStatus::Racing);
 });
 
 it('DNFs only the idle racer and lets the race continue for whoever is still typing', function () {
@@ -132,7 +133,7 @@ it('DNFs only the idle racer and lets the race continue for whoever is still typ
     // Yang diam dibuang; yang mengetik TIDAK boleh ikut dipotong balapannya.
     expect($memberDiam->fresh()->finished_time_seconds)->toBe(RoomMember::DNF_SENTINEL_SECONDS)
         ->and($memberNgetik->fresh()->finished_time_seconds)->toBeNull()
-        ->and($room->fresh()->status)->toBe('racing');
+        ->and($room->fresh()->status)->toBe(RoomStatus::Racing);
 });
 
 it('leaves everyone alone while the grace window is still open', function () {
@@ -150,7 +151,7 @@ it('leaves everyone alone while the grace window is still open', function () {
 
     expect($memberA->fresh()->finished_time_seconds)->toBeNull()
         ->and($memberB->fresh()->finished_time_seconds)->toBeNull()
-        ->and($room->fresh()->status)->toBe('racing');
+        ->and($room->fresh()->status)->toBe(RoomStatus::Racing);
 });
 
 it('never touches a spectator: they are not racing, so they cannot be DNF', function () {
@@ -196,7 +197,7 @@ it('force-closes the race at the hard limit, DNFing whoever has not finished', f
         ->call('checkRaceDeadline')
         ->assertSet('showResultModal', true);
 
-    expect($room->fresh()->status)->toBe('finished')
+    expect($room->fresh()->status)->toBe(RoomStatus::Finished)
         ->and($memberA->fresh()->finished_time_seconds)->toBe(RoomMember::DNF_SENTINEL_SECONDS)
         ->and($memberB->fresh()->finished_time_seconds)->toBe(RoomMember::DNF_SENTINEL_SECONDS);
 });
@@ -261,7 +262,7 @@ it('does not let the hard limit cut a running sudden-death window short', functi
         ->call('checkRaceDeadline');
 
     // 4 detik terakhirnya utuh: race masih jalan, dan ia belum di-DNF.
-    expect($room->fresh()->status)->toBe('racing')
+    expect($room->fresh()->status)->toBe(RoomStatus::Racing)
         ->and($member->fresh()->finished_time_seconds)->toBeNull();
 });
 
@@ -285,7 +286,7 @@ it('still closes once the sudden-death window itself elapses past the hard limit
         ->set('step', 'racing')
         ->call('checkSuddenDeath');
 
-    expect($room->fresh()->status)->toBe('finished')
+    expect($room->fresh()->status)->toBe(RoomStatus::Finished)
         ->and($member->fresh()->finished_time_seconds)->toBe(RoomMember::DNF_SENTINEL_SECONDS);
 });
 
@@ -326,7 +327,7 @@ it('keeps enforcing the start grace right through a sudden-death window', functi
     // dibiarkan sudden death yang menutup.
     expect($diam->fresh()->finished_time_seconds)->toBe(RoomMember::DNF_SENTINEL_SECONDS)
         ->and($aktif->fresh()->finished_time_seconds)->toBeNull()
-        ->and($room->fresh()->status)->toBe('racing');
+        ->and($room->fresh()->status)->toBe(RoomStatus::Racing);
 });
 
 /**
@@ -576,7 +577,7 @@ it('tells a player dropped by someone else’s check as soon as the room updates
         ->call('checkRaceDeadline');
 
     expect($member->fresh()->finished_time_seconds)->toBe(RoomMember::DNF_SENTINEL_SECONDS)
-        ->and($room->fresh()->status)->toBe('racing');
+        ->and($room->fresh()->status)->toBe(RoomStatus::Racing);
 
     Livewire::actingAs($diam)->test(MultiplayerLobby::class)
         ->set('roomCode', 'DL0031')
@@ -703,7 +704,7 @@ it('enforces the hard limit from the progress path in real time', function () {
         ->call('updateRaceProgress', 45, 50, 98)
         ->assertSet('showResultModal', true);
 
-    expect($room->fresh()->status)->toBe('finished');
+    expect($room->fresh()->status)->toBe(RoomStatus::Finished);
 });
 
 /** Backstop malas: siapa pun yang membuka lobby ikut membereskan race yang sudah lewat batas. */
@@ -717,7 +718,7 @@ it('resolves an over-deadline race lazily on lobby mount', function () {
 
     Livewire::actingAs($a)->test(MultiplayerLobby::class);
 
-    expect($room->fresh()->status)->toBe('finished');
+    expect($room->fresh()->status)->toBe(RoomStatus::Finished);
 });
 
 /**
@@ -745,7 +746,7 @@ it('finalizes a racing room that has lost every racer, leaving only spectators',
         ->call('checkRaceDeadline');
 
     // Tak ada balapan tanpa pembalap: room ditutup alih-alih menjebak penonton di arena kosong.
-    expect($room->fresh()->status)->toBe('finished');
+    expect($room->fresh()->status)->toBe(RoomStatus::Finished);
 });
 
 it('does not close a racing room that still has a racer', function () {
@@ -764,7 +765,7 @@ it('does not close a racing room that still has a racer', function () {
         ->set('step', 'racing')
         ->call('checkRaceDeadline');
 
-    expect($room->fresh()->status)->toBe('racing');
+    expect($room->fresh()->status)->toBe(RoomStatus::Racing);
 });
 
 it('does nothing for a room that is not racing', function () {
@@ -785,6 +786,6 @@ it('does nothing for a room that is not racing', function () {
         ->call('checkRaceDeadline');
 
     // race_starts_at basi milik race SEBELUMNYA tak boleh menutup lobby yang sedang menunggu.
-    expect($room->fresh()->status)->toBe('waiting')
+    expect($room->fresh()->status)->toBe(RoomStatus::Waiting)
         ->and($member->fresh()->finished_time_seconds)->toBeNull();
 });

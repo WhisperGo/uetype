@@ -1,12 +1,17 @@
-{{-- Clan emblem badge: renders the clan's colored icon, or its initials as a fallback. --}}
-@props(['clan', 'size' => 'md'])
+{{-- Clan emblem badge: renders the clan's colored icon, or its initials as a fallback.
+
+     `clan` may be null: a finished war outlives a disbanded clan (see the 2026_08_03
+     migration), so the history rows that render this can hold a war whose other side no
+     longer exists. Nullsafe throughout, which lands on the neutral default colour and a
+     '?' initial -- the same shape as a clan with no emblem set. --}}
+@props(['clan' => null, 'size' => 'md'])
 
 @php
     use App\Support\ClanEmblem;
 
-    $hasEmblem = ClanEmblem::isValidIcon($clan->emblem ?? null);
-    $hex = ClanEmblem::colorHex($clan->emblem_color ?? null);
-    $iconPath = ClanEmblem::iconPath($clan->emblem ?? null);
+    $hasEmblem = ClanEmblem::isValidIcon($clan?->emblem);
+    $hex = ClanEmblem::colorHex($clan?->emblem_color);
+    $iconPath = ClanEmblem::iconPath($clan?->emblem);
 
     $box = match ($size) {
         'sm' => 'w-10 h-10 rounded-lg',
@@ -24,7 +29,7 @@
         default => 'text-xl',
     };
 
-    $letters = mb_strtoupper(mb_substr($clan->name ?? '?', 0, 2));
+    $letters = mb_strtoupper(mb_substr($clan?->name ?? '?', 0, 2));
 @endphp
 
 <div {{ $attributes->merge(['class' => $box.' shrink-0 flex items-center justify-center border']) }}

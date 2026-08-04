@@ -14,6 +14,10 @@ class ClanWar extends Model
     protected $fillable = [
         'challenger_clan_id',
         'opponent_clan_id',
+        // Identity snapshots so a finished war still reads as a sentence after either clan
+        // disbands; written by booted(), see there.
+        'challenger_name',
+        'opponent_name',
         'status',
         'challenger_power_before',
         'opponent_power_before',
@@ -34,16 +38,48 @@ class ClanWar extends Model
         'ends_at' => 'datetime',
     ];
 
-    /** The clan that issued the challenge. */
+    /**
+     * Snapshot both clans' names as the war is created.
+     *
+     * Here rather than at the call site because a snapshot that any future way of starting a
+     * war could forget is a snapshot that will eventually be missing exactly when it matters:
+     * the row it belongs to outlives the clan it names.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $war) {
+            $war->challenger_name ??= Clan::find($war->challenger_clan_id)?->name;
+            $war->opponent_name ??= Clan::find($war->opponent_clan_id)?->name;
+        });
+    }
+
+    /** The clan that issued the challenge; null once it has disbanded. */
     public function challenger(): BelongsTo
     {
         return $this->belongsTo(Clan::class, 'challenger_clan_id');
     }
 
-    /** The clan that was challenged. */
+    /** The clan that was challenged; null once it has disbanded. */
     public function opponent(): BelongsTo
     {
         return $this->belongsTo(Clan::class, 'opponent_clan_id');
+    }
+
+    /**
+     * The other side's name, whether or not that clan still exists.
+     *
+     * Prefers the live clan so a rename is reflected, and falls back to the snapshot taken at
+     * creation. Only ever empty for wars predating the snapshot columns whose clan is also
+     * already gone -- callers render a neutral placeholder for that.
+     */
+    public function opponentNameFor(int $clanId): string
+    {
+        $isChallenger = $this->challenger_clan_id === $clanId;
+
+        $live = $isChallenger ? $this->opponent : $this->challenger;
+        $snapshot = $isChallenger ? $this->opponent_name : $this->challenger_name;
+
+        return $live?->name ?? $snapshot ?? '';
     }
 
     /**

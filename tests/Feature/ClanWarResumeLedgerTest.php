@@ -183,6 +183,10 @@ it('leaves a single-session attempt untouched by the ledger', function () {
 it('bounds a forged ledger by the wall clock the attempt has really held', function () {
     [$player, $claim] = warAttemptScenario('words', '50');
 
+    // Dibekukan di batas detik: seluruh batas di bawah diikat ke jam jangkar, jadi milidetik
+    // nyata yang lewat selama request ikut terhitung dan angkanya tak pernah persis.
+    $this->freezeSecond();
+
     remountWarAttempt($player, $claim);
 
     // Jangkarnya baru 10 detik lalu. Sebuah ping yang mengaku 5 menit mengetik dan 4000
@@ -196,13 +200,17 @@ it('bounds a forged ledger by the wall clock the attempt has really held', funct
     $claim->refresh();
 
     // Tak lebih dari 10 detik yang bisa dibukukan, dan tak lebih karakter dari yang bisa
-    // diketik dalam 10 detik itu (SoloSessionGuard::MAX_CHARS_PER_SECOND). Batas atasnya dihitung
-    // dari 11 detik, bukan 10: jangkarnya jam sungguhan dan terus berjalan selama request test,
-    // jadi mematoknya persis di 10 berarti menguji ketepatan waktu, bukan aturannya. Yang
-    // diperjuangkan adalah jarak ke angka palsunya -- 4000 karakter menyusut jadi ratusan.
-    expect((float) $claim->attempt_live_ms)->toBeLessThanOrEqual(11_000.0)
+    // diketik dalam 10 detik itu (SoloSessionGuard::MAX_CHARS_PER_SECOND).
+    //
+    // Batasnya kini tepat 10 detik, bukan 11. Padding satu detik itu dulu ada karena jangkarnya
+    // jam sungguhan yang terus berjalan selama request test -- persis penyakit yang membuat
+    // ClanWarProgressPingTest gagal pada 21019 ms, di mana padding yang sama ternyata tak cukup
+    // di bawah beban paralel. Padding tak pernah menyelesaikan masalah ini; ia hanya memindahkan
+    // ambang gagalnya. Dengan jam beku (lihat freezeSecond di atas) angkanya deterministik, dan
+    // testnya jadi lebih tajam sekaligus lebih tenang.
+    expect((float) $claim->attempt_live_ms)->toBeLessThanOrEqual(10_000.0)
         ->and((int) $claim->attempt_live_total_chars)
-        ->toBeLessThanOrEqual((int) (11 * SoloSessionGuard::MAX_CHARS_PER_SECOND));
+        ->toBeLessThanOrEqual((int) (10 * SoloSessionGuard::MAX_CHARS_PER_SECOND));
 });
 
 it('never lowers a ledger already banked for the running session', function () {

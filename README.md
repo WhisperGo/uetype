@@ -279,17 +279,29 @@ Data dicatat **real-time** ke database; tampilan dashboard **auto-refresh tiap 1
 
 ## Testing
 
-Proyek memakai **Pest**. Jalankan seluruh test:
-```bash
-php artisan test
+Proyek memakai **Pest**.
+
+### Persiapan sekali per mesin
+
+Test berjalan di database **terpisah** dari database dev, jadi menjalankan suite tidak
+pernah menghapus data lokal Anda. Namanya dipatok di `phpunit.xml` (`uetype_test`), tapi
+databasenya sendiri harus dibuat sekali:
+
+```sql
+CREATE DATABASE uetype_test;
 ```
-Menjalankan sebagian:
+
+Tidak perlu dimigrasikan manual — `RefreshDatabase` mengurusnya tiap kali suite jalan.
+
+### Menjalankan
+
 ```bash
-php artisan test tests/Feature/ChatOverlayTest.php
-```
-Cek gaya kode (linter):
-```bash
-vendor/bin/pint
+php artisan test                                   # seluruh test
+php artisan test tests/Feature/ChatOverlayTest.php # sebagian
+php artisan test --parallel                        # lebih cepat (butuh 1 DB per proses,
+                                                   # `uetype_test_1..N`, dibuat otomatis)
+vendor/bin/pint                                    # perapi gaya kode
+npm test                                           # test unit JS (Vitest)
 ```
 
 > Catatan: beberapa test yang menyiarkan event butuh Reverb — kalau Reverb tak jalan,

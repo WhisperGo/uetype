@@ -54,6 +54,19 @@ function racingRoomFor(User $host, array $others = []): Room
 }
 
 it('schedules the race start in the future when the host presses start', function () {
+    // Jam dibekukan TEPAT di batas detik, dan keduanya penting.
+    //
+    // Dibekukan, karena `raceStartsInMs` adalah selisih terhadap now(): tiap milidetik nyata
+    // yang lewat antara startRace() dan pembacaan ikut terpotong dari hasilnya. Test ini dulu
+    // menuntut "> 2000" dan gagal dengan 1990 di mesin yang lebih lambat -- kegagalan yang
+    // tidak menunjukkan apa pun tentang kodenya.
+    //
+    // Di batas detik, karena `race_starts_at` bertipe `timestamp` (presisi detik): membekukan
+    // jam di X.900 membuat penyimpanan membuang 900 ms itu, jadi sisa waktunya 2100 dan bukan
+    // 3000. Membekukan tanpa menyebut posisinya hanya mengubah keacakan jadi keacakan yang
+    // tersembunyi. Lihat test berikutnya untuk sisi lain pembulatan yang sama.
+    $this->travelTo(now()->startOfSecond());
+
     Event::fake([RoomUpdated::class]);
     $host = User::factory()->create();
     racingRoomFor($host);
@@ -64,9 +77,8 @@ it('schedules the race start in the future when the host presses start', functio
 
     $remaining = $c->instance()->raceStartsInMs;
 
-    // Sisa waktu, bukan jam absolut. Harus positif & mendekati 3 detik.
-    expect($remaining)->toBeGreaterThan(2000)
-        ->and($remaining)->toBeLessThanOrEqual(3000);
+    // Sisa waktu, bukan jam absolut: persis COUNTDOWN_SECONDS, tanpa rentang toleransi.
+    expect($remaining)->toBe(MultiplayerLobby::COUNTDOWN_SECONDS * 1000);
 });
 
 it('sends the remaining time in milliseconds, not rounded to whole seconds', function () {
@@ -77,17 +89,23 @@ it('sends the remaining time in milliseconds, not rounded to whole seconds', fun
     // startnya memang dibulatkan. Yang penting: pembulatan itu SAMA untuk semua
     // pemain -- jadi tak membuat mereka tak sinkron -- dan sisa waktunya sendiri
     // dihitung dari now() presisi milidetik, bukan dari selisih detik bulat.
+    //
+    // Jam dibekukan 400 ms SESUDAH batas detik, dan offset itulah bahan ujinya: menyimpan
+    // now()+3s membuang 400 ms tersebut, jadi sisa waktu yang benar adalah 2600 -- bukan
+    // kelipatan 1000, persis yang hendak dibuktikan. Sebelumnya angka itu diserahkan pada
+    // nasib: kalau eksekusi kebetulan mendarat di batas detik, `% 1000` menjadi 0 dan test
+    // gagal tanpa ada yang berubah di kodenya.
+    $this->travelTo(now()->startOfSecond()->addMilliseconds(400));
+
     $room->update(['status' => 'racing', 'race_starts_at' => now()->addSeconds(3)]);
 
     $remaining = Livewire::actingAs($host)->test(MultiplayerLobby::class)
         ->set('roomCode', 'CNT123')->set('step', 'racing')
         ->instance()->raceStartsInMs;
 
-    // Ada di antara 2 dan 3 detik, dan hampir pasti bukan kelipatan 1000 --
-    // artinya milidetik dari now() benar-benar terbawa, bukan dibulatkan.
-    expect($remaining)->toBeGreaterThan(1500)
-        ->and($remaining)->toBeLessThanOrEqual(3000)
-        ->and($remaining % 1000)->not->toBe(0);
+    // 3000 ms dikurangi 400 ms yang hilang saat pembulatan ke detik: milidetik dari now()
+    // benar-benar terbawa, bukan dibulatkan.
+    expect($remaining)->toBe(2600);
 });
 
 it('gives every player the same start instant even though the column stores whole seconds', function () {

@@ -96,7 +96,9 @@ class GoogleAuthController extends Controller
         } catch (\Exception $e) {
             // Without a log, an OAuth misconfig (wrong client ID, mismatched redirect
             // URI) can't be told apart from a user simply cancelling consent.
-            Log::warning('Google OAuth gagal', ['exception' => $e]);
+            // English, like every other log line: logs are read by operators and tooling,
+            // not by players. The UI stays translated through lang/.
+            Log::warning('Google OAuth failed', ['exception' => $e]);
 
             return redirect()->route('login')->with('error', __('auth.google_failed'));
         }

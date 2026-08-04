@@ -95,7 +95,14 @@
                     <div class="flex-1 min-w-0">
                         <p class="font-mono text-sm text-foreground truncate">
                             {{ __('clan.war.vs_label') }}
-                            <a href="{{ route('clans.show', $row['opponent']) }}" wire:navigate class="font-bold hover:text-gold transition-colors">{{ $row['opponent']->name }}</a>
+                            {{-- Nama selalu ada (disnapshot saat war dibuat); MODEL-nya belum
+                                 tentu -- clan lawan bisa sudah bubar. Perangnya tetap tampil,
+                                 hanya tautannya yang hilang, karena tak ada halaman untuk dituju. --}}
+                            @if ($row['opponent'])
+                                <a href="{{ route('clans.show', $row['opponent']) }}" wire:navigate class="font-bold hover:text-gold transition-colors">{{ $row['opponent_name'] }}</a>
+                            @else
+                                <span class="font-bold text-muted">{{ $row['opponent_name'] ?: __('clan.war.opponent_disbanded') }}</span>
+                            @endif
                         </p>
                         <p class="font-mono text-[0.65rem] text-muted mt-0.5">@localtime($row['war']->updated_at, 'd M Y')</p>
                     </div>

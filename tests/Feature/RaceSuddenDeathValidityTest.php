@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\RoomStatus;
 use App\Livewire\MultiplayerLobby;
 use App\Models\Room;
 use App\Models\RoomMember;
@@ -59,7 +60,7 @@ it('does not start sudden death when an invalid result finishes first', function
     expect($bad->finished_time_seconds)->not->toBeNull()
         ->and($bad->place)->toBeNull()
         ->and($room->fresh()->countdown_started_at)->toBeNull()
-        ->and($room->fresh()->status)->toBe('racing');
+        ->and($room->fresh()->status)->toBe(RoomStatus::Racing);
 });
 
 it('starts sudden death when a valid result finishes first', function () {

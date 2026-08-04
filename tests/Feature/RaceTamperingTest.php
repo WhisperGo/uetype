@@ -48,6 +48,13 @@ function sendProgress(User $user, Room $room, int $progress, int $wpm = 0, int $
 }
 
 it('refuses a finish claimed faster than a human can type', function () {
+    // Jam dibekukan: durasi balapan dihitung server sebagai now() - race_starts_at, jadi tiap
+    // detik NYATA antara penyiapan room dan pengiriman progress ikut menambah penyebutnya.
+    // Room ini sengaja dibuat baru berjalan 2 detik supaya 100 karakter mustahil -- tapi kalau
+    // eksekusinya sendiri memakan beberapa detik, klaimnya berubah jadi wajar dan test gagal
+    // membuktikan apa pun.
+    $this->freezeTime();
+
     $user = User::factory()->create();
     $room = tamperRoom($user, startedSecondsAgo: 2);
     $member = tamperMember($room, $user);

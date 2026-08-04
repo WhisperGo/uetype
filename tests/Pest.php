@@ -3,11 +3,13 @@
 use App\Enums\ClanMemberStatus;
 use App\Enums\ClanRole;
 use App\Enums\ClanWarStatus;
+use App\Enums\FriendshipStatus;
 use App\Livewire\TypingEngine;
 use App\Models\Clan;
 use App\Models\ClanMember;
 use App\Models\ClanWar;
 use App\Models\ClanWarModeClaim;
+use App\Models\Friendship;
 use App\Models\Message;
 use App\Models\User;
 use App\Services\SoloSessionGuard;
@@ -378,6 +380,50 @@ function pingWarAttempt(
         'totalKeystrokes' => $totalKeystrokes,
         'correctKeystrokes' => $correctKeystrokes,
     ]);
+}
+
+/**
+ * Persahabatan yang sudah diterima, dua arah.
+ *
+ * Tinggal di sini, bukan di berkas test tempat ia lahir: fungsi yang dideklarasikan di sebuah
+ * berkas test menjadi GLOBAL saat suite dijalankan penuh, jadi berkas kedua yang mendeklarasikan
+ * nama yang sama membuat seluruh suite fatal -- alasan yang sama persis dengan bladeViews().
+ */
+function befriend(User $a, User $b): void
+{
+    Friendship::create([
+        'requester_id' => $a->id,
+        'addressee_id' => $b->id,
+        'status' => FriendshipStatus::Accepted,
+    ]);
+}
+
+/**
+ * Seorang user beserta clan yang ia pimpin.
+ *
+ * @return array{0: User, 1: Clan}
+ */
+function userInClan(?string $clanName = null): array
+{
+    $user = User::factory()->create();
+
+    $clan = Clan::create([
+        // Nama unik per pemanggilan: `clans.name` unik, jadi satu test yang membuat dua clan
+        // tak bisa memakai nama tetap.
+        'name' => $clanName ?? 'Clan '.uniqid('', true),
+        'tag' => 'TAG',
+        'leader_id' => $user->id,
+        'power' => 1000,
+    ]);
+
+    ClanMember::create([
+        'clan_id' => $clan->id,
+        'user_id' => $user->id,
+        'role' => ClanRole::Leader,
+        'status' => ClanMemberStatus::Active,
+    ]);
+
+    return [$user, $clan];
 }
 
 function countQueries(Closure $callback): int

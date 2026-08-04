@@ -49,11 +49,9 @@ class ReviewQueue extends Component
         $result->update(['review_status' => TypingResult::REVIEW_APPROVED]);
 
         // Approving may make this the player's new PB, which was withheld while pending.
-        $user = $result->user;
-        if ($user && $result->mode->value !== 'survival' && (float) $result->net_wpm > (float) $user->highest_wpm) {
-            $user->highest_wpm = $result->net_wpm;
-            $user->save();
-        }
+        // Same method the original save path uses -- what qualifies as a record is defined
+        // once, on the model, rather than copied to both places and kept in sync by hand.
+        $result->user?->recordPersonalBest($result);
 
         unset($this->pending);
     }

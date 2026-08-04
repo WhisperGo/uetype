@@ -30,6 +30,22 @@ class TypingResult extends Model
         'review_reason',
     ];
 
+    /**
+     * Mirror the column's own default onto the model.
+     *
+     * `review_status` defaults to 'clear' in the schema, but a DB-side default is applied by
+     * the DATABASE: a row created without mentioning the column comes back from create() with
+     * the attribute still unset, so reading it in PHP yields null until the model is refreshed.
+     * Any rule that asks "is this result cleared?" then gets null instead of 'clear' and
+     * silently answers no -- which is how a legitimate personal best can fail to register.
+     *
+     * Declaring the default here makes the model agree with the schema from the moment it is
+     * instantiated, so callers never have to know which of the two answered.
+     */
+    protected $attributes = [
+        'review_status' => self::REVIEW_CLEAR,
+    ];
+
     // Review states for the anti-cheat queue (§7.5/§7.6). Only CLEAR and APPROVED count for
     // the public leaderboard; PENDING is held for a human; REJECTED was declined.
     public const REVIEW_CLEAR = 'clear';

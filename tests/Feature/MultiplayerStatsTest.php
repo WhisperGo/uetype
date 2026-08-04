@@ -182,7 +182,14 @@ it('only aggregates the signed in users own multiplayer history', function () {
     MultiplayerMatchHistory::create(['user_id' => $me->id, 'room_code' => 'A', 'place' => 1, 'player_count' => 2, 'wpm' => 77, 'accuracy' => 90, 'finished_time_seconds' => 10, 'xp_earned' => 5]);
     MultiplayerMatchHistory::create(['user_id' => $other->id, 'room_code' => 'B', 'place' => 1, 'player_count' => 2, 'wpm' => 199, 'accuracy' => 99, 'finished_time_seconds' => 5, 'xp_earned' => 9]);
 
-    Livewire::actingAs($me)->test(Stats::class)
-        ->assertSee('77')
-        ->assertDontSee('199');
+    // Diperiksa pada data terstruktur, bukan lewat assertDontSee('199') -- alasannya sama
+    // dengan padanannya di StatsPageTest: substring angka dicari di seluruh HTML, termasuk
+    // snapshot & checksum Livewire yang berubah tiap run, jadi test bisa merah tanpa ada
+    // yang salah pada agregatnya.
+    expect(Livewire::actingAs($me)->test(Stats::class)->viewData('multiplayerStats'))
+        ->toMatchArray([
+            'total_races' => 1,
+            'best_wpm' => 77,
+            'avg_wpm' => 77,
+        ]);
 });

@@ -127,6 +127,9 @@ return [
         'not_in_war' => 'Your clan is not in a war right now. Ask your leader to challenge another clan.',
         'history_heading' => 'War History',
         'history_vs' => 'vs :name',
+        // Shown in place of an opponent's name when that clan has disbanded and the war
+        // predates the name snapshot, so the row still reads as a sentence.
+        'opponent_disbanded' => 'a disbanded clan',
         'match_history' => 'Match History',
         'vs_label' => 'vs',
     ],

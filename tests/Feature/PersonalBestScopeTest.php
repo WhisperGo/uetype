@@ -166,3 +166,37 @@ it('celebrates the record only when it is actually broken', function () {
         ->assertSee(__('result.new_personal_best'))
         ->assertDontSee('vs record');
 });
+
+/**
+ * Aturan "hasil ini memecahkan rekor?" hidup di SATU tempat: User::recordPersonalBest().
+ *
+ * Dulu ia ditulis dua kali -- di TypingEngine::saveResult() saat hasil pertama kali disimpan,
+ * dan di ReviewQueue::approve() saat hasil yang ditahan akhirnya diloloskan -- sebagai dua
+ * salinan tiga syarat yang wajib selalu identik. Keduanya tak terlihat berhubungan di kode,
+ * dan arah kegagalannya senyap: ubah aturannya di satu sisi, sisi lain tetap menjawab dengan
+ * versi lama, dan tak ada yang tahu sampai ada pemain yang protes soal PB-nya.
+ */
+it('defines a personal best in one place, for both the save and the approve path', function () {
+    $user = User::factory()->create(['highest_wpm' => 50]);
+
+    $make = fn (array $attributes) => TypingResult::create(array_merge([
+        'user_id' => $user->id, 'mode' => 'time', 'mode_config' => '30',
+        'net_wpm' => 90, 'raw_wpm' => 95, 'accuracy' => 97,
+        'correct_chars' => 250, 'incorrect_chars' => 5, 'duration_seconds' => 30,
+    ], $attributes));
+
+    // Survival tak pernah menaikkan rekor WPM: dicapai di bawah tekanan stamina, dan papannya
+    // dinilai dari durasi.
+    expect($user->recordPersonalBest($make(['mode' => 'survival', 'mode_config' => 'hard'])))->toBeFalse()
+        // Hasil yang masih ditahan review juga tidak: angka ber-flag tak boleh mendarat di
+        // profil sebelum ada manusia yang meloloskannya.
+        ->and($user->recordPersonalBest($make(['review_status' => TypingResult::REVIEW_PENDING])))->toBeFalse()
+        ->and((float) $user->fresh()->highest_wpm)->toBe(50.0);
+
+    // Hasil bersih yang benar-benar lebih cepat: barulah rekornya bergerak.
+    expect($user->recordPersonalBest($make([])))->toBeTrue()
+        ->and((float) $user->fresh()->highest_wpm)->toBe(90.0)
+        // ...dan hasil yang lebih lambat sesudahnya tidak menurunkannya.
+        ->and($user->recordPersonalBest($make(['net_wpm' => 60])))->toBeFalse()
+        ->and((float) $user->fresh()->highest_wpm)->toBe(90.0);
+});

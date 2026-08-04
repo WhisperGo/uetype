@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ClanMemberStatus;
 use App\Enums\FriendshipStatus;
+use App\Enums\TypingMode;
 use App\Events\PresenceUpdated;
 use App\Support\SafeBroadcast;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -49,15 +50,15 @@ class User extends Authenticatable
         return '';
     }
 
-    protected function casts(): array
-    {
-        return [
-            'highest_wpm' => 'decimal:2',
-            'is_admin' => 'boolean',
-            'preferences' => 'array',
-            'last_seen_at' => 'datetime',
-        ];
-    }
+    // Property form, matching the other eleven models. Both forms work in Laravel 12 and
+    // neither is deprecated; what costs the next reader time is the project answering the
+    // question two different ways, and this file was the only one answering it the other way.
+    protected $casts = [
+        'highest_wpm' => 'decimal:2',
+        'is_admin' => 'boolean',
+        'preferences' => 'array',
+        'last_seen_at' => 'datetime',
+    ];
 
     /**
      * Base of the progressive level curve (Level/EXP requirement part 2, Option B):
@@ -141,6 +142,43 @@ class User extends Authenticatable
         $this->increment('total_xp', $xpEarned);
 
         return $xpEarned;
+    }
+
+    /**
+     * Raise `highest_wpm` if this result earns it. Returns whether the record moved.
+     *
+     * THE definition of "does this result count as a personal best", in one place. It used to
+     * live in two -- TypingEngine::saveResult() when a run is first saved, and
+     * ReviewQueue::approve() when a held run is later cleared -- as two copies of the same
+     * three conditions that had to stay identical forever. They are not obviously connected in
+     * the code, and the failure mode is silent: change the rule on one side (count survival,
+     * move the threshold, add a mode) and the other keeps the old answer. Nobody sees a wrong
+     * PB until a player says so.
+     *
+     * The three conditions, and why each is there:
+     *   - survival is excluded: it is achieved under stamina pressure, and its board metric is
+     *     duration, not WPM -- the two are not comparable.
+     *   - only a cleared result counts: a run held for anti-cheat review must not put a
+     *     flagged number on the profile before a human has looked at it. Approving one calls
+     *     this method again, which is how it eventually lands.
+     *   - and it must actually beat the current record.
+     */
+    public function recordPersonalBest(TypingResult $result): bool
+    {
+        $mode = $result->mode instanceof TypingMode ? $result->mode->value : (string) $result->mode;
+
+        $counts = $mode !== 'survival'
+            && in_array($result->review_status, [TypingResult::REVIEW_CLEAR, TypingResult::REVIEW_APPROVED], true)
+            && (float) $result->net_wpm > (float) $this->highest_wpm;
+
+        if (! $counts) {
+            return false;
+        }
+
+        $this->highest_wpm = $result->net_wpm;
+        $this->save();
+
+        return true;
     }
 
     /** Set a single key in the JSON preferences column and persist. */
