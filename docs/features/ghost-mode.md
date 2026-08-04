@@ -56,6 +56,24 @@ yang mungkin **tak pernah ia capai** di mode itu. Sekarang ketiganya sepakat pad
 pernah mereka mainkan — perilaku yang memang sudah berlaku untuk daftar leaderboard di picker
 yang sama. Lihat juga [typing-engine.md](typing-engine.md) §3.4.a.
 
+### 3.1.b Tipe `leaderboard` dibatasi ke pemain yang memang ditampilkan papan
+
+`bestWpmIn()` kini melewati `scopeTrustworthy()` (hasil ber-flag tak boleh jadi pace — lihat
+[anti-cheat-wpm.md](anti-cheat-wpm.md) §7.8), dan tipe `leaderboard` **tambah satu gerbang**:
+`refId` harus milik pemain yang lolos `scopeLeaderboardEligible()`, gerbang kelayakan 30 menit
+yang sama dengan papan publik.
+
+**Justifikasi:** berbeda dari `own` dan `friend`, tipe ini menerima **user id mentah** — `?ghost=`
+adalah query param yang bisa diketik siapa saja (§3.5). Tak ada kepemilikan untuk diperiksa (papan
+memang publik), jadi batasnya beda: id itu harus milik seseorang yang **benar-benar ditampilkan
+papan**. Tanpa itu, menjawab dengan `username` menjadikan deep-link ini **oracle id→username** atas
+setiap akun yang pernah mengetik — persis enumerasi yang dicegah dengan mengunci route profil ke
+username (lihat komentar di `routes/web.php`), masuk lewat pintu lain.
+
+Daftar di picker memakai kedua gerbang yang sama, dan itu wajib: picker yang menawarkan lawan
+yang kemudian ditolak resolver adalah bug yang lebih buruk daripada yang diperbaiki — pemain
+memilih sebuah nama lalu tak terjadi apa-apa. Dikunci `GhostLeaderboardScopeTest`.
+
 ### 3.2 Validasi kepemilikan untuk tipe `friend`
 
 `selectOpponent('friend', $refId)` memverifikasi bahwa `friendship_id` benar-benar milik user

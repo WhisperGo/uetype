@@ -91,12 +91,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/clan-leaderboard', ClanLeaderboard::class)->name('clan-leaderboard.index');
     Route::get('/clans/{clan}', ClanShow::class)->name('clans.show');
 
-    // Admin-only anti-cheat review queue (§7.6). EnsureUserIsAdmin -> 404 for non-admins,
-    // same as the monitoring dashboard, so the page's existence doesn't leak.
-    Route::get('/review-queue', ReviewQueue::class)
-        ->middleware(EnsureUserIsAdmin::class)
-        ->name('review-queue');
-
     Volt::route('/multiplayer', 'multiplayer-lobby')->name('multiplayer.lobby');
 
     // Leave endpoints for the multiplayer room. The nav is a full page load, so leaving
@@ -111,6 +105,19 @@ Route::middleware('auth')->group(function () {
 
     Volt::route('/leaderboard', 'leaderboard')->name('leaderboard');
 });
+
+// Admin-only anti-cheat review queue (§7.6). EnsureUserIsAdmin -> 404 for guests AND
+// signed-in non-admins alike, so the page's existence doesn't leak.
+//
+// OUTSIDE the auth group, and that placement is the point rather than an oversight -- it is
+// the same wiring the monitoring dashboard uses (UserMonitoringServiceProvider registers its
+// routes with web + EnsureUserIsAdmin and no 'auth'). Inside the group, 'auth' ran first and
+// redirected guests to login: a 302 where an unknown URL gives 404 confirms the route exists,
+// which is precisely what EnsureUserIsAdmin's own docblock says it refuses to do. The gate
+// itself needs no help from 'auth' -- Gate::allows() is false for guests.
+Route::get('/review-queue', ReviewQueue::class)
+    ->middleware(EnsureUserIsAdmin::class)
+    ->name('review-queue');
 
 Route::post('/locale', LocaleController::class)
     ->middleware('throttle:20,1')

@@ -1310,10 +1310,10 @@ class TypingEngine extends Component
         ];
 
         if ($this->mainMode === 'survival') {
-            $best = TypingResult::where('user_id', $userId)
-                ->where('mode', 'survival')
-                ->where('mode_config', (string) $this->subMode)
-                ->max('duration_seconds');
+            // Through the model helper, which applies the same review gate as the standard
+            // modes: a survival run held for review must not come back as the record it was
+            // withheld from being.
+            $best = TypingResult::bestSurvivalDurationFor($userId, (string) $this->subMode);
 
             return array_merge($blank, [
                 'survivalPreviousBest' => $best === null ? null : (float) $best,

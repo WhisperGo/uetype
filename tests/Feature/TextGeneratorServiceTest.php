@@ -2,9 +2,43 @@
 
 use App\Services\TextGeneratorService;
 use App\Support\TypingLanguage;
+use Illuminate\Support\Facades\Cache;
 
 beforeEach(function () {
     $this->generator = new TextGeneratorService;
+
+    // The memo is static, so it outlives a single test. Cleared here so no case is answered
+    // by a list another one left behind.
+    TextGeneratorService::forgetMemo();
+});
+
+afterEach(function () {
+    TextGeneratorService::forgetMemo();
+});
+
+/**
+ * The docblock used to promise a cache "in process memory" while calling
+ * Cache::rememberForever(), which goes to the configured store -- `database` in this project.
+ * So every generateText() ran a query that returned the whole wordlist to unserialize, and the
+ * comment said the opposite.
+ *
+ * Proven by making the STORE disagree with the memo: once a language has been read, a value
+ * planted in the store must not be able to reach the caller, and must reach it again the moment
+ * the memo is dropped. Anything weaker (calling twice and comparing) passes with no memo at
+ * all, since re-reading the same file returns the same words.
+ */
+it('answers a repeat wordlist read from process memory, not the cache store', function () {
+    $first = $this->generator->wordlist('en');
+
+    expect($first)->not->toBeEmpty();
+
+    Cache::put('wordlist.en', ['sentinel']);
+
+    expect($this->generator->wordlist('en'))->toBe($first);
+
+    TextGeneratorService::forgetMemo();
+
+    expect($this->generator->wordlist('en'))->toBe(['sentinel']);
 });
 
 it('merakit tepat sejumlah kata yang diminta', function () {

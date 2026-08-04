@@ -124,6 +124,21 @@ it('is admin-only: a non-admin gets 404', function () {
     $this->actingAs($user)->get(route('review-queue'))->assertNotFound();
 });
 
+/**
+ * A GUEST must get the same 404, and that is the whole reason EnsureUserIsAdmin exists in the
+ * shape it does: its docblock says a redirect to login "would confirm the page exists, which is
+ * exactly what an admin panel should not leak", and that 'auth' is therefore deliberately NOT
+ * used alongside it. The monitoring dashboard obeys that (web + EnsureUserIsAdmin, no auth);
+ * this route was declared inside the auth group, so guests were redirected instead -- and a
+ * redirect where an unknown URL gives 404 is exactly the confirmation the rule forbids.
+ *
+ * Only the signed-in non-admin was covered before, which is why the gap survived: the case that
+ * behaved differently was the one nobody asked about.
+ */
+it('is admin-only: a guest gets 404 too, not a redirect that proves the page exists', function () {
+    $this->get(route('review-queue'))->assertNotFound();
+});
+
 it('lets an admin reject a pending result for good', function () {
     $admin = User::factory()->admin()->create();
     $user = User::factory()->create();

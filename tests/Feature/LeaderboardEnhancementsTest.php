@@ -52,6 +52,10 @@ test('a valid ghost deep-link locks the mode to the requested time/words config'
     $rival = User::factory()->create();
     $this->actingAs($me);
 
+    // The deep link only reaches players the board actually lists, so the rival needs the same
+    // accumulated typing time the board demands before their record can pace a ghost.
+    accumulateTypingTime($rival);
+
     TypingResult::create([
         'user_id' => $rival->id,
         'mode' => 'time',

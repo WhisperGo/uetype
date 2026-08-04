@@ -71,11 +71,31 @@ class TextGeneratorService
     }
 
     /**
-     * A language's wordlist, cached in process memory.
+     * Wordlists already decoded during THIS request, keyed by language.
+     *
+     * @var array<string, array<int, string>>
+     */
+    private static array $memo = [];
+
+    /**
+     * A language's wordlist.
      *
      * The file is static (never changes at runtime), but it used to be read from
      * disk and JSON-decoded AGAIN every time the user switched mode, switched
      * language, or restarted -- even though the result is always the same.
+     *
+     * TWO layers, because they solve different halves and the docblock used to claim the
+     * cheaper one while only having the dearer one:
+     *
+     *  - $memo is the actual in-process cache. Cache::rememberForever() goes to the configured
+     *    store, and CACHE_STORE is `database` here -- so what read like a memory lookup was a
+     *    query returning the whole list to unserialize, on every generateText().
+     *  - the cache store still earns its place ACROSS requests, saving the disk read and
+     *    json_decode for every request after the first.
+     *
+     * KNOWN CONSEQUENCE of rememberForever: editing database/data/*.json changes nothing until
+     * `php artisan cache:clear`. That is the same class of trap as rebuilding assets after a
+     * REVERB change (PROJECT_OVERVIEW.md §12) -- the edit looks applied and simply is not.
      *
      * @return array<int, string>
      */
@@ -83,7 +103,11 @@ class TextGeneratorService
     {
         $lang = TypingLanguage::resolve($lang);
 
-        return Cache::rememberForever("wordlist.{$lang}", function () use ($lang) {
+        if (isset(self::$memo[$lang])) {
+            return self::$memo[$lang];
+        }
+
+        return self::$memo[$lang] = Cache::rememberForever("wordlist.{$lang}", function () use ($lang) {
             $path = TypingLanguage::wordlistPath($lang);
 
             if (! File::exists($path)) {
@@ -98,5 +122,16 @@ class TextGeneratorService
 
             return array_values(array_filter($data['words'], 'is_string'));
         });
+    }
+
+    /**
+     * Drop the in-process memo.
+     *
+     * For tests: static state outlives a single test, so a case that swaps a wordlist or
+     * asserts on cache behaviour would otherwise be answered by the previous test's copy.
+     */
+    public static function forgetMemo(): void
+    {
+        self::$memo = [];
     }
 }

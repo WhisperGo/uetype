@@ -366,7 +366,7 @@ class MultiplayerLobby extends Component
         }
 
         $user = Auth::user();
-        $code = strtoupper(Str::random(6));
+        $code = $this->freshRoomCode();
 
         // Seed the room language from the player's solo preference, so it feels continuous;
         // the host can change it inside the room afterwards.
@@ -402,6 +402,37 @@ class MultiplayerLobby extends Component
         $this->forgetRoomCache();
 
         $this->dispatch('subscribe-room', room: $code);
+    }
+
+    /**
+     * A six-character room code that is not already on the table.
+     *
+     * `rooms.code` is unique, so generating one blind meant a collision arrived as an unhandled
+     * QueryException -- a 500 for a player who did nothing but press Create, and a bug nobody
+     * could reproduce on demand. Rare is the reason to handle it, not the reason to skip it.
+     *
+     * Bounded rather than a `while (true)`: at 62^6 codes a second attempt is already
+     * improbable, so needing all five means something is wrong that a longer loop would only
+     * hide (an empty random source, or a rooms table so large the code space is the real
+     * problem). The last attempt is returned as-is and left to the unique index, which turns
+     * an infinite hang into an error someone can actually read.
+     *
+     * Checked rather than caught, unlike ClanWar::claimMode(): there a collision means a
+     * teammate legitimately took the slot and the player must be TOLD, so the exception carries
+     * information. Here the code is an arbitrary identifier nobody asked for -- the only correct
+     * response is to quietly pick another one.
+     */
+    private function freshRoomCode(): string
+    {
+        foreach (range(1, 5) as $attempt) {
+            $code = strtoupper(Str::random(6));
+
+            if (! Room::where('code', $code)->exists()) {
+                return $code;
+            }
+        }
+
+        return $code;
     }
 
     /**
@@ -635,36 +666,53 @@ class MultiplayerLobby extends Component
             return;
         }
 
-        if ($member->isSpectator()) {
-            if ($room->players()->count() >= self::MAX_PLAYERS) {
-                session()->flash('error', __('multiplayer.error_players_full'));
+        // Count-then-move must be atomic, for the reason joinRoomByCode() already spells out
+        // for the identical check: a `count() >= MAX` read outside the transaction can be
+        // passed by two callers at once, so the room ends up over quota. Both sides of this
+        // toggle read the same two limits that path reads, so both take the same lock -- the
+        // knowledge was already in this file, just not applied here.
+        $full = DB::transaction(function () use ($room, $member) {
+            if ($member->isSpectator()) {
+                if ($room->players()->lockForUpdate()->count() >= self::MAX_PLAYERS) {
+                    return 'players';
+                }
 
-                return;
+                // Back to racer: reset race & ready state. A host returning to racer stays
+                // auto-ready (consistent with createRoom).
+                $member->update([
+                    'role' => RoomMember::ROLE_PLAYER,
+                    'is_ready' => $room->host_id === Auth::id(),
+                    'progress_percent' => 0,
+                    'wpm' => 0,
+                    'accuracy' => 100,
+                    'finished_time_seconds' => null,
+                    'place' => null,
+                    'xp_earned' => null,
+                ]);
+
+                return null;
             }
 
-            // Back to racer: reset race & ready state. A host returning to racer stays
-            // auto-ready (consistent with createRoom).
-            $member->update([
-                'role' => RoomMember::ROLE_PLAYER,
-                'is_ready' => $room->host_id === Auth::id(),
-                'progress_percent' => 0,
-                'wpm' => 0,
-                'accuracy' => 100,
-                'finished_time_seconds' => null,
-                'place' => null,
-                'xp_earned' => null,
-            ]);
-        } else {
-            if ($room->spectators()->count() >= self::MAX_SPECTATORS) {
-                session()->flash('error', __('multiplayer.error_spectators_full'));
-
-                return;
+            if ($room->spectators()->lockForUpdate()->count() >= self::MAX_SPECTATORS) {
+                return 'spectators';
             }
 
             $member->update([
                 'role' => RoomMember::ROLE_SPECTATOR,
                 'is_ready' => false,
             ]);
+
+            return null;
+        });
+
+        // Flashed outside the transaction: a session write is not part of what the lock is
+        // protecting, and holding row locks across it buys nothing.
+        if ($full !== null) {
+            session()->flash('error', $full === 'players'
+                ? __('multiplayer.error_players_full')
+                : __('multiplayer.error_spectators_full'));
+
+            return;
         }
 
         $this->forgetRoomCache();
@@ -1159,10 +1207,22 @@ class MultiplayerLobby extends Component
                 ->whereNull('finished_time_seconds')
                 ->count();
 
-            if ($unfinished === 0) {
-                $room->update(['status' => RoomStatus::Finished]);
-                $this->finalizeRace($room->id);
-                $this->captureResultSnapshot();
+            // Through closeRaceNow(), not an inline status write. This used to be
+            // `$room->update(['status' => Finished]); $this->finalizeRace(...)` -- a
+            // read-then-write that took no part in the claim protecting every other ending,
+            // so this path and a concurrent deadline ping could both finalize the same race.
+            // finalizeRace() awards XP via increment() and writes a permanent history row,
+            // and neither is recoverable: total_xp is never recomputed, and
+            // multiplayer_match_history has no unique constraint. Exactly the shape
+            // ClanWarResolver::settleWar() documents -- increment() is atomic per column, which
+            // never protected against running the whole settlement twice.
+            //
+            // It also makes this the fourth caller of ONE definition of "the race is over"
+            // rather than a fourth definition of it, which is the reason closeRaceNow() was
+            // extracted in the first place. Returning early because it broadcasts RoomUpdated
+            // itself; falling through would send the same re-render twice.
+            if ($unfinished === 0 && $this->closeRaceNow($room)) {
+                return;
             }
 
             SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));
@@ -1204,11 +1264,13 @@ class MultiplayerLobby extends Component
             ->whereNull('finished_time_seconds')
             ->count();
 
-        if ($unfinished === 0) {
-            $room->update(['status' => RoomStatus::Finished]);
-            $this->finalizeRace($room->id);
-            $this->showResultModal = true;
-            $this->captureResultSnapshot();
+        // Same claim as every other ending, for the same reason as the fast-path in
+        // updateRaceProgress(): conceding can be the act that ends the race, so it must close
+        // it the way the race is closed everywhere else rather than writing the status itself.
+        // The DNF sweep inside closeRaceNow() is a no-op here -- nobody is unfinished by the
+        // time we reach it -- and it broadcasts RoomUpdated, hence the early return.
+        if ($unfinished === 0 && $this->closeRaceNow($room)) {
+            return;
         }
 
         SafeBroadcast::run(fn () => broadcast(new RoomUpdated($this->roomCode)));

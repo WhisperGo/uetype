@@ -10,9 +10,19 @@ beforeEach(function () {
     $this->resolver = new GhostResolver;
 });
 
-/** Satu baris rekor dengan angka yang masuk akal. */
+/**
+ * Satu baris rekor dengan angka yang masuk akal.
+ *
+ * Pemiliknya sekaligus dibuat memenuhi syarat papan: lawan ghost tipe 'leaderboard' kini
+ * dibatasi ke pemain yang memang ditampilkan papan, jadi tanpa ini rekornya ada tapi tak
+ * pernah bisa dipakai sebagai pace.
+ */
 function ghostResult(User $user, string $mode, string $config, float $wpm): TypingResult
 {
+    if (! TypingResult::where('user_id', $user->id)->exists()) {
+        accumulateTypingTime($user);
+    }
+
     return TypingResult::create([
         'user_id' => $user->id,
         'mode' => $mode,

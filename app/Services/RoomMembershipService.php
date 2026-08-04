@@ -31,25 +31,35 @@ class RoomMembershipService
      * ALREADY occupy doesn't "leave then rejoin" (which, for a host, would hand the room
      * to someone else before you re-enter).
      *
-     * Wrapped in a transaction: between deleting the old membership and settling the room
-     * there must be no window where a concurrent read sees an inconsistent state.
+     * OPENS ITS OWN TRANSACTION, rather than documenting one and leaving callers to provide it.
+     * Two things need it: between deleting the old membership and settling the room there must
+     * be no window where a concurrent read sees an inconsistent state, and settleAbandonedRoom()
+     * takes a lockForUpdate that is a NO-OP outside a transaction -- a row lock is released as
+     * soon as the statement ends, so a caller who forgot silently lost the protection rather
+     * than failing. The promise now lives where it is kept.
+     *
+     * Nested safely: Laravel turns an inner transaction into a savepoint, so the three callers
+     * that already wrap this in one of their own (they have wider work to make atomic) are
+     * unaffected.
      */
     public function departCurrentRooms(int $userId, ?int $exceptRoomId = null): void
     {
-        $query = RoomMember::where('user_id', $userId)
-            ->when($exceptRoomId, fn ($q) => $q->where('room_id', '!=', $exceptRoomId));
+        DB::transaction(function () use ($userId, $exceptRoomId) {
+            $query = RoomMember::where('user_id', $userId)
+                ->when($exceptRoomId, fn ($q) => $q->where('room_id', '!=', $exceptRoomId));
 
-        $roomIds = (clone $query)->pluck('room_id')->unique();
+            $roomIds = (clone $query)->pluck('room_id')->unique();
 
-        if ($roomIds->isEmpty()) {
-            return;
-        }
+            if ($roomIds->isEmpty()) {
+                return;
+            }
 
-        $query->delete();
+            $query->delete();
 
-        foreach (Room::whereIn('id', $roomIds)->get() as $room) {
-            $this->settleAbandonedRoom($room, $userId);
-        }
+            foreach (Room::whereIn('id', $roomIds)->get() as $room) {
+                $this->settleAbandonedRoom($room, $userId);
+            }
+        });
     }
 
     /**
@@ -72,7 +82,8 @@ class RoomMembershipService
         $roomCode = $room?->code;
         $username = $member->user?->username ?? '';
 
-        DB::transaction(fn () => $this->departCurrentRooms($userId));
+        // No wrapper of its own any more: departCurrentRooms() opens the transaction it needs.
+        $this->departCurrentRooms($userId);
 
         if ($roomCode === null) {
             return true;

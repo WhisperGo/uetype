@@ -11,6 +11,12 @@ use Livewire\Livewire;
 /** Satu baris rekor. */
 function lbResult(User $user, string $mode, string $config, float $wpm): void
 {
+    // Lawan ghost tipe 'leaderboard' dibatasi ke pemain yang memang ditampilkan papan, jadi
+    // pemilik rekor harus lolos gerbang waktu terakumulasi dulu.
+    if (! TypingResult::where('user_id', $user->id)->exists()) {
+        accumulateTypingTime($user);
+    }
+
     TypingResult::create([
         'user_id' => $user->id, 'mode' => $mode, 'mode_config' => $config,
         'net_wpm' => $wpm, 'raw_wpm' => $wpm + 5, 'accuracy' => 96,

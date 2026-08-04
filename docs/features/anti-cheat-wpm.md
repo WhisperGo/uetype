@@ -484,12 +484,29 @@ lebih mahal daripada poin yang ia jaga.
 Sinyal §7.7c yang menandai membuat hasil disimpan sebagai **`pending`**, bukan ditolak. Kolom
 `review_status` di `typing_results` punya empat nilai:
 
-| Status | Arti | Di leaderboard? |
+| Status | Arti | Boleh jadi angka publik? |
 |---|---|---|
 | `clear` | lolos otomatis (mayoritas hasil) | ✅ |
 | `pending` | ditahan untuk ditinjau manusia | ❌ (sampai di-approve) |
 | `approved` | admin menyetujui | ✅ |
 | `rejected` | admin menolak | ❌ selamanya |
+
+**Kolomnya menjaga tiga angka, bukan cuma leaderboard.** Gerbangnya hidup di satu tempat —
+`TypingResult::scopeTrustworthy()` — dan dipakai papan, kedua helper rekor per-mode
+(`bestNetWpmFor()` / `bestSurvivalDurationFor()`), serta `User::recordPersonalBest()`.
+
+Dulu hanya papan dan `recordPersonalBest()` yang menanyakannya, dan itu meninggalkan celah yang
+tak kasat mata: rekor **per-mode** diturunkan dengan `MAX(net_wpm)` polos. Sebuah run 200 WPM yang
+ditahan memang tak masuk papan dan tak menaikkan `highest_wpm`, tapi ia tetap menjadi
+`previousBest` di layar hasil dan pace yang dipakai Ghost — jadi angka yang ditahan tetap
+dipertunjukkan, dan run jujur pemain berikutnya tak pernah lagi ditandai PB. Status `rejected`
+sama saja: `ReviewQueue::reject()` memindahkan kolom dan **membiarkan barisnya**, jadi tanpa
+gerbang ini angka yang sudah dibuang admin ikut dihitung selamanya.
+
+Survival adalah sisi yang paling perlu: metrik papannya `duration_seconds`, dan stamina
+disimulasikan di **klien** — jadi justru angka yang tak bisa dihitung ulang server itulah yang
+dulu kembali sebagai rekor meski `SurvivalPlausibility` menahannya. Dikunci
+`RecordExcludesFlaggedTest`.
 
 Admin membuka **`/review-queue`** ([`ReviewQueue`](../../app/Livewire/ReviewQueue.php)) untuk
 menilai tiap hasil pending (pemain, WPM, akurasi, alasan flag) lalu **Approve** (hasil masuk

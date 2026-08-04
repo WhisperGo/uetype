@@ -16,6 +16,12 @@ it('renders the typing page with ghost picker mounted', function () {
 /** Satu baris rekor untuk mode+config tertentu. */
 function pickerResult(User $user, string $mode, string $config, float $wpm): void
 {
+    // Daftar & resolusi lawan 'leaderboard' kini dibatasi ke pemain yang memang ditampilkan
+    // papan, jadi pemilik rekor harus lolos gerbang waktu terakumulasi dulu.
+    if (! TypingResult::where('user_id', $user->id)->exists()) {
+        accumulateTypingTime($user);
+    }
+
     TypingResult::create([
         'user_id' => $user->id, 'mode' => $mode, 'mode_config' => $config,
         'net_wpm' => $wpm, 'raw_wpm' => $wpm + 5, 'accuracy' => 96,
@@ -53,6 +59,10 @@ it('selectOpponent own dispatches ghost-selected with server-derived wpm', funct
 it('selectOpponent leaderboard re-derives wpm from DB, ignoring any client-implied number', function () {
     $ghostSource = User::factory()->create(['username' => 'speedy']);
     $viewer = User::factory()->create();
+
+    // A 'leaderboard' ghost is now scoped to players the board actually lists, so the source
+    // has to have earned a board spot before their record can be a pace.
+    accumulateTypingTime($ghostSource);
 
     TypingResult::create([
         'user_id' => $ghostSource->id, 'mode' => 'time', 'mode_config' => '30',

@@ -11,6 +11,7 @@ use App\Models\ClanWar;
 use App\Models\ClanWarModeClaim;
 use App\Models\Friendship;
 use App\Models\Message;
+use App\Models\TypingResult;
 use App\Models\User;
 use App\Services\SoloSessionGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -379,6 +380,40 @@ function pingWarAttempt(
         'typedMs' => $typedMs,
         'totalKeystrokes' => $totalKeystrokes,
         'correctKeystrokes' => $correctKeystrokes,
+    ]);
+}
+
+/**
+ * Beri seorang user cukup waktu mengetik terakumulasi untuk lolos gerbang kelayakan papan
+ * (TypingResult::LEADERBOARD_MIN_TYPING_SECONDS), TANPA menciptakan rekor time/words.
+ *
+ * Ada karena gerbang itu kini juga dipakai daftar & deep link Ghost, bukan cuma leaderboard:
+ * lawan ghost hanya boleh berupa pemain yang memang ditampilkan papan. Fixture ghost yang
+ * dulunya hanya menulis satu baris 30 detik jadi tak lolos, dan itu benar -- yang perlu
+ * disesuaikan fixture-nya, bukan gerbangnya.
+ *
+ * Baris pemanasnya SURVIVAL, dan itu bukan pilihan sembarangan: ghost hanya berlaku di
+ * time/words, jadi baris survival menambah waktu terakumulasi tanpa pernah muncul sebagai
+ * rekor di mode yang sedang diassert. Baris time/60 (yang dipakai helper serupa di
+ * LeaderboardIntegrityTest) akan mencemari justru assertion "tak ada rekor di config ini".
+ *
+ * Tinggal di sini, bukan di berkas test tempat ia dibutuhkan pertama kali: fungsi yang
+ * dideklarasikan di sebuah berkas test menjadi GLOBAL saat suite dijalankan penuh, jadi berkas
+ * kedua yang mendeklarasikan nama yang sama membuat seluruh suite fatal -- alasan yang sama
+ * persis dengan bladeViews() di atas.
+ */
+function accumulateTypingTime(User $user): void
+{
+    TypingResult::create([
+        'user_id' => $user->id,
+        'mode' => 'survival',
+        'mode_config' => 'easy',
+        'net_wpm' => 0,
+        'raw_wpm' => 0,
+        'accuracy' => 100,
+        'correct_chars' => 0,
+        'incorrect_chars' => 0,
+        'duration_seconds' => TypingResult::LEADERBOARD_MIN_TYPING_SECONDS,
     ]);
 }
 

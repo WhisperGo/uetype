@@ -34,7 +34,23 @@ class ClanWarResolver
             ->update(['status' => ClanWarStatus::Expired]);
     }
 
-    /** Score and close Ongoing wars that are due, updating both clans' power. */
+    /**
+     * Score and close Ongoing wars that are due, updating both clans' power.
+     *
+     * KNOWN SCALING LIMIT, recorded so it is found by decision rather than by a slow page.
+     * resolveDue() runs from ClanWar::mount(), so this sweeps EVERY ongoing war in the system
+     * each time any player opens /clan-war -- including wars they have nothing to do with. A
+     * war already past ends_at costs nothing extra (the short-circuit below skips the checks),
+     * but one still running costs bothClansHaveNothingLeftToPlay(): a claims query per side,
+     * plus a roster query when a side looks finished. So the work per page load grows linearly
+     * with the number of wars running anywhere.
+     *
+     * Fine at this project's scale -- a handful of concurrent wars is a handful of queries --
+     * and lazy resolution is deliberate (no scheduler; same pattern as the room sweep). If the
+     * count ever grows, the fix is to narrow this loop to the caller's own war and let the
+     * existing `clan-war:resolve` command carry the rest, rather than to abandon lazy
+     * resolution wholesale.
+     */
     private function resolveFinishedWars(): void
     {
         // Close Ongoing wars that are past their time or finished early.

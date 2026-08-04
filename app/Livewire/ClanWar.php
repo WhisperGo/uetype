@@ -517,6 +517,17 @@ class ClanWar extends Component
         ClanWarBroadcast::refresh($war, exceptUserIds: [$opponent->leader_id]);
     }
 
+    /**
+     * Leader-only: turn an incoming Pending challenge into a running war.
+     *
+     * The status write is a CLAIM (`where('status', Pending)`), not a plain update, and it is
+     * the same idiom settleWar() uses one file over. The read that authorises this happens in
+     * pendingChallengeForMyLeadership(), so between that SELECT and this write the row can
+     * already have moved -- two leaders' tabs pressing Accept together, or
+     * ClanWarResolver::expirePendingChallenges() marking it Expired a moment earlier. Without
+     * the condition the later writer wins, which at best re-snapshots started_at/ends_at and
+     * the claim caps, and at worst revives a war the deadline had already closed.
+     */
     public function acceptChallenge(int $warId): void
     {
         $war = $this->pendingChallengeForMyLeadership($warId);
@@ -524,19 +535,32 @@ class ClanWar extends Component
             return;
         }
 
-        $war->update([
-            'status' => ClanWarStatus::Ongoing,
-            'challenger_power_before' => $war->challenger->power,
-            'opponent_power_before' => $war->opponent->power,
-            // Claim caps are SNAPSHOTTED here, alongside the power figures and for the same
-            // reason: both describe the war as agreed, and neither may move while it runs.
-            // Recomputing the cap live would let a clan kick members mid-war to raise its own
-            // cap and pile every slot onto one account -- the concentration the cap prevents.
-            'challenger_max_claims' => ClanWarModeCatalog::claimCapFor($war->challenger->activeMembers()->count()),
-            'opponent_max_claims' => ClanWarModeCatalog::claimCapFor($war->opponent->activeMembers()->count()),
-            'started_at' => now(),
-            'ends_at' => now()->addDays(self::WAR_DURATION_DAYS),
-        ]);
+        $claimed = ClanWarModel::where('id', $war->id)
+            ->where('status', ClanWarStatus::Pending)
+            ->update([
+                'status' => ClanWarStatus::Ongoing,
+                'challenger_power_before' => $war->challenger->power,
+                'opponent_power_before' => $war->opponent->power,
+                // Claim caps are SNAPSHOTTED here, alongside the power figures and for the same
+                // reason: both describe the war as agreed, and neither may move while it runs.
+                // Recomputing the cap live would let a clan kick members mid-war to raise its own
+                // cap and pile every slot onto one account -- the concentration the cap prevents.
+                'challenger_max_claims' => ClanWarModeCatalog::claimCapFor($war->challenger->activeMembers()->count()),
+                'opponent_max_claims' => ClanWarModeCatalog::claimCapFor($war->opponent->activeMembers()->count()),
+                'started_at' => now(),
+                'ends_at' => now()->addDays(self::WAR_DURATION_DAYS),
+            ]);
+
+        // Somebody else already answered this challenge (or the deadline did). Nothing to
+        // announce: whoever won the claim sent the notification that belongs to it.
+        if (! $claimed) {
+            return;
+        }
+
+        // The in-memory model still carries the Pending row this method read; the columns just
+        // written live only in the database until it is re-read, and the broadcast below reports
+        // them.
+        $war->refresh();
 
         $this->notify($war->challenger->leader_id, [
             'type' => 'war-accepted',

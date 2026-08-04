@@ -109,9 +109,20 @@ class GhostResolver
     /**
      * A user's record in the ACTIVE mode+config. refId = user_id.
      * If the user has no record for that config -> null (fail-safe; ghost hidden).
+     *
+     * Unlike 'own' and 'friend', this type takes a RAW user id straight from the client -- the
+     * ?ghost=<id> deep link is a query parameter anyone can type. There is no ownership to
+     * check here (a board is public by definition), so the boundary is a different one: the id
+     * must belong to somebody the board actually lists. Without that, answering with a username
+     * turned this into an id-to-username oracle over every account that had ever typed, which
+     * is exactly what routing profiles by username is meant to prevent.
      */
     private function resolveLeaderboard(?int $refId, string $mainMode, string $subMode): ?array
     {
+        if ($refId === null || ! $this->isPubliclyListed($refId)) {
+            return null;
+        }
+
         $wpm = $this->bestWpmIn($refId, $mainMode, $subMode);
 
         if ($wpm === null) {
@@ -121,5 +132,11 @@ class GhostResolver
         $label = User::find($refId)?->username ?? 'Leaderboard';
 
         return ['wpm' => $wpm, 'label' => $label];
+    }
+
+    /** Does this user clear the same eligibility gate the public board applies? */
+    private function isPubliclyListed(int $userId): bool
+    {
+        return TypingResult::where('user_id', $userId)->leaderboardEligible()->exists();
     }
 }

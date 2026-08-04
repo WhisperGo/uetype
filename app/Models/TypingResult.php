@@ -113,8 +113,69 @@ class TypingResult extends Model
             ->where('user_id', $userId)
             ->where('mode', $mode)
             ->where('mode_config', $config)
+            ->trustworthy()
             ->max('net_wpm');
 
         return $best === null ? null : (float) $best;
+    }
+
+    /**
+     * The longest this user survived in one survival difficulty, or null if they have no
+     * result there. The survival counterpart to bestNetWpmFor(), and it exists for the same
+     * reason: the result screen and the survival board have to agree on what the record is.
+     *
+     * Survival is measured in duration, not WPM -- it is played under stamina pressure, so
+     * how long you lasted is the achievement. That is also why it needs the review gate most:
+     * stamina is simulated on the CLIENT, so duration_seconds is the one figure the server
+     * cannot recompute, and SurvivalPlausibility holds an implausible one for review rather
+     * than refusing it.
+     */
+    public static function bestSurvivalDurationFor(int $userId, string $config): ?float
+    {
+        $best = static::query()
+            ->where('user_id', $userId)
+            ->where('mode', 'survival')
+            ->where('mode_config', $config)
+            ->trustworthy()
+            ->max('duration_seconds');
+
+        return $best === null ? null : (float) $best;
+    }
+
+    /**
+     * Results that may stand as a public number: cleared automatically, or approved by a human.
+     *
+     * ONE definition of "this result is allowed to represent the player", because it is asked
+     * in more places than is obvious -- the leaderboard, both record helpers above, and (in its
+     * own words) User::recordPersonalBest(). It used to be asked only in the first and the last,
+     * which is how a run held `pending` stayed off the board and off the profile while still
+     * becoming the per-mode record the result screen compared against and the pace a ghost ran
+     * at. `rejected` mattered just as much: ReviewQueue::reject() moves the column and leaves
+     * the row, so without this the number an admin threw out counted forever.
+     */
+    public function scopeTrustworthy($query)
+    {
+        return $query->whereIn('review_status', [self::REVIEW_CLEAR, self::REVIEW_APPROVED]);
+    }
+
+    /**
+     * Restrict to results belonging to players who have earned a place on the public board:
+     * accumulated typing time (all modes) at or over LEADERBOARD_MIN_TYPING_SECONDS.
+     *
+     * ONE definition, because "who is publicly listed" is now asked by more than the board. The
+     * ghost opponent list and the `?ghost=<user_id>` deep link ask it too, and used to answer it
+     * differently -- they answered "anyone who has ever typed", which turned the deep link into
+     * an id-to-username oracle over accounts no board shows. That is the enumeration keying
+     * profiles by username exists to prevent, arriving through a different door.
+     *
+     * Kept as a subquery on user_id rather than a join so callers can attach it to an already
+     * grouped/joined query without disturbing their own shape.
+     */
+    public function scopeLeaderboardEligible($query)
+    {
+        return $query->whereIn('user_id', static::query()
+            ->select('user_id')
+            ->groupBy('user_id')
+            ->havingRaw('SUM(duration_seconds) >= ?', [self::LEADERBOARD_MIN_TYPING_SECONDS]));
     }
 }

@@ -107,9 +107,16 @@ class GhostPicker extends Component
             return collect();
         }
 
+        // Same two gates the public board applies, and applied HERE rather than left to the
+        // resolver alone: a picker that offered an opponent GhostResolver then refuses would be
+        // a worse bug than the one being fixed -- the player picks a name and nothing happens.
+        // trustworthy() keeps a run held for anti-cheat review from advertising a pace it was
+        // withheld from having; leaderboardEligible() keeps this list to players the board lists.
         $subQuery = TypingResult::select('user_id', DB::raw('MAX(net_wpm) as best_score'))
             ->where('mode', $this->mainMode)
             ->where('mode_config', $this->subMode)
+            ->trustworthy()
+            ->leaderboardEligible()
             ->groupBy('user_id');
 
         // GROUP BY in the outer query is required: the join matches `tr.net_wpm =

@@ -9,6 +9,19 @@ namespace App\Services;
  */
 class EloCalculator
 {
+    /**
+     * How far one war may move a clan's rating. Deliberately FLAT, not a decay schedule.
+     *
+     * Mature Elo implementations lower K as a competitor accumulates games (32 -> 16 -> 10), so
+     * an established rating stops swinging on a single result. That is the right shape for a
+     * populated ladder and the wrong one here: with few clans and few wars each, a high K is
+     * what lets a rating find its level at all -- decaying it early would freeze clans near
+     * their starting 1000 based on two or three matches, which says less than the flat version.
+     *
+     * Recorded so it reads as a decision rather than an omission. Revisit when wars per clan
+     * are into double figures, and take the number from THIS install's rating spread rather
+     * than from the chess convention the values come from.
+     */
     public const K_FACTOR = 32;
 
     /**
