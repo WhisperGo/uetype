@@ -448,28 +448,63 @@ class ClanWar extends Component
         ClanWarBroadcast::refresh($this->myActiveWar);
     }
 
+    /**
+     * Leader-only: open a Pending challenge against another clan.
+     *
+     * The "one active war per clan" rule is a read-then-write, so the checks and the insert run
+     * inside ONE transaction that first locks both clan rows. Without it two leaders pressing at
+     * the same moment both read "free" and both insert: Clan::activeWar() then returns whichever
+     * row comes first while the other stays alive, locking both clans out of any further war and
+     * -- once ends_at passes -- paying Elo TWICE for one fixture (see ClanWarResolver::settleWar).
+     *
+     * Locked in ascending id order because two leaders challenging each other approach the same
+     * pair from opposite ends; a fixed order is what stops that becoming a deadlock.
+     */
     public function challengeClan(int $opponentClanId): void
     {
         if (! $this->isLeader || $this->myActiveWar) {
             return;
         }
 
-        // populated(): re-checked HERE, not just filtered out of the list above. Hiding an
-        // empty clan from the picker is presentation; without this gate the id could still
-        // be posted directly, and an unplayable clan is a free 3-day walkover.
-        $opponent = Clan::populated()->find($opponentClanId);
+        $myClanId = $this->myClan->id;
 
-        // Server-side re-validation: don't trust the list shown on the client.
-        if (! $opponent || $opponent->id === $this->myClan->id || $opponent->activeWar() !== null) {
+        if ($opponentClanId === $myClanId) {
             return;
         }
 
-        $war = ClanWarModel::create([
-            'challenger_clan_id' => $this->myClan->id,
-            'opponent_clan_id' => $opponent->id,
-            'status' => ClanWarStatus::Pending,
-            'accept_deadline_at' => now()->addHours(self::ACCEPT_WINDOW_HOURS),
-        ]);
+        $war = DB::transaction(function () use ($opponentClanId, $myClanId) {
+            Clan::whereIn('id', [$myClanId, $opponentClanId])
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            // populated(): re-checked HERE, not just filtered out of the list above. Hiding an
+            // empty clan from the picker is presentation; without this gate the id could still
+            // be posted directly, and an unplayable clan is a free 3-day walkover.
+            $opponent = Clan::populated()->find($opponentClanId);
+
+            // Both sides re-read INSIDE the lock, not reused from the memoised computed property
+            // above: that value was resolved before the lock existed, which is exactly the stale
+            // read this transaction is here to prevent.
+            $mine = Clan::find($myClanId);
+
+            if (! $opponent || ! $mine || $mine->activeWar() !== null || $opponent->activeWar() !== null) {
+                return null;
+            }
+
+            return ClanWarModel::create([
+                'challenger_clan_id' => $myClanId,
+                'opponent_clan_id' => $opponent->id,
+                'status' => ClanWarStatus::Pending,
+                'accept_deadline_at' => now()->addHours(self::ACCEPT_WINDOW_HOURS),
+            ]);
+        });
+
+        if (! $war) {
+            return;
+        }
+
+        $opponent = $war->opponent;
 
         $this->notify($opponent->leader_id, [
             'type' => 'war-challenge',

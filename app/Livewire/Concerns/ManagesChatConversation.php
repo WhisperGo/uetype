@@ -141,7 +141,7 @@ trait ManagesChatConversation
     {
         $body = trim($body ?? $this->body);
 
-        if ($body === '' || mb_strlen($body) > 2000) {
+        if ($body === '' || mb_strlen($body) > Message::MAX_BODY_LENGTH) {
             return;
         }
 
@@ -250,7 +250,7 @@ trait ManagesChatConversation
 
         $body = trim($this->editBody);
 
-        if ($body === '' || mb_strlen($body) > 2000) {
+        if ($body === '' || mb_strlen($body) > Message::MAX_BODY_LENGTH) {
             return;
         }
 

@@ -223,5 +223,10 @@ return [
         'demoted' => 'Kamu kembali menjadi anggota biasa di :clan',
         'disbanded' => ':clan telah dibubarkan oleh leader-nya',
         'identity_updated' => 'Identitas clan-mu kini menjadi :clan',
+        // Hasil war. Masing-masing disambung " vs <clan> (<+/-N> power)" di ClanWarResolver,
+        // jadi ini pembuka kalimat, bukan kalimat utuh.
+        'war_won' => 'Clan-mu MENANG Clan War',
+        'war_lost' => 'Clan-mu KALAH Clan War',
+        'war_drawn' => 'Clan War berakhir SERI',
     ],
 ];

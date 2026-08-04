@@ -10,6 +10,7 @@ use App\Models\ClanWar;
 use App\Models\ClanWarModeClaim;
 use App\Support\SafeBroadcast;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Settles due Clan Wars: expires unaccepted challenges and scores finished wars
@@ -44,47 +45,119 @@ class ClanWarResolver
                 continue;
             }
 
-            $pointsChallenger = $this->clanWarPoints($war->id, $war->challenger_clan_id);
-            $pointsOpponent = $this->clanWarPoints($war->id, $war->opponent_clan_id);
-
-            if ($pointsChallenger > $pointsOpponent) {
-                $scoreChallenger = 1.0;
-                $result = 'win';
-            } elseif ($pointsChallenger < $pointsOpponent) {
-                $scoreChallenger = 0.0;
-                $result = 'loss';
-            } else {
-                $scoreChallenger = 0.5;
-                $result = 'draw';
-            }
-
-            [$deltaChallenger, $deltaOpponent] = EloCalculator::calculate(
-                $war->challenger_power_before,
-                $war->opponent_power_before,
-                $scoreChallenger
-            );
-
-            $war->challenger->increment('power', $deltaChallenger);
-            $war->opponent->increment('power', $deltaOpponent);
-
-            $war->update([
-                'status' => ClanWarStatus::Finished,
-                'result' => $result,
-                'challenger_power_delta' => $deltaChallenger,
-                'opponent_power_delta' => $deltaOpponent,
-            ]);
-
-            $this->notifyResult($war, $result, $deltaChallenger, $deltaOpponent);
+            $this->settleWar($war);
         }
     }
 
-    /** Notify both leaders of the result via real-time toast (each side's view flipped). */
+    /**
+     * Score ONE due war and apply its Elo. Returns true only for the caller that settled it.
+     *
+     * Public because "settle this war" is the unit of resolution, and because the only way to
+     * prove the guard below works is to hand it a war a competing caller has already closed.
+     *
+     * WHY THE CONDITIONAL UPDATE COMES FIRST. resolveDue() runs from ClanWar::mount(), so every
+     * member opening /clan-war triggers it -- and the moment two of them are most likely to do
+     * that at once is exactly when their war has just ended. This used to write Finished AFTER
+     * increment('power'), which meant the status was not a gate at all: two requests both
+     * reading Ongoing both applied the delta, and each clan's power moved twice.
+     *
+     * increment() is atomic per column, but that never protected against running the whole
+     * settlement twice. The damage is permanent because clans.power is never recomputed from
+     * war history -- once it has drifted there is nothing left to correct it from.
+     *
+     * Same shape as MultiplayerLobby::closeRaceNow() and FinalizesRace::startSuddenDeathIfNeeded():
+     * of any number of concurrent callers, exactly one gets affected-rows = 1 and does the work.
+     * Inside a transaction so the claim and what it authorises commit together -- a crash between
+     * them would leave a war marked Finished that no retry could ever reach again.
+     */
+    public function settleWar(ClanWar $war): bool
+    {
+        $settled = DB::transaction(function () use ($war) {
+            $claimed = ClanWar::where('id', $war->id)
+                ->where('status', ClanWarStatus::Ongoing)
+                ->update(['status' => ClanWarStatus::Finished]);
+
+            if (! $claimed) {
+                return null;
+            }
+
+            return $this->applySettlement($war);
+        });
+
+        if ($settled === null) {
+            return false;
+        }
+
+        // Outside the transaction: broadcasting is a side effect that shouldn't hold the row
+        // locks the settlement above took on both clans.
+        $this->notifyResult($war, $settled['result'], $settled['challenger'], $settled['opponent']);
+
+        return true;
+    }
+
+    /**
+     * Compute the outcome and move both clans' power. Only ever reached by the caller that won
+     * the claim above, and only from inside its transaction.
+     *
+     * @return array{result: string, challenger: int, opponent: int}
+     */
+    private function applySettlement(ClanWar $war): array
+    {
+        $pointsChallenger = $this->clanWarPoints($war->id, $war->challenger_clan_id);
+        $pointsOpponent = $this->clanWarPoints($war->id, $war->opponent_clan_id);
+
+        if ($pointsChallenger > $pointsOpponent) {
+            $scoreChallenger = 1.0;
+            $result = 'win';
+        } elseif ($pointsChallenger < $pointsOpponent) {
+            $scoreChallenger = 0.0;
+            $result = 'loss';
+        } else {
+            $scoreChallenger = 0.5;
+            $result = 'draw';
+        }
+
+        [$deltaChallenger, $deltaOpponent] = EloCalculator::calculate(
+            $war->challenger_power_before,
+            $war->opponent_power_before,
+            $scoreChallenger
+        );
+
+        // Null-safe because clan_wars keeps finished rows after a clan disbands (the FK is
+        // nullOnDelete). disbandClan() refuses to run mid-war so this should be unreachable,
+        // but the war is already claimed by the time we get here: crashing now would leave it
+        // Finished with no result written and no way back in.
+        $war->challenger?->increment('power', $deltaChallenger);
+        $war->opponent?->increment('power', $deltaOpponent);
+
+        $war->update([
+            'result' => $result,
+            'challenger_power_delta' => $deltaChallenger,
+            'opponent_power_delta' => $deltaOpponent,
+        ]);
+
+        return ['result' => $result, 'challenger' => $deltaChallenger, 'opponent' => $deltaOpponent];
+    }
+
+    /**
+     * Notify both leaders of the result via real-time toast (each side's view flipped).
+     *
+     * These three sentences were the only hardcoded Indonesian left in shipped code, which meant
+     * an English player was told 'Clan-mu MENANG Clan War' -- the one clan message that never
+     * went through the translation files it belongs in.
+     *
+     * KNOWN LIMITATION, shared with every other clan notification: __() renders in the locale of
+     * whoever's page load happened to trigger resolveDue(), not the recipient's. Clans::notify()
+     * has always worked this way, so fixing it here alone would make the two disagree; it needs
+     * one change across all of them (resolve each recipient's preferences['locale'] and render
+     * per addressee), which is a bigger job than this finding.
+     */
     private function notifyResult(ClanWar $war, string $result, int $deltaChallenger, int $deltaOpponent): void
     {
         $label = fn (string $r) => match ($r) {
-            'win' => 'Clan-mu MENANG Clan War',
-            'loss' => 'Clan-mu KALAH Clan War',
-            default => 'Clan War berakhir SERI',
+            'win' => __('clan.notify.war_won'),
+            'loss' => __('clan.notify.war_lost'),
+            default => __('clan.notify.war_drawn'),
         };
 
         $opponentResult = match ($result) {
@@ -93,15 +166,26 @@ class ClanWarResolver
             default => 'draw',
         };
 
-        SafeBroadcast::run(fn () => broadcast(new ClanUpdated($war->challenger->leader_id, [
-            'type' => 'war-result',
-            'message' => $label($result).' vs '.$war->opponent->name.' ('.$this->signed($deltaChallenger).' power)',
-        ])));
+        // Null-safe for the same reason applySettlement() is: a finished war outlives a clan
+        // that later disbands, and the name falls back to the snapshot taken at creation.
+        $challengerLeaderId = $war->challenger?->leader_id;
+        $opponentLeaderId = $war->opponent?->leader_id;
 
-        SafeBroadcast::run(fn () => broadcast(new ClanUpdated($war->opponent->leader_id, [
-            'type' => 'war-result',
-            'message' => $label($opponentResult).' vs '.$war->challenger->name.' ('.$this->signed($deltaOpponent).' power)',
-        ])));
+        if ($challengerLeaderId) {
+            SafeBroadcast::run(fn () => broadcast(new ClanUpdated($challengerLeaderId, [
+                'type' => 'war-result',
+                'message' => $label($result).' vs '.$war->opponentNameFor($war->challenger_clan_id)
+                    .' ('.$this->signed($deltaChallenger).' power)',
+            ])));
+        }
+
+        if ($opponentLeaderId) {
+            SafeBroadcast::run(fn () => broadcast(new ClanUpdated($opponentLeaderId, [
+                'type' => 'war-result',
+                'message' => $label($opponentResult).' vs '.$war->opponentNameFor($war->opponent_clan_id)
+                    .' ('.$this->signed($deltaOpponent).' power)',
+            ])));
+        }
     }
 
     /** Format a delta with an explicit +/- sign. */

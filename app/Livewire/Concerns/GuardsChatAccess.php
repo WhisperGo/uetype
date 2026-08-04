@@ -71,8 +71,23 @@ trait GuardsChatAccess
         SafeBroadcast::run(fn () => broadcast(new DirectMessageSent($message->load('sender'))));
     }
 
+    /**
+     * Post into a clan's chat. The membership check lives HERE, not in the caller.
+     *
+     * It used to rely entirely on its one caller passing $this->myClan->id, which was correct
+     * but left this trait asymmetric: sendDmMessage() above re-checks the friendship itself.
+     * A method named sendClanMessageAs() sitting in GuardsChatAccess is exactly what the next
+     * caller will assume is already guarded -- and the cost of removing that whole class of
+     * mistake is one lookup.
+     */
     private function sendClanMessageAs(int $clanId, string $body, ?int $replyToId = null): void
     {
+        // Active membership only: a pending join request is not membership, and ChatAccess
+        // already answers this question for the controller path.
+        if (ChatAccess::activeClan(Auth::id())?->id !== $clanId) {
+            return;
+        }
+
         $message = Message::create([
             'sender_id' => Auth::id(),
             'clan_id' => $clanId,

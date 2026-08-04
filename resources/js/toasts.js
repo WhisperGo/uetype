@@ -77,8 +77,13 @@ export default function toastStack(config) {
 
         // ---- SUBSCRIPTIONS ----
 
+        // All four subscriptions below use Echo.private(): these channels are keyed by
+        // sequential ids, so they are authorized server-side in routes/channels.php rather than
+        // relying on an id being hard to guess. Echo hits /broadcasting/auth with the CSRF token
+        // from the meta tag in the layout; the component only mounts inside @auth, so there is
+        // never a guest here to fail that handshake.
         listenFriends() {
-            const channel = window.Echo.channel(`friends.${config.userId}`);
+            const channel = window.Echo.private(`friends.${config.userId}`);
 
             // wire:navigate can run init() several times; drop the old listener first so
             // callbacks don't stack up (1 event = 1 toast).
@@ -118,7 +123,7 @@ export default function toastStack(config) {
         },
 
         listenClan() {
-            const channel = window.Echo.channel(`clan.${config.userId}`);
+            const channel = window.Echo.private(`clan.${config.userId}`);
 
             channel.stopListening('.clan.updated');
             channel.listen('.clan.updated', (e) => {
@@ -140,7 +145,7 @@ export default function toastStack(config) {
         },
 
         listenChat() {
-            const dmChannel = window.Echo.channel(`chat.${config.userId}`);
+            const dmChannel = window.Echo.private(`chat.${config.userId}`);
 
             dmChannel.stopListening('.dm.sent');
             dmChannel.listen('.dm.sent', (e) => {
@@ -173,7 +178,7 @@ export default function toastStack(config) {
             if (!config.clanId) return;
 
             // Clan chat: a per-clan channel that every member subscribes to.
-            const clanChannel = window.Echo.channel(`clan-chat.${config.clanId}`);
+            const clanChannel = window.Echo.private(`clan-chat.${config.clanId}`);
 
             clanChannel.stopListening('.clan-message.sent');
             clanChannel.listen('.clan-message.sent', (e) => {

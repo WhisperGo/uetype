@@ -15,7 +15,22 @@ use App\Services\SoloSessionGuard;
  * Di mode Words teksnya beku, jadi tiap pengulangan adalah latihan pada soal yang persis
  * akan dinilai. Di time/survival justru sebaliknya: tak ada teks beku sama sekali, jadi
  * tiap mount me-reroll teks acak -- reroll yang sama yang sudah dilarang restart().
+ *
+ * JAM DIBEKUKAN UNTUK SELURUH BERKAS INI, bukan per test.
+ *
+ * Semua yang diuji di sini adalah jam attempt: sisa waktu, jangkar yang tak boleh bergeser,
+ * plafon karakter yang tumbuh mengikuti waktu tunggu. Setiap detik NYATA yang lewat antara
+ * penyiapan dan assertion masuk ke angka yang sedang diperiksa, dan sebagian marginnya cuma
+ * dua detik -- di bawah beban paralel test-nya merah tanpa ada kode yang berubah.
+ *
+ * freezeSecond, bukan freezeTime: attempt_started_at menempuh kolom berpresisi detik, jadi
+ * "now" berpecahan terpotong saat ditulis dan terbaca sampai satu detik lebih tua.
+ *
+ * Di beforeEach karena sifat itu milik BERKAS ini, bukan satu-dua test. Tiga test sudah
+ * memanggilnya sendiri-sendiri, dan yang gagal justru yang TIDAK -- persis cara pengaman
+ * per-test membiarkan test berikutnya lahir tanpa perlindungan yang sama.
  */
+beforeEach(fn () => test()->freezeSecond());
 it('freezes the issued text for time across a re-mount', function () {
     [$player, $claim] = warAttemptScenario('time', '60');
 
@@ -205,6 +220,12 @@ it('does not reset the character ceiling on a refresh', function () {
 });
 
 it('never lets a refresh buy characters beyond the attempt wall budget', function () {
+    // Marginnya hanya 2 detik (28 dari 30), dan itu diukur terhadap jam NYATA: di bawah beban
+    // paralel attempt-nya kedaluwarsa sebelum submit, TypingEngine menyelesaikannya, dan test
+    // gagal pada redirect alih-alih pada plafon yang sedang diuji. Membekukan jam membuat 28
+    // benar-benar berarti 28 -- melebarkan marginnya hanya akan memindahkan titik gagalnya.
+    $this->freezeSecond();
+
     [$player, $claim] = warAttemptScenario('time', '30');
 
     $component = remountWarAttempt($player, $claim);

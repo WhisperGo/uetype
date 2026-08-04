@@ -81,6 +81,12 @@ class ProfileController extends Controller
             'user' => $user,
             'stats' => $stats,
             'isPublic' => $public,
+            // Resolved HERE rather than read off $user in the view. The view is shared between
+            // the private and public profile, so `@if(! $isPublic) {{ $user->email }}` put the
+            // only boundary protecting a private field inside presentation -- correct today, and
+            // one careless edit outside that guard away from not being. Null on the public
+            // branch means the address never enters that render at all.
+            'email' => $public ? null : $user->email,
             // Always defined so the view never has to guard it; show() overrides it with
             // the real origin. The private profile has no back arrow, so it goes unused.
             'backUrl' => route('friends.index'),

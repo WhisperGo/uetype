@@ -18,6 +18,15 @@ class Message extends Model
     /** How long after sending a message may still be edited (minutes). */
     public const EDIT_WINDOW_MINUTES = 30;
 
+    /**
+     * Longest body a message may carry, for sends AND edits, through every door.
+     *
+     * One definition because there are three call sites (both send paths in
+     * ManagesChatConversation and the validation rule in ChatController), and a limit written
+     * three times is a limit that can move in two of them unnoticed.
+     */
+    public const MAX_BODY_LENGTH = 2000;
+
     protected $fillable = [
         'sender_id',
         'recipient_id',

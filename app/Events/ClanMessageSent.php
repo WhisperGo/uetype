@@ -3,8 +3,8 @@
 namespace App\Events;
 
 use App\Models\Message;
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -16,9 +16,14 @@ class ClanMessageSent implements ShouldBroadcastNow
 
     public function __construct(public Message $message) {}
 
+    /**
+     * PRIVATE: clan ids are sequential too, so this was every clan's chat readable by anyone.
+     * Authorization (active membership) lives in routes/channels.php, matching the same rule
+     * GuardsChatAccess enforces on the send path.
+     */
     public function broadcastOn(): array
     {
-        return [new Channel('clan-chat.'.$this->message->clan_id)];
+        return [new PrivateChannel('clan-chat.'.$this->message->clan_id)];
     }
 
     public function broadcastAs(): string

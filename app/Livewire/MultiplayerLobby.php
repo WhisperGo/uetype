@@ -587,11 +587,17 @@ class MultiplayerLobby extends Component
     }
 
     /** Toggle the caller's ready flag (non-host racers only) and broadcast the change. */
+    /**
+     * Toggle the caller's ready flag. Lobby only: is_ready means nothing once a room has left
+     * 'waiting' (startRace() never reads it, and playAgain() resets it), so letting it move
+     * mid-race changed nothing but left the column looking live. Same guard as every other
+     * lobby action, so no future reader has to work out which ones are still in force.
+     */
     public function toggleReady(): void
     {
         $room = Room::where('code', $this->roomCode)->first();
 
-        if (! $room) {
+        if (! $room || $room->status !== RoomStatus::Waiting) {
             return;
         }
 
@@ -1514,12 +1520,24 @@ class MultiplayerLobby extends Component
         return view('livewire.multiplayer-lobby')->layout('layouts.app');
     }
 
-    /** Host-only: schedule the synced countdown and flip the room to 'racing'. */
+    /**
+     * Host-only: schedule the synced countdown and flip the room to 'racing'.
+     *
+     * The 'waiting' check is load-bearing twice over, and this was the one host-only action in
+     * this class missing it -- setRaceLang(), kickMember() and toggleSpectator() all have it.
+     *
+     *  - Mid-race it reset every racer's progress, wpm and finish time to zero and cleared
+     *    countdown_started_at, killing a sudden death already running.
+     *  - From 'finished' it was a second, unguarded way to start a rematch. playAgain() is the
+     *    only path that regenerates text_to_type, so going through here replayed the SAME
+     *    paragraph while resetting xp_earned -- and the resulting WPM, inflated by having
+     *    already read the text, lands in multiplayer_match_history permanently.
+     */
     public function startRace(): void
     {
         $room = Room::where('code', $this->roomCode)->first();
 
-        if (! $room || $room->host_id !== Auth::id()) {
+        if (! $room || $room->host_id !== Auth::id() || $room->status !== RoomStatus::Waiting) {
             return;
         }
 

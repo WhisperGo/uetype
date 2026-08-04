@@ -3,8 +3,8 @@
 namespace App\Events;
 
 use App\Models\Message;
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -16,9 +16,19 @@ class DirectMessageSent implements ShouldBroadcastNow
 
     public function __construct(public Message $message) {}
 
+    /**
+     * PRIVATE, and this one matters most of all: the payload below carries the message body.
+     *
+     * This was a plain Channel keyed by a sequential user id, so `Echo.channel('chat.5')` read
+     * every DM arriving for user #5 in real time -- no guessing needed, and the app key that
+     * makes it possible has to ship in the bundle. The 'encrypted' cast on Message::$body does
+     * not help here: it decrypts on attribute access, so what went over the wire was plaintext.
+     *
+     * Authorized in routes/channels.php.
+     */
     public function broadcastOn(): array
     {
-        return [new Channel('chat.'.$this->message->recipient_id)];
+        return [new PrivateChannel('chat.'.$this->message->recipient_id)];
     }
 
     public function broadcastAs(): string
@@ -26,7 +36,7 @@ class DirectMessageSent implements ShouldBroadcastNow
         return 'dm.sent';
     }
 
-    /** Minimal payload (not the whole model) to avoid leaking columns over the public WebSocket. */
+    /** Minimal payload (not the whole model): the channel is private, the row still isn't public. */
     public function broadcastWith(): array
     {
         return [

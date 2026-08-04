@@ -126,6 +126,17 @@ describe('multiplayer lobby', function () {
     });
 
     it('records the real elapsed time from race start when a player finishes', function () {
+        // finished_time_seconds diturunkan server dari (now() - race_starts_at), jadi setiap
+        // detik NYATA antara penyiapan di bawah dan pemanggilan ikut terhitung. Di bawah beban
+        // paralel itu melewati batas atas dan test ini merah tanpa ada kode yang berubah --
+        // pola yang sama dengan RaceWpmIntegrityTest.
+        //
+        // freezeSecond, BUKAN freezeTime: race_starts_at menempuh kolom DATETIME yang membuang
+        // pecahan detik. Beku pada 12:00:00.9 berarti yang tersimpan adalah 11:59:30 sementara
+        // now() tetap 12:00:00.9 -- selisihnya 30,9 dan terbaca 31. Membekukan pada batas detik
+        // membuat yang ditulis dan yang dibaca benar-benar sama.
+        $this->freezeSecond();
+
         // Broadcast di-fake supaya updateRaceProgress() tak mencoba konek Reverb asli.
         Event::fake([RaceProgressUpdated::class, RoomUpdated::class, SuddenDeathTriggered::class]);
 
@@ -162,10 +173,14 @@ describe('multiplayer lobby', function () {
             ->where('user_id', $user->id)
             ->value('finished_time_seconds');
 
-        // Harus ~30 detik (durasi asli sejak race_starts_at), BUKAN ~2 detik
+        // Harus TEPAT 30 detik (durasi asli sejak race_starts_at), BUKAN ~2 detik
         // (yang akan terjadi kalau masih memakai updated_at yang lama & keliru).
-        expect($seconds)->toBeGreaterThanOrEqual(29);
-        expect($seconds)->toBeLessThanOrEqual(31);
+        //
+        // Nilai persis, bukan rentang 29-31, karena jamnya dibekukan di atas. Rentang itu ada
+        // untuk menyerap detik nyata yang lewat antara penyiapan dan pemanggilan -- dan di bawah
+        // beban paralel ia tetap terlampaui (32 > 31). Melebarkannya hanya memindahkan titik
+        // gagalnya; membekukan jam menghapusnya sekaligus menajamkan assertion-nya.
+        expect($seconds)->toBe(30);
     });
 
     it('transfers host to the earliest remaining member when the host leaves', function () {

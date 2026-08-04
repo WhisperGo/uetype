@@ -226,5 +226,10 @@ return [
         'demoted' => 'You are a regular member of :clan again',
         'disbanded' => ':clan was disbanded by its leader',
         'identity_updated' => 'Your clan is now called :clan',
+        // War results. Each is followed by " vs <clan> (<+/-N> power)" built in ClanWarResolver,
+        // so these read as the opening of a sentence rather than a complete one.
+        'war_won' => 'Your clan WON the Clan War',
+        'war_lost' => 'Your clan LOST the Clan War',
+        'war_drawn' => 'The Clan War ended in a DRAW',
     ],
 ];

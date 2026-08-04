@@ -30,7 +30,7 @@ class ChatController extends Controller
     {
         $data = $request->validate([
             'mode' => 'required|in:dm,clan',
-            'body' => 'required|string|max:2000',
+            'body' => 'required|string|max:'.Message::MAX_BODY_LENGTH,
             'with' => 'nullable|string',        // friend's username (dm mode)
             'reply_to_id' => 'nullable|integer', // the message being replied to
         ]);

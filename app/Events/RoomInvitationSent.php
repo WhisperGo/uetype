@@ -2,8 +2,8 @@
 
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -35,9 +35,18 @@ class RoomInvitationSent implements ShouldBroadcastNow
         $this->inviterAvatar = $inviterAvatar;
     }
 
+    /**
+     * PRIVATE, and this event is why 'friends.{userId}' had to become private at all.
+     *
+     * room.{code} and race.{code} are deliberately public, on the grounds that a 6-character
+     * random code cannot be guessed. That argument only holds while the code stays secret --
+     * and this payload carries it. Broadcast on a channel keyed by a sequential user id, it
+     * handed out the very credential the room channels rely on, so anyone listening on
+     * friends.7 could harvest codes and walk into the races behind them.
+     */
     public function broadcastOn(): array
     {
-        return [new Channel('friends.'.$this->userId)];
+        return [new PrivateChannel('friends.'.$this->userId)];
     }
 
     public function broadcastAs(): string

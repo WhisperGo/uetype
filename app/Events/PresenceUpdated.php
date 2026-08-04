@@ -2,8 +2,8 @@
 
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -15,9 +15,10 @@ class PresenceUpdated implements ShouldBroadcastNow
 
     public function __construct(public int $friendId) {}
 
+    /** Private: same channel as FriendshipUpdated and RoomInvitationSent, so it moves with them. */
     public function broadcastOn(): array
     {
-        return [new Channel('friends.'.$this->friendId)];
+        return [new PrivateChannel('friends.'.$this->friendId)];
     }
 
     public function broadcastAs(): string

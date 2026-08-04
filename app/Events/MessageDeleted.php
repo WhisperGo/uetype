@@ -3,8 +3,8 @@
 namespace App\Events;
 
 use App\Models\Message;
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -16,11 +16,15 @@ class MessageDeleted implements ShouldBroadcastNow
 
     public function __construct(public Message $message) {}
 
+    /**
+     * Private to match the channel it was sent on. It carries no body, but a public retraction
+     * feed still tells an eavesdropper which conversations are live and how busy they are.
+     */
     public function broadcastOn(): array
     {
         return [$this->message->isClanMessage()
-            ? new Channel('clan-chat.'.$this->message->clan_id)
-            : new Channel('chat.'.$this->message->recipient_id)];
+            ? new PrivateChannel('clan-chat.'.$this->message->clan_id)
+            : new PrivateChannel('chat.'.$this->message->recipient_id)];
     }
 
     public function broadcastAs(): string

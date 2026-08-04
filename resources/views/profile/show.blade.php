@@ -72,9 +72,10 @@
                             <span class="px-2 py-0.5 rounded-md bg-brand/25 text-muted text-xs font-mono">{{ __('profile.level', ['level' => $stats['level']]) }}</span>
                         </div>
 
-                        {{-- Email shown only on your own profile (private). --}}
-                        @if(! $isPublic)
-                            <p class="mt-1 font-mono text-sm text-muted">{{ $user->email }}</p>
+                        {{-- Email shown only on your own profile: the controller sends null for a
+                             public one, so there is nothing here to guard wrongly. --}}
+                        @if($email)
+                            <p class="mt-1 font-mono text-sm text-muted">{{ $email }}</p>
                         @endif
 
                         <p class="mt-1 text-xs text-muted">

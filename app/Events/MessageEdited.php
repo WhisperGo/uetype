@@ -3,8 +3,8 @@
 namespace App\Events;
 
 use App\Models\Message;
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -16,11 +16,12 @@ class MessageEdited implements ShouldBroadcastNow
 
     public function __construct(public Message $message) {}
 
+    /** Private for the same reason as the original send: the payload repeats the body. */
     public function broadcastOn(): array
     {
         return [$this->message->isClanMessage()
-            ? new Channel('clan-chat.'.$this->message->clan_id)
-            : new Channel('chat.'.$this->message->recipient_id)];
+            ? new PrivateChannel('clan-chat.'.$this->message->clan_id)
+            : new PrivateChannel('chat.'.$this->message->recipient_id)];
     }
 
     public function broadcastAs(): string
