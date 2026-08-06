@@ -32,7 +32,7 @@
             {{ __('clan.war.clan_power', ['name' => $this->myClan->name, 'power' => number_format($this->myClan->power)]) }}
         </p>
 
-        {{-- ================= INCOMING CHALLENGE (leader only) ================= --}}
+        {{-- ================= INCOMING CHALLENGE (everyone sees it; officers can answer) ================= --}}
         @if ($this->incomingChallenge)
             @php $war = $this->incomingChallenge; @endphp
             <div class="p-5 border bg-surface/40 border-gold/30 rounded-2xl mb-6">
@@ -49,18 +49,26 @@
                         </p>
                     </div>
                 </div>
-                <div class="flex gap-3 mt-4">
-                    <x-btn-gold wire:click="acceptChallenge({{ $war->id }})">{{ __('clan.war.accept') }}</x-btn-gold>
-                    <button wire:click="declineChallenge({{ $war->id }})"
-                        class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
-                        {{ __('clan.war.decline') }}
-                    </button>
-                </div>
+                {{-- Ordinary members get the news without the two buttons. They used to get the
+                     buttons too, and pressing either did nothing at all: the server refuses
+                     anyone outside canManageWar and returns in silence. A line naming who is
+                     being waited on is the honest replacement for a dead control. --}}
+                @if ($this->canManageWar)
+                    <div class="flex gap-3 mt-4">
+                        <x-btn-gold wire:click="acceptChallenge({{ $war->id }})">{{ __('clan.war.accept') }}</x-btn-gold>
+                        <button wire:click="declineChallenge({{ $war->id }})"
+                            class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                            {{ __('clan.war.decline') }}
+                        </button>
+                    </div>
+                @else
+                    <p class="font-mono text-xs text-muted mt-4">{{ __('clan.war.awaiting_officers') }}</p>
+                @endif
             </div>
 
         {{-- ================= WAR CHALLENGE SENT (waiting for opponent to accept) ================= --}}
-        @elseif ($this->myActiveWar && $this->myActiveWar->status->value === 'pending')
-            @php $war = $this->myActiveWar; @endphp
+        @elseif ($this->outgoingChallenge)
+            @php $war = $this->outgoingChallenge; @endphp
             <div class="p-5 border bg-surface/40 border-white/5 rounded-2xl mb-6">
                 <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">{{ __('clan.war.waiting') }}</p>
                 <div class="flex items-center gap-4">
@@ -75,6 +83,16 @@
                         </p>
                     </div>
                 </div>
+                {{-- Without this the only way out of a mistaken challenge was to wait the hour
+                     out, and Clan::activeWar() counts Pending as active -- so the wait locked
+                     the opposing clan out of every war too. --}}
+                @if ($this->canManageWar)
+                    <button type="button"
+                        @click="$dispatch('open-modal', 'confirm-cancel-challenge')"
+                        class="px-4 py-1.5 mt-4 font-mono text-xs text-danger border border-danger/30 rounded-lg hover:bg-danger/10 transition">
+                        {{ __('clan.war.cancel_challenge') }}
+                    </button>
+                @endif
             </div>
 
         {{-- ================= WAR ONGOING ================= --}}
@@ -183,7 +201,10 @@
                                         </x-btn-gold>
                                     @endif
                                 </div>
-                                @if ($slot['claim']->user_id === auth()->id() || $this->isLeader)
+                                {{-- canManageMembers, not the leader alone: cancelClaim() has always
+                                     allowed roster powers here, so gating the button on the leader
+                                     hid a control co-leaders were entitled to. --}}
+                                @if ($slot['claim']->user_id === auth()->id() || $this->canManageMembers)
                                     <button type="button"
                                         @click="$dispatch('open-modal', { name: 'confirm-cancel-claim', id: {{ $slot['claim']->id }}, label: @js($labelMode.' '.$labelConfig) })"
                                         class="w-full px-3 py-1.5 font-mono text-[0.7rem] text-danger border border-danger/30 rounded-lg hover:bg-danger/10 transition">
@@ -246,8 +267,8 @@
                 @endforeach
             </div>
 
-        {{-- ================= FREE: CAN CHALLENGE (leader only) ================= --}}
-        @elseif ($this->isLeader)
+        {{-- ================= FREE: CAN CHALLENGE (officers only) ================= --}}
+        @elseif ($this->canManageWar)
             <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">{{ __('clan.war.challenge_heading') }}</p>
             @if ($this->challengeableClans->count() > 0)
                 <div class="space-y-3 mb-8">
@@ -336,6 +357,31 @@
                 </div>
             </x-modal>
         </div>
+
+        {{-- Withdrawing a challenge reaches into another clan (their incoming panel disappears
+             and their leader is notified), so it gets the same themed confirmation as the other
+             destructive actions on this page. No Alpine payload is needed: a clan has at most
+             one outgoing challenge, so the id is known at render time. --}}
+        @if ($this->canManageWar && $this->outgoingChallenge)
+            <x-modal name="confirm-cancel-challenge" maxWidth="md">
+                <div class="p-6">
+                    <p class="font-mono text-sm font-bold text-foreground">{{ __('clan.modal.cancel_challenge_title') }}</p>
+                    <p class="font-mono text-xs text-gold mt-1">{{ $this->outgoingChallenge->opponent->name }}</p>
+                    <p class="font-mono text-xs text-muted mt-2">{{ __('clan.modal.cancel_challenge_body') }}</p>
+                    <div class="flex justify-end gap-3 mt-6">
+                        <button type="button" @click="$dispatch('close-modal', 'confirm-cancel-challenge')"
+                            class="px-4 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                            {{ __('clan.modal.cancel') }}
+                        </button>
+                        <button type="button"
+                            @click="$wire.cancelChallenge({{ $this->outgoingChallenge->id }}); $dispatch('close-modal', 'confirm-cancel-challenge')"
+                            class="px-4 py-2 font-mono text-xs font-bold text-foreground bg-danger hover:bg-danger/80 rounded-lg transition">
+                            {{ __('clan.modal.cancel_challenge_confirm') }}
+                        </button>
+                    </div>
+                </div>
+            </x-modal>
+        @endif
 
         {{-- Starting an attempt is the irreversible step, so the confirmation sits HERE rather
              than on claiming: opening the page anchors a clock the player cannot wind back, and

@@ -3,7 +3,6 @@
 namespace App\Livewire;
 
 use App\Enums\ClanMemberStatus;
-use App\Enums\ClanRole;
 use App\Enums\ClanWarStatus;
 use App\Events\ClanUpdated;
 use App\Models\Clan;
@@ -95,12 +94,16 @@ class ClanWar extends Component
     }
 
     /**
-     * Declaring, accepting and declining a war stakes the clan's permanent Elo power,
-     * so it stays with the single leader -- a co-leader's remit is the roster.
+     * War powers: issue, cancel, accept and decline a challenge. Leader and co-leaders.
+     *
+     * This used to be leader-only, and the reason it no longer is has nothing to do with how
+     * much a war is worth. A challenge expires in ACCEPT_WINDOW_HOURS, so a leader who happened
+     * to be offline for that hour let every challenge lapse and no one could do anything about
+     * it -- the clan's war life hung on one person's availability. See ClanRole::canManageWar().
      */
-    public function getIsLeaderProperty(): bool
+    public function getCanManageWarProperty(): bool
     {
-        return $this->myMembership?->role === ClanRole::Leader;
+        return (bool) $this->myMembership?->role->canManageWar();
     }
 
     /** Roster powers (leader or co-leader); enough to cancel a teammate's stale claim. */
@@ -114,7 +117,15 @@ class ClanWar extends Component
         return $this->myClan?->activeWar();
     }
 
-    /** Incoming challenge (Pending war where our clan is the opponent); only relevant to leaders. */
+    /**
+     * Incoming challenge (Pending war where our clan is the opponent).
+     *
+     * Returned to EVERY member, not just the officers who can answer it. The view used to be
+     * commented "leader only" while gating nothing, so ordinary members were shown Accept and
+     * Decline buttons that the server refused in silence -- pressed, nothing happened, no
+     * message. The fix is not to hide the challenge from them: being at war concerns the whole
+     * roster. It is to drop the two buttons and say who is being waited on (see the view).
+     */
     public function getIncomingChallengeProperty(): ?ClanWarModel
     {
         $war = $this->myActiveWar;
@@ -126,10 +137,29 @@ class ClanWar extends Component
         return $war->opponent_clan_id === $this->myClan->id ? $war : null;
     }
 
-    /** Other clans free to challenge; only for a leader whose own clan is also free. */
+    /**
+     * Outgoing challenge (Pending war we issued and are waiting on).
+     *
+     * The mirror of incomingChallenge, and stated rather than inferred: the view previously
+     * reached this branch by elimination ("pending, and not the incoming case"), which is only
+     * true for as long as the branch above it keeps its exact shape. cancelChallenge() is
+     * offered here, so the side we are on has to be a fact, not a leftover.
+     */
+    public function getOutgoingChallengeProperty(): ?ClanWarModel
+    {
+        $war = $this->myActiveWar;
+
+        if (! $war || $war->status !== ClanWarStatus::Pending || ! $this->myClan) {
+            return null;
+        }
+
+        return $war->challenger_clan_id === $this->myClan->id ? $war : null;
+    }
+
+    /** Other clans free to challenge; only for an officer whose own clan is also free. */
     public function getChallengeableClansProperty()
     {
-        if (! $this->isLeader || $this->myActiveWar) {
+        if (! $this->canManageWar || $this->myActiveWar) {
             return collect();
         }
 
@@ -449,7 +479,7 @@ class ClanWar extends Component
     }
 
     /**
-     * Leader-only: open a Pending challenge against another clan.
+     * Officers only: open a Pending challenge against another clan.
      *
      * The "one active war per clan" rule is a read-then-write, so the checks and the insert run
      * inside ONE transaction that first locks both clan rows. Without it two leaders pressing at
@@ -462,7 +492,7 @@ class ClanWar extends Component
      */
     public function challengeClan(int $opponentClanId): void
     {
-        if (! $this->isLeader || $this->myActiveWar) {
+        if (! $this->canManageWar || $this->myActiveWar) {
             return;
         }
 
@@ -518,7 +548,7 @@ class ClanWar extends Component
     }
 
     /**
-     * Leader-only: turn an incoming Pending challenge into a running war.
+     * Officers only: turn an incoming Pending challenge into a running war.
      *
      * The status write is a CLAIM (`where('status', Pending)`), not a plain update, and it is
      * the same idiom settleWar() uses one file over. The read that authorises this happens in
@@ -530,7 +560,7 @@ class ClanWar extends Component
      */
     public function acceptChallenge(int $warId): void
     {
-        $war = $this->pendingChallengeForMyLeadership($warId);
+        $war = $this->pendingChallengeIMayAnswer($warId);
         if (! $war) {
             return;
         }
@@ -575,7 +605,7 @@ class ClanWar extends Component
 
     public function declineChallenge(int $warId): void
     {
-        $war = $this->pendingChallengeForMyLeadership($warId);
+        $war = $this->pendingChallengeIMayAnswer($warId);
         if (! $war) {
             return;
         }
@@ -592,10 +622,62 @@ class ClanWar extends Component
         ClanWarBroadcast::refresh($war, exceptUserIds: [$war->challenger->leader_id]);
     }
 
-    /** A Pending war where our clan is the opponent and we're its leader. */
-    private function pendingChallengeForMyLeadership(int $warId): ?ClanWarModel
+    /**
+     * Officers only: withdraw a challenge our own clan issued and nobody has answered yet.
+     *
+     * Why this exists at all: Clan::activeWar() counts Pending as an active war, so an unanswered
+     * challenge locks BOTH clans out of every other war until accept_deadline_at passes. Without
+     * a way back the only remedy for picking the wrong clan was to wait out the hour -- and the
+     * cost landed just as hard on the opponent, who had done nothing.
+     *
+     * Withdrawing is deliberately NOT the mirror of declining: only the challenging side may call
+     * it. Letting the opponent cancel would give them a second way to refuse, one that skips
+     * declineChallenge() and therefore never tells the challenger anything.
+     *
+     * The write is a CLAIM (`where('status', Pending)`), the same idiom as acceptChallenge():
+     * between the panel being rendered and this button being pressed the opponent may already
+     * have accepted, and an unconditional update would cancel a war that is running -- from a
+     * screen that was merely stale.
+     */
+    public function cancelChallenge(int $warId): void
     {
-        if (! $this->isLeader || ! $this->myClan) {
+        if (! $this->canManageWar || ! $this->myClan) {
+            return;
+        }
+
+        $war = ClanWarModel::with(['challenger', 'opponent'])
+            ->where('id', $warId)
+            ->where('challenger_clan_id', $this->myClan->id)
+            ->where('status', ClanWarStatus::Pending)
+            ->first();
+
+        if (! $war) {
+            return;
+        }
+
+        $cancelled = ClanWarModel::where('id', $war->id)
+            ->where('status', ClanWarStatus::Pending)
+            ->update(['status' => ClanWarStatus::Cancelled]);
+
+        // The opponent answered in the meantime; their notification is the one that stands.
+        if (! $cancelled) {
+            return;
+        }
+
+        $this->notify($war->opponent->leader_id, [
+            'type' => 'war-cancelled',
+            'message' => __('clan.notify.war_cancelled', ['clan' => $war->challenger->name]),
+        ]);
+
+        // Both rosters were looking at a panel that no longer describes anything: "waiting for a
+        // response" on our side, "incoming challenge" on theirs.
+        ClanWarBroadcast::refresh($war, exceptUserIds: [$war->opponent->leader_id]);
+    }
+
+    /** A Pending war where our clan is the one being challenged and we may answer for it. */
+    private function pendingChallengeIMayAnswer(int $warId): ?ClanWarModel
+    {
+        if (! $this->canManageWar || ! $this->myClan) {
             return null;
         }
 

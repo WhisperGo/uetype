@@ -47,6 +47,7 @@ tersebar:
 
 ```php
 public function canManageMembers(): bool { return $this !== self::Member; }   // leader + co-leader
+public function canManageWar(): bool     { return $this !== self::Member; }   // leader + co-leader
 public function canManageClan(): bool    { return $this === self::Leader; }   // leader saja
 ```
 
@@ -54,6 +55,20 @@ public function canManageClan(): bool    { return $this === self::Leader; }   //
 menyentuh eksistensi atau kepemilikan clan (transfer, promote/demote, disband). Pemisahan inilah
 yang membuat role co-leader aman dibagikan — seorang co-leader bisa membantu mengurus clan tanpa
 bisa menghancurkannya.
+
+**`canManageWar()` sengaja terpisah meski himpunannya sama persis dengan `canManageMembers()`.**
+Keduanya menjawab pertanyaan berbeda — "boleh mengurus roster?" dan "boleh mengikat clan ke sebuah
+war?" — dan kalau salah satunya memanggil yang lain, hari ketika satu bergeser akan menggeser yang
+lain **diam-diam**. Duplikasi satu baris di sini lebih murah daripada perubahan kewenangan yang tak
+disengaja.
+
+> **Diubah 2026-08-06 — kewenangan war pindah dari leader-saja ke leader + co-leader.**
+> Alasannya bukan "war ternyata tak sepenting itu", melainkan sebuah **ketiadaan**: tantangan
+> hangus dalam `ACCEPT_WINDOW_HOURS` (1 jam), jadi leader yang kebetulan sedang offline satu jam
+> itu membuat setiap tantangan lewat begitu saja dan **tak seorang pun** bisa berbuat apa-apa.
+> Hidup-matinya war sebuah clan bergantung pada ketersediaan satu orang. Yang dipertaruhkan war
+> adalah power Elo — yang dimainkan kembali — bukan clan itu sendiri, jadi ia lebih dekat ke kerja
+> roster ketimbang ke kepemilikan. Lihat [clan-war.md](clan-war.md) §3.11.
 
 **Gate peringkat.** Kick tidak cukup dijaga "apakah saya boleh kick", tapi juga *terhadap siapa*:
 

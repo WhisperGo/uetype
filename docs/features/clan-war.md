@@ -14,8 +14,9 @@
 ## 1. Apa Ini
 
 Kompetisi antar dua clan. Alur:
-1. Leader **menantang** clan lain → war `Pending` (harus di-accept dalam **1 jam**).
-2. Lawan **accept** → war `Ongoing` selama **3 hari**.
+1. Leader/co-leader **menantang** clan lain → war `Pending` (harus di-accept dalam **1 jam**;
+   penantang boleh **membatalkan** selama belum dijawab — §3.11).
+2. Leader/co-leader lawan **accept** → war `Ongoing` selama **3 hari**.
 3. Kedua clan berlomba menyelesaikan **9 mode wajib** (grid). Tiap member **mengklaim** satu mode,
    mengerjakannya di typing engine (mode terkunci), hasilnya jadi **poin**.
 4. War **selesai** (lewat 3 hari, atau kedua clan tuntas 9 mode). Poin dibandingkan, **power**
@@ -382,6 +383,58 @@ hitung-live, supaya war lama tetap jalan.
 kuota habis, dan menyuruh pemain mencari rekan yang tak ada. Sekarang closure transaksinya
 mengembalikan **alasan**, bukan `null`. Grid pun berhenti menawarkan tombol Claim begitu kuota
 habis, dan `clan.war.modes_hint` menyebut angka capnya.
+
+### 3.11 Siapa yang menjawab tantangan, dan jalan pulang dari tantangan yang telanjur dikirim
+
+Dua defect di sekitar war yang masih `Pending`, dilaporkan 2026-08-06. Keduanya berakar di tempat
+yang sama: **status `Pending` mengunci dua clan sekaligus, tapi tak ada satu pun kendali yang benar
+bekerja di atasnya.**
+
+**Kewenangan war kini leader + co-leader** (`ClanRole::canManageWar`), mencakup keempat aksinya:
+menantang, membatalkan, menerima, menolak. Sebelumnya leader-saja.
+
+*Kenapa berubah:* bukan karena war dinilai ulang, melainkan karena `ACCEPT_WINDOW_HOURS` = 1 jam.
+Leader yang kebetulan offline selama jam itu membuat setiap tantangan hangus, dan tak seorang pun
+bisa berbuat apa-apa — hidup-matinya war satu clan bergantung pada ketersediaan satu orang. Yang
+dipertaruhkan adalah power Elo, yang dimainkan kembali; bukan clan itu sendiri.
+
+*Kenapa keempatnya sekaligus, bukan hanya accept/decline:* co-leader yang boleh **menjawab** tapi
+tak boleh **mengajukan** akan bisa membatalkan tantangan yang tak boleh ia buat. Satu konsep, satu
+predikat.
+
+**Member biasa tetap melihat panel tantangan masuk — yang hilang cuma tombolnya.** Dulu
+`getIncomingChallengeProperty()` tak mengecek role sama sekali, padahal komentar di atasnya
+*dan* di view sama-sama berbunyi "leader only". Akibatnya member dirender tombol Terima/Tolak yang
+`pendingChallengeIMayAnswer()` tolak dengan `return` senyap: ditekan, tak terjadi apa pun, tanpa
+pesan. Perbaikannya **bukan** menyembunyikan tantangannya — sedang diperangi itu urusan seluruh
+roster — melainkan mengganti kendali mati itu dengan satu baris yang menyebut siapa yang ditunggu
+(`clan.war.awaiting_officers`).
+
+**`cancelChallenge()` menutup kuncian satu jam.** `Clan::activeWar()` menghitung `Pending` sebagai
+war aktif, jadi tantangan yang belum dijawab mengunci **kedua** clan dari war mana pun sampai
+`accept_deadline_at` lewat. Tanpa jalan pulang, obat satu-satunya untuk salah pilih clan adalah
+menunggu satu jam — dan ongkosnya jatuh sama beratnya ke clan lawan, yang tak melakukan apa-apa.
+
+Tiga keputusan di dalamnya yang mudah salah "diperbaiki":
+
+1. **Status `Cancelled`, bukan baris yang dihapus.** Mengikuti `Declined`/`Expired` — idiom proyek
+   ini untuk "tantangan yang berakhir tanpa dimainkan". Setiap query yang menentukan sudah bekerja
+   atas whitelist: `activeWar()` hanya menerima Pending/Ongoing (jadi kedua clan langsung bebas) dan
+   `finishedWars()` hanya menerima Finished (jadi ia tak pernah mencemari riwayat).
+2. **Hanya sisi penantang yang boleh memanggilnya.** Ini menarik tantangan sendiri, bukan cara kedua
+   untuk menolak. Kalau pihak yang ditantang bisa membatalkan, ia menolak lewat jalur yang **melewati
+   `declineChallenge()`** — dan penantang tak pernah diberi tahu apa pun.
+3. **Tulisannya update bersyarat** (`where('status', Pending)`), idiom yang sama dengan
+   `acceptChallenge()` dan `ClanWarResolver::settleWar()`. Antara panel dirender dan tombolnya
+   ditekan, lawan bisa sudah menerima; update polos akan **membatalkan war yang sedang berjalan**
+   dari layar yang cuma basi.
+
+**Efek samping yang ikut diperbaiki:** tombol "Batalkan Klaim" di grid mode digating
+`$this->isLeader` padahal `cancelClaim()` di server menerima `canManageMembers` — kelas defect yang
+sama persis dengan defect member di atas, hanya terbalik arah (server mengizinkan, UI
+menyembunyikan). Sekarang keduanya membaca predikat yang sama.
+
+Dikunci [`ClanWarChallengeAuthorityTest`](../../tests/Feature/ClanWarChallengeAuthorityTest.php).
 
 ## 4. Integritas
 

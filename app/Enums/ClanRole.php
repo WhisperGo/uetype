@@ -39,4 +39,22 @@ enum ClanRole: string
     {
         return $this === self::Leader;
     }
+
+    /**
+     * War powers: issue, cancel, accept and decline a clan war challenge.
+     *
+     * Today this is the same set as canManageMembers(), and it is deliberately a SEPARATE
+     * method rather than a call to it. The two answer different questions -- "may they run the
+     * roster" and "may they commit the clan to a war" -- and the day one of them moves, sharing
+     * an implementation would move the other silently. A war stake is closer to roster work
+     * than to ownership: the loss is Elo power, which is played back, not the clan itself.
+     *
+     * It sat with the single leader until 2026-08-06. What ended that was not a rule change but
+     * an absence: an offline leader blocked the whole clan, since nobody else could answer a
+     * challenge before its one-hour deadline burned it.
+     */
+    public function canManageWar(): bool
+    {
+        return $this !== self::Member;
+    }
 }
