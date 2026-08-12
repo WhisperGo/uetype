@@ -16,7 +16,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    'default' => env('DB_CONNECTION', 'mysql'),
 
     /*
     |--------------------------------------------------------------------------
@@ -27,20 +27,16 @@ return [
     | An example configuration is provided for each database system which
     | is supported by Laravel. You're free to add / remove connections.
     |
+    | This project runs on MySQL, so the sqlite block Laravel scaffolds here has
+    | been removed. Note this is cosmetic only: since Laravel 11 the framework
+    | merges its own defaults (vendor/laravel/framework/config/database.php) into
+    | this file, so `sqlite` stays resolvable regardless. What actually pins the
+    | project to MySQL is the `default` fallback above plus the CHECK constraint
+    | in the migrations, which no other driver accepts.
+    |
     */
 
     'connections' => [
-
-        'sqlite' => [
-            'driver' => 'sqlite',
-            'url' => env('DB_URL'),
-            'database' => env('DB_DATABASE', database_path('database.sqlite')),
-            'prefix' => '',
-            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
-        ],
 
         'mysql' => [
             'driver' => 'mysql',

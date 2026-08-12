@@ -1,0 +1,261 @@
+<?php
+
+namespace App\Livewire\Concerns;
+
+use App\Models\MultiplayerMatchHistory;
+use App\Models\Room;
+use App\Models\RoomMember;
+use App\Models\User;
+use App\Services\AchievementService;
+use App\Services\AntiCheatService;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Race finalization: assigns final placements & durations, validates them through
+ * anti-cheat, and freezes the result board.
+ *
+ * Extracted because this is the ONLY cluster in MultiplayerLobby with a truly clean
+ * boundary: it's only ever called INTO (from updateRaceProgress, giveUp, and
+ * checkSuddenDeath) and calls nothing back except the read-model.
+ *
+ * Room-lifecycle and race-lifecycle are deliberately NOT split out: they're
+ * interdependent (roomUpdated/render call resetToChoose, playAgain resets sudden-death
+ * state), so splitting them would only yield mutually-using traits without adding
+ * clarity.
+ */
+trait FinalizesRace
+{
+    /**
+     * All in ONE transaction: a single race writes place & xp_earned for each player,
+     * each user's total_xp, and one permanent history row per player. Failing midway
+     * without a transaction leaves a half-finalized race -- and since the idempotency
+     * guard `xp_earned IS NULL` treats already-processed players as done, re-calling
+     * won't fix it.
+     *
+     * The idempotency guard is STILL needed: the transaction protects against partial
+     * writes, the guard protects against double calls (the "all finished" fast-path and
+     * checkSuddenDeath can both reach here). Different roles, not duplication.
+     */
+    public function finalizeRace(string $roomId): void
+    {
+        $awarded = DB::transaction(fn () => $this->writeFinalStandings($roomId));
+
+        // Achievements are recorded here too -- a race grants EXP exactly like a solo run,
+        // so a player could cross a level threshold mid-race and never have it written down.
+        // Their badge then showed up on /achievements with no date, and only after they
+        // happened to play solo again.
+        //
+        // OUTSIDE the transaction, deliberately. syncUnlocks() costs ~2 reads per player,
+        // and the finalization transaction already writes place, xp, total_xp and a history
+        // row for each of up to MAX_PLAYERS racers -- the hottest path in multiplayer. Achievements
+        // are derived and idempotent, so a failure here heals itself on the next call; they
+        // don't need to be atomic with the race result, and holding the transaction open for
+        // them would only make the race slower for everyone.
+        //
+        // Note a race writes no typing_results row, so the only thing it can newly unlock is
+        // a LEVEL achievement. syncUnlocks() is still called whole rather than checking levels
+        // directly, so the rules stay in one place if the definitions ever grow.
+        foreach ($awarded as $user) {
+            app(AchievementService::class)->syncUnlocks($user);
+        }
+
+        // place/xp/result_recorded just changed -> snapshot & view must re-read. OUTSIDE
+        // the transaction: this drops the in-memory cache, it doesn't write to the DB.
+        $this->forgetRoomCache();
+    }
+
+    /**
+     * @return array<int, User> the players who actually received EXP on this call
+     */
+    private function writeFinalStandings(string $roomId): array
+    {
+        $room = Room::find($roomId);
+        $textLength = $room ? mb_strlen($room->text_to_type) : 0;
+
+        // Only racers get finalized: spectators have no place/XP and must not pollute
+        // the podium order or the player count in history.
+        //
+        // "Not finished" MUST be the first sort key. MySQL places NULL first on ASC, so
+        // with finished_time_seconds as the primary key, unfinished players would land
+        // above legitimate finishers -- 1st place for someone who never finished. The
+        // three current callers of finalizeRace() guarantee no NULL reaches here (they
+        // either wait for everyone to finish or set the DNF sentinel first), so this is
+        // fragility, not a live bug -- but fragility that costs one line to prevent.
+        $members = RoomMember::with('user')
+            ->where('room_id', $roomId)
+            ->where('role', RoomMember::ROLE_PLAYER)
+            ->orderByRaw('finished_time_seconds IS NULL')
+            ->orderBy('finished_time_seconds', 'asc')
+            ->orderBy('progress_percent', 'desc')
+            ->get();
+
+        // Validity is decided BEFORE places are handed out. Ranking by raw position would
+        // let a rejected result occupy the podium: a cheater teleporting to 100% in two
+        // seconds earned no XP and no history row, yet still took place 1 and pushed the
+        // real winner down to 2 -- in that honest player's PERMANENT history. Places are
+        // therefore only counted for players whose result survives the anti-cheat gate.
+        $validity = [];
+
+        foreach ($members as $member) {
+            $progress = max(0, min(100, (int) $member->progress_percent));
+            $correctChars = (int) round(($progress / 100) * $textLength);
+
+            $validity[$member->id] = $member->user
+                ? $this->isValidRaceResult($member, $correctChars)
+                : false;
+        }
+
+        $validCount = count(array_filter($validity));
+        $place = 0;
+
+        // Collected inside the idempotency guard below, so a second finalizeRace call
+        // returns an empty list -- achievements are then synced exactly once per race.
+        $awarded = [];
+
+        foreach ($members as $member) {
+            $isValid = $validity[$member->id];
+
+            // Rejected results keep their existing place value rather than claiming a new
+            // one; only genuine finishers advance the counter.
+            if ($isValid) {
+                $place++;
+            }
+
+            $updateData = ['place' => $isValid ? $place : null];
+
+            // EXP once per player: xp_earned null = not yet awarded (safe from double-award
+            // via the "all finished" fast-path or checkSuddenDeath). rooms/room_members are
+            // deleted once all players leave, so the permanent history row is written here
+            // too -- the only point where all final columns (place, wpm, accuracy, xp) are
+            // settled before the room can vanish.
+            if (is_null($member->xp_earned) && $member->user) {
+                // correctChars derived from progress% x text length (room_members doesn't
+                // store the correct-char count), using the same formula as solo mode.
+                $progress = max(0, min(100, (int) $member->progress_percent));
+                $correctChars = (int) round(($progress / 100) * $textLength);
+
+                $updateData['result_recorded'] = $isValid;
+
+                if ($isValid) {
+                    $xp = $member->user->addExp($correctChars, (float) $member->accuracy);
+                    $updateData['xp_earned'] = $xp;
+                    $awarded[] = $member->user;
+
+                    MultiplayerMatchHistory::create([
+                        'user_id' => $member->user_id,
+                        'room_code' => $room?->code ?? '',
+                        'place' => $place,
+                        // Counts only players whose result stood: "1st of 2" would read as
+                        // a hollow win if the other entry was a rejected cheat attempt.
+                        'player_count' => $validCount,
+                        'wpm' => (int) $member->wpm,
+                        'accuracy' => (float) $member->accuracy,
+                        // The DNF sentinel (999) MUST NOT reach permanent history: here the
+                        // column means "elapsed duration", and 999 would be read as a real
+                        // duration by any stats that average it. Unreachable in practice --
+                        // isValidRaceResult() already rejected every DNF above -- but kept as
+                        // the last line of defence, since this is where the value is written.
+                        'finished_time_seconds' => $member->realFinishedSeconds(),
+                        'xp_earned' => $xp,
+                    ]);
+                } else {
+                    // Still mark xp_earned (0) so the idempotency guard above won't
+                    // reprocess this player on the next finalizeRace call.
+                    $updateData['xp_earned'] = 0;
+                }
+            }
+
+            $member->update($updateData);
+        }
+
+        return $awarded;
+    }
+
+    /**
+     * Start the sudden-death timer if it isn't running yet. Returns true ONLY on the
+     * call that actually started it (that caller is the one that broadcasts).
+     *
+     * The condition is just one -- "timer not yet running" -- and deliberately does NOT
+     * ask "am I the first player to finish". That second question used to be a condition,
+     * and it was dangerous: the finish count is read BEFORE this player's finish status
+     * is written, so if someone was already recorded as finished but the timer hadn't
+     * started yet, the next player fails the "first" test -> the timer never starts ->
+     * checkSuddenDeath() always returns -> the remaining players hang forever.
+     *
+     * The conditional `whereNull(...)` update makes it atomic: of two parallel requests,
+     * only one gets affected-rows = 1, so the timer can't be reset by the second player.
+     * Same pattern as TypingEngine::attachToWarClaim().
+     */
+    private function startSuddenDeathIfNeeded(Room $room): bool
+    {
+        $claimed = Room::where('id', $room->id)
+            ->whereNull('countdown_started_at')
+            ->update(['countdown_started_at' => now()]);
+
+        if (! $claimed) {
+            return false;
+        }
+
+        // Reload so the caller can read the fresh countdown_started_at (used to compute
+        // the broadcast deadline).
+        $room->refresh();
+
+        return true;
+    }
+
+    /**
+     * Server-side validity gate for a finished race result, reusing AntiCheatService.
+     * Rejects the impossible (WPM beyond human limits, inconsistent chars, AND a high
+     * progress paired with an impossibly low accuracy -- the "fast garbage" cheat), the
+     * truly-empty (no_input: joined but never typed), AND every DNF.
+     *
+     * A DNF -- whether the player gave up or was timed out for going AFK -- means they did
+     * not finish, so it is not a real typing result and must not enter permanent history:
+     * a DNF's low WPM would drag down the player's average. The AFK case is exactly this:
+     * type a little, stop, get timed out at sudden death, then land in history at ~3 WPM.
+     * A DNF still shows on the result screen (with its DNF badge); it just isn't recorded.
+     */
+    private function isValidRaceResult(RoomMember $member, int $correctChars): bool
+    {
+        // Not finished = not a recordable result, regardless of how far they got.
+        if ($member->isDnf()) {
+            return false;
+        }
+
+        $duration = (float) ($member->finished_time_seconds ?? 0);
+        $progress = max(0, min(100, (int) $member->progress_percent));
+
+        $antiCheat = app(AntiCheatService::class);
+
+        // raceResultReasons() adds the progress/accuracy cross-check the plain check()
+        // can't make: in a race the server derives WPM from progress, so it can only
+        // validate the client-reported accuracy against progress, not recompute it.
+        $reasons = $antiCheat->raceResultReasons($correctChars, $duration, $progress, (float) $member->accuracy);
+
+        // The rejection rule lives in AntiCheatService, not copied here: one definition
+        // of "invalid race result", used wherever a race is finalized.
+        return ! $antiCheat->rejectsRaceResult($reasons);
+    }
+
+    private function captureResultSnapshot(): void
+    {
+        if (! empty($this->resultSnapshot) || ! $this->roomData) {
+            return;
+        }
+
+        $this->resultSnapshot = $this->leaderboardData->map(fn ($member) => [
+            'user_id' => $member->user_id,
+            'username' => $member->user->username,
+            'avatar' => $member->user->avatar,
+            'wpm' => (int) $member->wpm,
+            'accuracy' => $member->accuracy,
+            // Kept so the result screen can re-derive WHY a result was rejected (the
+            // accuracy/progress cross-check needs progress) without a DB round-trip.
+            'progress_percent' => (int) $member->progress_percent,
+            'finished_time_seconds' => $member->finished_time_seconds,
+            'place' => $member->place,
+            // false = rejected by anti-cheat (excluded from stats); null = not yet finalized.
+            'result_recorded' => $member->result_recorded,
+        ])->values()->all();
+    }
+}

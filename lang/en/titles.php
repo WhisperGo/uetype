@@ -1,0 +1,27 @@
+<?php
+
+return [
+    'brand' => 'UeType',
+    'template' => ':page | :brand',
+
+    'pages' => [
+        'profile.me' => 'Profile',
+        'profile.show' => 'Player Profile',
+        'settings' => 'Settings',
+        'achievements.index' => 'Achievements',
+        'stats' => 'Stats',
+        'friends.index' => 'Friends',
+        'clans.index' => 'Clans',
+        'clan-war.index' => 'Clan War',
+        'clan-leaderboard.index' => 'Clan Leaderboard',
+        'clans.show' => 'Clan',
+        'typing.result' => 'Result',
+        'multiplayer.lobby' => 'Multiplayer',
+        'leaderboard' => 'Leaderboard',
+        'about' => 'About',
+        'terms' => 'Terms and Conditions',
+        'login' => 'Sign In',
+        'register' => 'Sign Up',
+        'style-guide' => 'Design System',
+    ],
+];

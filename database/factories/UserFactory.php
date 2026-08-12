@@ -2,20 +2,15 @@
 
 namespace Database\Factories;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
+ * @extends Factory<User>
  */
 class UserFactory extends Factory
 {
-    /**
-     * The current password being used by the factory.
-     */
-    protected static ?string $password;
-
     /**
      * Define the model's default state.
      *
@@ -24,21 +19,38 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
+            'google_id' => fake()->unique()->numerify('##################'),
+            'username' => fake()->unique()->userName(),
             'email' => fake()->unique()->safeEmail(),
-            'email_verified_at' => now(),
-            'password' => static::$password ??= Hash::make('password'),
+            'avatar' => null,
+            'highest_wpm' => 0,
+            'total_xp' => 0,
+            'is_admin' => false,
+            'preferences' => null,
             'remember_token' => Str::random(10),
+            // A factory user represents an active account: present, so isOnline() is true
+            // and the multiplayer stale-member sweep won't reap them from a room. Tests that
+            // need an offline/absent user set last_seen_at explicitly (null or a past time)
+            // -- see PresenceTest and the offline() helper in MultiplayerStaleSweepTest.
+            'last_seen_at' => now(),
         ];
     }
 
-    /**
-     * Indicate that the model's email address should be unverified.
-     */
-    public function unverified(): static
+    /** An absent/offline user: last_seen_at is null, so isOnline() is false. */
+    public function offline(): static
     {
         return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
+            'last_seen_at' => null,
+        ]);
+    }
+
+    /**
+     * Indicate that the user is an admin.
+     */
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_admin' => true,
         ]);
     }
 }

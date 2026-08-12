@@ -1,7 +1,8 @@
+{{-- Renders a session status message (e.g. after login or password reset), if present. --}}
 @props(['status'])
 
 @if ($status)
-    <div {{ $attributes->merge(['class' => 'font-medium text-sm text-green-600 dark:text-green-400']) }}>
+    <div {{ $attributes->merge(['class' => 'font-medium text-sm text-gold']) }}>
         {{ $status }}
     </div>
 @endif

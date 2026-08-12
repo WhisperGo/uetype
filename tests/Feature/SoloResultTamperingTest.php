@@ -1,0 +1,166 @@
+<?php
+
+use App\Livewire\TypingEngine;
+use App\Models\TypingResult;
+use App\Models\User;
+use App\Services\SoloSessionGuard;
+use Livewire\Livewire;
+
+/**
+ * saveResult() used to take the client's duration and keystroke counts at face value.
+ * Recomputing WPM from those numbers is not verification -- a forged payload recomputes
+ * to exactly the fake figure it claims, so 299 WPM sailed through every check and became
+ * the user's highest_wpm. These tests pin the server-side reference (SoloSessionGuard).
+ */
+function playSolo(User $user, string $main = 'time', string $sub = '30')
+{
+    return Livewire::actingAs($user)->test(TypingEngine::class)
+        ->call('setMode', $main, $sub);
+}
+
+it('refuses a fabricated high-wpm payload in time mode', function () {
+    $user = User::factory()->create();
+
+    // 1495 correct chars claimed in 60s = 299 WPM, just under the 300 ceiling. This used
+    // to be stored verbatim and become the user's highest_wpm.
+    playSolo($user, 'time', '30')
+        ->call('saveResult', ['durationMs' => 60000, 'totalKeystrokes' => 1495, 'correctKeystrokes' => 1495])
+        ->assertRedirect(route('typing'));
+
+    expect(TypingResult::where('user_id', $user->id)->count())->toBe(0)
+        ->and((float) $user->fresh()->highest_wpm)->toBe(0.0);
+});
+
+it('ignores a shortened duration in time mode', function () {
+    $user = User::factory()->create();
+
+    // Claiming 5s for a 30s test would multiply WPM sixfold.
+    $component = playSolo($user, 'time', '30');
+    app(SoloSessionGuard::class)->backdate(30);
+
+    $component->call('saveResult', ['durationMs' => 5000, 'totalKeystrokes' => 400, 'correctKeystrokes' => 400]);
+
+    $result = TypingResult::where('user_id', $user->id)->first();
+
+    // Duration is taken from the sub-mode, not the payload.
+    expect((float) $result->duration_seconds)->toBe(30.0);
+});
+
+it('refuses a character count the issued text could not produce', function () {
+    $user = User::factory()->create();
+
+    // words 10 is a short text; 5000 chars is far beyond anything it contains.
+    playSolo($user, 'words', '10')
+        ->call('saveResult', ['durationMs' => 60000, 'totalKeystrokes' => 5000, 'correctKeystrokes' => 5000])
+        ->assertRedirect(route('typing'));
+
+    expect(TypingResult::where('user_id', $user->id)->count())->toBe(0);
+});
+
+it('rejects a result whose mode no longer matches the issued text', function () {
+    $user = User::factory()->create();
+
+    // Take a 15-second test, then submit it as a 120-second one to stretch the WPM window.
+    $component = playSolo($user, 'time', '15');
+
+    $component->set('subMode', '120')
+        ->call('saveResult', ['durationMs' => 120000, 'totalKeystrokes' => 2000, 'correctKeystrokes' => 2000])
+        ->assertRedirect(route('typing'));
+
+    expect(TypingResult::where('user_id', $user->id)->count())->toBe(0)
+        ->and((float) $user->fresh()->highest_wpm)->toBe(0.0);
+});
+
+/**
+ * Mounting the component legitimately issues a text, so "no session at all" only happens
+ * once a result has already been banked and the guard consumed. That second submission is
+ * the replay attempt, and it must not reach the result page.
+ */
+it('rejects a submission once the issued session has been consumed', function () {
+    $user = User::factory()->create();
+
+    $component = playSolo($user, 'time', '30');
+    app(SoloSessionGuard::class)->backdate(30);
+    $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290]);
+
+    $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290])
+        ->assertRedirect(route('typing'));
+
+    expect(TypingResult::where('user_id', $user->id)->count())->toBe(1);
+});
+
+it('refuses to bank the same finished session twice', function () {
+    $user = User::factory()->create();
+
+    $component = playSolo($user, 'time', '30');
+    $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290]);
+
+    $countAfterFirst = TypingResult::where('user_id', $user->id)->count();
+
+    // Replaying the identical payload must not add a second row or more XP.
+    $xpAfterFirst = $user->fresh()->total_xp;
+    $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290]);
+
+    expect(TypingResult::where('user_id', $user->id)->count())->toBe($countAfterFirst)
+        ->and($user->fresh()->total_xp)->toBe($xpAfterFirst);
+});
+
+it('still accepts an honest session', function () {
+    $user = User::factory()->create();
+
+    // ~300 chars over a 30-second test is a realistic ~60 WPM.
+    $component = playSolo($user, 'time', '30');
+
+    // A real player spends the 30 seconds typing; a test calls saveResult() instantly,
+    // which would otherwise look like an automated forgery to the elapsed-time guard.
+    app(SoloSessionGuard::class)->backdate(30);
+
+    $component->call('saveResult', ['durationMs' => 30000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 290])
+        ->assertRedirect(route('typing.result'));
+
+    $result = TypingResult::where('user_id', $user->id)->first();
+
+    expect($result)->not->toBeNull()
+        ->and((float) $result->net_wpm)->toBeGreaterThan(0.0)
+        ->and((float) $result->net_wpm)->toBeLessThan(120.0);
+});
+
+it('refuses a duration far longer than the session has been open', function () {
+    $user = User::factory()->create();
+
+    // Sesi `words/10` yang benar-benar baru berjalan 15 detik, mengklaim 45.
+    $component = playSolo($user, 'words', '10');
+    app(SoloSessionGuard::class)->backdate(15);
+
+    $component->call('saveResult', ['durationMs' => 45000, 'totalKeystrokes' => 60, 'correctKeystrokes' => 60])
+        ->assertRedirect(route('typing'));
+
+    // Kelonggarannya dulu 30 detik DATAR, jadi 45 > 15 + 30 bernilai false dan klaim ini lolos:
+    // tiga kali panjang sesi sesungguhnya. Di solo itu nyaris tak berarti (durasi lebih panjang
+    // justru menurunkan WPM), tapi Clan War survival menilai JUSTRU dari durasi -- dan itu slot
+    // berplafon tertinggi di grid. Sekarang kelonggarannya proporsional, sama seperti gerbang
+    // karakter: min(30, 45 x 0.35) = 15,75 detik.
+    expect(TypingResult::where('user_id', $user->id)->count())->toBe(0);
+});
+
+it('still accepts a duration that merely lags behind the clock a little', function () {
+    $user = User::factory()->create();
+
+    // Sesi 30 detik yang dikirim beberapa detik setelah ketukan terakhir: pemain jujur yang
+    // requestnya mendarat telat tak boleh ikut tersapu oleh gerbang di atas.
+    $component = playSolo($user, 'words', '25');
+    app(SoloSessionGuard::class)->backdate(30);
+
+    $component->call('saveResult', ['durationMs' => 33000, 'totalKeystrokes' => 150, 'correctKeystrokes' => 148])
+        ->assertRedirect(route('typing.result'));
+
+    expect(TypingResult::where('user_id', $user->id)->count())->toBe(1);
+});
+
+it('does not let a client rewrite the issued text', function () {
+    $user = User::factory()->create();
+
+    // #[Locked] makes this attempt an error rather than a silent swap.
+    expect(fn () => playSolo($user, 'words', '10')->set('textToType', str_repeat('a ', 5000)))
+        ->toThrow(Exception::class);
+});

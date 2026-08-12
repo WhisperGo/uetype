@@ -1,36 +1,172 @@
+{{-- Main authenticated app layout: nav, optional header, slot content, footer, and global overlays (toasts, chat, presence heartbeat). --}}
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+    <title>{{ $pageTitle ?? config('app.name', 'UeType') }}</title>
+    @include('partials.favicon')
 
-        <!-- Scripts -->
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    </head>
-    <body class="font-sans antialiased">
-        <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
-            @include('layouts.navigation')
+    <!-- Fonts: JetBrains Mono for all readable text; Pixelify Sans & Press Start 2P for game accents -->
+    @include('layouts._fonts')
 
-            <!-- Page Heading -->
-            @isset($header)
-                <header class="bg-white dark:bg-gray-800 shadow">
-                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                        {{ $header }}
-                    </div>
-                </header>
-            @endisset
+    <!-- Scripts -->
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @livewireStyles
+    @livewireScripts
+</head>
 
-            <!-- Page Content -->
-            <main>
-                {{ $slot }}
-            </main>
-        </div>
-    </body>
+<body class="font-mono antialiased text-foreground bg-background selection:bg-brand selection:text-foreground">
+    <div class="min-h-screen flex flex-col bg-background">
+        @include('layouts.navigation')
+
+        @isset($header)
+            <header class="border-b border-white/5">
+                <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                    {{ $header }}
+                </div>
+            </header>
+        @endisset
+
+        <main class="flex-1">
+            {{ $slot }}
+        </main>
+
+        @auth
+            @include('layouts.sign-out-confirmation')
+        @endauth
+
+        {{-- The chat FAB owns the bottom-right corner (fixed, bottom-5 right-5, ~56px, see
+             livewire/chat-overlay.blade.php). This footer reserves a matching safe-zone so its
+             links are never covered when the page is scrolled to the end -- the FAB is NOT
+             lifted to dodge them. The two viewports need different clearances: on mobile the
+             row is centred and stacks under the button, so it gets VERTICAL room (pb-24, reset
+             to pb-6 once the FAB sits beside it at sm+); on desktop the links are right-aligned
+             straight into the FAB's column, so the nav is pushed clear HORIZONTALLY (sm:me-20)
+             with no extra empty space. --}}
+        {{-- `focus-fade-full` opts the footer out of the touch-device exception: on a phone
+             the navbar only recedes to 25% (nothing there can hover it back), but a copyright
+             line and two legal links can disappear entirely without costing anyone a way
+             forward. It is the one part of the frame with nothing to get back to. --}}
+        <footer class="focus-fade focus-fade-full border-t border-white/5">
+            <div class="max-w-7xl mx-auto pt-6 pb-24 sm:pb-6 px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-x-small text-muted">
+                <span>&copy; 2026 UeType</span>
+                <nav class="flex items-center gap-6 sm:me-20">
+                    <a href="/about" class="hover:text-foreground transition-colors">{{ __('common.footer.about') }}</a>
+                    <a href="/privacy-policy" class="hover:text-foreground transition-colors">{{ __('common.footer.privacy') }}</a>
+                </nav>
+            </div>
+        </footer>
+
+        @auth
+            {{-- ===== NOTIFICATION LANE =====
+                 Everything that appears unbidden shares ONE lane, top-right below the
+                 navbar, so nothing can ever cover the chat button, which owns the
+                 bottom-right corner. Positioning lives entirely in `.notif-lane`
+                 (resources/css/app.css); the children below carry none of their own, and
+                 stack via flex.
+
+                 Order matters: the invite comes FIRST so it sits nearest the anchor edge
+                 and stays put. The toast is transient and appends below it -- reverse the
+                 two and every arriving toast would shove the invite, which needs a
+                 decision, down the screen and back up again. Both live outside
+                 {{ '{{ $slot }}' }} to survive wire:navigate -- a notification may arrive
+                 while the player is typing or racing.
+
+                 The invite has no Echo subscription of its own: <x-toast-stack /> listens on
+                 friends.{id} and re-raises `room-invite-received` as a window event. --}}
+            <div class="notif-lane">
+                <x-room-invite-overlay />
+                <x-toast-stack />
+            </div>
+
+            {{-- ===== GLOBAL CHAT OVERLAY =====
+                 A chat drawer openable from any page, mounted once here (outside
+                 {{ '{{ $slot }}' }}) so it survives across wire:navigate like the
+                 toast above. Echo is still subscribed only by <x-toast-stack />;
+                 this overlay listens to the same window events
+                 (message-received-remote/-mutated-remote). --}}
+            <livewire:chat-overlay />
+
+            {{-- ===== PRESENCE HEARTBEAT =====
+                 A lightweight ping to /heartbeat every ~30s marks the user as still
+                 online (last_seen_at is updated). The server broadcasts to friends
+                 only on the offline->online transition, so this ping is cheap.
+
+                 The pause while the tab is hidden is PRESENCE semantics, not session
+                 semantics: a backgrounded tab must not report its owner as online to the
+                 friends list. Do not remove it to keep a session alive -- session liveness
+                 no longer depends on this ping at all (SESSION_LIFETIME is 14 days and
+                 sign-ins are remembered), so the trade would cost an accurate online dot
+                 and buy nothing. The immediate ping on visibilitychange is what restores
+                 the dot when the tab comes back. --}}
+            <script>
+                if (!window.__presenceHeartbeatRegistered) {
+                    window.__presenceHeartbeatRegistered = true;
+                    (function () {
+                        const url = '{{ route('presence.heartbeat') }}';
+                        const token = document.querySelector('meta[name="csrf-token"]')?.content;
+                        const INTERVAL = 30000; // 30s; server online threshold is 60s
+                        let timer = null;
+
+                        const ping = () => {
+                            if (document.hidden || !token) return;
+                            fetch(url, {
+                                method: 'POST',
+                                headers: { 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
+                                keepalive: true,
+                            }).catch(() => {}); // swallow network errors; the next ping retries
+                        };
+
+                        const start = () => {
+                            if (timer) return;
+                            ping();
+                            timer = setInterval(ping, INTERVAL);
+                        };
+                        const stop = () => {
+                            if (timer) { clearInterval(timer); timer = null; }
+                        };
+
+                        document.addEventListener('visibilitychange', () => {
+                            document.hidden ? stop() : start();
+                        });
+
+                        start();
+                    })();
+                }
+            </script>
+        @endauth
+    </div>
+
+    {{-- A 419 on a Livewire round-trip means this page's CSRF token no longer matches the
+         session. Reloading is the repair, and remember-me is what makes it a repair rather
+         than an ejection: the reloaded request carries a valid recaller cookie, the guard
+         re-authenticates, and the visitor lands back on the SAME url (query state and all)
+         still signed in, having noticed nothing. Before remember-me the same reload dropped
+         them at /login with no explanation.
+
+         Full-page POSTs (locale, logout, the username form) never reach this hook -- they
+         fall through to the exception handler and render errors/419.blade.php. --}}
+    <script>
+        document.addEventListener('livewire:init', () => {
+            Livewire.hook('request', ({
+                fail
+            }) => {
+                fail(({
+                    status,
+                    preventDefault
+                }) => {
+                    if (status === 419) {
+                        window.location.reload();
+                        preventDefault();
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+
 </html>

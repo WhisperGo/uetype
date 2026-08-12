@@ -1,3 +1,287 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Semantic tokens (default "moonlight" theme). Swap/add this block for other themes (Deep Blue, Midnight, Carbon). */
+@layer base {
+    :root {
+        --color-background: 25 31 40;
+        --color-surface: 18 22 28;
+        --color-elevated: 21 26 34;
+        --color-foreground: 249 245 240;
+        --color-muted: 156 159 163;
+        --color-border: 66 71 79;
+        --color-brand: 22 46 147;
+        --color-brand-bright: 155 165 209;
+        --color-gold: 198 159 104;
+        --color-active: 21 155 84;
+        --color-danger: 184 27 44;
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+
+    /* Always reserve the scrollbar's width. Without it /typing (sized to fit the viewport,
+       no scroll) and Multiplayer/Clan (long content, scrolls) render at viewport widths
+       ~15px apart, so every `max-w-7xl mx-auto` container -- the nav included -- shifts
+       ~7-8px sideways on each navigation. Also stops the page jumping when a modal locks
+       body scroll. */
+    html {
+        scrollbar-gutter: stable;
+    }
+}
+
+@layer utilities {
+    /* The single home for anything that appears UNBIDDEN: toasts and room invites.
+       One lane, one owner -- see docs/design-system.md "Layering & Anchor".
+
+       TOP-right, and the "top" matters as much as the "right".
+
+       Bottom-right is out: it belongs to the chat FAB. A 320px toast anchored `right-5`
+       fully contains a 56px button anchored `right-5`, at a higher z-index, so every toast
+       covered the chat button AND blocked it from being clicked for six seconds -- unread
+       badge included. A transient thing and a permanent control cannot share a corner.
+
+       Bottom-LEFT solved that but read as unusual: most apps put notifications on the
+       right. Moving to the TOP keeps the right-hand side people expect while separating
+       from the FAB on a different AXIS -- not merely by a gap that a layout change could
+       eat. It also drops the mobile special case entirely: the bottom edge was contested,
+       the top edge is not, so one anchor now serves every screen size.
+
+       `top: 5rem` clears the h-16 (4rem) navbar plus a 1rem gap. It must never become
+       `top: 0`: the navbar's right side holds the account dropdown and its friend-request
+       dot, so covering it would just move the original bug from one control to another.
+       (The navbar is not sticky on /typing, but a fixed lane sits in the same place
+       regardless, so the position stays consistent across pages.)
+
+       Children stack via flex, so a new kind of notification needs no coordinates of its
+       own. That is the point: the invite card once hard-coded its own `bottom-24` to dodge
+       the toast, measured against the TOAST rather than the FAB, and the two conventions
+       drifted apart.
+
+       Anchoring at the top also settles the stacking: a transient toast added BELOW a
+       persistent invite leaves the invite where it is. Anchored at the bottom, the same
+       toast pushed the invite upward every time it appeared and dropped it again when it
+       expired. */
+    .notif-lane {
+        position: fixed;
+        z-index: 80;
+        top: 5rem;
+        left: 1.25rem;
+        right: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        /* The lane spans a wide area but must not swallow clicks meant for the page
+           beneath it; each card re-enables pointer events for itself. */
+        pointer-events: none;
+    }
+
+    @media (min-width: 640px) {
+        .notif-lane {
+            left: auto;
+            width: 20rem;
+        }
+    }
+
+    /* Shown only where the primary pointer is a finger.
+
+       Deliberately a POINTER query, not a width query: a narrow desktop window still has a
+       physical keyboard, so a "tap to type" hint there would be nonsense. Used by the typing
+       area, whose keyboard-summoning input is invisible and therefore needs something on
+       screen telling touch users to tap first. */
+    .touch-only {
+        display: none;
+    }
+
+    @media (pointer: coarse) {
+        .touch-only {
+            display: flex;
+        }
+    }
+
+    /* The mirror of .touch-only: shown only where there's a fine pointer (mouse/keyboard),
+       hidden on touch. For keyboard-only affordances -- e.g. the "tab then enter" restart
+       hint -- that are meaningless on a phone. Same pointer query, not a width query. */
+    .no-touch {
+        display: inline-flex;
+    }
+
+    @media (pointer: coarse) {
+        .no-touch {
+            display: none;
+        }
+    }
+
+    /* ===== FOCUS MODE =====
+       While a typing session or a race is running, the page frame steps back so the only
+       things competing for attention are the text and the clock. Toggled by
+       resources/js/focus-mode.js off the existing `test-activity` event.
+
+       OPACITY, never display/visibility. The typing area is `flex-1 justify-center` inside a
+       `min-h-screen flex flex-col`, so removing the navbar's 64px and the footer's height
+       would re-centre the column and slide the text under the player's fingers mid-keystroke.
+       That is a worse distraction than the bar it removed. Reserving the space is the same
+       rule the mode-control bar on the typing page already follows, for the same reason.
+
+       Pointer events stay ALIVE on the navbar. `pointer-events: none` here would be the
+       third time this project trapped somebody behind an invisible exit: `words` and
+       `survival` do not end on their own, so a player who starts one and changes their mind
+       would have nothing left to click. Invisible is fine; unreachable is not. */
+    body.is-typing .focus-fade {
+        opacity: 0;
+        transition: opacity 500ms ease;
+    }
+
+    /* Bring it back the moment the cursor goes looking for it. Hover on the element itself
+       rather than a mousemove listener: no JS runs during the run, and the reveal is exactly
+       as fast as the pointer.
+
+       :focus-within is the keyboard half of the same promise. Tabbing into the navbar must
+       show it -- otherwise focus lands somewhere invisible, which is a worse trap than the
+       one the pointer rule avoids. */
+    body.is-typing .focus-fade:hover,
+    body.is-typing .focus-fade:focus-within {
+        opacity: 1;
+    }
+
+    /* Touch has no hover, so "invisible until you hover" would leave real links that can be
+       tapped but not seen. Recede instead of vanish -- the same pointer query, and the same
+       decision, as the restart row on the typing page.
+
+       The footer is exempt: it is a copyright line and two legal links, so nothing is lost by
+       fading it out entirely even where nothing can hover it back. */
+    @media (pointer: coarse) {
+        body.is-typing .focus-fade:not(.focus-fade-full) {
+            opacity: 0.25;
+        }
+    }
+
+    /* Motion is a preference, not a decoration: with reduced motion the frame still fades,
+       it just arrives without the half-second travel. */
+    @media (prefers-reduced-motion: reduce) {
+        body.is-typing .focus-fade {
+            transition: none;
+        }
+    }
+
+    /* ===== CHAT FAB: MICRO-INTERACTION =====
+       The FAB used to be draggable, sold as "more feel". That put the delight budget on
+       the button's POSITION -- the one property a user needs to stay predictable, and it
+       cost keyboard access to do it (see resources/js/chat-dock.js). The budget moved to
+       the button's REACTIONS instead: nothing structural changes, and unlike a drag nobody
+       has to discover it.
+
+       Both effects are one-shot, never looping. A badge that pulses forever stops reading
+       as "new" within seconds and turns into visual noise on every page.
+
+       No reduced-motion guard needed here: the global block at the end of this file
+       already flattens every animation and transition. */
+
+    /* Fires when the unread COUNT changes. The replay is free: the badge carries
+       wire:key="...{count}", so Livewire swaps the element on each new value and the fresh
+       node runs its animation once. Keying off the server-rendered count means the signal
+       is already correct -- own messages and the currently-open thread are excluded by the
+       same query that draws the number. */
+    @keyframes chat-badge-pop {
+        0% { transform: scale(0.4); opacity: 0; }
+        70% { transform: scale(1.15); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    .chat-badge-pop {
+        animation: chat-badge-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* Slim gold-themed scrollbar, used in the chat message list. Firefox uses
+       scrollbar-width/color; WebKit (Chrome/Edge) uses the ::-webkit-scrollbar
+       pseudo-element. A transparent thumb that thickens on hover so it's unobtrusive
+       but still visible. */
+    .chat-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: rgb(var(--color-gold) / 0.35) transparent;
+    }
+    .chat-scroll::-webkit-scrollbar {
+        width: 8px;
+    }
+    .chat-scroll::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .chat-scroll::-webkit-scrollbar-thumb {
+        background-color: rgb(var(--color-gold) / 0.3);
+        border-radius: 9999px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+    }
+    .chat-scroll::-webkit-scrollbar-thumb:hover {
+        background-color: rgb(var(--color-gold) / 0.6);
+    }
+
+    /* A brief highlight when scrolling to the original message from a reply quote. */
+    @keyframes chat-flash-highlight {
+        0%, 100% { background-color: transparent; }
+        30% { background-color: rgb(var(--color-gold) / 0.18); }
+    }
+    .chat-flash {
+        animation: chat-flash-highlight 1.2s ease-in-out;
+        border-radius: 0.75rem;
+    }
+
+    @keyframes caret-flash-smooth {
+        0%, 100% { opacity: 0; }
+        50% { opacity: 1; }
+    }
+
+    @keyframes stamina-critical {
+        0%, 100% { transform: translateX(0) scale(1); opacity: 1; }
+        20% { transform: translateX(-2px) scale(1.04); opacity: 0.7; }
+        40% { transform: translateX(2px) scale(1.04); }
+        60% { transform: translateX(-1.5px) scale(1.02); opacity: 0.8; }
+        80% { transform: translateX(1.5px) scale(1.02); }
+    }
+
+    @keyframes race-surge {
+        0% { transform: scale(1); }
+        45% { transform: scale(1.14); }
+        100% { transform: scale(1); }
+    }
+    .race-surge {
+        animation: race-surge 0.4s ease-out;
+    }
+
+    .race-runner {
+        transition: transform 0.25s ease-out;
+        will-change: transform;
+    }
+
+    /* Finish line: a 2x2 checkerboard from a single tiled conic-gradient.
+       Square size = half the ribbon width, so it's always 2 columns at any height. */
+    .race-finish-flag {
+        --square: 6px;
+        background-image: conic-gradient(
+            #fff 0.25turn,
+            #0a0e14 0.25turn 0.5turn,
+            #fff 0.5turn 0.75turn,
+            #0a0e14 0.75turn
+        );
+        background-size: calc(var(--square) * 2) calc(var(--square) * 2);
+    }
+}
+
+/* Respect the system "reduce motion" preference.
+
+   This app is motion-heavy: race countdowns, toast transitions, caret animation, stamina
+   pulse, and race-surge. For users with vestibular sensitivity (migraine, vertigo, balance
+   disorders) that much motion can trigger real physical symptoms. Durations aren't fully
+   zeroed (0.01ms) so transitionend/animationend events still fire -- zeroing them entirely
+   would leave logic that waits on those events hanging. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

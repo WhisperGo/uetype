@@ -1,0 +1,549 @@
+{{-- Clans page. Two tabs for someone without a clan -- Browse (search and join) and Create
+     (new clan form) -- and no tabs at all once you are in one, where the page is simply your
+     clan: hero card, join requests, roster.
+
+     'my-clan' is still a real tab STATE even though nothing navigates to it by hand:
+     resetToMyClan() switches to it after you create or join a clan. Only its button is gone.
+
+     Real-time updates via the global toast subscriber. --}}
+<div class="py-10">
+    <x-page-container>
+
+    <h1 class="font-display text-fluid-title tracking-wide text-foreground mb-4">{{ __('clan.title') }}</h1>
+
+    {{-- ===== TABS =====
+
+         Rendered only when there is something to switch between: a clan member has no
+         Browse/Create tabs, so the whole bar stays out of the document rather than
+         rendering empty.
+
+         Chips (the Achievements filter pattern), not underlines: each target is legible on
+         its own, and aria-current marks the selection instead of colour alone. --}}
+    @unless ($this->myClan)
+        <nav class="flex flex-wrap gap-2 mb-6" aria-label="{{ __('clan.tab.aria') }}">
+            @foreach (['browse', 'create'] as $tabKey)
+                <button type="button" wire:click="setTab('{{ $tabKey }}')"
+                    @if ($tab === $tabKey) aria-current="page" @endif
+                    @class([
+                        'px-4 py-1.5 rounded-lg border font-mono text-xs font-semibold transition-colors',
+                        'bg-brand-bright text-background border-brand-bright' => $tab === $tabKey,
+                        'bg-surface/60 text-muted border-white/10 hover:text-foreground hover:border-white/20' => $tab !== $tabKey,
+                    ])>
+                    {{ __('clan.tab.'.$tabKey) }}
+                </button>
+            @endforeach
+        </nav>
+    @endunless
+
+    {{-- TAB: MY CLAN --}}
+    @if ($tab === 'my-clan')
+        @if ($this->myClan)
+            @php $lvl = $this->myClan->levelData(); @endphp
+
+            {{-- EDIT IDENTITY (leader only) -- replaces the hero card while open, rather
+                 than sitting below it. The form carries its own live preview, so showing
+                 both would put two versions of the same clan on screen at once, the card
+                 above still displaying the values being edited away. --}}
+            @if ($editing && $this->canManageClan)
+                <form wire:submit.prevent="saveClanIdentity" class="p-5 sm:p-6 border bg-surface/70 border-white/10 rounded-3xl mb-6 max-w-lg">
+                    <p class="font-mono text-xs uppercase tracking-widest text-muted mb-5">{{ __('clan.my_clan.edit_heading') }}</p>
+
+                    <x-clan.identity-fields
+                        name="editName" tag="editTag" emblem="editEmblem" color="editEmblemColor" description="editDescription"
+                        :name-value="$editName" :tag-value="$editTag" :emblem-value="$editEmblem"
+                        :color-value="$editEmblemColor" :description-value="$editDescription" />
+
+                    <div class="flex flex-wrap items-center gap-3 mt-6">
+                        <x-btn-gold type="submit">{{ __('clan.my_clan.edit_save') }}</x-btn-gold>
+                        <button type="button" wire:click="cancelEditClan"
+                            class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                            {{ __('clan.my_clan.edit_cancel') }}
+                        </button>
+                    </div>
+                </form>
+            @else
+
+            {{-- HERO CARD --}}
+            <div class="relative overflow-hidden p-5 sm:p-6 border bg-surface/70 border-white/10 rounded-3xl mb-6">
+                <div class="pointer-events-none absolute -top-16 -right-16 w-56 h-56 rounded-full bg-gold/5 blur-2xl"></div>
+                <div class="relative flex flex-col sm:flex-row sm:items-center gap-5">
+                    <x-clan-emblem :clan="$this->myClan" size="lg" />
+
+                    <div class="flex-1 min-w-0">
+                        <p class="font-mono text-xl font-bold text-foreground leading-tight">
+                            {{ $this->myClan->name }}
+                            @if ($this->myClan->tag)<span class="text-muted font-normal">[{{ $this->myClan->tag }}]</span>@endif
+                        </p>
+                        @if ($this->myClan->description)
+                            <p class="font-mono text-xs text-muted mt-1 max-w-md">{{ $this->myClan->description }}</p>
+                        @endif
+                        <div class="flex flex-wrap items-center gap-2 mt-2.5">
+                            <span class="px-2.5 py-1 font-mono text-xs font-bold text-gold border border-gold/40 rounded-lg">{{ __('clan.level', ['level' => $lvl['level']]) }}</span>
+                            <span class="font-mono text-xs text-muted">
+                                {{ __('clan.members', ['count' => $this->myClanMembers->count(), 'max' => \App\Livewire\Clans::MAX_MEMBERS]) }}
+                                · {{ __('clan.power') }} <span class="text-gold font-bold">{{ number_format($this->myClan->power) }}</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    {{-- w-full sm:w-auto: the hero stacks (flex-col) on phones, so this 4-button
+                         toolbar drops onto its own full-width row below the identity instead of
+                         being squeezed beside it as a shrink-0 block. sm:shrink-0 keeps the
+                         desktop side-by-side behaviour unchanged. --}}
+                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:shrink-0">
+                        <x-btn-gold as="a" href="{{ route('clan-war.index') }}" wire:navigate>
+                            {{ __('clan.clan_war') }}
+                        </x-btn-gold>
+                        {{-- The link carries no clan id: chat derives the channel from the
+                             viewer's active membership, so it cannot be pointed elsewhere.
+                             Secondary styling keeps Clan War the only gold button. --}}
+                        <a href="{{ route('chat.index', ['mode' => 'clan']) }}" wire:navigate
+                            class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition inline-flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z" />
+                            </svg>
+                            {{ __('clan.chat') }}
+                        </a>
+                        <a href="{{ route('clan-leaderboard.index') }}" wire:navigate
+                            class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                            {{ __('clan.leaderboard') }}
+                        </a>
+                        {{-- The leader has no Leave button: leaving is the one thing they
+                             cannot do directly. Their exits live in the Manage menu --
+                             transfer (hand it over, then leave) or disband. --}}
+                        @if ($this->canManageClan)
+                            <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+                                <button type="button" @click="open = !open"
+                                    class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition inline-flex items-center gap-1.5">
+                                    {{ __('clan.my_clan.manage') }}
+                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+
+                                <div x-show="open" x-cloak
+                                    x-transition:enter="transition ease-out duration-150"
+                                    x-transition:enter-start="opacity-0 scale-95"
+                                    x-transition:enter-end="opacity-100 scale-100"
+                                    x-transition:leave="transition ease-in duration-100"
+                                    x-transition:leave-start="opacity-100 scale-100"
+                                    x-transition:leave-end="opacity-0 scale-95"
+                                    class="absolute right-0 top-full z-50 mt-1 w-56 origin-top-right rounded-xl border border-white/10 bg-surface shadow-lg ring-1 ring-black/20 overflow-hidden py-1">
+                                    <button type="button" @click="open = false" wire:click="startEditClan"
+                                        class="w-full text-left px-4 py-2.5 font-mono text-xs font-bold text-foreground whitespace-nowrap hover:bg-white/5 transition">
+                                        {{ __('clan.my_clan.edit') }}
+                                    </button>
+                                    <button type="button" @click="open = false; $dispatch('open-modal', 'confirm-disband')"
+                                        class="w-full text-left px-4 py-2.5 font-mono text-xs font-bold text-danger whitespace-nowrap hover:bg-danger/10 transition border-t border-white/5">
+                                        {{ __('clan.my_clan.disband') }}
+                                    </button>
+                                </div>
+                            </div>
+                        @else
+                            <button type="button"
+                                @click="$dispatch('open-modal', 'confirm-leave')"
+                                class="px-4 py-1.5 font-mono text-xs text-danger border border-danger/30 rounded-lg hover:bg-danger/10 transition">
+                                {{ __('clan.my_clan.leave') }}
+                            </button>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Level progress bar --}}
+                <x-clan.progress :data="$lvl" :show-unit="true" class="mt-5" />
+            </div>
+            @endif
+
+            {{-- Incoming join requests. Visible to whoever holds roster powers -- the
+                 leader and co-leaders -- matching the server-side gate exactly. --}}
+            
+            @if ($this->canManageMembers && $this->pendingRequests->count() > 0)
+                <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">{{ __('clan.my_clan.join_requests', ['count' => $this->pendingRequests->count()]) }}</p>
+                <div class="space-y-3 mb-8">
+                    @foreach ($this->pendingRequests as $req)
+                        {{-- flex-wrap + the action group going w-full below sm: on a phone the
+                             Accept/Reject pair drops onto its own full-width row instead of
+                             crushing the username to a few characters beside two buttons. --}}
+                        <div class="flex flex-wrap items-center gap-3 p-4 border bg-surface/40 border-white/5 rounded-2xl" wire:key="req-{{ $req->id }}">
+                            <x-friend-avatar :user="$req->user" />
+                            <div class="flex-1 min-w-0">
+                                <p class="font-mono text-sm font-bold text-foreground truncate">{{ $req->user->username }}</p>
+                                <p class="font-mono text-xs text-muted mt-0.5">{{ __('clan.user_level', ['level' => $req->user->levelData()['level']]) }}</p>
+                            </div>
+                            <div class="flex items-center gap-2 w-full sm:w-auto sm:shrink-0">
+                                <x-btn-gold wire:click="approveMember({{ $req->id }})">{{ __('clan.my_clan.accept') }}</x-btn-gold>
+                                <button wire:click="rejectMember({{ $req->id }})"
+                                    class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                                    {{ __('clan.my_clan.reject') }}
+                                </button>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
+            {{-- approveMember error (e.g. clan full); its own key, rendered near the
+                 pending list. This block used to use the 'newName' key from the create-clan
+                 form on another tab -- a fragile coupling now removed. --}}
+            @error('approveMember')
+                <p class="font-mono text-xs text-danger mb-4">{{ $message }}</p>
+            @enderror
+
+            <p class="font-mono text-xs uppercase tracking-widest text-muted mb-3">{{ __('clan.members_heading', ['count' => $this->myClanMembers->count()]) }}</p>
+            <div class="space-y-3">
+                @foreach ($this->myClanMembers as $row)
+                    @php
+                        $member = $row['member'];
+                        $user = $row['user'];
+                    @endphp
+                    <div @class([
+                            'flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl group hover:border-white/10 transition',
+                            'ring-1 ring-gold/20' => $member->role->value === 'leader',
+                            'ring-1 ring-white/10' => $member->role->value === 'co-leader',
+                        ]) wire:key="member-{{ $member->id }}">
+                        <a href="{{ route('profile.show', $user) }}" wire:navigate class="flex items-center gap-4 flex-1 min-w-0">
+                            {{-- Online rides on the avatar dot (as in friends), not the meta line. --}}
+                            <x-friend-avatar :user="$user" :online="$row['online']" />
+                            <div class="flex-1 min-w-0">
+                                <p class="font-mono text-sm font-bold text-foreground truncate group-hover:text-gold transition-colors">{{ $user->username }}</p>
+
+                                {{-- One wrapping line, not stacked rows: three lines per member
+                                     turns a 20-person roster into a wall of text. "last seen"
+                                     shows only when offline, where the dot says nothing. --}}
+                                <p class="font-mono text-xs text-muted mt-0.5 flex flex-wrap items-center gap-x-1.5">
+                                    <span>{{ __('clan.user_level', ['level' => $user->levelData()['level']]) }}</span>
+
+                                    @unless ($row['online'])
+                                        <span aria-hidden="true">·</span>
+                                        <span>{{ $user->last_seen_at ? __('clan.roster.last_seen', ['time' => $user->last_seen_at->diffForHumans(short: true)]) : __('clan.roster.never_seen') }}</span>
+                                    @endunless
+
+                                    @if (! is_null($row['contribution']))
+                                        <span aria-hidden="true">·</span>
+                                        {{-- Only non-zero goes gold: zero is what a leader is
+                                             scanning for, so it must not glow like a score. --}}
+                                        <span @class(['text-gold' => $row['contribution'] > 0])>
+                                            {{ __('clan.roster.war_points', ['points' => number_format($row['contribution'], 0)]) }}
+                                        </span>
+                                    @endif
+
+                                    @if ($row['joined_at'])
+                                        <span aria-hidden="true">·</span>
+                                        <span>{{ __('clan.roster.joined', ['time' => $row['joined_at']->diffForHumans(short: true)]) }}</span>
+                                    @endif
+                                </p>
+                            </div>
+                        </a>
+                        @php
+                            $isSelf = $member->user_id === auth()->id();
+                            // Mirrors the rank gate in kickMember/changeRole: you may only
+                            // act on someone strictly below you, and never on yourself.
+                            $canActOnRow = $this->canManageMembers && ! $isSelf
+                                && $member->role->rank() > $this->myMembership->role->rank();
+                            $iOwnClan = $this->canManageClan;
+                        @endphp
+
+                        <x-clan.role-badge :role="$member->role" />
+
+                        @if ($canActOnRow)
+                            {{-- Up to three actions per row, so they collapse into a kebab
+                                 (the friends-list pattern): a bare destructive Kick beside a
+                                 routine Promote invites misclicks. Always visible, never
+                                 group-hover -- hover-only controls are dead on touch. --}}
+                            <div class="shrink-0 relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+                                {{-- 44px click box via <x-icon-button> (WCAG 2.5.5): the old
+                                     hand-written p-1.5 + w-4 svg was ~28px, too small for a thumb.
+                                     @click/aria pass straight through $attributes. --}}
+                                <x-icon-button @click="open = !open"
+                                    :label="__('clan.aria.member_actions', ['name' => $user->username])">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v.01M12 12v.01M12 19v.01" />
+                                    </svg>
+                                </x-icon-button>
+
+                                <div x-show="open" x-cloak
+                                    x-transition:enter="transition ease-out duration-150"
+                                    x-transition:enter-start="opacity-0 scale-95"
+                                    x-transition:enter-end="opacity-100 scale-100"
+                                    x-transition:leave="transition ease-in duration-100"
+                                    x-transition:leave-start="opacity-100 scale-100"
+                                    x-transition:leave-end="opacity-0 scale-95"
+                                    class="absolute right-0 top-full z-50 mt-1 w-56 origin-top-right rounded-xl border border-white/10 bg-surface shadow-lg ring-1 ring-black/20 overflow-hidden py-1">
+
+                                    @if ($iOwnClan)
+                                        @if ($member->role->value === 'member')
+                                            <button type="button"
+                                                @click="open = false; $dispatch('open-modal', { name: 'confirm-role', id: {{ $member->id }}, label: @js($user->username), action: 'promote' })"
+                                                class="w-full text-left px-4 py-2.5 font-mono text-xs font-bold text-foreground whitespace-nowrap hover:bg-white/5 transition">
+                                                {{ __('clan.my_clan.promote') }}
+                                            </button>
+                                        @else
+                                            <button type="button"
+                                                @click="open = false; $dispatch('open-modal', { name: 'confirm-role', id: {{ $member->id }}, label: @js($user->username), action: 'demote' })"
+                                                class="w-full text-left px-4 py-2.5 font-mono text-xs font-bold text-foreground whitespace-nowrap hover:bg-white/5 transition">
+                                                {{ __('clan.my_clan.demote') }}
+                                            </button>
+                                        @endif
+
+                                        <button type="button"
+                                            @click="open = false; $dispatch('open-modal', { name: 'confirm-role', id: {{ $member->id }}, label: @js($user->username), action: 'transfer' })"
+                                            class="w-full text-left px-4 py-2.5 font-mono text-xs font-bold text-gold whitespace-nowrap hover:bg-gold/10 transition border-t border-white/5">
+                                            {{ __('clan.my_clan.transfer') }}
+                                        </button>
+                                    @endif
+
+                                    <button type="button"
+                                        @click="open = false; $dispatch('open-modal', { name: 'confirm-kick', id: {{ $member->id }}, label: @js($user->username) })"
+                                        class="w-full text-left px-4 py-2.5 font-mono text-xs font-bold text-danger whitespace-nowrap hover:bg-danger/10 transition border-t border-white/5">
+                                        {{ __('clan.my_clan.kick') }}
+                                    </button>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <x-empty-state :title="__('clan.empty.no_clan_title')" :body="__('clan.empty.no_clan_body')">
+                <x-slot:cta>
+                    <x-btn-gold size="lg" wire:click="setTab('browse')">{{ __('clan.tab.browse') }}</x-btn-gold>
+                    <x-btn-ghost size="lg" wire:click="setTab('create')">{{ __('clan.tab.create') }}</x-btn-ghost>
+                    <x-btn-ghost as="a" size="lg" href="{{ route('clan-leaderboard.index') }}" wire:navigate>
+                        {{ __('clan.leaderboard') }}
+                    </x-btn-ghost>
+                </x-slot:cta>
+            </x-empty-state>
+        @endif
+    @endif
+
+    {{-- TAB: BROWSE CLANS --}}
+    @if ($tab === 'browse')
+        <div class="relative mb-6">
+            <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z" />
+            </svg>
+            <input type="text" wire:model.live.debounce.300ms="search"
+                placeholder="{{ __('clan.browse.search_placeholder') }}"
+                class="w-full pl-11 pr-4 py-3.5 bg-surface/40 border border-white/10 rounded-2xl font-mono text-base text-foreground placeholder-muted focus:border-gold/50 focus:ring-0 transition">
+        </div>
+
+        @if ($this->browseClans->count() > 0)
+            <div class="space-y-3">
+                @foreach ($this->browseClans as $row)
+                    <div class="flex items-center gap-4 p-4 border bg-surface/40 border-white/5 rounded-2xl group hover:border-white/10 transition" wire:key="clan-{{ $row['clan']->id }}">
+                        <a href="{{ route('clans.show', $row['clan']) }}" wire:navigate class="flex items-center gap-4 flex-1 min-w-0">
+                            <x-clan-emblem :clan="$row['clan']" size="sm" />
+                            <div class="flex-1 min-w-0">
+                                <p class="font-mono text-sm font-bold text-foreground truncate group-hover:text-gold transition-colors">
+                                    {{ $row['clan']->name }}
+                                    @if ($row['clan']->tag)<span class="text-muted font-normal">[{{ $row['clan']->tag }}]</span>@endif
+                                </p>
+                                <p class="font-mono text-xs text-muted mt-0.5">
+                                    {{ __('clan.level', ['level' => $row['clan']->levelData()['level']]) }}
+                                    · {{ __('clan.members', ['count' => $row['clan']->members_count, 'max' => \App\Livewire\Clans::MAX_MEMBERS]) }}
+                                    · {{ __('clan.power_inline', ['value' => number_format($row['clan']->power)]) }}
+                                </p>
+                            </div>
+                        </a>
+
+                        @switch($row['relation'])
+                            @case('member')
+                                <span class="px-4 py-1.5 font-mono text-xs font-bold text-gold border border-gold/40 rounded-lg shrink-0">{{ __('clan.browse.joined') }}</span>
+                                @break
+                            @case('pending')
+                                {{-- Status text plus a separate button, as on the friends page.
+                                     One control swapping its label on hover would hide the
+                                     action on touch and make the row's meaning depend on
+                                     pointer position. --}}
+                                <div class="flex items-center gap-3 shrink-0">
+                                    {{-- hidden xs:inline: below 400px this status label + Cancel
+                                         squeeze the clan name; the Cancel button alone carries the
+                                         meaning there, and the label returns at xs (400px)+. --}}
+                                    <span class="hidden xs:inline font-mono text-xs text-muted">{{ __('clan.browse.request_sent') }}</span>
+                                    <button type="button" wire:click="cancelJoinRequest({{ $row['clan']->id }})"
+                                        class="px-4 py-1.5 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                                        {{ __('clan.browse.cancel_request') }}
+                                    </button>
+                                </div>
+                                @break
+                            @default
+                                <x-btn-gold class="shrink-0" wire:click="sendJoinRequest({{ $row['clan']->id }})">
+                                    {{ __('clan.browse.join') }}
+                                </x-btn-gold>
+                        @endswitch
+                    </div>
+                @endforeach
+            </div>
+        @else
+            {{-- Body passed via slot, not a prop: its text depends on whether a search query exists. --}}
+            <x-empty-state :title="__('clan.empty.no_results_title')">
+                {{ trim($search) !== '' ? __('clan.empty.no_results_body', ['query' => trim($search)]) : __('clan.empty.no_results_alt') }}
+            </x-empty-state>
+        @endif
+    @endif
+
+    {{-- TAB: CREATE CLAN --}}
+    @if ($tab === 'create')
+        <form wire:submit.prevent="createClan" class="max-w-lg space-y-5">
+            <x-clan.identity-fields
+                name="newName" tag="newTag" emblem="newEmblem" color="newEmblemColor" description="newDescription"
+                :name-value="$newName" :tag-value="$newTag" :emblem-value="$newEmblem"
+                :color-value="$newEmblemColor" :description-value="$newDescription" />
+
+            <x-btn-gold type="submit" size="xl">{{ __('clan.create.submit') }}</x-btn-gold>
+        </form>
+    @endif
+
+    {{-- ===== CONFIRMATION MODALS (themed, replace native wire:confirm) ===== --}}
+    @if ($this->myClan)
+        {{-- Leave Clan (anyone but the leader, whose exits are transfer and disband).
+             Gated like its trigger: otherwise it is a modal nothing opens, still reachable
+             by dispatching the event, confirming an action the server refuses. --}}
+        @unless ($this->canManageClan)
+        <x-modal name="confirm-leave" maxWidth="md">
+            <div class="p-6">
+                <p class="font-mono text-sm font-bold text-foreground">{{ __('clan.modal.leave_title', ['name' => $this->myClan->name]) }}</p>
+                <p class="font-mono text-xs text-muted mt-2">{{ __('clan.modal.leave_body') }}</p>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" @click="$dispatch('close-modal', 'confirm-leave')"
+                        class="px-4 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                        {{ __('clan.modal.cancel') }}
+                    </button>
+                    <button type="button" wire:click="leaveClan" @click="$dispatch('close-modal', 'confirm-leave')"
+                        class="px-4 py-2 font-mono text-xs font-bold text-foreground bg-danger hover:bg-danger/80 rounded-lg transition">
+                        {{ __('clan.modal.leave_confirm') }}
+                    </button>
+                </div>
+            </div>
+        </x-modal>
+        @endunless
+
+        {{-- Promote, demote and transfer share ONE modal: all three ask the same question,
+             so the copy is swapped from the dispatched action rather than rendering three
+             near-identical modals per roster row. --}}
+        @if ($this->canManageClan)
+            <div x-data="{
+                    roleId: null,
+                    roleLabel: '',
+                    action: null,
+                    copy: {
+                        promote: @js([
+                            'title' => __('clan.modal.promote_title', ['name' => ':name']),
+                            'body' => __('clan.modal.promote_body'),
+                            'confirm' => __('clan.modal.promote_confirm'),
+                        ]),
+                        demote: @js([
+                            'title' => __('clan.modal.demote_title', ['name' => ':name']),
+                            'body' => __('clan.modal.demote_body'),
+                            'confirm' => __('clan.modal.demote_confirm'),
+                        ]),
+                        transfer: @js([
+                            'title' => __('clan.modal.transfer_title', ['name' => ':name']),
+                            'body' => __('clan.modal.transfer_body'),
+                            'confirm' => __('clan.modal.transfer_confirm'),
+                        ]),
+                    },
+                    text(key) {
+                        if (! this.action) return '';
+                        return this.copy[this.action][key].replace(':name', this.roleLabel);
+                    },
+                    run() {
+                        if (this.action === 'promote') $wire.promoteMember(this.roleId);
+                        else if (this.action === 'demote') $wire.demoteMember(this.roleId);
+                        else if (this.action === 'transfer') $wire.transferLeadership(this.roleId);
+                        $dispatch('close-modal', 'confirm-role');
+                    },
+                }"
+                @open-modal.window="if ($event.detail?.name === 'confirm-role') { roleId = $event.detail.id; roleLabel = $event.detail.label; action = $event.detail.action; $dispatch('open-modal', 'confirm-role') }">
+                <x-modal name="confirm-role" maxWidth="md">
+                    <div class="p-6">
+                        <p class="font-mono text-sm font-bold text-foreground" x-text="text('title')"></p>
+                        <p class="font-mono text-xs text-muted mt-2" x-text="text('body')"></p>
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button type="button" @click="$dispatch('close-modal', 'confirm-role')"
+                                class="px-4 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                                {{ __('clan.modal.cancel') }}
+                            </button>
+                            {{-- Transfer is gold, not danger: it hands the clan on rather than
+                                 destroying it, and red here would flatten the difference from
+                                 a genuinely destructive Kick. --}}
+                            <button type="button" @click="run()"
+                                :class="action === 'transfer'
+                                    ? 'bg-gold text-background hover:bg-gold/80'
+                                    : 'bg-white/10 text-foreground hover:bg-white/15'"
+                                class="px-4 py-2 font-mono text-xs font-bold rounded-lg transition"
+                                x-text="text('confirm')"></button>
+                        </div>
+                    </div>
+                </x-modal>
+            </div>
+
+            {{-- Disband (leader only): retype-the-name confirmation, the same guard the
+                 account-deletion flow uses, because this is equally irreversible. --}}
+            <x-modal name="confirm-disband" maxWidth="md">
+                <div class="p-6">
+                    <p class="font-mono text-sm font-bold text-foreground">{{ __('clan.modal.disband_title', ['name' => $this->myClan->name]) }}</p>
+                    <p class="font-mono text-xs text-muted mt-2">{{ __('clan.modal.disband_body') }}</p>
+
+                    <label class="block font-mono text-xs text-muted mt-4 mb-1.5">{{ __('clan.modal.disband_prompt', ['name' => $this->myClan->name]) }}</label>
+                    {{-- The name is compared EXACTLY server-side (Clans::disbandClan). A phone
+                         capitalises the first letter by default, so without these attributes the
+                         correct name never matches and the leader simply cannot disband from a
+                         phone -- the guard stops being a confirmation and becomes a wall. --}}
+                    <input type="text" wire:model="confirmDisbandName"
+                        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                        class="w-full px-4 py-2.5 bg-surface/40 border border-white/10 rounded-xl font-mono text-base text-foreground placeholder-muted focus:border-danger/50 focus:ring-0 transition">
+                    @error('disband')<p class="font-mono text-xs text-danger mt-2">{{ $message }}</p>@enderror
+
+                    <div class="flex justify-end gap-3 mt-6">
+                        <button type="button" @click="$dispatch('close-modal', 'confirm-disband')"
+                            class="px-4 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                            {{ __('clan.modal.cancel') }}
+                        </button>
+                        {{-- Does NOT close on click: disband can fail server-side (name
+                             mismatch, war running) and the error renders right here. --}}
+                        <button type="button" wire:click="disbandClan"
+                            class="px-4 py-2 font-mono text-xs font-bold text-foreground bg-danger hover:bg-danger/80 rounded-lg transition">
+                            {{ __('clan.modal.disband_confirm') }}
+                        </button>
+                    </div>
+                </div>
+            </x-modal>
+        @endif
+
+        {{-- Kick member: one modal, target stored from the event --}}
+        @if ($this->canManageMembers)
+            <div x-data="{ kickId: null, kickLabel: '' }"
+                @open-modal.window="if ($event.detail?.name === 'confirm-kick') { kickId = $event.detail.id; kickLabel = $event.detail.label; $dispatch('open-modal', 'confirm-kick') }">
+                <x-modal name="confirm-kick" maxWidth="md">
+                    <div class="p-6">
+                        <p class="font-mono text-sm font-bold text-foreground">{{ __('clan.modal.kick_title') }}</p>
+                        <p class="font-mono text-xs text-gold mt-1" x-text="kickLabel"></p>
+                        <p class="font-mono text-xs text-muted mt-2">{{ __('clan.modal.kick_body') }}</p>
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button type="button" @click="$dispatch('close-modal', 'confirm-kick')"
+                                class="px-4 py-2 font-mono text-xs text-muted border border-white/10 rounded-lg hover:text-foreground hover:bg-white/5 transition">
+                                {{ __('clan.modal.cancel') }}
+                            </button>
+                            <button type="button" @click="$wire.kickMember(kickId); $dispatch('close-modal', 'confirm-kick')"
+                                class="px-4 py-2 font-mono text-xs font-bold text-foreground bg-danger hover:bg-danger/80 rounded-lg transition">
+                                {{ __('clan.modal.kick_confirm') }}
+                            </button>
+                        </div>
+                    </div>
+                </x-modal>
+            </div>
+        @endif
+    @endif
+
+    {{-- ===== REAL-TIME ===== --}}
+    @script
+        <script>
+            const onRemote = () => $wire.dispatch('clan-updated');
+            window.addEventListener('clan-updated-remote', onRemote);
+
+            document.addEventListener('livewire:navigating', () => {
+                window.removeEventListener('clan-updated-remote', onRemote);
+            }, { once: true });
+        </script>
+    @endscript
+    </x-page-container>
+</div>

@@ -1,0 +1,360 @@
+<?php
+
+use App\Events\FriendshipUpdated;
+use App\Models\Friendship;
+use App\Models\TypingResult;
+use App\Support\TypingLanguage;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+
+use function Livewire\Volt\computed;
+use function Livewire\Volt\state;
+
+state([
+    'currentTab' => 'time',
+    'currentConfig' => '30',
+    'timeframe' => 'all_time',
+    'currentLang' => 'en',
+]);
+
+$setTab = function ($tab) {
+    $this->currentTab = $tab;
+    $this->currentConfig = match ($tab) {
+        'time' => '30',
+        'words' => '25',
+        'survival' => 'medium',
+    };
+};
+
+$setConfig = function ($config) {
+    $this->currentConfig = $config;
+};
+
+$setTimeframe = function ($timeframe) {
+    $this->timeframe = $timeframe;
+};
+
+// Typed-text language (en|id): an orthogonal dimension that applies to every tab.
+// Normalized server-side -- an unknown code falls back to the default (en).
+$setLanguage = function ($lang) {
+    $this->currentLang = TypingLanguage::resolve($lang);
+};
+
+$sendRequest = function (int $userId) {
+    $me = Auth::id();
+
+    // The "already related (either direction)" check + insert happen as a single
+    // operation inside Friendship::requestBetween(), not two separate steps.
+    if (! Friendship::requestBetween($me, $userId)) {
+        return;
+    }
+
+    $payload = ['type' => 'request', 'message' => __('friends.notify.request', ['name' => Auth::user()->username])];
+
+    FriendshipUpdated::dispatch($userId, $payload);
+};
+
+// Ranking metric per tab: survival is scored by SURVIVAL TIME, other modes by WPM.
+$metricFor = fn (string $tab) => $tab === 'survival' ? 'duration_seconds' : 'net_wpm';
+
+// Base filter (active mode + config + timeframe). A single source of truth used by
+// BOTH the board and the rank computation, so the two can never filter by
+// different rules.
+//
+// State is passed explicitly as arguments, not via $this: a plain closure in Volt
+// is NOT bound to the component (only actions and computeds are bound), so $this
+// here would be fatal.
+$scoped = function (string $tab, string $config, string $timeframe, string $language) {
+    $q = TypingResult::where('mode', $tab)
+        ->where('mode_config', $config)
+        ->where('language', $language)
+        // Only publicly-cleared results reach the board (anti-cheat §7.6): a run held for
+        // review (`pending`) or declined (`rejected`) never appears until a human clears it.
+        // Applied in the single scoped source so BOTH the board and the rank agree.
+        ->whereIn('review_status', [TypingResult::REVIEW_CLEAR, TypingResult::REVIEW_APPROVED])
+        // Leaderboard eligibility gate (Monkeytype's minTimeTyping): only players whose
+        // accumulated typing time (all modes) clears the threshold appear. Kills the
+        // throwaway-account-then-script attack before scoring; a real player crosses it
+        // naturally. Applied here in the single scoped source so board AND rank agree.
+        ->whereIn('user_id', TypingResult::query()
+            ->select('user_id')
+            ->groupBy('user_id')
+            ->havingRaw('SUM(duration_seconds) >= ?', [TypingResult::LEADERBOARD_MIN_TYPING_SECONDS]));
+
+    if ($timeframe === 'daily') {
+        $q->where('created_at', '>=', now()->startOfDay());
+    }
+
+    return $q;
+};
+
+// Each user's best record within the active scope.
+$bestPerUser = fn (string $metric, string $tab, string $config, string $timeframe, string $language) => $scoped($tab, $config, $timeframe, $language)
+    ->select('user_id', DB::raw("MAX({$metric}) as best_score"))
+    ->groupBy('user_id');
+
+$leaderboard = computed(function () use ($metricFor, $bestPerUser) {
+    $metric = $metricFor($this->currentTab);
+
+    // The GROUP BY on the OUTER query is required, not decorative: the join matches
+    // `tr.{metric} = pb.best_score`, so a user with TWO results at an identical score
+    // (easy to hit -- net_wpm has only 2 decimals) would produce two rows, duplicating
+    // themselves on the board AND pushing another player out of the top 10. Grouping
+    // structurally guarantees one row per user.
+    $rows = TypingResult::from('typing_results as tr')
+        ->joinSub($bestPerUser($metric, $this->currentTab, $this->currentConfig, $this->timeframe, $this->currentLang), 'pb', function ($join) use ($metric) {
+            $join->on('tr.user_id', '=', 'pb.user_id')
+                ->on("tr.{$metric}", '=', 'pb.best_score');
+        })
+        ->join('users', 'tr.user_id', '=', 'users.id')
+        ->groupBy('tr.user_id', 'users.username', 'users.avatar', 'pb.best_score')
+        ->select(
+            'tr.user_id',
+            'users.username',
+            'users.avatar',
+            DB::raw('pb.best_score as score'),
+            // Accuracy from the record session; if several sessions tie on the same
+            // score, take the most accurate as the tie-breaker.
+            DB::raw('MAX(tr.accuracy) as accuracy'),
+        )
+        ->orderBy('score', 'desc')
+        ->orderBy('accuracy', 'desc')
+        ->limit(10)
+        ->get();
+
+    $me = Auth::user();
+
+    if (! $me) {
+        return $rows->each(fn ($row) => $row->relation = 'none');
+    }
+
+    // Relationship status for ALL rows in a single query (previously: one query per
+    // row via friendshipWith() -> 10 queries on every tab/config change).
+    $relations = Friendship::relationMapFor($me->id, $rows->pluck('user_id')->all());
+
+    return $rows->each(function ($row) use ($relations) {
+        $row->relation = $relations[(int) $row->user_id]['relation'] ?? 'none';
+    });
+});
+
+$userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
+    if (! Auth::check()) {
+        return null;
+    }
+
+    $metric = $metricFor($this->currentTab);
+
+    // MY record in this mode/config. Never played -> unranked. `$scoped` already applies the
+    // eligibility gate, so a player under the typing-time threshold reads as $myBest === null
+    // here just like someone who never played -- the two cases are told apart below.
+    $myBest = $scoped($this->currentTab, $this->currentConfig, $this->timeframe, $this->currentLang)
+        ->where('user_id', Auth::id())
+        ->max($metric);
+
+    if ($myBest === null) {
+        // Distinguish "typed but not yet eligible" from "never played". A player who HAS
+        // typed but is still short of the gate gets a "keep typing" message, not a bare
+        // "unranked" that reads like their record vanished. Someone with no results at all
+        // (typedSeconds === 0) is genuinely unranked -- the ordinary empty state.
+        $typedSeconds = (int) TypingResult::where('user_id', Auth::id())->sum('duration_seconds');
+
+        if ($typedSeconds > 0 && $typedSeconds < TypingResult::LEADERBOARD_MIN_TYPING_SECONDS) {
+            $remaining = (int) ceil((TypingResult::LEADERBOARD_MIN_TYPING_SECONDS - $typedSeconds) / 60);
+
+            return __('leaderboard.eligibility_pending', ['minutes' => $remaining]);
+        }
+
+        return __('leaderboard.unranked');
+    }
+
+    // Rank = the number of users whose record is HIGHER than mine, + 1.
+    // Computed IN THE DATABASE via COUNT: only a single number comes back to PHP.
+    // (Previously: pluck() pulled ONE ROW PER USER into PHP memory, then array_search
+    //  -- 10,000 users = 10,000 rows pulled, every time the user switches tabs.)
+    // Records are fractional (e.g. 102.5), so the comparison MUST be numeric -- it is
+    // guarded by a test that ranks 102.5 against 103. A plain where() is enough here:
+    // best_score is a numeric column, so MySQL compares it numerically even though PDO
+    // binds the parameter as a string.
+    $better = DB::query()
+        ->fromSub($bestPerUser($metric, $this->currentTab, $this->currentConfig, $this->timeframe, $this->currentLang), 'pb')
+        ->where('pb.best_score', '>', $myBest)
+        ->count();
+
+    return $better + 1;
+});
+
+?>
+
+{{-- Leaderboard page: top-10 ranking for the selected mode/config/timeframe/language,
+     the viewer's own rank, and per-row actions (view profile, ghost race, friend request). --}}
+<div class="text-muted font-mono py-16">
+    <x-page-container width="max-w-4xl">
+
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-10">
+            <h1 class="font-display text-fluid-title tracking-wide text-foreground">{{ __('leaderboard.title') }}</h1>
+
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="flex gap-1 bg-surface border border-border p-1 rounded-xl text-xs">
+                    <button wire:click="setTimeframe('all_time')" class="px-4 py-2 rounded-lg transition font-bold tracking-wider uppercase {{ $timeframe === 'all_time' ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">{{ __('leaderboard.all_time') }}</button>
+                    <button wire:click="setTimeframe('daily')" class="px-4 py-2 rounded-lg transition font-bold tracking-wider uppercase {{ $timeframe === 'daily' ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">{{ __('leaderboard.daily') }}</button>
+                </div>
+
+                {{-- Typed-text language (not the UI language): an orthogonal filter applying to all tabs. --}}
+                <div class="flex gap-1 bg-surface border border-border p-1 rounded-xl text-xs" role="group" aria-label="{{ __('leaderboard.language') }}">
+                    @foreach (['en' => 'EN', 'id' => 'ID'] as $code => $label)
+                        <button wire:click="setLanguage('{{ $code }}')" class="px-4 py-2 rounded-lg transition font-bold tracking-wider uppercase {{ $currentLang === $code ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">{{ $label }}</button>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-surface border border-border rounded-2xl p-2.5 flex flex-col md:flex-row justify-between items-center gap-3 mb-8">
+
+            <div class="flex w-full gap-2 md:w-auto">
+                @foreach(['time', 'words', 'survival'] as $tab)
+                    <button wire:click="setTab('{{ $tab }}')" class="flex-1 md:flex-none px-4 py-2 rounded-xl text-xs font-bold transition {{ $currentTab === $tab ? 'bg-brand-bright text-background' : 'hover:text-foreground' }}">
+                        {{ __("leaderboard.tab.{$tab}") }}
+                    </button>
+                @endforeach
+            </div>
+
+            <div class="flex justify-end w-full gap-2 text-xs font-bold md:w-auto">
+                @if($currentTab === 'time')
+                    @foreach(['15', '30', '60', '120'] as $t)
+                        <button wire:click="setConfig('{{ $t }}')" class="px-3 py-2 rounded-xl tabular-nums transition {{ $currentConfig === $t ? 'text-brand-bright bg-background border border-brand-bright/40' : 'hover:text-foreground' }}">{{ $t }}</button>
+                    @endforeach
+                @elseif($currentTab === 'words')
+                    @foreach(['10', '25', '50', '100'] as $w)
+                        <button wire:click="setConfig('{{ $w }}')" class="px-3 py-2 rounded-xl tabular-nums transition {{ $currentConfig === $w ? 'text-brand-bright bg-background border border-brand-bright/40' : 'hover:text-foreground' }}">{{ $w }}</button>
+                    @endforeach
+                @elseif($currentTab === 'survival')
+                    @foreach(['easy', 'medium', 'hard'] as $d)
+                        <button wire:click="setConfig('{{ $d }}')" class="px-3 py-2 rounded-xl transition capitalize {{ $currentConfig === $d ? 'text-brand-bright bg-background border border-brand-bright/40' : 'hover:text-foreground' }}">{{ __("leaderboard.difficulty.{$d}") }}</button>
+                    @endforeach
+                @endif
+            </div>
+        </div>
+
+        @auth
+            <div class="mb-6 bg-surface/40 border border-border rounded-2xl p-4 flex justify-between items-center text-xs tracking-wider uppercase">
+                <span class="text-muted">{{ __('leaderboard.your_rank') }}</span>
+                <span class="font-bold text-brand-bright text-base tabular-nums">#{{ $this->userRank }}</span>
+            </div>
+        @endauth
+
+        <div class="bg-surface rounded-2xl border border-border">
+            <div class="hidden sm:flex items-center gap-4 px-6 py-4 text-xs font-bold tracking-widest text-muted uppercase border-b border-border bg-background rounded-t-2xl">
+                <span class="w-8 text-center">#</span>
+                <span class="flex-1">{{ __('leaderboard.player') }}</span>
+                <span class="w-28 text-right">{{ $currentTab === 'survival' ? __('leaderboard.duration') : __('leaderboard.wpm') }}</span>
+                <span class="w-20 text-right">{{ __('leaderboard.accuracy') }}</span>
+                <span class="w-8"></span>
+            </div>
+
+            <div class="divide-y divide-border text-foreground">
+                @forelse($this->leaderboard as $index => $row)
+                    @php $isMe = Auth::id() === (int) $row->user_id; @endphp
+                    <div wire:key="lb-{{ $row->user_id }}"
+                        class="relative flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 transition last:rounded-b-2xl {{ $isMe ? 'bg-brand-bright/10' : ($index === 0 ? 'bg-gold/5 hover:bg-gold/10' : 'hover:bg-background/60') }}">
+
+                        <span class="w-8 shrink-0 text-center text-xs font-bold tabular-nums {{ $index === 0 ? 'text-gold' : 'text-muted' }}">
+                            @if($index === 0) <span class="text-base">👑</span>
+                            @elseif($index === 1) <span class="text-base">🥈</span>
+                            @elseif($index === 2) <span class="text-base">🥉</span>
+                            @else {{ $index + 1 }}
+                            @endif
+                        </span>
+
+                        <x-friend-avatar :user="$row" />
+
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-bold truncate {{ $isMe ? 'text-brand-bright' : ($index === 0 ? 'text-gold' : 'text-foreground') }}">
+                                {{ $row->username }}
+                                @if($isMe)
+                                    <span class="ml-1.5 align-middle text-[10px] font-bold uppercase tracking-wider text-brand-bright/70">{{ __('leaderboard.you') }}</span>
+                                @endif
+                            </p>
+                            <p class="sm:hidden text-xs text-muted tabular-nums mt-0.5">
+                                {{ $currentTab === 'survival' ? $row->score . 's' : $row->score . ' wpm' }} · {{ $row->accuracy }}%
+                            </p>
+                        </div>
+
+                        <span class="hidden sm:block w-28 text-right text-sm font-bold tracking-tight tabular-nums {{ $isMe ? 'text-brand-bright' : 'text-foreground' }}">
+                            {{ $currentTab === 'survival' ? $row->score . 's' : $row->score . ' wpm' }}
+                        </span>
+                        <span class="hidden sm:block w-20 text-right text-sm font-medium tabular-nums {{ $isMe ? 'text-brand-bright' : 'text-muted' }}">{{ $row->accuracy }}%</span>
+
+                        <div class="w-8 shrink-0 flex justify-end" x-data="{ open: false }" @keydown.escape="open = false">
+                            <button type="button" @click="open = !open" @click.outside="open = false"
+                                aria-label="{{ __('leaderboard.actions') }}"
+                                class="p-1.5 rounded-lg text-muted hover:text-foreground hover:bg-white/5 transition">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v.01M12 12v.01M12 19v.01" />
+                                </svg>
+                            </button>
+
+                            <div x-show="open" x-cloak
+                                x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="opacity-0 scale-95"
+                                x-transition:enter-end="opacity-100 scale-100"
+                                x-transition:leave="transition ease-in duration-100"
+                                x-transition:leave-start="opacity-100 scale-100"
+                                x-transition:leave-end="opacity-0 scale-95"
+                                @click="open = false"
+                                class="absolute right-4 top-full z-50 mt-1 w-48 origin-top-right rounded-xl border border-white/10 bg-surface shadow-lg ring-1 ring-black/20 overflow-hidden py-1">
+
+                                <a href="{{ route('profile.show', $row->username) }}" wire:navigate
+                                    class="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-foreground hover:bg-white/5 transition">
+                                    <svg class="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                    {{ __('leaderboard.view_profile') }}
+                                </a>
+
+                                @unless($isMe)
+                                    @if(in_array($currentTab, ['time', 'words'], true))
+                                        <a href="{{ route('typing') }}?ghost={{ $row->user_id }}&mode={{ $currentTab }}&config={{ $currentConfig }}" wire:navigate
+                                            class="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-foreground hover:bg-white/5 transition">
+                                            <svg class="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 7h10v10H7V7z" /></svg>
+                                            {{ __('leaderboard.challenge_ghost') }}
+                                        </a>
+                                    @endif
+
+                                    @switch($row->relation)
+                                        @case('friends')
+                                            <span class="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-gold">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                                {{ __('leaderboard.friends_label') }}
+                                            </span>
+                                            @break
+                                        @case('sent')
+                                            <span class="flex items-center gap-2.5 px-4 py-2.5 text-xs text-muted">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                {{ __('leaderboard.request_sent') }}
+                                            </span>
+                                            @break
+                                        @case('incoming')
+                                            <a href="{{ route('friends.index') }}" wire:navigate
+                                                class="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-foreground hover:bg-white/5 transition">
+                                                <svg class="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1" /></svg>
+                                                {{ __('leaderboard.respond') }}
+                                            </a>
+                                            @break
+                                        @default
+                                            <button type="button" wire:click="sendRequest({{ $row->user_id }})"
+                                                class="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-foreground hover:bg-white/5 transition text-left">
+                                                <svg class="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                                                {{ __('leaderboard.add_friend') }}
+                                            </button>
+                                    @endswitch
+                                @endunless
+                            </div>
+                        </div>
+                    </div>
+                @empty
+                    <div class="py-16 text-center text-muted tracking-wide text-xs uppercase">
+                        {{ __('leaderboard.empty') }}
+                    </div>
+                @endforelse
+            </div>
+        </div>
+    </x-page-container>
+</div>
