@@ -61,7 +61,7 @@ $wpmCheck = app(AntiCheatService::class)->check($correctChars, $correctChars, $d
 **Justifikasi:** menyelaraskan multiplayer dengan mode solo — WPM tak bisa dipompa dengan ketik
 ngasal. `$liveWpm` tetap diterima di signature hanya demi kompatibilitas payload client lama.
 Lihat [anti-cheat-wpm.md](anti-cheat-wpm.md) dan
-[`../wpm-accuracy-integrity.md`](../wpm-accuracy-integrity.md).
+bagian validasi race pada dokumen tersebut.
 
 #### Presisi durasi: kenapa pemain jujur pernah ditolak (bug yang ditutup, 2026-07-27)
 
@@ -559,7 +559,7 @@ settle room (hapus kalau kosong / reassign host), broadcast `RoomPresenceChanged
 `RoomUpdated`. Trait `ManagesRoomMembership` kini tipis, mendelegasikan ke service ini.
 
 **Keputusan disederhanakan:** refresh not-ready **juga** ikut leave (tanpa grace-window/kolom
-DB/cron — proyek tak punya scheduler). Konsekuensinya kecil (not-ready yang refresh join ulang);
+DB/cron khusus room). Konsekuensinya kecil (not-ready yang refresh join ulang);
 ready/host tak tersentuh beacon jadi restore mereka selalu jalan.
 
 **Beacon vs confirm saat `racing`** — dua jalur leave sengaja dibedakan berdasarkan **niat**:
@@ -647,7 +647,7 @@ menyapunya:
 | Aspek | Keputusan | Justifikasi |
 |-------|-----------|-------------|
 | **Sinyal deteksi** | User **offline** menurut `last_seen_at` (basi > `ONLINE_THRESHOLD_SECONDS` = 60 dtk, atau null setelah logout) | Numpang **heartbeat presence site-wide** yang sudah ada (lihat [friends-presence.md](friends-presence.md) §3.3–3.4). Heartbeat berhenti begitu tab ditutup/hidden — penanda "benar-benar pergi". Yang **menunggu diam-diam di lobby tetap ping**, jadi tak ikut tersapu. Jauh lebih akurat daripada menebak dari `updated_at`. **Tanpa kolom/endpoint/JS baru.** |
-| **Kapan jalan** | **Lazy saat lobby di-load** (`mount()`), bukan cron | Pola sama seperti [`ClanWarResolver`](../../app/Services/ClanWarResolver.php) — proyek tak punya scheduler. Setiap ada yang membuka `/multiplayer`, room hantu ikut dibersihkan. |
+| **Kapan jalan** | **Lazy saat lobby di-load** (`mount()`), bukan cron | Scheduler proyek saat ini dipakai untuk reconciliation anti-cheat, bukan pembersihan room. Setiap ada yang membuka `/multiplayer`, room hantu ikut dibersihkan. |
 | **Cakupan** | Room **`waiting`** per-member; room **`racing`** hanya kalau **seluruh** member hilang | Mencabut **satu** peserta di tengah race merusak placement, jadi satu pemain yang masih online melindungi seluruh room. Tapi kalau tak ada siapa-siapa lagi, race tak bisa menutup dirinya sendiri (§3.4: server gerbang, bukan pemicu) — room-nya **dihapus**, tanpa finalisasi, tanpa baris history, tanpa XP. Balapan yang tak diselesaikan siapa pun tak menghasilkan hasil yang layak disimpan, sejalan dengan aturan "DNF tak pernah dicatat". |
 | **Host tersapu** | **Handoff** ke member tersisa (racer diprioritaskan), atau room dihapus kalau semua tersapu | Memakai ulang `settleAbandonedRoom()`/`reassignHostIfNeeded()` yang sama dengan leave/kick — satu definisi. Sisa member disiarkan `RoomUpdated` agar slot bebas/host baru langsung ter-render. |
 | **Pemanggil dikecualikan** | `exceptUserId` = user yang halamannya baru load | Ia provably hadir; heartbeat-nya mungkin belum mendarat pada fresh load, jadi jangan sampai menyapu diri sendiri. **Batasnya:** pengecualian ini juga membuat baris **basi milik sendiri** kebal, dan itu bukan tugas sapuan ini untuk menutupnya — lihat §3.12.a. |
@@ -797,12 +797,12 @@ spasi sebuah keyboard bermasalah.
 
 #### Batas yang jujur
 
-Semua test di atas adalah **kontrak markup & modul, bukan bukti perilaku** — proyek ini tak
-mengeksekusi JavaScript di test sama sekali. Dua hal yang **tak bisa** ditutup dari HTML dan
+Test markup dan unit Vitest tetap bukan bukti perilaku browser/perangkat nyata. Dua hal yang
+**tak bisa** ditutup dari HTML maupun unit test dan
 harus diverifikasi di perangkat: sesi *composition* IME yang masih berjalan saat `advanceWord()`
 mengosongkan field, dan fitur Gboard "dobel spasi jadi titik" (rancangan di atas menolaknya
-dengan sopan, tapi tak bisa mematikannya). Checklistnya di
-[`../mobile-test-checklist.md`](../mobile-test-checklist.md).
+dengan sopan, tapi tak bisa mematikannya). Verifikasi manual minimal mencakup Android/Gboard dan
+iOS/Safari untuk input huruf, swipe typing, spasi/Enter, composition IME, serta paste.
 
 ### 3.17 Arena di layar sempit (temuan uji perangkat, 2026-07-26)
 
@@ -915,5 +915,5 @@ jadi `raceArena` tidak di-remount.
 ## 4. Batasan Saat Ini
 
 - WPM/place tersimpan di `room_members` tidak melalui jalur PB/leaderboard global — race adalah
-  event sosial, bukan sumber rekor pribadi. Lihat diskusi di
-  [`../wpm-accuracy-integrity.md`](../wpm-accuracy-integrity.md).
+  event sosial, bukan sumber rekor pribadi. Batas integritasnya dijelaskan di
+  [anti-cheat-wpm.md](anti-cheat-wpm.md).

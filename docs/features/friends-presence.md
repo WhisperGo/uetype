@@ -69,8 +69,8 @@ presence, dua pemakai — lihat [multiplayer-race.md](multiplayer-race.md) §3.1
 
 **Ping berhenti saat tab tersembunyi, dan itu memang disengaja.** Jeda ini **presence**, bukan sesi:
 tab latar tak boleh melaporkan pemiliknya online ke daftar teman. Jangan membuangnya demi menjaga
-sesi tetap hidup — keaktifan sesi tak lagi bergantung padanya sejak `SESSION_LIFETIME` jadi 14 hari
-dan sign-in diingat ([auth.md](auth.md) §3.6), jadi menukarnya hanya membayar titik online yang
+sesi tetap hidup — sign-in memakai remember-me dan masa sesi dikonfigurasi terpisah
+(`SESSION_LIFETIME=120` menit di `.env.example`; lihat [auth.md](auth.md) §3.6), jadi menukarnya hanya membayar titik online yang
 akurat untuk sesuatu yang sudah beres di lapisan yang benar. Ping langsung saat `visibilitychange`
 adalah yang memulihkan titiknya begitu tab kembali.
 

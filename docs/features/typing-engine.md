@@ -73,8 +73,9 @@ $finalNetWpm = $check['net_wpm'];
 ```
 
 **Justifikasi:** trust boundary. Detail lengkap di [anti-cheat-wpm.md](anti-cheat-wpm.md).
-Client hanya mengirim **jumlah karakter & durasi** (fakta sulit dipalsukan tanpa benar-benar
-mengetik dengan konsisten), bukan hasil akhir WPM.
+Client hanya mengirim **jumlah karakter & durasi**, bukan hasil akhir WPM. Data mentah tersebut
+tetap dianggap tidak tepercaya: `SoloSessionGuard`, bukti timing, batas throughput, dan evaluator
+longitudinal membatasi apakah klaim boleh disimpan atau dipakai sebagai angka publik.
 
 ### 3.4 Rekor (PB) hanya dari mode Time/Words — Survival dikecualikan
 

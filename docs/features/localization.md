@@ -37,7 +37,7 @@ public static function resolve(?string $lang): string {
 **Justifikasi:** kode bahasa berasal dari input pengguna/URL/session. `resolve()` adalah satu titik
 yang memetakan nilai liar ke default aman — jadi tak ada kode bahasa tak dikenal yang bisa membuat
 `wordlistPath()` menunjuk file yang tak ada. Pola yang sama dengan whitelist mode di
-[typing-engine.md](typing-engine.md#32).
+[typing-engine.md](typing-engine.md#32-whitelist-mode-di-server-allowed_submodes--normalizemode).
 
 ### 2.3 Wordlist sebagai file JSON per bahasa
 

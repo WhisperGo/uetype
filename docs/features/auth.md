@@ -91,14 +91,14 @@ ID user (dan jumlah total user terdaftar) tak bisa ditebak dengan mengubah angka
 ### 3.6 "Tetap masuk sampai sign out" — remember-me menyala
 
 `loginAndRegenerate()` dulu memanggil `Auth::login($user)` **tanpa argumen kedua**, di ketiga jalur
-login. Kolom `remember_token` sudah ada sejak migrasi pertama tapi tak pernah sekali pun diisi, jadi
-cookie sesi mati saat browser ditutup dan server membuangnya setelah idle — tak ada apa pun yang
-bisa memulihkan login. Itulah keluhan "kok sering ter-logout" yang dilaporkan pemain.
+login. Kolom `remember_token` sudah ada sejak migrasi pertama tetapi tidak dipakai oleh login itu.
+Saat sesi server kedaluwarsa, tidak ada cookie remember-me yang dapat membangun ulang autentikasi;
+pemain harus melewati OAuth lagi.
 
-**Justifikasi:** Google adalah satu-satunya jalur masuk dan tak ada kolom password, jadi sesi yang
-kedaluwarsa **tak membeli keamanan apa pun** — ia hanya membebani pemilik sah dengan satu putaran
-OAuth. Sekarang `Auth::login($user, remember: true)`, ditemani `SESSION_LIFETIME` 14 hari
-(`config/session.php`; karena `expire_on_close` false, angka itu juga jadi `Max-Age` cookie-nya).
+**Justifikasi:** Google adalah satu-satunya jalur masuk dan tak ada kolom password. Sekarang
+`Auth::login($user, remember: true)` memungkinkan cookie remember-me memulihkan autentikasi ketika
+sesi biasa berakhir. `.env.example` saat ini memakai `SESSION_LIFETIME=120` menit; instalasi dapat
+mengubahnya lewat `.env` tanpa mengubah mekanisme remember-me.
 
 **Sign out tetap benar-benar keluar.** `SessionGuard::logout()` memanggil `cycleRememberToken()`
 sehingga recaller lama tak lagi cocok dengan barisnya, **dan** `clearUserDataFromStorage()` mengantre

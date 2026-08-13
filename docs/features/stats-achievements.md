@@ -29,6 +29,13 @@ $activity = [
 tersimpan" menyimpang dari data sebenarnya. Trade-off: query agregat tiap render, tapi untuk skala
 per-user ini murah dan menghilangkan seluruh kelas bug sinkronisasi.
 
+Tidak semua agregat memakai cakupan integritas yang sama:
+
+- rekor WPM/Survival dan achievement memakai scope `trustworthy()` (`clear` atau legacy
+  `approved`), sehingga hasil probation tidak menjadi PB atau membuka achievement;
+- aktivitas, grafik, dan distribusi pada halaman Stats milik sendiri membaca seluruh hasil yang
+  tersimpan, termasuk `pending`, sebagai riwayat privat. Angka tersebut bukan ranking publik.
+
 ### 2.2 Rekor Survival = MAX(duration_seconds), bukan MAX(net_wpm)
 
 **Justifikasi:** metrik Survival adalah **lama bertahan**, bukan kecepatan. Memakai `net_wpm`
@@ -72,14 +79,15 @@ engine kompleks, dan mudah diuji. Tabel `user_achievements` hanya mencatat **sia
 ### 3.2 Dihitung dari data existing (stateless), bukan pelacakan streak/temporal
 
 **Justifikasi:** semua achievement saat ini bisa diturunkan dari agregat yang sudah ada
-(`MAX(net_wpm)`, `total_xp`, `COUNT(typing_results)`). Ini menghindari kebutuhan melacak event
-temporal (streak harian, dll) yang jauh lebih rumit dan rawan bug. Kalau nanti butuh streak,
+(`MAX(net_wpm)` dari hasil tepercaya, `total_xp`, dan jumlah hasil tepercaya). Ini menghindari
+kebutuhan melacak event temporal (streak harian, dll) yang jauh lebih rumit dan rawan bug. Kalau nanti butuh streak,
 barulah tambah mekanisme — sekarang sengaja dijaga sederhana (*YAGNI*).
 
 ### 3.3 Rekor WPM diturunkan dari `typing_results`, bukan dibaca dari `users.highest_wpm`
 
-```sql
-COALESCE(MAX(CASE WHEN mode <> 'survival' THEN net_wpm END), 0) as highest_wpm
+```php
+TypingResult::where('user_id', $userId)->trustworthy()
+    ->selectRaw('COALESCE(MAX(CASE WHEN mode <> \'survival\' THEN net_wpm END), 0) as highest_wpm')
 ```
 
 **Justifikasi:** ini penerapan prinsip §2.1 pada achievement. `users.highest_wpm` hanya pernah

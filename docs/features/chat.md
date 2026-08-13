@@ -130,7 +130,8 @@ menutup drawer" — pertanyaan yang berbeda, dan ia tak pernah punya halaman asa
 ### 2.7 Body listener kosong memicu re-render
 
 Sama seperti Friends/Clans: `#[On('message-received')]` kosong — menerima event sudah cukup untuk
-menyegarkan daftar pesan. Lihat [friends-presence.md](friends-presence.md#36).
+menyegarkan daftar pesan. Lihat
+[friends-presence.md](friends-presence.md#36-body-listener-kosong--action-apa-pun-memicu-re-render).
 
 ## 3. Batas & Guard
 

@@ -25,8 +25,9 @@ Dibangun dengan **Laravel 12 + Livewire 4 + Alpine.js + Tailwind CSS**, dengan
 6. [Akun Uji Coba (Dev Login)](#akun-uji-coba-dev-login)
 7. [Panel Monitoring](#panel-monitoring)
 8. [Testing](#testing)
-9. [Struktur Proyek](#struktur-proyek)
-10. [Troubleshooting](#troubleshooting)
+9. [Deployment Production](#deployment-production)
+10. [Struktur Proyek](#struktur-proyek)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -38,11 +39,12 @@ Dibangun dengan **Laravel 12 + Livewire 4 + Alpine.js + Tailwind CSS**, dengan
 - **Mode Survival** — stamina berkurang seiring waktu; skor = berapa lama bertahan.
 - **Ghost Mode** — balapan melawan rekor: diri sendiri, teman, atau entri leaderboard.
 - **Dua bahasa konten** (Inggris / Indonesia) yang bisa dipilih terpisah dari bahasa UI.
-- **Anti-cheat**: WPM & akurasi dihitung ulang di server (Net WPM), sesi tak masuk
-  akal ditolak. Lihat [`docs/features/anti-cheat-wpm.md`](docs/features/anti-cheat-wpm.md).
+- **Anti-cheat**: WPM & akurasi dihitung ulang di server (Net WPM); hasil mustahil ditolak,
+  sedangkan anomali longitudinal masuk probation otomatis. Lihat
+  [`docs/features/anti-cheat-wpm.md`](docs/features/anti-cheat-wpm.md).
 
 ### Multiplayer Race (Real-time)
-- Buat / gabung ruang lewat **kode 6 digit** (maks. 5 pemain + 5 penonton).
+- Buat / gabung ruang lewat **kode 6 karakter acak** (maks. 5 pemain + 5 penonton).
 - **Countdown 3-2-1 tersinkron** di semua layar, lalu balapan bersama.
 - Progres & maskot lawan bergerak **real-time** lewat WebSocket.
 - **Sudden death** (masa tenggang setelah pemenang pertama finis).
@@ -78,7 +80,7 @@ Dibangun dengan **Laravel 12 + Livewire 4 + Alpine.js + Tailwind CSS**, dengan
 
 ### Autentikasi
 - **Login Google** (OAuth via Socialite) + alur pilih username.
-- Register/login klasik (email + password), reset password, verifikasi email.
+- Tidak ada register/login email-password, reset password, atau verifikasi email.
 
 ### Monitoring (Admin)
 - **Visit monitoring** (kunjungan halaman), **action monitoring** (create/update/delete
@@ -117,7 +119,7 @@ Dibangun dengan **Laravel 12 + Livewire 4 + Alpine.js + Tailwind CSS**, dengan
 | **MySQL / MariaDB** | MySQL 8.0+ / MariaDB 10.6+ | Bisa lewat Laragon/XAMPP |
 
 > Cara termudah di Windows: pakai **Laragon** (sudah membundel PHP 8.2+, MySQL, dan
-> Composer). Proyek ini dikembangkan dengan Laragon (`c:\laragon\www\agile`).
+> Composer). Di Laragon, proyek dapat diletakkan misalnya di `C:\laragon\www\uetype`.
 
 ### Perangkat Keras (disarankan minimum untuk pengembangan lancar)
 | Komponen | Minimum | Nyaman |
@@ -141,7 +143,7 @@ internet. Kalau `vendor/`/`node_modules/` **belum ada**, jalankan `composer inst
 dan `npm install` sekali saat masih online, lalu sisanya bisa offline.
 
 ### 1. Salin proyek
-Letakkan folder proyek di web root (mis. `c:\laragon\www\agile`).
+Letakkan folder proyek di web root (mis. `C:\laragon\www\uetype`).
 
 ### 2. Buat file environment
 Salin `.env.example` menjadi `.env`:
@@ -159,7 +161,7 @@ APP_URL=http://localhost:8000
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=webprogramming
+DB_DATABASE=uetype
 DB_USERNAME=root
 DB_PASSWORD=
 
@@ -175,10 +177,10 @@ REVERB_SCHEME=http
 > Nilai `VITE_REVERB_*` di bawahnya sudah mewarisi otomatis dari `REVERB_*`.
 
 ### 4. Buat database
-Buat database MySQL kosong bernama **`webprogramming`** (sesuai `DB_DATABASE` di atas),
+Buat database MySQL kosong bernama **`uetype`** (sesuai `DB_DATABASE` di atas),
 mis. via phpMyAdmin/HeidiSQL/CLI:
 ```sql
-CREATE DATABASE webprogramming CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE uetype CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
 ### 5. Install dependency (jika belum)
@@ -196,8 +198,11 @@ php artisan key:generate
 ```bash
 php artisan migrate --seed
 ```
-Ini membuat semua tabel (termasuk tabel monitoring) **dalam urutan yang benar** dan
-mengisi data awal: bahasa, teks, user dummy, riwayat multiplayer dummy.
+Ini membuat semua tabel (termasuk tabel monitoring) dan menjalankan seeder. Teks latihan
+tidak disimpan di database; teks dirakit dari wordlist JSON. Seeder default mengisi roster demo
+leaderboard, sedangkan data multiplayer/clan tambahan dan akun `/dev-login` hanya dibuat pada
+environment `local`. Jangan menambahkan `--seed` ke deployment production rutin kecuali memang
+ingin memperbarui data demo; `deploy.sh` sengaja hanya menjalankan `php artisan migrate --force`.
 
 ### 8. Build aset frontend
 ```bash
@@ -235,6 +240,13 @@ npm run dev
 
 > Alternatif praktis: `composer run dev` menjalankan server + queue + log + Vite
 > sekaligus dalam satu perintah (tapi Reverb tetap dijalankan terpisah).
+
+Resolver anti-cheat berjalan langsung setelah hasil disimpan. Untuk menjalankan safety net
+terjadwal selama pengembangan, gunakan terminal tambahan:
+
+```bash
+php artisan schedule:work
+```
 
 ---
 
@@ -304,8 +316,50 @@ vendor/bin/pint                                    # perapi gaya kode
 npm test                                           # test unit JS (Vitest)
 ```
 
-> Catatan: beberapa test yang menyiarkan event butuh Reverb — kalau Reverb tak jalan,
-> test broadcasting bisa gagal karena tak bisa konek ke port 8080 (bukan bug aplikasi).
+Test PHP memakai `BROADCAST_CONNECTION=null`, sehingga Reverb tidak perlu dijalankan saat test.
+
+---
+
+## Deployment Production
+
+`npm run build` hanya membangun aset frontend. Perubahan backend dapat membawa dependency
+Composer baru, migrasi database, route/config baru, atau proses persisten yang perlu dimuat ulang.
+Karena itu deployment production harus menjalankan seluruh rangkaian deployment, bukan hanya build.
+
+File `deploy.sh` di root proyek menjalankan maintenance mode, `git pull --ff-only`, instalasi
+dependency, migrasi, build frontend, dan pembuatan ulang cache Laravel:
+
+```bash
+chmod +x deploy.sh       # sekali saja setelah file tersedia di server
+./deploy.sh
+```
+
+Script dijalankan dari checkout production oleh user sistem yang memiliki akses tulis ke `storage/`
+dan `bootstrap/cache/`. `git pull --ff-only` akan berhenti jika checkout server tidak dapat
+di-*fast-forward*, sehingga perubahan lokal di server harus diamankan terlebih dahulu.
+
+### Scheduler
+
+Tambahkan satu cron Laravel pada server. Scheduler menjalankan `typing:reconcile` setiap jam sebagai
+safety net untuk hasil anti-cheat yang belum sempat diselesaikan secara sinkron:
+
+```cron
+* * * * * cd /path/ke/uetype && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Cron dipasang **sekali**, bukan setiap deployment. Verifikasi jadwal dengan:
+
+```bash
+php artisan schedule:list
+```
+
+### Proses persisten
+
+`deploy.sh` tidak mengetahui process manager server. Setelah deployment, restart proses Reverb dan
+queue worker bila production menjalankannya melalui Supervisor, systemd, atau process manager lain.
+Gunakan konfigurasi service server masing-masing; jangan menjalankan dua instance Reverb pada port
+yang sama. `php artisan queue:restart` hanya diperlukan bila queue production memakai worker
+persisten—`.env.example` sendiri memakai queue `sync`.
 
 ---
 
@@ -325,7 +379,7 @@ database/
 resources/
   views/livewire/  Blade untuk komponen Livewire
   js/, css/        Aset frontend (echo.js untuk Reverb)
-routes/            web.php, auth.php, channels.php, user-monitoring.php
+routes/            web.php, channels.php, console.php, user-monitoring.php
 tests/             Test Pest (Feature & Unit)
 docs/              Dokumentasi teknis (PROJECT_OVERVIEW.md, features/)
 ```
@@ -336,7 +390,7 @@ docs/              Dokumentasi teknis (PROJECT_OVERVIEW.md, features/)
 
 **`Table 'users' doesn't exist` / migrasi berhenti di tengah**
 Jalankan ulang dari awal: `php artisan migrate:fresh --seed`. Pastikan database
-`webprogramming` sudah dibuat dan `DB_*` di `.env` benar.
+`uetype` sudah dibuat dan `DB_*` di `.env` benar.
 
 **Chat/multiplayer tidak real-time / countdown tak muncul di perangkat lain**
 1. Pastikan `php artisan reverb:start` berjalan.
@@ -353,6 +407,6 @@ Isi kredensial Google OAuth di `.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET
 
 ---
 
-*Untuk detail arsitektur, skema database lengkap, dan penjelasan tiap fitur beserta
+*Untuk gambaran arsitektur, skema database utama, dan penjelasan tiap fitur beserta
 alasan desainnya, lihat [`docs/PROJECT_OVERVIEW.md`](docs/PROJECT_OVERVIEW.md) dan
 [`docs/features/`](docs/features/README.md).*

@@ -58,15 +58,17 @@ Sesi ditolak (`valid = false`) kalau memenuhi salah satu:
 ### 4.1 Server menghitung ulang, tidak percaya WPM dari client
 
 **Justifikasi:** angka WPM yang dikirim browser bisa dipalsukan dengan mudah (edit payload).
-Yang **sulit** dipalsukan tanpa benar-benar mengetik adalah **jumlah karakter benar dan durasi**.
-Dengan hanya menerima dua fakta itu lalu menghitung sendiri, celah "kirim WPM=999" tertutup.
+Server menerima jumlah karakter benar dan durasi untuk menghitung ulang WPM, tetapi kedua klaim
+mentah itu juga tidak otomatis tepercaya; guard sesi dan bukti timing membatasi manipulasi yang
+tidak dapat dicegah oleh perhitungan ulang saja. Celah sederhana "kirim WPM=999" tertutup, sementara
+payload mentah ditangani oleh lapisan §7.
 
 ### 4.2 Batas WPM manusiawi 300, bukan angka lebih ketat
 
 **Justifikasi:** rekor dunia berada di kisaran 210–230 WPM. Ambang 300 memberi *headroom* agar
 pengetik sangat cepat yang sah tidak salah-tolak (*false positive*), sambil tetap menangkap nilai
-yang jelas mustahil. Ini pilihan konservatif: **lebih baik longgar tapi tak pernah menghukum
-pemain jujur**.
+yang jelas mustahil. Ini pilihan konservatif untuk mengurangi kemungkinan false positive pada
+pemain jujur; ceiling ini bukan satu-satunya lapisan deteksi.
 
 ### 4.3 Throughput minimum (0.5 cps) khusus penting untuk Survival
 
@@ -514,8 +516,11 @@ dulu kembali sebagai rekor meski `SurvivalPlausibility` menahannya. Dikunci
 `RecordExcludesFlaggedTest`.
 
 Untuk Time/Words, minimal tiga sesi pada bucket user + mode + config + bahasa yang sama harus
-membawa fingerprint server unik, timing bersih dengan coverage memadai, total volume minimal,
-konsistensi di bawah invariant mekanis, dan WPM dalam rentang 12% atau 12 WPM dari median cluster.
+membawa fingerprint server unik, timing bersih dengan coverage memadai, konsistensi di bawah
+invariant mekanis, dan WPM dalam rentang 12% atau 12 WPM dari median cluster. Gabungan cluster
+juga harus mencapai **minimal 60 detik atau 1.200 karakter benar**. Karena syarat volume ini,
+tiga sesi `words/10` yang sangat cepat biasanya belum cukup untuk auto-clear walaupun WPM-nya
+konsisten; pemain perlu menambah sesi pada bucket yang sama sampai salah satu ambang tercapai.
 Cluster dibatasi 14 hari. Jika lolos, resolver mempromosikan seluruh hasil pending yang didukung
 secara atomik, menghitung ulang `highest_wpm`, dan melepas poin Clan War yang masih ongoing.
 
@@ -631,8 +636,8 @@ Empat temuan (F-01…F-04) dari pentest pihak ketiga. Ringkasan status & apa yan
 | ID | Temuan | Status |
 |---|---|---|
 | F-01 | Dashboard monitoring tanpa autentikasi | **Ditutup** — §3.6 + Gate `access-monitoring` |
-| F-02 | Manipulasi skor/WPM/leaderboard | **Ditutup** — §7, diperketat di §10.1, dilapisi §7.7–§7.8 & gerbang §11 |
-| F-03 | Manipulasi poin Clan War | **Ditutup** — §9 + batas klaim per anggota |
+| F-02 | Manipulasi skor/WPM/leaderboard | **Dimitigasi berlapis** — §7, §10.1, §7.7–§7.8, dan gerbang §11; bukti client tetap memiliki residual risk |
+| F-03 | Manipulasi poin Clan War | **Dimitigasi berlapis** — §9 + batas klaim per anggota; tetap bergantung validasi bukti client |
 | F-04 | Paket monitoring insecure-by-default | **Ditutup** — §3.6 + audit dependensi di CI |
 
 ### 10.1 PoC pentester lolos separuh — apa yang kurang
@@ -649,12 +654,13 @@ ulang **menyapu berbagai nilai**, ternyata masih ada yang lolos:
 Ini **bukan** temuan sepele. `WPM_SCALE = 150`, jadi **160 WPM saja sudah memberi poin Clan
 War penuh** — F-03 belum benar-benar tertutup meski F-02 tampak beres. Dua perbaikan:
 
-1. **`MAX_HUMAN_WPM` 300 → 240.** Batas 300 hanya menyaring yang mustahil dan menyisakan
-   pita lebar "tak masuk akal tapi diterima". Rekor dunia berkelanjutan ~210–230.
+1. **Ceiling race 240 WPM.** `MAX_HUMAN_WPM` umum tetap 300, sedangkan jalur race memakai
+   `MAX_RACE_WPM = 240` agar payload progres instan ditahan lebih awal.
 2. **Slack proporsional** (lihat catatan kalibrasi di atas) — inilah yang benar-benar
    mengikat; menurunkan ceiling saja tak cukup.
 
-Setelah keduanya: **tak ada nilai yang bisa dipalsukan**, dan kiriman instan mentok ~83 WPM.
+Setelah keduanya, kiriman instan dibatasi jauh lebih ketat dan pada model ancaman yang diuji
+mentok sekitar 83 WPM. Ini mitigasi, bukan bukti bahwa seluruh payload client mustahil dipalsukan.
 
 ### 10.2 Rate limit pengiriman hasil
 
@@ -752,8 +758,9 @@ Hasil hanya muncul di leaderboard bila pemiliknya sudah mengumpulkan
 `HAVING SUM(duration_seconds) >= ambang`, jadi **papan dan rank selalu setuju** — tanpa migrasi
 (`duration_seconds` sudah ada di tiap hasil), tanpa perubahan klien.
 
-Keunggulannya unik: gerbang ini **tidak bisa di-*pace*** (tak ada angka untuk dibidik dari bawah),
-**tidak bisa dipalsukan dengan timing lebih baik**, dan **tak bergantung data historis** lain.
+Gerbang ini tidak mempunyai ambang WPM yang bisa sekadar dibidik dari bawah dan tidak bergantung
+baseline performa historis. Namun durasinya tetap berasal dari hasil yang melewati guard sesi;
+karena itu gerbang 30 menit adalah lapisan biaya akun, bukan bukti kriptografis bahwa input manusia.
 
 ### 11.3 Keputusan desain
 

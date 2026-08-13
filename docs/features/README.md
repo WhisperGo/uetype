@@ -20,10 +20,11 @@ UeType adalah **game latihan mengetik** (sejenis Monkeytype/TypeRacer) berbasis:
 
 Sebelum membaca per fitur, tiga prinsip ini muncul terus dan menjelaskan banyak keputusan:
 
-1. **Server adalah satu-satunya sumber kebenaran (trust boundary).**
-   Angka penting (WPM, akurasi, poin, WPM lawan ghost) **tidak pernah** diterima dari client.
-   Client hanya mengirim data mentah (jumlah karakter, durasi, identifier), server yang
-   menghitung ulang & memvalidasi. Kenapa: mencegah *cheat* dengan memalsukan payload browser.
+1. **Server mengambil keputusan akhir pada trust boundary.**
+   Angka akhir tidak diterima begitu saja dari client. Client tetap mengirim bukti mentah seperti
+   jumlah karakter, durasi, progres, dan identifier; server menghitung ulang nilai yang dapat
+   diturunkan lalu memeriksa bukti tersebut dengan guard sesuai mode. Karena bukti mentah bukan
+   bukti kriptografis, aturan anti-cheat tetap memakai mitigasi berlapis.
 
 2. **State diturunkan (derived), bukan disimpan ganda.**
    Level diturunkan dari `total_xp`, status online dari `last_seen_at`, keanggotaan clan dari
@@ -54,7 +55,8 @@ Sebelum membaca per fitur, tiga prinsip ini muncul terus dan menjelaskan banyak 
 | 13 | Monitoring Aktivitas Pengguna | [monitoring.md](monitoring.md) |
 
 Dokumen lain yang relevan:
-- [`../PROJECT_OVERVIEW.md`](../PROJECT_OVERVIEW.md) — peta menyeluruh proyek: tech
-  stack, arsitektur, skema database lengkap, seluruh route, testing, tooling.
+- [`../PROJECT_OVERVIEW.md`](../PROJECT_OVERVIEW.md) — peta tingkat tinggi proyek: tech
+  stack, arsitektur, skema database, route utama, testing, dan tooling.
 - [`../design-system.md`](../design-system.md) — token warna, tipografi, komponen UI.
-- [`../wpm-accuracy-integrity.md`](../wpm-accuracy-integrity.md) — analisis integritas WPM vs akurasi.
+- [`anti-cheat-wpm.md`](anti-cheat-wpm.md) — aturan integritas WPM/akurasi, race, dan
+  probation otomatis.
