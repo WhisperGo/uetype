@@ -269,7 +269,7 @@ selamat melewati unload; `FriendController` melayani nav yang berupa partial sta
 
 ## 8. Services & Events
 
-### Services (`app/Services/`, 16 file)
+### Services (`app/Services/`)
 | Service | Peran |
 |---|---|
 | `AntiCheatService` | Hitung ulang & validasi WPM/akurasi server-side — trust boundary utama |
@@ -278,6 +278,10 @@ selamat melewati unload; `FriendController` melayani nav yang berupa partial sta
 | `KeystrokeAnalyzer` | Analisis distribusi timing antar-keystroke (deteksi bot) — §7.7b |
 | `LongitudinalBaseline` | Bandingkan hasil vs riwayat tepercaya pemain; tandai lonjakan untuk probation otomatis — §7.7c |
 | `AutomaticResultResolver` | Evaluasi cluster bukti pending dan promosikan hasil yang saling mendukung ke `clear` tanpa keputusan admin |
+| `TypingSpeedVerificationService` | Terbitkan dan konsumsi challenge Time 30 dengan token sekali pakai, replay event, expiry, serta lifecycle attempt |
+| `TypingVerificationReplay` | Rekonstruksi teks dan metrik challenge dari urutan event tombol yang dibatasi |
+| `TypingSpeedCapabilityService` | Simpan capability per user + bahasa dan gunakan ceiling terverifikasi pada hasil berikutnya |
+| `TypingResultPromoter` | Satu jalur idempoten untuk clear hasil serta sinkronisasi PB, achievement, dan poin war |
 | `RoomMembershipService` | Keanggotaan room multiplayer (keluar, sapu offline, pindah host) |
 | `AchievementService` | Evaluasi & catat unlock achievement |
 | `GhostResolver` | Turunkan lawan ghost dari identitas (type + refId), WPM selalu di-fetch ulang dari DB — satu sumber kebenaran (dipakai `GhostPicker` & `TypingEngine`) |

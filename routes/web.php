@@ -23,6 +23,7 @@ use App\Livewire\Stats;
 use App\Livewire\Terms;
 use App\Livewire\TypingEngine;
 use App\Livewire\TypingResult;
+use App\Livewire\TypingSpeedVerification;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +40,7 @@ Route::get('/result', TypingResult::class)->name('typing.result');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'me'])->name('profile.me');
+    Route::get('/typing/verify', TypingSpeedVerification::class)->name('typing.verify');
 
     // Another user's public profile (opened from the friends list / search results).
     // Referenced by username, not ID, so user IDs (and the total registered-user count)

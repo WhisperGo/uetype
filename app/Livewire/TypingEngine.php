@@ -1117,6 +1117,7 @@ class TypingEngine extends Component
                     (string) $this->subMode,
                     $this->contentLang,
                     $finalNetWpm,
+                    $timing,
                 );
             $reviewReason = $reviewDecision?->reason;
             $reviewStatus = $reviewReason === null

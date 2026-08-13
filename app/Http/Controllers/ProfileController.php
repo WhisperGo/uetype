@@ -80,6 +80,12 @@ class ProfileController extends Controller
             'pending_results' => $public
                 ? 0
                 : TypingResult::where('user_id', $user->id)->pendingVerification()->count(),
+            'has_speed_verification' => ! $public && TypingResult::query()
+                ->where('user_id', $user->id)
+                ->whereIn('mode', ['time', 'words'])
+                ->pendingVerification()
+                ->whereIn('review_reason', ['no_history_high', 'longitudinal_spike'])
+                ->exists(),
         ];
 
         // Level is derived from total_xp via a single source of truth (User::levelData()).

@@ -22,7 +22,8 @@ return [
     'integrity' => [
         'clear' => 'Result accepted and eligible for records and the leaderboard.',
         'pending_title' => 'Result is being verified automatically',
-        'pending_body' => 'The result is saved, but is not used for records, Ghost, or the leaderboard yet. The backend will re-check it using later results without admin approval.',
+        'pending_body' => 'The result is saved, but is not used for records, Ghost, or the leaderboard yet. Complete a 30-second speed check to verify this pace now.',
+        'verify_speed' => 'Verify speed · 30 seconds',
         'auto_cleared' => ':count previously verified results were accepted automatically.',
     ],
 
@@ -64,7 +65,7 @@ return [
         'not_counted_title' => 'Not counted toward the war',
         'not_counted_body' => 'This slot was already submitted, or the war ended before you finished. Your typing result is still saved.',
         'verification_pending_title' => 'War points are being verified',
-        'verification_pending_body' => 'The slot is saved, but its points remain 0 until the backend accepts the result automatically.',
+        'verification_pending_body' => 'The slot is saved, but its points remain 0 while the result is being verified.',
     ],
 
     'error_heatmap' => 'error heatmap',

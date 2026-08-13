@@ -32,8 +32,20 @@ class LongitudinalBaseline
         string $modeConfig,
         string $language,
         float $netWpm,
+        ?array $timing = null,
     ): LongitudinalDecision {
         $language = TypingLanguage::resolve($language);
+
+        if (app(TypingSpeedCapabilityService::class)->supports(
+            $userId,
+            $language,
+            $netWpm,
+            $timing,
+        )) {
+            return new LongitudinalDecision(null, 'verified_capability', [
+                'source_scope' => 'verified_capability',
+            ]);
+        }
 
         $exact = $this->trustedQuery($userId, $mode, $language)
             ->where('mode_config', $modeConfig)

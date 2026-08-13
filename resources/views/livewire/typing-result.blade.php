@@ -79,6 +79,15 @@
                     <span>{{ __('result.integrity.pending_title') }}</span>
                 </p>
                 <p class="mt-2 text-x-small text-gold/80">{{ __('result.integrity.pending_body') }}</p>
+                @auth
+                    @if(in_array($mode, ['time', 'words'], true)
+                        && in_array($resultReason, ['no_history_high', 'longitudinal_spike'], true))
+                        <a href="{{ route('typing.verify') }}"
+                            class="mt-3 inline-flex min-h-11 items-center rounded-lg bg-gold px-4 py-2 text-x-small font-bold text-background transition hover:bg-gold/90">
+                            {{ __('result.integrity.verify_speed') }}
+                        </a>
+                    @endif
+                @endauth
             </div>
         @elseif (! $afk && $resultStatus === 'clear')
             <div role="status" class="mb-6 flex items-center gap-2 rounded-lg border border-brand/30 bg-brand/10 px-4 py-3 text-x-small font-mono text-brand-bright">

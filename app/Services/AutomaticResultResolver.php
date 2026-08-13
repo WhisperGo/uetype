@@ -2,10 +2,8 @@
 
 namespace App\Services;
 
-use App\Enums\ClanWarStatus;
 use App\Models\ClanWarModeClaim;
 use App\Models\TypingResult;
-use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -86,22 +84,12 @@ class AutomaticResultResolver
                 ->map(fn ($id) => (int) $id)
                 ->all();
 
-            TypingResult::query()
-                ->whereIn('id', $ids)
-                ->where('review_status', TypingResult::REVIEW_PENDING)
-                ->update([
-                    'review_status' => TypingResult::REVIEW_CLEAR,
-                    'review_reason' => null,
-                    'review_resolved_at' => now(),
-                ]);
-
-            $this->refreshPersonalBest((int) $result->user_id);
-            $this->releaseWarPoints($ids);
+            $promotedIds = app(TypingResultPromoter::class)->promote($ids);
 
             return [
-                'promoted_count' => count($ids),
-                'current_cleared' => in_array((int) $result->id, $ids, true),
-                'promoted_ids' => $ids,
+                'promoted_count' => count($promotedIds),
+                'current_cleared' => in_array((int) $result->id, $promotedIds, true),
+                'promoted_ids' => $promotedIds,
             ];
         }, 3);
     }
@@ -232,43 +220,6 @@ class AutomaticResultResolver
 
         return ($meta['server_session_confirmed'] ?? false) === true
             && (($meta['consistency'] ?? null) === null || (int) $meta['consistency'] < 99);
-    }
-
-    private function refreshPersonalBest(int $userId): void
-    {
-        $highest = (float) TypingResult::query()
-            ->where('user_id', $userId)
-            ->whereIn('mode', ['time', 'words'])
-            ->trustworthy()
-            ->max('net_wpm');
-
-        User::where('id', $userId)->update(['highest_wpm' => $highest]);
-    }
-
-    /** @param list<int> $resultIds */
-    private function releaseWarPoints(array $resultIds): void
-    {
-        ClanWarModeClaim::query()
-            ->with(['typingResult', 'war'])
-            ->whereIn('typing_result_id', $resultIds)
-            ->get()
-            ->each(function (ClanWarModeClaim $claim) {
-                if (! $claim->typingResult?->isTrustworthy()
-                    || $claim->war?->status !== ClanWarStatus::Ongoing) {
-                    return;
-                }
-
-                $duration = app(ClanWarAttempt::class)
-                    ->scoredDuration($claim, (float) $claim->typingResult->duration_seconds);
-                $points = ClanWarScorer::score(
-                    $claim->mode,
-                    $claim->mode_config,
-                    $claim->typingResult,
-                    $duration,
-                );
-
-                ClanWarModeClaim::where('id', $claim->id)->update(['points' => $points]);
-            });
     }
 
     /** @return array{promoted_count: int, current_cleared: bool, promoted_ids: list<int>} */

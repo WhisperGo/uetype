@@ -196,6 +196,16 @@ class User extends Authenticatable
         return $this->hasMany(TypingResult::class);
     }
 
+    public function typingSpeedCapabilities(): HasMany
+    {
+        return $this->hasMany(TypingSpeedCapability::class);
+    }
+
+    public function typingVerificationAttempts(): HasMany
+    {
+        return $this->hasMany(TypingVerificationAttempt::class);
+    }
+
     /** Friend requests this user sent (as requester). */
     public function sentFriendRequests(): HasMany
     {

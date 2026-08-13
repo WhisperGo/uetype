@@ -22,7 +22,8 @@ return [
     'integrity' => [
         'clear' => 'Hasil diterima dan dapat dihitung untuk rekor serta leaderboard.',
         'pending_title' => 'Hasil sedang diverifikasi otomatis',
-        'pending_body' => 'Hasil tetap tersimpan, tetapi belum digunakan untuk rekor, Ghost, atau leaderboard. Backend akan memeriksanya kembali dari hasil berikutnya tanpa persetujuan admin.',
+        'pending_body' => 'Hasil tetap tersimpan, tetapi belum digunakan untuk rekor, Ghost, atau leaderboard. Selesaikan cek kecepatan 30 detik untuk memverifikasi pace ini sekarang.',
+        'verify_speed' => 'Verifikasi kecepatan · 30 detik',
         'auto_cleared' => ':count hasil yang sebelumnya diverifikasi kini diterima otomatis.',
     ],
 
@@ -64,7 +65,7 @@ return [
         'not_counted_title' => 'Tak dihitung untuk war',
         'not_counted_body' => 'Slot ini sudah disubmit, atau war berakhir sebelum kamu selesai. Hasil ketikmu tetap tersimpan.',
         'verification_pending_title' => 'Poin war sedang diverifikasi',
-        'verification_pending_body' => 'Slot sudah tersimpan, tetapi poin tetap 0 sampai backend menerima hasil secara otomatis.',
+        'verification_pending_body' => 'Slot sudah tersimpan, tetapi poin tetap 0 selama hasil sedang diverifikasi.',
     ],
 
     'error_heatmap' => 'heatmap kesalahan',

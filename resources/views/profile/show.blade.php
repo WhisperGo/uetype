@@ -107,6 +107,12 @@
                     <p class="mt-1 text-xs text-gold/80">
                         {{ __('profile.integrity_pending_body', ['count' => $stats['pending_results']]) }}
                     </p>
+                    @if($stats['has_speed_verification'] ?? false)
+                        <a href="{{ route('typing.verify') }}"
+                            class="mt-3 inline-flex min-h-11 items-center rounded-xl bg-gold px-4 py-2 text-xs font-bold text-background transition hover:bg-gold/90">
+                            {{ __('profile.verify_speed') }}
+                        </a>
+                    @endif
                 </div>
             @endif
 

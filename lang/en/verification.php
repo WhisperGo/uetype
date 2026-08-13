@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'eyebrow' => 'Speed verification',
+    'title' => 'Verify your typing pace',
+    'intro' => 'Type the provided text for 30 seconds. A clean result close to your saved pace can release eligible results immediately.',
+    'seconds' => 'seconds',
+    'rule_time' => 'The timer stops automatically after 30 seconds.',
+    'rule_locked' => 'Paste, drop, and automated input are not accepted.',
+    'rule_no_rewards' => 'This check verifies your pace; it is not a scored typing test.',
+    'start' => 'Start verification',
+    'input_label' => 'Typing verification input',
+    'typing_hint' => 'Keep typing until the timer reaches zero.',
+    'checking' => 'Checking the complete typing pattern…',
+    'expired_title' => 'This verification expired',
+    'expired_body' => 'Start a new check and complete it without leaving the page.',
+    'failed_title' => 'This pace could not be verified yet',
+    'failed_body' => 'Try again with your natural rhythm and type until the timer ends.',
+    'retry_after' => 'You can try again in :seconds seconds.',
+    'try_again' => 'Try again',
+    'success_title' => 'Typing pace verified',
+    'success_body' => 'Your verified pace is :wpm WPM. :count eligible saved result(s) were released.',
+    'view_profile' => 'View profile',
+    'later' => 'Back to typing',
+];

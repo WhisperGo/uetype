@@ -5,6 +5,8 @@
 **Analisis timing keystroke:** [`App\Services\KeystrokeAnalyzer`](../../app/Services/KeystrokeAnalyzer.php)
 **Baseline per-pemain:** [`App\Services\LongitudinalBaseline`](../../app/Services/LongitudinalBaseline.php)
 **Resolver probation otomatis:** [`App\Services\AutomaticResultResolver`](../../app/Services/AutomaticResultResolver.php)
+**Verifikasi kecepatan 30 detik:** [`App\Services\TypingSpeedVerificationService`](../../app/Services/TypingSpeedVerificationService.php)
+**Capability kecepatan:** [`App\Services\TypingSpeedCapabilityService`](../../app/Services/TypingSpeedCapabilityService.php)
 **Antrean review legacy:** [`App\Livewire\ReviewQueue`](../../app/Livewire/ReviewQueue.php) (`/review-queue`)
 **Dipakai oleh:** [`TypingEngine::saveResult()`](../../app/Livewire/TypingEngine.php) (solo),
 [`MultiplayerLobby::updateRaceProgress()`](../../app/Livewire/MultiplayerLobby.php) (WPM live race),
@@ -527,6 +529,14 @@ secara atomik, menghitung ulang `highest_wpm`, dan melepas poin Clan War yang ma
 Resolver dipanggil sesudah setiap hasil dan oleh command `typing:reconcile` per jam sebagai safety
 net. Satu baris tanpa evidence atau satu outlier tidak memblokir cluster bersih berikutnya, tetapi
 baris tersebut juga tidak menjadi suara pembentuk cluster.
+
+Pemain juga dapat memilih challenge Time 30 detik dari halaman hasil atau profil sendiri. Server
+menerbitkan teks dan token sekali pakai, lalu me-replay stream tombol lengkap untuk menghitung WPM,
+akurasi, dan bentuk timing. Challenge yang lolos membentuk capability per user + bahasa. Capability
+berlaku untuk hasil Time/Words bertiming bersih sampai `verified_wpm + max(15 WPM, 15%)`, termasuk
+lintas konfigurasi pada bahasa yang sama. Challenge itu sendiri bukan `TypingResult`: tidak memberi
+XP, PB, achievement, entri leaderboard, atau poin war. Kegagalan hanya menghabiskan attempt; hasil
+asal tetap `pending` dan capability lama tidak diturunkan.
 
 `/review-queue` dipertahankan hanya untuk kompatibilitas/audit legacy pada iterasi ini. Workflow
 normal tidak menunggu klik Approve/Reject dan fungsi admin tetap monitoring.
