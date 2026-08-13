@@ -24,6 +24,7 @@ class TypingVerificationAttempt extends Model
         'text_hash',
         'status',
         'started_at',
+        'input_started_at',
         'expires_at',
         'consumed_at',
         'result_meta',
@@ -36,6 +37,7 @@ class TypingVerificationAttempt extends Model
 
     protected $casts = [
         'started_at' => 'datetime',
+        'input_started_at' => 'datetime',
         'expires_at' => 'datetime',
         'consumed_at' => 'datetime',
         'result_meta' => 'array',

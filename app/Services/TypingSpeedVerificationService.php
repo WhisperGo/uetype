@@ -111,7 +111,11 @@ class TypingSpeedVerificationService
                 return $this->failure($attempt, 'attempt_expired', TypingVerificationAttempt::STATUS_EXPIRED);
             }
 
-            $elapsed = $attempt->started_at->diffInMilliseconds(now()) / 1000;
+            if ($attempt->input_started_at === null) {
+                return $this->failure($attempt, 'input_not_started');
+            }
+
+            $elapsed = $attempt->input_started_at->diffInMilliseconds(now()) / 1000;
 
             if ($elapsed < self::MIN_SERVER_ELAPSED_SECONDS || $elapsed > self::MAX_SERVER_ELAPSED_SECONDS) {
                 return $this->failure($attempt, 'elapsed_invalid', meta: ['elapsed_seconds' => $elapsed]);
@@ -218,6 +222,34 @@ class TypingSpeedVerificationService
                 'wpm' => $replay['net_wpm'],
                 'ceiling' => $result['ceiling'],
             ];
+        }, 3);
+    }
+
+    /** Start the authoritative 30-second window on the first real input, exactly once. */
+    public function begin(User $user, int $attemptId, string $token): bool
+    {
+        return DB::transaction(function () use ($user, $attemptId, $token) {
+            User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+
+            $attempt = TypingVerificationAttempt::query()
+                ->whereKey($attemptId)
+                ->where('user_id', $user->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $attempt
+                || $attempt->status !== TypingVerificationAttempt::STATUS_ACTIVE
+                || $attempt->consumed_at !== null
+                || $attempt->expires_at->isPast()
+                || ! hash_equals($attempt->token_hash, hash('sha256', $token))) {
+                return false;
+            }
+
+            if ($attempt->input_started_at === null) {
+                $attempt->update(['input_started_at' => now()]);
+            }
+
+            return true;
         }, 3);
     }
 

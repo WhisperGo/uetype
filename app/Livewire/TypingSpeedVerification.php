@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Renderless;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -44,24 +45,18 @@ class TypingSpeedVerification extends Component
     public function startChallenge(TypingSpeedVerificationService $verification): bool
     {
         $userId = (int) Auth::id();
-        $cooldownKey = "typing-verification-cooldown:{$userId}";
         $rateKey = "typing-verification-start:{$userId}";
 
-        if (RateLimiter::tooManyAttempts($cooldownKey, 1)) {
-            $this->retryAfter = RateLimiter::availableIn($cooldownKey);
-            $this->state = 'cooldown';
-
-            return false;
-        }
-
-        if (RateLimiter::tooManyAttempts($rateKey, 3)) {
+        // Normal retries are immediate. This generous ceiling only stops automated request
+        // flooding and can never produce the previous hour-long wait after three attempts.
+        if (RateLimiter::tooManyAttempts($rateKey, 30)) {
             $this->retryAfter = RateLimiter::availableIn($rateKey);
             $this->state = 'rate_limited';
 
             return false;
         }
 
-        RateLimiter::hit($rateKey, 3600);
+        RateLimiter::hit($rateKey, 60);
         $issued = $verification->issue(Auth::user());
 
         $this->attemptId = $issued['attempt']->id;
@@ -72,6 +67,16 @@ class TypingSpeedVerification extends Component
         $this->retryAfter = 0;
 
         return true;
+    }
+
+    #[Renderless]
+    public function beginChallenge(string $token, TypingSpeedVerificationService $verification): bool
+    {
+        if ($this->attemptId === null || ! hash_equals($this->challengeToken, $token)) {
+            return false;
+        }
+
+        return $verification->begin(Auth::user(), $this->attemptId, $token);
     }
 
     /** @param array<int, mixed> $events */
@@ -94,7 +99,6 @@ class TypingSpeedVerification extends Component
             $this->verifiedWpm = $result['wpm'];
         } else {
             $this->state = $result['reason'] === 'attempt_expired' ? 'expired' : 'failed';
-            RateLimiter::hit('typing-verification-cooldown:'.Auth::id(), 30);
         }
 
         // The browser only needs a neutral outcome. Detailed reason codes stay in the

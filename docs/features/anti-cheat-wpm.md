@@ -538,6 +538,10 @@ lintas konfigurasi pada bahasa yang sama. Challenge itu sendiri bukan `TypingRes
 XP, PB, achievement, entri leaderboard, atau poin war. Kegagalan hanya menghabiskan attempt; hasil
 asal tetap `pending` dan capability lama tidak diturunkan.
 
+Timer challenge mulai pada ketikan pertama, bukan saat request penerbitan selesai, sehingga waktu
+render dan pemulihan fokus tidak memotong jatah 30 detik. Retry gagal tidak memakai cooldown;
+pembatas 30 start/menit hanya menjadi backstop terhadap request flood.
+
 `/review-queue` dipertahankan hanya untuk kompatibilitas/audit legacy pada iterasi ini. Workflow
 normal tidak menunggu klik Approve/Reject dan fungsi admin tetap monitoring.
 

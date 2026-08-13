@@ -28,17 +28,20 @@
                 </button>
             @endif
 
+            {{-- Always present so the Start click can focus it before awaiting Livewire. --}}
+            <textarea wire:key="speed-verification-input" x-ref="input"
+                aria-label="{{ __('verification.input_label') }}"
+                class="fixed h-px w-px opacity-0"
+                autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false"
+                inputmode="text"
+                x-on:beforeinput="beforeInput($event)"
+                x-on:paste="preventTransfer($event)"
+                x-on:drop="preventTransfer($event)"></textarea>
+
             <div x-show="active || submitting" x-cloak class="mt-8">
-                <textarea x-ref="input" aria-label="{{ __('verification.input_label') }}"
-                    class="fixed h-px w-px opacity-0"
-                    autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false"
-                    inputmode="text"
-                    x-on:beforeinput="beforeInput($event)"
-                    x-on:paste="preventTransfer($event)"
-                    x-on:drop="preventTransfer($event)"></textarea>
 
                 <button type="button" class="w-full rounded-2xl border border-white/5 bg-background/50 p-5 text-left leading-8"
-                    x-on:click="$refs.input.focus({ preventScroll: true })">
+                    x-on:click="focusInput()">
                     <template x-for="(character, index) in [...text]" :key="index">
                         <span :class="classFor(index, character)" x-text="character"></span>
                     </template>
@@ -47,11 +50,11 @@
                 <p class="mt-3 text-xs text-gold" x-show="submitting">{{ __('verification.checking') }}</p>
             </div>
 
-            @if (in_array($state, ['failed', 'expired', 'cooldown', 'rate_limited'], true))
+            @if (in_array($state, ['failed', 'expired', 'rate_limited'], true))
                 <div role="alert" class="mt-8 rounded-2xl border border-gold/40 bg-gold/10 p-5 text-gold">
                     <p class="font-bold">{{ $state === 'expired' ? __('verification.expired_title') : __('verification.failed_title') }}</p>
                     <p class="mt-2 text-sm text-gold/80">
-                        {{ in_array($state, ['cooldown', 'rate_limited'], true)
+                        {{ $state === 'rate_limited'
                             ? __('verification.retry_after', ['seconds' => $retryAfter])
                             : ($state === 'expired' ? __('verification.expired_body') : __('verification.failed_body')) }}
                     </p>

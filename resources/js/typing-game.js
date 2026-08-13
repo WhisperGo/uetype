@@ -983,8 +983,14 @@ export default function typingGame(initialText, warAttempt = null) {
         },
 
         /** One synthesised keystroke, shaped exactly as handleInput() reads it. */
-        feedKey(key) {
-            this.handleInput({ key, ctrlKey: false, metaKey: false, preventDefault() {} });
+        feedKey(key, modifiers = {}) {
+            this.handleInput({
+                key,
+                ctrlKey: modifiers.ctrlKey === true,
+                altKey: modifiers.altKey === true,
+                metaKey: modifiers.metaKey === true,
+                preventDefault() {},
+            });
         },
 
         /** Replay inserted text character by character. Swipe typing and autocorrect deliver
@@ -1005,7 +1011,7 @@ export default function typingGame(initialText, warAttempt = null) {
             if (e.key !== 'Backspace') return;
 
             this._softDeleteHandled = true;
-            this.feedKey('Backspace');
+            this.feedKey('Backspace', e);
         },
 
         onTypingBeforeInput(e) {
@@ -1023,7 +1029,11 @@ export default function typingGame(initialText, warAttempt = null) {
                     return;
                 }
 
-                this.feedKey('Backspace');
+                this.feedKey('Backspace', {
+                    // Browsers expose the platform-native word deletion semantically via
+                    // beforeinput even when keydown is unavailable (notably soft keyboards).
+                    altKey: e.inputType === 'deleteWordBackward',
+                });
 
                 return;
             }
@@ -1090,7 +1100,9 @@ export default function typingGame(initialText, warAttempt = null) {
             let bounds = this.wordBounds[this.currentWordIndex];
 
             if (e.key === 'Backspace') {
-                if (e.ctrlKey || e.metaKey) {
+                // Windows/Linux use Ctrl+Backspace; macOS uses Option+Backspace (`altKey`).
+                // Keep Meta for existing users who already rely on the previous shortcut.
+                if (e.ctrlKey || e.altKey || e.metaKey) {
                     const startWord = this.currentWordIndex;
                     let guard = 0;
                     while (this.currentIndex > 0 && guard++ < 500) {

@@ -46,6 +46,20 @@ class TypingVerificationReplay
                 continue;
             }
 
+            if ($key === 'BackspaceWord') {
+                while ($typed !== [] && end($typed) === ' ') {
+                    array_pop($typed);
+                }
+
+                while ($typed !== [] && end($typed) !== ' ') {
+                    array_pop($typed);
+                }
+
+                $timestamps[] = $at;
+
+                continue;
+            }
+
             if ($key === 'Enter') {
                 $key = ' ';
             }

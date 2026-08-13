@@ -68,6 +68,7 @@ it('verifies a 30-second pace and promotes supported pending results in the same
     $issued = $verification->issue($user);
     $events = speedVerificationEvents($issued['attempt']->challenge_text);
 
+    expect($verification->begin($user, $issued['attempt']->id, $issued['token']))->toBeTrue();
     $this->travel(30)->seconds();
     $result = $verification->complete($user, $issued['attempt']->id, $issued['token'], $events);
 
@@ -97,6 +98,7 @@ it('consumes a token once and never promotes a failed uniform event stream', fun
     $verification = app(TypingSpeedVerificationService::class);
     $issued = $verification->issue($user);
 
+    $verification->begin($user, $issued['attempt']->id, $issued['token']);
     $this->travel(30)->seconds();
     $failed = $verification->complete(
         $user,
@@ -134,7 +136,13 @@ it('keeps only one active attempt and binds submission to its owner', function (
         ->and(TypingVerificationAttempt::whereBelongsTo($user)
             ->where('status', TypingVerificationAttempt::STATUS_ACTIVE)->count())->toBe(1);
 
-    $this->travel(30)->seconds();
+    expect($verification->begin($user, $second['attempt']->id, $second['token']))->toBeTrue();
+    $firstInputAt = $second['attempt']->fresh()->input_started_at;
+    $this->travel(5)->seconds();
+    expect($verification->begin($user, $second['attempt']->id, $second['token']))->toBeTrue()
+        ->and($second['attempt']->fresh()->input_started_at->equalTo($firstInputAt))->toBeTrue();
+
+    $this->travel(25)->seconds();
     $foreign = $verification->complete(
         $other,
         $second['attempt']->id,
@@ -179,6 +187,34 @@ it('replays corrections and rejects a backward timestamp or incomplete timing co
         ->and($valid['accuracy'])->toBe(98.77)
         ->and($replay->replay($target, $backward)['reason'])->toBe('event_timing_invalid')
         ->and($replay->replay($target, $sparse)['reason'])->toBe('event_coverage_invalid');
+});
+
+it('replays a platform word deletion as one physical event', function () {
+    $replay = app(TypingVerificationReplay::class);
+    $target = str_repeat('alpha beta ', 20);
+    $prefixWithMistake = 'alpha zeta';
+    $correctRemainder = mb_substr($target, 6, 74);
+    $events = [];
+    $at = 0;
+
+    foreach (mb_str_split($prefixWithMistake) as $index => $character) {
+        $at += [48, 71, 93][$index % 3];
+        $events[] = ['key' => $character, 'at_ms' => $at];
+    }
+
+    $at += 110;
+    $events[] = ['key' => 'BackspaceWord', 'at_ms' => $at];
+
+    foreach (mb_str_split($correctRemainder) as $index => $character) {
+        $at += [52, 83, 119][$index % 3];
+        $events[] = ['key' => $character, 'at_ms' => $at];
+    }
+
+    $result = $replay->replay($target, $events);
+
+    expect($result['valid'])->toBeTrue()
+        ->and($result['correct_chars'])->toBe(80)
+        ->and($result['accuracy'])->toBe(95.24);
 });
 
 it('protects the verification page and only offers it for an eligible pending result', function () {
