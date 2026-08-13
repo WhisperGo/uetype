@@ -64,6 +64,15 @@ class TypingResult extends Component
     /** True when the run was abandoned mid-session: every number still shows, nothing was saved. */
     public $afk = false;
 
+    /** clear|pending|not_recorded; always shown to the player when their result is saved. */
+    public string $resultStatus = 'clear';
+
+    /** Internal reason code, mapped to safe public copy in the lang files. */
+    public ?string $resultReason = null;
+
+    /** Number of this player's probation rows automatically cleared by the latest run. */
+    public int $autoClearedCount = 0;
+
     /**
      * War context when this result came from a Clan War attempt, null for an ordinary solo run.
      * Drives the "Back to Clan War" action in place of the solo Next Test / Retry buttons: a war
@@ -120,6 +129,9 @@ class TypingResult extends Component
         // ?? REQUIRED: old sessions (from before this deploy) don't have this key.
         $this->errorEvents = $result['errorEvents'] ?? [];
         $this->afk = $result['afk'] ?? false;
+        $this->resultStatus = $result['resultStatus'] ?? ($this->afk ? 'not_recorded' : 'clear');
+        $this->resultReason = $result['resultReason'] ?? null;
+        $this->autoClearedCount = (int) ($result['autoClearedCount'] ?? 0);
         // `?? []` on purpose: a session stored before this key existed must still render.
         $this->newAchievements = $result['newAchievements'] ?? [];
         // `?? null`: solo runs (and pre-deploy sessions) simply have no war context.

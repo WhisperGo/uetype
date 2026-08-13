@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'eyebrow' => 'Verifikasi kecepatan',
+    'title' => 'Verifikasi pace mengetikmu',
+    'intro' => 'Ketik teks yang tersedia selama 10 detik. Hasil bersih yang mendekati pace tersimpan dapat langsung meloloskan hasil Time dan Words yang memenuhi syarat.',
+    'seconds' => 'detik',
+    'rule_time' => 'Timer dimulai saat ketikan pertama dan berhenti otomatis setelah 10 detik.',
+    'rule_locked' => 'Paste, drop, dan input otomatis tidak diterima.',
+    'rule_no_rewards' => 'Cek ini memverifikasi pace; ini bukan tes mengetik yang menghasilkan skor.',
+    'start' => 'Mulai verifikasi',
+    'input_label' => 'Input verifikasi mengetik',
+    'typing_hint' => 'Mulai mengetik saat siap; timer berjalan dari ketikan pertama.',
+    'checking' => 'Memeriksa pola ketikan lengkap…',
+    'expired_title' => 'Verifikasi ini kedaluwarsa',
+    'expired_body' => 'Mulai cek baru dan selesaikan tanpa meninggalkan halaman.',
+    'failed_title' => 'Pace ini belum dapat diverifikasi',
+    'failed_body' => 'Coba lagi dengan ritme alami dan terus mengetik sampai timer selesai.',
+    'retry_after' => 'Kamu dapat mencoba lagi dalam :seconds detik.',
+    'try_again' => 'Coba lagi',
+    'success_title' => 'Pace mengetik terverifikasi',
+    'success_body' => 'Pace terverifikasimu :wpm WPM. :count hasil tersimpan yang memenuhi syarat telah diloloskan.',
+    'view_profile' => 'Lihat profil',
+    'later' => 'Kembali mengetik',
+];

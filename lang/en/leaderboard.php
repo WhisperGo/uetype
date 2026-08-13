@@ -21,6 +21,7 @@ return [
     'your_rank' => 'Your Rank:',
     'unranked' => 'Unranked',
     'eligibility_pending' => 'Type :minutes more min to rank',
+    'verification_pending' => 'Your result for this category is being verified automatically',
 
     'player' => 'Player',
     'wpm' => 'Speed (WPM)',

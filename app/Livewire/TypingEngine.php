@@ -8,6 +8,7 @@ use App\Models\ClanWarModeClaim;
 use App\Models\TypingResult;
 use App\Services\AchievementService;
 use App\Services\AntiCheatService;
+use App\Services\AutomaticResultResolver;
 use App\Services\ClanWarAttempt;
 use App\Services\ClanWarScorer;
 use App\Services\GhostResolver;
@@ -86,6 +87,7 @@ class TypingEngine extends Component
     private const REJECTION_MESSAGES = [
         'rate_limited' => 'typing.result_rate_limited',
         'session_mismatch' => 'typing.result_session_expired',
+        'survival_impossible' => 'typing.result_survival_unverified',
     ];
 
     /**
@@ -611,16 +613,23 @@ class TypingEngine extends Component
         }
 
         // Conditional update: only fill if not yet submitted (idempotent, race-safe).
+        // A probationary result reserves the one-shot slot but contributes zero until the
+        // automatic resolver clears it. Counting its full score here made Clan War trust a
+        // number the public leaderboard explicitly refused to trust.
+        $verificationPending = ! $typingResult->isTrustworthy();
         $filled = ClanWarModeClaim::where('id', $claim->id)
             ->whereNull('typing_result_id')
             ->update([
                 'typing_result_id' => $typingResult->id,
                 'user_id' => Auth::id(),
-                'points' => $breakdown['points'],
+                'points' => $verificationPending ? 0 : $breakdown['points'],
             ]);
 
         return $filled === 1
-            ? $breakdown + ['war_id' => $claim->clan_war_id]
+            ? $breakdown + [
+                'war_id' => $claim->clan_war_id,
+                'verification_pending' => $verificationPending,
+            ]
             : null;
     }
 
@@ -1027,6 +1036,26 @@ class TypingEngine extends Component
             ]);
         }
 
+        // Survival's floor is a conservative physical invariant, not a longitudinal guess.
+        // Leaving it pending would create a status no future run could honestly resolve: typing
+        // the impossible claim again does not make it possible. Refuse it automatically and tell
+        // the player through the normal rejection banner instead of creating permanent probation.
+        if ($this->mainMode === 'survival') {
+            $survivalReason = app(SurvivalPlausibility::class)->reviewReasonFor(
+                (string) $this->subMode,
+                $duration,
+                $correctKeystrokes,
+            );
+
+            if ($survivalReason !== null) {
+                return $this->rejectSubmission('survival_impossible', [
+                    'duration_seconds' => round($duration, 2),
+                    'correct_chars' => $correctKeystrokes,
+                    'difficulty' => (string) $this->subMode,
+                ]);
+            }
+        }
+
         // AFK: a session the player walked away from is not an attempt at typing. In `time`
         // the clock runs to zero and submits on its own, so "type two letters then leave"
         // lands in history as a 1-WPM row and drags the player's average down for good.
@@ -1068,11 +1097,11 @@ class TypingEngine extends Component
                 'isSurvivalPersonalBest' => $isSurvivalPersonalBest,
             ] = $this->resolvePersonalBest($user->id, $duration, $finalNetWpm);
 
-            // Review (§7.5): a run that clears every hard gate but still doesn't add up is HELD
-            // for review, not rejected -- real players improve, and a wrong rejection costs more
-            // trust than a delayed record. `pending` rows still save and show on the player's own
-            // profile but stay off the public leaderboard and don't advance highest_wpm until a
-            // human approves. Computed BEFORE the transaction so it doesn't compare the row
+            // Review (§7.5): a run that clears every hard gate but still doesn't add up enters
+            // automatic probation, not human review -- real players improve, and a wrong
+            // rejection costs more trust than a delayed record. `pending` rows still save and
+            // show on the player's own profile, but stay out of public records until later clean
+            // sessions corroborate them. Computed BEFORE the transaction so it cannot compare
             // against itself.
             //
             // The two modes ask different questions, because they are scored on different
@@ -1080,20 +1109,34 @@ class TypingEngine extends Component
             // the player's own history. Survival is scored on DURATION, and its stamina
             // simulation runs entirely in the browser -- so the question is whether the player
             // typed enough to have stayed alive that long at all.
-            $reviewReason = $this->mainMode === 'survival'
-                ? app(SurvivalPlausibility::class)->reviewReasonFor(
-                    (string) $this->subMode, $duration, $correctKeystrokes
-                )
-                : app(LongitudinalBaseline::class)->reviewReasonFor(
-                    $user->id, $this->mainMode, (string) $this->subMode, $finalNetWpm
+            $reviewDecision = $this->mainMode === 'survival'
+                ? null
+                : app(LongitudinalBaseline::class)->decisionFor(
+                    $user->id,
+                    $this->mainMode,
+                    (string) $this->subMode,
+                    $this->contentLang,
+                    $finalNetWpm,
+                    $timing,
                 );
+            $reviewReason = $reviewDecision?->reason;
             $reviewStatus = $reviewReason === null
                 ? TypingResult::REVIEW_CLEAR
                 : TypingResult::REVIEW_PENDING;
 
+            if ($reviewStatus === TypingResult::REVIEW_PENDING) {
+                // It may numerically beat the previous record, but it is not a PB until the
+                // automatic resolver trusts it. Never celebrate a withheld public number.
+                $isPersonalBest = false;
+                $isSurvivalPersonalBest = false;
+            }
+
+            $typingResult = null;
+
             DB::transaction(function () use (
                 &$xpEarned, &$warScore, $user, $duration, $finalNetWpm, $finalRawWpm, $finalAccuracy,
-                $correctKeystrokes, $incorrectKeystrokes, $score, $reviewStatus, $reviewReason
+                $correctKeystrokes, $incorrectKeystrokes, $score, $reviewStatus, $reviewReason,
+                $reviewDecision, $timing, $consistency, $session, &$typingResult
 
             ) {
                 // XP based on volume + accuracy bonus. The formula is centralized in
@@ -1119,6 +1162,24 @@ class TypingEngine extends Component
                     'ghost_data' => null, // filled selectively by ghost mode later
                     'review_status' => $reviewStatus,
                     'review_reason' => $reviewReason,
+                    // tabKey is generated server-side and Locked in Livewire. Hashing keeps the
+                    // raw identifier out of storage while the unique column prevents one issued
+                    // session from becoming two pieces of corroborating evidence.
+                    'session_fingerprint' => hash('sha256', $this->tabKey),
+                    'integrity_meta' => [
+                        'version' => 1,
+                        'decision' => $reviewDecision?->context ?? [],
+                        'baseline_state' => $reviewDecision?->state,
+                        'timing' => $timing + [
+                            'sample_count' => count($session->keyIntervals),
+                            'claimed_keystrokes' => $session->keyStrokeCount,
+                        ],
+                        'consistency' => $consistency,
+                        'consistency_samples' => count($session->wpmHistory),
+                        // The server issued and consumed this exact tab session. Time mode also
+                        // fixes duration outright; variable modes retain their bounded claim.
+                        'server_session_confirmed' => true,
+                    ],
                 ]);
 
                 // Link to the war claim if this session works one (fail-safe: a solo attempt
@@ -1126,11 +1187,39 @@ class TypingEngine extends Component
                 $warScore = $this->attachToWarClaim($typingResult);
 
                 // What counts as a personal best is defined once, on the model: survival is
-                // excluded, a run held for review does not advance the PB, and it has to beat
-                // the current record. ReviewQueue::approve() calls the same method when a held
-                // run is later cleared -- the two used to carry separate copies of the rule.
+                // excluded, a probationary run does not advance the PB, and it has to beat the
+                // current record. AutomaticResultResolver refreshes the record when a cluster
+                // clears; the legacy ReviewQueue still delegates to this same model rule.
                 $user->recordPersonalBest($typingResult);
             });
+
+            // A pending Time/Words result is probation, not a human review ticket. The current
+            // run may complete a corroborated cluster, in which case all rows are promoted in
+            // one transaction and every downstream public number is refreshed immediately.
+            $automaticResolution = $typingResult
+                ? app(AutomaticResultResolver::class)->resolveFor($typingResult)
+                : ['promoted_count' => 0, 'current_cleared' => false, 'promoted_ids' => []];
+
+            if ($automaticResolution['current_cleared']) {
+                $reviewStatus = TypingResult::REVIEW_CLEAR;
+                $reviewReason = null;
+                $typingResult->refresh();
+
+                $isPersonalBest = $this->mainMode === 'survival'
+                    ? $isSurvivalPersonalBest
+                    : ($previousBest === null || $finalNetWpm > $previousBest);
+
+                // attachToWarClaim reserved the slot with zero provisional points. Promotion
+                // releases the real score; refresh what this result screen reports so it agrees
+                // with the scoreboard written by AutomaticResultResolver.
+                if ($warScore !== null) {
+                    $claim = ClanWarModeClaim::where('typing_result_id', $typingResult->id)->first();
+                    if ($claim) {
+                        $warScore['points'] = (float) $claim->points;
+                        $warScore['verification_pending'] = false;
+                    }
+                }
+            }
 
             // Both clans' scoreboards just moved. Broadcast AFTER the transaction, never inside
             // it: ClanUpdated is ShouldBroadcastNow, so a listener re-querying before COMMIT
@@ -1198,6 +1287,13 @@ class TypingEngine extends Component
             // was not recorded. Silently redirecting (the anti-cheat reject path) would
             // read as the app eating the session.
             'afk' => $isAfk,
+            // Never hide integrity state in the database. Guests/AFK runs have no saved row;
+            // authenticated runs say whether this exact result is public or still probationary.
+            'resultStatus' => $isAfk
+                ? 'not_recorded'
+                : (Auth::check() ? ($reviewStatus ?? TypingResult::REVIEW_CLEAR) : 'guest'),
+            'resultReason' => $reviewReason ?? null,
+            'autoClearedCount' => $automaticResolution['promoted_count'] ?? 0,
             // Achievement KEYS only, never titles: those live solely in the lang files, and
             // carrying a copy here would rebuild the duplication that was just removed.
             'newAchievements' => $newlyUnlocked,

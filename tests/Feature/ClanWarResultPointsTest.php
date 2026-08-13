@@ -82,6 +82,38 @@ it('membawa poin yang benar-benar diberikan ke session hasil', function () {
         ->and($score)->not->toHaveKey('war_id');
 });
 
+it('menahan poin war pada nol selama hasil masih diverifikasi otomatis', function () {
+    [$me, $myClan, $war] = pointsWarFixture();
+
+    $claim = ClanWarModeClaim::create([
+        'clan_war_id' => $war->id, 'clan_id' => $myClan->id, 'user_id' => $me->id,
+        'mode' => 'time', 'mode_config' => '30', 'claimed_at' => now(),
+    ]);
+
+    $component = Livewire::actingAs($me)->test(TypingEngine::class, ['warClaimId' => $claim->id]);
+    runWarAttemptClock($claim);
+
+    $intervals = [];
+    for ($i = 0; $i < 240; $i++) {
+        $intervals[] = $i % 17 === 0 ? 620 : 145 + (($i * 53) % 230);
+    }
+
+    $component->call('saveResult', [
+        'durationMs' => 30000,
+        'totalKeystrokes' => 430,
+        'correctKeystrokes' => 425,
+        'keyIntervals' => $intervals,
+        'keyStrokeCount' => 430,
+        'wpmHistory' => [158, 166, 172, 169, 175, 163, 171, 168, 174, 170, 165, 173],
+    ]);
+
+    $result = TypingResultModel::find($claim->fresh()->typing_result_id);
+
+    expect($result->review_status)->toBe(TypingResultModel::REVIEW_PENDING)
+        ->and((float) $claim->fresh()->points)->toBe(0.0)
+        ->and(session('typing_result.war.score.verification_pending'))->toBeTrue();
+});
+
 it('tidak melaporkan poin apa pun kalau slotnya sudah diisi rekan sekelompok', function () {
     [$me, $myClan, $war] = pointsWarFixture();
 

@@ -55,7 +55,13 @@ class ProfileController extends Controller
         // full activity live on the /stats page (App\Livewire\Stats).
         //
         // Four aggregates over the same table & filter -> one query, not four.
-        $agg = TypingResult::where('user_id', $user->id)
+        $results = TypingResult::where('user_id', $user->id);
+
+        if ($public) {
+            $results->trustworthy();
+        }
+
+        $agg = $results
             ->selectRaw('
                 COUNT(*) as total_matches,
                 AVG(net_wpm) as avg_wpm,
@@ -69,6 +75,17 @@ class ProfileController extends Controller
             'avg_wpm' => round((float) $agg->avg_wpm, 1),
             'avg_accuracy' => round((float) $agg->avg_accuracy, 1),
             'total_seconds' => (int) $agg->total_seconds,
+            // Private profile only uses this to explain withheld results. Public viewers must
+            // not learn that another player's session is under integrity probation.
+            'pending_results' => $public
+                ? 0
+                : TypingResult::where('user_id', $user->id)->pendingVerification()->count(),
+            'has_speed_verification' => ! $public && TypingResult::query()
+                ->where('user_id', $user->id)
+                ->whereIn('mode', ['time', 'words'])
+                ->pendingVerification()
+                ->whereIn('review_reason', ['no_history_high', 'longitudinal_spike'])
+                ->exists(),
         ];
 
         // Level is derived from total_xp via a single source of truth (User::levelData()).

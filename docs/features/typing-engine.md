@@ -73,8 +73,9 @@ $finalNetWpm = $check['net_wpm'];
 ```
 
 **Justifikasi:** trust boundary. Detail lengkap di [anti-cheat-wpm.md](anti-cheat-wpm.md).
-Client hanya mengirim **jumlah karakter & durasi** (fakta sulit dipalsukan tanpa benar-benar
-mengetik dengan konsisten), bukan hasil akhir WPM.
+Client hanya mengirim **jumlah karakter & durasi**, bukan hasil akhir WPM. Data mentah tersebut
+tetap dianggap tidak tepercaya: `SoloSessionGuard`, bukti timing, batas throughput, dan evaluator
+longitudinal membatasi apakah klaim boleh disimpan atau dipakai sebagai angka publik.
 
 ### 3.4 Rekor (PB) hanya dari mode Time/Words — Survival dikecualikan
 
@@ -227,6 +228,9 @@ apa pun selain memanggilnya.
 `deleteContentBackward`). Flag `_softDeleteHandled` membuat yang datang belakangan berhenti.
 Keduanya tetap dipasang karena Backspace adalah satu-satunya tuts yang dilaporkan andal oleh
 keyboard layar, sementara `beforeinput` menutup kasus keyboard yang tak mengirim `keydown`.
+Penghapusan satu kata mengikuti shortcut platform: `Ctrl + Backspace` pada Windows/Linux dan
+`Option + Backspace` (`altKey`) pada macOS. Modifier ikut diteruskan oleh input fokusable;
+`deleteWordBackward` dari `beforeinput` dipetakan ke operasi yang sama.
 
 **`beforeinput` dibatalkan bila bisa; kalau tidak, `input` yang menangani.** Membatalkannya
 menjaga field tetap kosong sehingga tak ada nilai yang perlu di-diff maupun fragmen basi yang

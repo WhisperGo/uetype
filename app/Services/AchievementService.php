@@ -39,6 +39,7 @@ class AchievementService
     public function computeStats(User $user): array
     {
         $agg = TypingResult::where('user_id', $user->id)
+            ->trustworthy()
             ->selectRaw("
                 COUNT(*) as total_tests,
                 COALESCE(SUM(correct_chars), 0) as total_chars,

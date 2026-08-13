@@ -26,7 +26,12 @@
             : __('clan.mode.config_words', ['n' => $war['config']]));
 @endphp
 
-@if ($score === null)
+@if (($score['verification_pending'] ?? false) === true)
+    <div role="status" class="rounded-2xl border border-gold/40 bg-gold/10 px-4 py-3 font-mono text-gold">
+        <p class="text-x-small font-bold">{{ __('result.war.verification_pending_title') }}</p>
+        <p class="mt-2 text-x-small text-gold/80">{{ __('result.war.verification_pending_body') }}</p>
+    </div>
+@elseif ($score === null)
     {{-- Gold, not `danger`: the same treatment as the AFK banner and for the same reason --
          this is not an accusation, just work that didn't land. --}}
     <div class="rounded-2xl border border-gold/40 bg-gold/10 px-4 py-3 font-mono text-gold">

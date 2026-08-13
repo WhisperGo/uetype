@@ -3,6 +3,7 @@ import './bootstrap';
 import toastStack from './toasts';
 import navBadges from './nav-badges';
 import typingGame from './typing-game';
+import speedVerification from './speed-verification';
 import chatOverlayDock from './chat-dock';
 import createChatRuntime from './chat-runtime';
 import { registerMultiplayerNav } from './multiplayer-nav';
@@ -40,6 +41,7 @@ window.ensureChart = () => {
 // shares scope with @entangle('mainMode'/'subMode'), which the mode-picker buttons write
 // two-way. Alpine.data isn't built to be spread, so the call contract is kept as-is.
 window.typingGame = typingGame;
+window.speedVerification = speedVerification;
 
 // The chat runtime is invoked from each chat component's @script (full page & overlay)
 // because it needs $wire and 4 values from Blade: auth()->id(), route('chat.send'), and

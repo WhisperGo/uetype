@@ -19,6 +19,14 @@ return [
     'vs_ghost' => 'vs :label (:wpm wpm)',
     'afk_not_recorded' => 'You were away for a long stretch of this test, so it was not saved to your history or stats.',
 
+    'integrity' => [
+        'clear' => 'Result accepted and eligible for records and the leaderboard.',
+        'pending_title' => 'Result is being verified automatically',
+        'pending_body' => 'The result is saved, but is not used for records, Ghost, or the leaderboard yet. Complete a 10-second speed check to verify this pace now.',
+        'verify_speed' => 'Verify speed · 10 seconds',
+        'auto_cleared' => ':count previously verified results were accepted automatically.',
+    ],
+
     // Toast heading. Reads correctly for one unlock or several -- the names follow it as a
     // list, so no pluralised string is needed. The toast's own "view" link is notif.view.
     'achievement_unlocked' => 'Achievement unlocked',
@@ -56,6 +64,8 @@ return [
         'factor_accuracy' => 'accuracy :value% → :multiplier×',
         'not_counted_title' => 'Not counted toward the war',
         'not_counted_body' => 'This slot was already submitted, or the war ended before you finished. Your typing result is still saved.',
+        'verification_pending_title' => 'War points are being verified',
+        'verification_pending_body' => 'The slot is saved, but its points remain 0 while the result is being verified.',
     ],
 
     'error_heatmap' => 'error heatmap',

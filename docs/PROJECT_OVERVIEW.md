@@ -1,7 +1,7 @@
-# UeType — Dokumentasi Proyek Menyeluruh
+# UeType — Gambaran Proyek
 
-**Dibuat:** 2026-07-13 · **Diperbarui:** 2026-08-03
-**Cakupan:** Gambaran arsitektur, database, seluruh route, dan tooling di satu tempat.
+**Dibuat:** 2026-07-13 · **Diperbarui:** 2026-08-13
+**Cakupan:** Gambaran arsitektur, database, route utama, dan tooling di satu tempat.
 Untuk detail *cara kerja & justifikasi* per fitur, dokumen ini merujuk ke
 [`docs/features/`](features/README.md) yang sudah ada — tidak diduplikasi di sini.
 
@@ -40,11 +40,11 @@ pertemanan, achievement, dan leaderboard.
 non-eksperimental, perlu diperhatikan saat upgrade dependency.
 
 ### Real-time
-Semua fitur real-time (multiplayer race, chat, presence, notifikasi clan/teman)
-memakai **channel publik** Reverb (bukan `PrivateChannel`) — keamanan mengandalkan
-kode/ID yang tak mudah ditebak (kode room 6 digit, user ID), bukan otorisasi channel
-Laravel. `routes/channels.php` hanya mendaftarkan channel privat bawaan
-`App.Models.User.{id}`. Setiap broadcast dibungkus
+Channel yang membawa data berdasarkan ID berurutan memakai **`PrivateChannel`** dan diotorisasi
+di `routes/channels.php`: DM, clan chat, presence/friend, undangan room, dan notifikasi clan.
+Channel `room.{code}` serta `race.{code}` tetap publik agar spectator dan deep link undangan dapat
+subscribe sebelum memiliki baris membership; batas aksesnya adalah kode room acak enam karakter.
+Setiap broadcast dibungkus
 [`App\Support\SafeBroadcast::run()`](../app/Support/SafeBroadcast.php) supaya
 WebSocket yang mati tidak pernah menggagalkan request utama (lihat prinsip desain di
 [`features/README.md`](features/README.md)).
@@ -68,14 +68,15 @@ Laravel app ──── broadcast(...) ─────────────�
 Dua pola arsitektur yang berulang di seluruh proyek (detail alasan ada di
 [`features/README.md`](features/README.md#prinsip-desain-yang-berulang-di-semua-fitur)):
 
-1. **Server adalah satu-satunya sumber kebenaran** — WPM, akurasi, poin tidak pernah
-   dipercaya dari client; selalu dihitung ulang server (`AntiCheatService`).
+1. **Server memutuskan hasil akhir** — WPM dan akurasi diturunkan ulang dari data mentah,
+   sedangkan bukti dari client dibatasi dan diperiksa sebelum dipakai (`AntiCheatService`,
+   `SoloSessionGuard`, dan evaluator integritas terkait).
 2. **State diturunkan, bukan disimpan ganda** — level dari `total_xp`, status online
    dari `last_seen_at`, dsb.
 
 ## 4. Skema Database
 
-50 migrasi di `database/migrations/`. Dikelompokkan per domain:
+51 migrasi di `database/migrations/`. Dikelompokkan per domain:
 
 > **Tabel legacy sudah dibuang.** Migrasi
 > `2026_07_20_110000_drop_legacy_match_and_text_tables.php` men-*drop*
@@ -89,20 +90,23 @@ Dua pola arsitektur yang berulang di seluruh proyek (detail alasan ada di
 ### Identitas & Autentikasi
 - **`users`** — `google_id`, `email`, `username` (unik), `avatar`, `highest_wpm`,
   `total_xp`, `is_admin`, `preferences` (json), `last_seen_at` (presence).
-- **`password_reset_tokens`**, **`sessions`** — standar Laravel/Breeze.
+- **`password_reset_tokens`** — tabel bawaan yang masih ada di schema, tetapi tidak mempunyai
+  alur reset aktif karena autentikasi aplikasi Google-only.
+- **`sessions`** — penyimpanan sesi Laravel.
 
 ### Konten Mengetik
 - **`typing_results`** — catatan sesi solo: `net_wpm`, `raw_wpm`, `accuracy`,
   `correct_chars`/`incorrect_chars`, `duration_seconds`, `score` (khusus survival),
-  `xp_earned`. Write-once (`UPDATED_AT = null`). Teks latihan **tidak** lagi berasal
+  `xp_earned`, `review_status`/`review_reason`, `session_fingerprint`, `integrity_meta`, dan
+  `review_resolved_at`. Write-once (`UPDATED_AT = null`). Teks latihan **tidak** lagi berasal
   dari tabel — dirakit runtime oleh `TextGeneratorService` dari wordlist JSON.
 
 ### Multiplayer Race
 - **`rooms`** — `code` (unik), `host_id`, `status`, `text_to_type`,
   `race_starts_at` (countdown tersinkron), `countdown_started_at` (sudden death).
 - **`room_members`** — state live per pemain: `progress_percent`, `wpm`, `accuracy`,
-  `finished_time_seconds`, `place`, `xp_earned`, `result_recorded` (flag anti-cheat,
-  lihat [`wpm-accuracy-integrity.md`](wpm-accuracy-integrity.md)).
+  `finished_time_seconds`, `place`, `xp_earned`, dan `result_recorded`. Validasi hasil race
+  dijelaskan di [`features/anti-cheat-wpm.md`](features/anti-cheat-wpm.md).
 - **`multiplayer_match_history`** — log permanen hasil race (karena `rooms`/
   `room_members` dihapus setelah semua pemain keluar) — sumber data tab multiplayer
   di halaman Stats.
@@ -144,10 +148,9 @@ Dua pola arsitektur yang berulang di seluruh proyek (detail alasan ada di
 ### Infrastruktur
 - `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs` — tabel bawaan Laravel.
 
-**Catatan gaya:** seluruh komentar kode (termasuk migrasi) memakai **Bahasa Inggris**
-sebagai standar, dan cenderung menjelaskan *alasan* keputusan (skema/desain), bukan cuma
-deskripsi kolom — konvensi yang konsisten di seluruh proyek. Komentar berbahasa Indonesia
-yang tersisa hanya ada di **file test** (di luar kode yang di-ship).
+**Catatan gaya:** komentar baru sebaiknya menjelaskan *alasan* keputusan, bukan sekadar
+mengulang apa yang sudah terlihat dari kode. Jangan mengandalkan bahasa komentar sebagai kontrak
+teknis karena masih ada komentar lama dalam lebih dari satu bahasa.
 
 ## 5. Model & Relasi Kunci
 
@@ -170,7 +173,7 @@ Daftar lengkap ada di `app/Models/` (15 file). Yang paling sering disentuh:
 
 ## 6. Livewire Components
 
-16 komponen class-based di `app/Livewire/` + 2 view Volt-style di
+17 komponen class-based di `app/Livewire/`, ditambah view Livewire/Volt di
 `resources/views/livewire/` (`leaderboard.blade.php` fungsional penuh,
 `multiplayer-lobby.blade.php` adalah view biasa yang di-*backing* kelas
 `MultiplayerLobby`).
@@ -194,7 +197,7 @@ Daftar lengkap ada di `app/Models/` (15 file). Yang paling sering disentuh:
 | `About` | `/about` | Halaman tim statis |
 | `Terms` | `/privacy-policy` | Kebijakan privasi |
 | `leaderboard` (Volt) | `/leaderboard` | Top-10 global per mode/config/timeframe (gerbang kelayakan §11) |
-| `ReviewQueue` | `/review-queue` | Antrean review anti-cheat (admin-only) |
+| `ReviewQueue` | `/review-queue` | UI admin legacy untuk data review lama; bukan dependency alur anti-cheat otomatis |
 
 **Trait bersama** (`app/Livewire/Concerns/`, 5 file) — logika yang dipakai lintas
 komponen agar tak terduplikasi: `GuardsChatAccess` (guard DM/clan + kirim, dipakai
@@ -205,9 +208,9 @@ yang besar).
 Detail cara kerja tiap komponen inti ada di dokumen fitur masing-masing
 (lihat tabel di §9).
 
-## 7. Peta Route Lengkap
+## 7. Peta Route Utama
 
-Sumber: `routes/web.php`, `routes/auth.php`, `routes/channels.php`.
+Sumber: `routes/web.php`, `routes/channels.php`, dan route paket monitoring.
 
 **Publik/guest-accessible:**
 - `GET /`, `GET /typing` → `TypingEngine`
@@ -221,15 +224,18 @@ Sumber: `routes/web.php`, `routes/auth.php`, `routes/channels.php`.
 - `GET /achievements` → `AchievementController`
 - `GET /stats` → `Stats`
 - `GET /friends` → `Friends`
+- `GET /friends/pending-count` → badge permintaan teman pada navigasi
 - `GET /chat`, `POST /chat/send` → `Chat` / `ChatController`
 - `GET /clans`, `GET /clans/{clan}` → `Clans` / `ClanShow`
 - `GET /clan-war` → `ClanWar`
+- `POST /clan-war/attempt-progress` → simpan progres attempt saat unload
 - `GET /clan-leaderboard` → `ClanLeaderboard`
 - `GET /multiplayer` (Volt) → multiplayer-lobby
+- `POST /multiplayer/leave-beacon`, `POST /multiplayer/leave-confirm` → keluar room saat unload/konfirmasi
 - `GET /leaderboard` (Volt) → leaderboard
 
 **Admin-only (`EnsureUserIsAdmin`, guest/non-admin → 404):**
-- `GET /review-queue` → `ReviewQueue` (antrean review anti-cheat, lihat [anti-cheat-wpm.md](features/anti-cheat-wpm.md) §7.8)
+- `GET /review-queue` → `ReviewQueue` legacy (bukan bagian alur keputusan otomatis; lihat [anti-cheat-wpm.md](features/anti-cheat-wpm.md) §7.8)
 - `GET /user-monitoring/*` → dashboard monitoring (lihat [monitoring.md](features/monitoring.md))
 
 **Autentikasi:**
@@ -238,8 +244,8 @@ Sumber: `routes/web.php`, `routes/auth.php`, `routes/channels.php`.
 - `GET /auth/google`, `GET /auth/google/callback` → OAuth Google
 - `GET|POST /auth/google/username` → pilih username pasca-OAuth
 
-> **Autentikasi kini Google-only.** `routes/auth.php` beserta seluruh route Breeze
-> (register/login-password/reset password/verify email) **sudah tidak ada** — dikunci oleh
+> **Autentikasi kini Google-only.** Route Breeze untuk register/login-password/reset
+> password/verify email **sudah tidak ada** — dikunci oleh
 > `tests/Feature/Auth/GoogleOnlyAuthTest.php`. Nama route `login` wajib dipertahankan karena
 > middleware `auth` bawaan Laravel mengarahkan tamu ke nama itu.
 
@@ -263,14 +269,19 @@ selamat melewati unload; `FriendController` melayani nav yang berupa partial sta
 
 ## 8. Services & Events
 
-### Services (`app/Services/`, 15 file)
+### Services (`app/Services/`)
 | Service | Peran |
 |---|---|
 | `AntiCheatService` | Hitung ulang & validasi WPM/akurasi server-side — trust boundary utama |
-| `SurvivalPlausibility` | Lantai fisik Survival: minimum karakter yang bisa menopang durasi yang diklaim. Stamina disimulasikan di klien, jadi ini satu-satunya cara server memeriksa durasi Survival — hasil di bawah lantai **ditahan** (`pending`), tidak ditolak |
+| `SurvivalPlausibility` | Lantai fisik Survival: minimum karakter yang bisa menopang durasi yang diklaim. Pelanggaran invariant ditolak sebelum hasil disimpan |
 | `SoloSessionGuard` | Acuan sesi solo di server (mode/panjang teks/waktu mulai); plafon karakter & anti-replay — lihat [anti-cheat-wpm.md](features/anti-cheat-wpm.md) §7 |
 | `KeystrokeAnalyzer` | Analisis distribusi timing antar-keystroke (deteksi bot) — §7.7b |
-| `LongitudinalBaseline` | Bandingkan hasil vs riwayat pemain; tandai lonjakan untuk review — §7.7c |
+| `LongitudinalBaseline` | Bandingkan hasil vs riwayat tepercaya pemain; tandai lonjakan untuk probation otomatis — §7.7c |
+| `AutomaticResultResolver` | Evaluasi cluster bukti pending dan promosikan hasil yang saling mendukung ke `clear` tanpa keputusan admin |
+| `TypingSpeedVerificationService` | Terbitkan dan konsumsi challenge universal Time 10 untuk hasil Time/Words, dengan token sekali pakai, replay event, expiry, serta lifecycle attempt |
+| `TypingVerificationReplay` | Rekonstruksi teks dan metrik challenge dari urutan event tombol yang dibatasi |
+| `TypingSpeedCapabilityService` | Simpan capability per user + bahasa dan gunakan ceiling terverifikasi pada hasil berikutnya |
+| `TypingResultPromoter` | Satu jalur idempoten untuk clear hasil serta sinkronisasi PB, achievement, dan poin war |
 | `RoomMembershipService` | Keanggotaan room multiplayer (keluar, sapu offline, pindah host) |
 | `AchievementService` | Evaluasi & catat unlock achievement |
 | `GhostResolver` | Turunkan lawan ghost dari identitas (type + refId), WPM selalu di-fetch ulang dari DB — satu sumber kebenaran (dipakai `GhostPicker` & `TypingEngine`) |
@@ -282,21 +293,21 @@ selamat melewati unload; `FriendController` melayani nav yang berupa partial sta
 | `ClanWarScorer` | Skor hasil ketik untuk satu slot Clan War |
 | `ClanWarResolver` | Resolusi war yang selesai/kadaluarsa (lazy, dipicu saat halaman dibuka) |
 
-### Events (`app/Events/`, semua `ShouldBroadcastNow` di channel publik)
-| Event | Channel |
-|---|---|
-| `RoomUpdated` | `room.{code}` |
-| `RaceProgressUpdated` | `race.{code}` |
-| `SuddenDeathTriggered` | `race.{code}` |
-| `RoomMessageSent` | `room.{code}` (chat lobby, broadcast-only) |
-| `RoomPresenceChanged` | `room.{code}` (notif join/leave) |
-| `RoomInvitationSent` | `friends.{friendId}` — undangan room sebagai toast, membawa deep link `?invite=CODE` |
-| `DirectMessageSent` | `chat.{recipientId}` |
-| `ClanMessageSent` | `clan-chat.{clanId}` |
-| `MessageEdited` / `MessageDeleted` | `chat.{id}` atau `clan-chat.{id}` |
-| `FriendshipUpdated` | `friends.{userId}` |
-| `PresenceUpdated` | `friends.{friendId}` |
-| `ClanUpdated` | `clan.{userId}` — toast (bila ada `notification`) **atau** refresh war senyap dengan `null`, fan-out ke seluruh member kedua clan ([clan-war.md](features/clan-war.md) §3.7) |
+### Events (`app/Events/`, semua `ShouldBroadcastNow`)
+| Event | Channel | Akses |
+|---|---|---|
+| `RoomUpdated` | `room.{code}` | Publik, berbasis kode room acak |
+| `RaceProgressUpdated` | `race.{code}` | Publik, berbasis kode room acak |
+| `SuddenDeathTriggered` | `race.{code}` | Publik, berbasis kode room acak |
+| `RoomMessageSent` | `room.{code}` | Publik, chat lobby broadcast-only |
+| `RoomPresenceChanged` | `room.{code}` | Publik, notifikasi join/leave |
+| `RoomInvitationSent` | `friends.{userId}` | Private, hanya pemilik feed |
+| `DirectMessageSent` | `chat.{recipientId}` | Private, hanya penerima |
+| `ClanMessageSent` | `clan-chat.{clanId}` | Private, anggota clan aktif |
+| `MessageEdited` / `MessageDeleted` | `chat.{id}` atau `clan-chat.{id}` | Private sesuai percakapan |
+| `FriendshipUpdated` | `friends.{userId}` | Private, hanya pemilik feed |
+| `PresenceUpdated` | `friends.{friendId}` | Private, hanya pemilik feed |
+| `ClanUpdated` | `clan.{userId}` | Private, hanya pemilik feed; lihat [clan-war.md](features/clan-war.md) §3.7 |
 
 ## 9. Dokumentasi Fitur (sudah ada, per topik)
 
@@ -321,16 +332,17 @@ fitur — itu sudah didokumentasikan detail di `docs/features/`:
 
 Dokumen terkait lain:
 - [`design-system.md`](design-system.md) — token warna, tipografi, komponen UI
-- [`wpm-accuracy-integrity.md`](wpm-accuracy-integrity.md) — studi kasus keputusan
-  Net WPM vs Raw WPM di multiplayer
+- [`features/anti-cheat-wpm.md`](features/anti-cheat-wpm.md) — aturan integritas WPM,
+  akurasi, race, probation otomatis, dan dampaknya pada leaderboard
 
 ## 10. Testing
 
 - **Framework:** Pest v4 (`tests/Pest.php`), gaya fungsional (`it('...', fn () => ...)`),
   ditambah **Vitest** untuk logika klien murni (`resources/js/*.test.js`, dijalankan
   `npm test` dan ikut dieksekusi CI sebelum build aset).
-- **Struktur:** `tests/Unit` (10 file) + `tests/Feature` (122 file top-level + 4 di `Auth/`).
-- **Total:** 136 file test, ±1.117 kasus `it()`/`test()`.
+- **Struktur saat pembaruan dokumen:** 10 file di `tests/Unit` dan 139 file di
+  `tests/Feature`. Gunakan `find tests -name '*.php'` untuk inventaris terbaru; jumlah ini bukan
+  kontrak fitur dan akan bertambah bersama suite.
 - **Database test terpisah.** `phpunit.xml` mematok `DB_DATABASE=uetype_test`; buat sekali per
   mesin (`CREATE DATABASE uetype_test;`). Tanpa itu `RefreshDatabase` menjalankan
   `migrate:fresh` terhadap database dev di `.env` dan menghapus seluruh data lokal — mode
@@ -358,43 +370,44 @@ Dokumen terkait lain:
   `Livewire::actingAs($user)->test(Component::class)->call(...)->assertDispatched(...)`,
   fixture via factory (`UserFactory` — satu-satunya factory di proyek).
 - **Fokus verifikasi trust-boundary:** banyak test secara eksplisit memverifikasi
-  bahwa angka penting (WPM ghost, WPM race) selalu dihitung ulang server meski
-  client mengirim payload yang berbeda — pola yang sama dipakai berulang kali saat
-  menambah fitur baru (lihat juga [`wpm-accuracy-integrity.md`](wpm-accuracy-integrity.md)).
+  bahwa angka penting divalidasi atau diturunkan ulang server meski client mengirim payload
+  berbeda. Detail batas dan residual risk ada di
+  [`features/anti-cheat-wpm.md`](features/anti-cheat-wpm.md).
 
 ## 11. Tooling & Konfigurasi
 
 - **Linter:** Laravel Pint (`composer.json` dev dependency), preset default (tanpa
   `pint.json` custom).
-- **Broadcasting:** `config/broadcasting.php` (default `reverb`),
-  `config/reverb.php` (host/port dari env, rate limiting tersedia tapi nonaktif
-  default).
-- **Database:** proyek ini berjalan di **MySQL**. Perlu dicatat `.env.example` masih
-  memuat `DB_CONNECTION=sqlite` bawaan Laravel, jadi sesuaikan di `.env` sendiri —
-  migrasi akan gagal di driver lain (CHECK constraint).
+- **Broadcasting:** `.env.example` memilih `BROADCAST_CONNECTION=reverb`, sedangkan fallback
+  `config/broadcasting.php` adalah `null`. Host/port Reverb berasal dari env melalui
+  `config/reverb.php`; rate limiting tersedia tetapi nonaktif secara default.
+- **Database:** proyek dan `.env.example` memakai **MySQL** dengan database contoh `uetype`.
 - **Env kunci** (`.env.example`): `BROADCAST_CONNECTION=reverb`,
   `REVERB_APP_ID/KEY/SECRET`,
   `REVERB_HOST=127.0.0.1`, `REVERB_PORT=8080`, dicerminkan ke `VITE_REVERB_*`
   untuk frontend build (di-*bake* saat `npm run build` — lihat catatan penting di
   §12).
-- **Sesi:** `SESSION_LIFETIME=20160` (14 hari) dan sign-in **diingat** (`remember: true`)
-  — lihat [`features/auth.md`](features/auth.md) §3.6. Karena `.env` tak terlacak git,
-  salinan lama yang masih `SESSION_LIFETIME=120` tetap kedaluwarsa 2 jam meski kodenya
-  sudah diperbarui: `.env` menang atas default config.
+- **Sesi:** `.env.example` mematok `SESSION_LIFETIME=120` menit. Login Google memakai
+  `remember: true`, sehingga cookie remember-me dapat memulihkan autentikasi setelah sesi biasa
+  berakhir; lihat [`features/auth.md`](features/auth.md) §3.6.
 - **Composer script `dev`:** menjalankan `serve` + `queue:listen` + `pail` +
   `npm run dev` bersamaan.
-- **Seeder** (`database/seeders/`): `DatabaseSeeder` menjalankan `DummyDataSeeder` +
-  membuat akun admin `test@example.com`; `DummyUserSeeder`/`DummyMultiplayerSeeder`/
-  `DummyClanSeeder` hanya di env `local` (jadi basis akun `/dev-login`).
+- **Seeder** (`database/seeders/`): `DatabaseSeeder` menjalankan `DummyDataSeeder` dan
+  `LeaderboardRosterSeeder` di semua environment. Akun admin `test@example.com` dibuat hanya
+  di non-production; `DummyUserSeeder`/`DummyMultiplayerSeeder`/`DummyClanSeeder` hanya di env
+  `local` (jadi basis akun `/dev-login`). Production deployment normal hanya menjalankan migrasi,
+  bukan `db:seed`; jalankan seeder di production hanya jika roster demo memang dikehendaki.
   (`LanguageSeeder`/`TextSeeder` sudah **dihapus** bersama tabel `languages`/`texts` —
   teks latihan kini dirakit `TextGeneratorService` dari wordlist JSON, bukan dari DB.)
-  Seeder manual (tak ikut `db:seed` default): `LeaderboardDemoSeeder` (akun eligible di
-  papan leaderboard, lihat [`features/anti-cheat-wpm.md`](features/anti-cheat-wpm.md) §11.5)
-  dan `ClanUiTestSeeder`.
+  Seeder manual (tak ikut `db:seed` default): `LeaderboardDemoSeeder` (akun uji eligibility,
+  lihat [`features/anti-cheat-wpm.md`](features/anti-cheat-wpm.md) §11.5),
+  `ClanUiTestSeeder`, dan `RemoveLeaderboardRosterSeeder` untuk menghapus roster demo.
 - **Console command** (`app/Console/Commands/`):
   - `clan-war:resolve` (`ResolveClanWars.php`) — resolusi Clan War manual di luar lazy-resolve.
   - `typing:audit [--wpm=150] [--limit=50]` (`AuditTypingResults.php`) — daftar hasil ber-WPM
     mencurigakan (read-only), lihat [`features/anti-cheat-wpm.md`](features/anti-cheat-wpm.md) §7.6.
+  - `typing:reconcile` (`ReconcileTypingResults.php`) — proses ulang hasil probation yang memiliki
+    bukti cukup; dijadwalkan setiap jam sebagai safety net di `routes/console.php`.
   - `user:admin <email> [--revoke]` (`MakeUserAdmin.php`) — angkat/cabut hak admin (satu-satunya
     cara masuk dashboard monitoring), lihat [`features/monitoring.md`](features/monitoring.md) §3.6.
   - `achievements:backfill` (`BackfillAchievements.php`) — isi ulang achievement untuk data lama.
@@ -406,9 +419,11 @@ Dokumen terkait lain:
   Kalau host mengubah `REVERB_HOST` ke IP LAN tapi tidak `npm run build` ulang,
   perangkat lain akan gagal connect WebSocket secara diam-diam (root cause yang
   pernah ditemukan pada bug "countdown macet di PC teman").
-- **Channel Reverb bersifat publik**, bukan `PrivateChannel` — keamanan bergantung
-  pada kode/ID yang tak mudah ditebak, bukan otorisasi Laravel di
-  `routes/channels.php`.
+- **Jalankan scheduler di production.** Pasang cron `php artisan schedule:run` setiap menit agar
+  `typing:reconcile` benar-benar dieksekusi. Resolver sinkron tetap menjadi jalur utama; scheduler
+  adalah safety net.
+- **Bedakan channel publik dan private.** `room.{code}`/`race.{code}` publik berbasis kode acak;
+  channel berbasis user/clan ID private dan wajib lolos otorisasi `routes/channels.php`.
 - **Logika halaman ada di Livewire/Volt, bukan controller.** Controller stub versi
   lama sudah dihapus (lihat §7) — kalau mencari "controller" untuk suatu halaman dan
   tak menemukannya, cari komponen Livewire/Volt-nya, bukan mengira fiturnya hilang.
@@ -424,5 +439,5 @@ Dokumen terkait lain:
 
 ---
 
-*Dokumen ini adalah peta menyeluruh (arsitektur, skema DB, route, tooling).
+*Dokumen ini adalah peta tingkat tinggi (arsitektur, skema DB, route utama, tooling).
 Untuk "bagaimana X bekerja dan kenapa," rujuk dokumen fitur di §9.*

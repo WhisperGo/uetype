@@ -53,7 +53,7 @@ it('judges nothing on a difficulty it does not know', function () {
     expect(app(SurvivalPlausibility::class)->reviewReasonFor('nightmare', 90, 0))->toBeNull();
 });
 
-it('flags a long survival that nobody could have typed their way through', function () {
+it('automatically rejects a long survival that nobody could have typed their way through', function () {
     $user = User::factory()->create();
 
     $component = Livewire::actingAs($user)->test(TypingEngine::class)
@@ -70,12 +70,10 @@ it('flags a long survival that nobody could have typed their way through', funct
 
     $result = TypingResult::where('user_id', $user->id)->first();
 
-    // DITAHAN, bukan ditolak: barisnya tetap tersimpan dan tetap terlihat di profil pemain
-    // sendiri, hanya tak ikut papan publik sampai ada manusia yang meloloskannya. Lantai fisik
-    // yang salah tembak pada satu pemain jujur lebih mahal daripada poin yang ia jaga.
-    expect($result)->not->toBeNull()
-        ->and($result->review_status)->toBe(TypingResult::REVIEW_PENDING)
-        ->and($result->review_reason)->toBe('survival_impossible');
+    // Ini invariant fisik yang sudah sangat konservatif, sehingga tidak dibuat pending tanpa
+    // resolver. Backend menyelesaikannya langsung dan memberi pesan faktual kepada pemain.
+    expect($result)->toBeNull()
+        ->and(session('result_rejected'))->toBe(__('typing.result_survival_unverified'));
 });
 
 it('leaves an honest survival run alone', function () {

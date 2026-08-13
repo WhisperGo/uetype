@@ -101,6 +101,21 @@
                 </div>
             </div>
 
+            @if(! $isPublic && ($stats['pending_results'] ?? 0) > 0)
+                <div role="status" class="rounded-2xl border border-gold/40 bg-gold/10 px-5 py-4 font-mono text-gold">
+                    <p class="text-sm font-semibold">{{ __('profile.integrity_pending_title') }}</p>
+                    <p class="mt-1 text-xs text-gold/80">
+                        {{ __('profile.integrity_pending_body', ['count' => $stats['pending_results']]) }}
+                    </p>
+                    @if($stats['has_speed_verification'] ?? false)
+                        <a href="{{ route('typing.verify') }}"
+                            class="mt-3 inline-flex min-h-11 items-center rounded-xl bg-gold px-4 py-2 text-xs font-bold text-background transition hover:bg-gold/90">
+                            {{ __('profile.verify_speed') }}
+                        </a>
+                    @endif
+                </div>
+            @endif
+
             <!-- ===== STATISTICS ===== -->
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 @php
@@ -133,6 +148,10 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
                 </a>
+
+                {{-- Private audit trail: a player must be able to see which individual runs
+                     are public and which are still in automatic integrity probation. --}}
+                <livewire:profile.typing-history />
             @endif
 
         </div>
