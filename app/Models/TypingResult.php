@@ -28,6 +28,9 @@ class TypingResult extends Model
         'ghost_data',
         'review_status',
         'review_reason',
+        'session_fingerprint',
+        'integrity_meta',
+        'review_resolved_at',
     ];
 
     /**
@@ -46,8 +49,8 @@ class TypingResult extends Model
         'review_status' => self::REVIEW_CLEAR,
     ];
 
-    // Review states for the anti-cheat queue (§7.5/§7.6). Only CLEAR and APPROVED count for
-    // the public leaderboard; PENDING is held for a human; REJECTED was declined.
+    // Integrity states (§7.7/§7.8). New results write CLEAR or automatic PENDING;
+    // APPROVED/REJECTED remain readable for legacy review data.
     public const REVIEW_CLEAR = 'clear';
 
     public const REVIEW_PENDING = 'pending';
@@ -78,6 +81,8 @@ class TypingResult extends Model
         'raw_wpm' => 'decimal:2',
         'accuracy' => 'decimal:2',
         'ghost_data' => 'array',
+        'integrity_meta' => 'array',
+        'review_resolved_at' => 'datetime',
     ];
 
     /** The player who recorded this result. */
@@ -127,8 +132,8 @@ class TypingResult extends Model
      * Survival is measured in duration, not WPM -- it is played under stamina pressure, so
      * how long you lasted is the achievement. That is also why it needs the review gate most:
      * stamina is simulated on the CLIENT, so duration_seconds is the one figure the server
-     * cannot recompute, and SurvivalPlausibility holds an implausible one for review rather
-     * than refusing it.
+     * cannot recompute. SurvivalPlausibility therefore rejects a claim below its conservative
+     * physical floor before a result row exists.
      */
     public static function bestSurvivalDurationFor(int $userId, string $config): ?float
     {
@@ -143,7 +148,7 @@ class TypingResult extends Model
     }
 
     /**
-     * Results that may stand as a public number: cleared automatically, or approved by a human.
+     * Results that may stand as a public number: cleared automatically, or legacy-approved.
      *
      * ONE definition of "this result is allowed to represent the player", because it is asked
      * in more places than is obvious -- the leaderboard, both record helpers above, and (in its
@@ -156,6 +161,17 @@ class TypingResult extends Model
     public function scopeTrustworthy($query)
     {
         return $query->whereIn('review_status', [self::REVIEW_CLEAR, self::REVIEW_APPROVED]);
+    }
+
+    /** A result that is still being verified automatically. */
+    public function scopePendingVerification($query)
+    {
+        return $query->where('review_status', self::REVIEW_PENDING);
+    }
+
+    public function isTrustworthy(): bool
+    {
+        return in_array($this->review_status, [self::REVIEW_CLEAR, self::REVIEW_APPROVED], true);
     }
 
     /**

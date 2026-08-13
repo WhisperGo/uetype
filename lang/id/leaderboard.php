@@ -21,6 +21,7 @@ return [
     'your_rank' => 'Posisi Peringkat Kamu:',
     'unranked' => 'Belum Berperingkat',
     'eligibility_pending' => 'Ketik :minutes menit lagi untuk masuk papan',
+    'verification_pending' => 'Hasil untuk kategori ini sedang diverifikasi otomatis',
 
     'player' => 'Nama Pemain',
     'wpm' => 'Kecepatan (WPM)',

@@ -88,6 +88,11 @@ class ClanWarResolver
      */
     public function settleWar(ClanWar $war): bool
     {
+        // A submitted probation result reserves its slot with zero points. Give the automatic
+        // integrity resolver one final deterministic pass before the war snapshot is claimed;
+        // anything still uncorroborated remains zero and can never mutate a finished war later.
+        app(AutomaticResultResolver::class)->reconcileWar($war->id);
+
         $settled = DB::transaction(function () use ($war) {
             $claimed = ClanWar::where('id', $war->id)
                 ->where('status', ClanWarStatus::Ongoing)

@@ -21,10 +21,9 @@ namespace App\Services;
  * player could possibly have typed is computable, whatever they did in between. A run below
  * that floor did not happen as described.
  *
- * Deliberately conservative in the player's favour at every step (see minimumCorrectChars),
- * and deliberately NOT a rejection: like LongitudinalBaseline, an implausible run is held for
- * review, still saved and still visible on the player's own profile. A physical bound that
- * fires wrongly on one honest player costs more trust than the points it protects.
+ * Deliberately conservative in the player's favour at every step (see minimumCorrectChars).
+ * TypingEngine treats a result below this invariant as a visible hard rejection: repeating an
+ * impossible claim can never produce longitudinal evidence capable of resolving a probation.
  */
 class SurvivalPlausibility
 {
@@ -62,7 +61,7 @@ class SurvivalPlausibility
     private const TOLERANCE = 0.9;
 
     /**
-     * A review reason when the run is below the physical floor, or null when it is possible.
+     * A rejection reason when the run is below the physical floor, or null when it is possible.
      *
      * @param  string  $difficulty  easy|medium|hard
      */

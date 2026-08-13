@@ -42,6 +42,7 @@ return [
     'result_rejected' => 'This session was rejected by server validation (implausible) and was not saved.',
     'result_rate_limited' => 'Too many results submitted in a short time. Wait a moment before finishing the next test.',
     'result_session_expired' => 'This test session expired or was started in another tab, so the result could not be saved. Please run the test again.',
+    'result_survival_unverified' => 'The Survival result could not be verified from its duration and session input, so it was not saved.',
 
     'aria' => [
         'pick_main_mode' => 'Pick main mode',

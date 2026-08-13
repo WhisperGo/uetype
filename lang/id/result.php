@@ -19,6 +19,13 @@ return [
     'vs_ghost' => 'vs :label (:wpm wpm)',
     'afk_not_recorded' => 'Kamu meninggalkan tes ini cukup lama, jadi hasilnya tidak disimpan ke riwayat maupun statistikmu.',
 
+    'integrity' => [
+        'clear' => 'Hasil diterima dan dapat dihitung untuk rekor serta leaderboard.',
+        'pending_title' => 'Hasil sedang diverifikasi otomatis',
+        'pending_body' => 'Hasil tetap tersimpan, tetapi belum digunakan untuk rekor, Ghost, atau leaderboard. Backend akan memeriksanya kembali dari hasil berikutnya tanpa persetujuan admin.',
+        'auto_cleared' => ':count hasil yang sebelumnya diverifikasi kini diterima otomatis.',
+    ],
+
     // Judul toast. Tetap wajar untuk satu maupun beberapa unlock -- namanya menyusul sebagai
     // daftar, jadi tak perlu bentuk jamak terpisah. Tautan "lihat" toast memakai notif.view.
     'achievement_unlocked' => 'Achievement terbuka',
@@ -56,6 +63,8 @@ return [
         'factor_accuracy' => 'akurasi :value% → :multiplier×',
         'not_counted_title' => 'Tak dihitung untuk war',
         'not_counted_body' => 'Slot ini sudah disubmit, atau war berakhir sebelum kamu selesai. Hasil ketikmu tetap tersimpan.',
+        'verification_pending_title' => 'Poin war sedang diverifikasi',
+        'verification_pending_body' => 'Slot sudah tersimpan, tetapi poin tetap 0 sampai backend menerima hasil secara otomatis.',
     ],
 
     'error_heatmap' => 'heatmap kesalahan',

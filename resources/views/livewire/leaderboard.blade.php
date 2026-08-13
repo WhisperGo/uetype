@@ -71,7 +71,7 @@ $scoped = function (string $tab, string $config, string $timeframe, string $lang
         // Only publicly-cleared results reach the board (anti-cheat §7.6): a run held for
         // review (`pending`) or declined (`rejected`) never appears until a human clears it.
         // Applied in the single scoped source so BOTH the board and the rank agree.
-        ->whereIn('review_status', [TypingResult::REVIEW_CLEAR, TypingResult::REVIEW_APPROVED])
+        ->trustworthy()
         // Leaderboard eligibility gate (Monkeytype's minTimeTyping): only players whose
         // accumulated typing time (all modes) clears the threshold appear. Kills the
         // throwaway-account-then-script attack before scoring; a real player crosses it
@@ -162,6 +162,24 @@ $userRank = computed(function () use ($metricFor, $bestPerUser, $scoped) {
             $remaining = (int) ceil((TypingResult::LEADERBOARD_MIN_TYPING_SECONDS - $typedSeconds) / 60);
 
             return __('leaderboard.eligibility_pending', ['minutes' => $remaining]);
+        }
+
+        // Reaching 30 minutes and having no public record are different from never playing
+        // this category. Say when the matching result exists but is still in automatic
+        // probation instead of collapsing it into the misleading generic "Unranked" state.
+        $pending = TypingResult::query()
+            ->where('user_id', Auth::id())
+            ->where('mode', $this->currentTab)
+            ->where('mode_config', $this->currentConfig)
+            ->where('language', $this->currentLang)
+            ->pendingVerification();
+
+        if ($this->timeframe === 'daily') {
+            $pending->where('created_at', '>=', now()->startOfDay());
+        }
+
+        if ($typedSeconds >= TypingResult::LEADERBOARD_MIN_TYPING_SECONDS && $pending->exists()) {
+            return __('leaderboard.verification_pending');
         }
 
         return __('leaderboard.unranked');

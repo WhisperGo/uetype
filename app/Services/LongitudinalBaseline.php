@@ -3,65 +3,140 @@
 namespace App\Services;
 
 use App\Models\TypingResult;
+use App\Support\LongitudinalDecision;
+use App\Support\TypingLanguage;
 
-/**
- * Per-player longitudinal anomaly check (anti-cheat report §7.5).
- *
- * UEType's edge over a pure typing site: it already stores every player's history per
- * mode/config. A run that clears the hard gates but is wildly out of line with that history
- * -- a sudden 70 -> 200 WPM leap, or a brand-new account debuting far above a sane speed --
- * is flagged for HUMAN review, never auto-rejected. Real players improve; punishing genuine
- * progress erodes trust far more than letting one suspicious run wait for a glance. So this
- * returns a review REASON (or null), and the caller marks the row `pending`, it does not
- * discard anything.
- */
+/** Explainable, robust per-player baseline for solo Time and Words results. */
 class LongitudinalBaseline
 {
-    /** Compare against at most this many of the player's most recent runs in the same mode/config. */
     private const HISTORY_WINDOW = 20;
 
-    /** Need at least this much history before a "spike over your own average" claim is meaningful. */
-    private const MIN_HISTORY = 5;
+    private const MIN_EXACT_HISTORY = 5;
 
-    /** Flag if the new net WPM exceeds the recent average by more than this fraction. */
+    private const MIN_RELATED_HISTORY = 3;
+
     private const SPIKE_FRACTION = 0.40;
 
-    /** A player with (almost) no history debuting at/above this net WPM is flagged. */
     private const NO_HISTORY_WPM = 150.0;
 
+    private const MIN_ABSOLUTE_HEADROOM = 20.0;
+
+    private const MAD_MULTIPLIER = 4.0;
+
     /**
-     * Decide whether $netWpm is anomalous for this player in this mode/config.
-     * Returns a short review reason, or null if the run looks in-line with their history.
+     * Evaluate a new result without letting the result compare against itself.
      */
-    public function reviewReasonFor(int $userId, string $mode, string $modeConfig, float $netWpm): ?string
-    {
-        $recent = TypingResult::query()
-            ->where('user_id', $userId)
-            ->where('mode', $mode)
+    public function decisionFor(
+        int $userId,
+        string $mode,
+        string $modeConfig,
+        string $language,
+        float $netWpm,
+    ): LongitudinalDecision {
+        $language = TypingLanguage::resolve($language);
+
+        $exact = $this->trustedQuery($userId, $mode, $language)
             ->where('mode_config', $modeConfig)
-            // Only compare against results that are themselves trustworthy, so a cheated run
-            // can't quietly raise the baseline for the next one.
-            ->whereIn('review_status', [TypingResult::REVIEW_CLEAR, TypingResult::REVIEW_APPROVED])
-            ->orderByDesc('id')
             ->limit(self::HISTORY_WINDOW)
             ->pluck('net_wpm')
-            ->map(fn ($w) => (float) $w)
+            ->map(fn ($value) => (float) $value)
             ->all();
 
-        // No track record: a debut far above a plausible first-run speed is worth a look.
-        if (count($recent) < self::MIN_HISTORY) {
-            return $netWpm >= self::NO_HISTORY_WPM ? 'no_history_high' : null;
+        if (count($exact) >= self::MIN_EXACT_HISTORY) {
+            return $this->against($exact, $netWpm, 'established', 'exact');
         }
 
-        $avg = array_sum($recent) / count($recent);
+        // A player established in a comparable config is not a true no-history player.
+        // This is supporting evidence only: it can clear an in-family pace, never legitimise
+        // a second large jump above the related distribution.
+        $related = $this->trustedQuery($userId, $mode, $language)
+            ->where('mode_config', '!=', $modeConfig)
+            ->limit(self::HISTORY_WINDOW)
+            ->pluck('net_wpm')
+            ->map(fn ($value) => (float) $value)
+            ->all();
 
-        // Guard against a zero/near-zero average producing a meaningless ratio.
-        if ($avg <= 0) {
-            return $netWpm >= self::NO_HISTORY_WPM ? 'no_history_high' : null;
+        if (count($related) >= self::MIN_RELATED_HISTORY) {
+            $decision = $this->against($related, $netWpm, 'insufficient', 'related_config');
+
+            if (! $decision->isPending()) {
+                return $decision;
+            }
         }
 
-        return $netWpm > $avg * (1 + self::SPIKE_FRACTION)
-            ? 'longitudinal_spike'
-            : null;
+        return new LongitudinalDecision(
+            $netWpm >= self::NO_HISTORY_WPM ? 'no_history_high' : null,
+            $exact === [] && $related === [] ? 'empty' : 'insufficient',
+            [
+                'sample_count' => count($exact),
+                'related_sample_count' => count($related),
+                'source_scope' => $related === [] ? 'none' : 'related_config',
+                'effective_threshold' => self::NO_HISTORY_WPM,
+            ],
+        );
+    }
+
+    /** Backward-compatible reason-only API used by older callers/tests. */
+    public function reviewReasonFor(
+        int $userId,
+        string $mode,
+        string $modeConfig,
+        float $netWpm,
+        string $language = TypingLanguage::DEFAULT,
+    ): ?string {
+        return $this->decisionFor($userId, $mode, $modeConfig, $language, $netWpm)->reason;
+    }
+
+    private function trustedQuery(int $userId, string $mode, string $language)
+    {
+        return TypingResult::query()
+            ->where('user_id', $userId)
+            ->where('mode', $mode)
+            ->where('language', $language)
+            ->trustworthy()
+            ->orderByDesc('id');
+    }
+
+    /**
+     * @param  list<float>  $samples
+     */
+    private function against(array $samples, float $netWpm, string $state, string $source): LongitudinalDecision
+    {
+        $center = $this->median($samples);
+        $deviations = array_map(fn (float $value) => abs($value - $center), $samples);
+        $mad = $this->median($deviations);
+
+        // Both conditions are intentionally conservative. A noisy player's natural spread
+        // earns more headroom, while a perfectly stable baseline still gets an absolute and
+        // percentage allowance. One warm-up/outlier cannot drag the median down like mean did.
+        $threshold = max(
+            $center * (1 + self::SPIKE_FRACTION),
+            $center + self::MIN_ABSOLUTE_HEADROOM,
+            $center + self::MAD_MULTIPLIER * 1.4826 * $mad,
+        );
+
+        return new LongitudinalDecision(
+            $netWpm > $threshold ? 'longitudinal_spike' : null,
+            $state,
+            [
+                'sample_count' => count($samples),
+                'center' => round($center, 2),
+                'spread' => round($mad, 2),
+                'effective_threshold' => round($threshold, 2),
+                'source_scope' => $source,
+            ],
+        );
+    }
+
+    /** @param list<float> $values */
+    private function median(array $values): float
+    {
+        sort($values, SORT_NUMERIC);
+        $count = count($values);
+        $middle = intdiv($count, 2);
+
+        return $count % 2 === 1
+            ? (float) $values[$middle]
+            : ((float) $values[$middle - 1] + (float) $values[$middle]) / 2;
     }
 }

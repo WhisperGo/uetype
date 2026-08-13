@@ -70,6 +70,27 @@
             </div>
         @endif
 
+        @if (! $afk && $resultStatus === 'pending')
+            <div role="status" class="mb-6 rounded-lg border border-gold/40 bg-gold/10 px-4 py-3 font-mono text-gold">
+                <p class="flex items-center gap-2 text-x-small font-bold">
+                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{{ __('result.integrity.pending_title') }}</span>
+                </p>
+                <p class="mt-2 text-x-small text-gold/80">{{ __('result.integrity.pending_body') }}</p>
+            </div>
+        @elseif (! $afk && $resultStatus === 'clear')
+            <div role="status" class="mb-6 flex items-center gap-2 rounded-lg border border-brand/30 bg-brand/10 px-4 py-3 text-x-small font-mono text-brand-bright">
+                <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4 4L19 6" />
+                </svg>
+                <span>{{ $autoClearedCount > 1
+                    ? __('result.integrity.auto_cleared', ['count' => $autoClearedCount])
+                    : __('result.integrity.clear') }}</span>
+            </div>
+        @endif
+
         {{-- Achievements this session unlocked are announced as a TOAST, handed to the global
              stack in app.blade.php rather than drawn here.
 

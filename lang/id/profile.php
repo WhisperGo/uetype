@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'integrity_pending_title' => 'Hasil sedang diverifikasi otomatis',
+    'integrity_pending_body' => ':count hasil tersimpan belum digunakan untuk rekor atau leaderboard. Backend akan menyelesaikannya tanpa persetujuan admin.',
     'header' => 'PROFIL',
     'header_public' => 'PROFIL PEMAIN',
     'back' => 'Kembali',

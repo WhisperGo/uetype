@@ -16,6 +16,14 @@ return [
     'th_raw' => 'Raw',
     'th_accuracy' => 'Akurasi',
     'th_duration' => 'Durasi',
+    'th_status' => 'Status',
+
+    'status' => [
+        'clear' => 'Diterima',
+        'pending' => 'Verifikasi otomatis',
+        'verified' => 'Diterima otomatis',
+        'rejected' => 'Tidak diterima',
+    ],
 
     'empty' => 'Belum ada riwayat untuk mode yang dipilih.',
 ];

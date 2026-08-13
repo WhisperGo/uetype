@@ -4,11 +4,13 @@
 **Penjaga sesi solo:** [`App\Services\SoloSessionGuard`](../../app/Services/SoloSessionGuard.php)
 **Analisis timing keystroke:** [`App\Services\KeystrokeAnalyzer`](../../app/Services/KeystrokeAnalyzer.php)
 **Baseline per-pemain:** [`App\Services\LongitudinalBaseline`](../../app/Services/LongitudinalBaseline.php)
-**Antrean review admin:** [`App\Livewire\ReviewQueue`](../../app/Livewire/ReviewQueue.php) (`/review-queue`)
+**Resolver probation otomatis:** [`App\Services\AutomaticResultResolver`](../../app/Services/AutomaticResultResolver.php)
+**Antrean review legacy:** [`App\Livewire\ReviewQueue`](../../app/Livewire/ReviewQueue.php) (`/review-queue`)
 **Dipakai oleh:** [`TypingEngine::saveResult()`](../../app/Livewire/TypingEngine.php) (solo),
 [`MultiplayerLobby::updateRaceProgress()`](../../app/Livewire/MultiplayerLobby.php) (WPM live race),
 dan [`FinalizesRace::isValidRaceResult()`](../../app/Livewire/Concerns/FinalizesRace.php) (validasi hasil akhir race)
 **Audit data lama:** `php artisan typing:audit` (read-only)
+**Rekonsiliasi otomatis:** `php artisan typing:reconcile` (idempotent; juga dijadwalkan tiap jam)
 
 ---
 
@@ -197,8 +199,8 @@ invalid"** untuk semua titik finalisasi. Lihat detail alur di
 
 ## 6. Referensi Lanjutan
 
-Analisis mendalam soal "WPM tinggi + akurasi rendah apakah valid" dan penyelarasan solo vs
-multiplayer ada di [`../wpm-accuracy-integrity.md`](../wpm-accuracy-integrity.md).
+Rancangan dan hasil eksekusi perbaikan false-positive longitudinal ada di
+[`../iteration/iteration-1-longitudinal-anti-cheat.md`](../iteration/iteration-1-longitudinal-anti-cheat.md).
 
 ## 7. Penjaga Sesi Solo (`SoloSessionGuard`)
 
@@ -311,14 +313,13 @@ test-nya karena itu menguji **beberapa panjang tes**, bukan satu.
 #### Konsekuensi yang dibayar, dan siapa yang menanggungnya
 
 Payload §4.1 (500 karakter / 30 detik = 200 WPM) kini **lolos plafon**. Ia tidak lolos begitu
-saja: ia jatuh ke lapisan kedua (§7.5) — run ≥150 WPM tanpa riwayat, atau >40% di atas rata-rata
-pemain sendiri, **ditahan untuk review**. Baris `pending` tetap tersimpan tapi tak pernah masuk
-leaderboard publik dan tak menaikkan `highest_wpm`.
+saja: ia jatuh ke lapisan longitudinal (§7.7c) — run ≥150 WPM tanpa riwayat, atau di atas ambang
+robust pemain sendiri, masuk **probation otomatis**. Baris `pending` tetap tersimpan tetapi tidak
+masuk leaderboard publik dan tidak menaikkan `highest_wpm` sampai bukti sesi berikutnya cukup.
 
-Jadi yang berubah bukan "bot menang", melainkan **siapa yang menangkapnya**: dulu plafon menolak
-di depan, sekarang review menahan di belakang. Trade ini disengaja — menolak pemain jujur lebih
-mahal daripada menahan bot satu lapis lebih dalam, karena **pemain jujur tak punya jalan banding**
-sementara bot tak mendapat apa-apa dari baris yang tak pernah publik.
+Jadi yang berubah bukan "bot menang", melainkan **lapisan yang menangkapnya**: dulu plafon menolak
+di depan, sekarang probation menahan di belakang. Pemain jujur dapat keluar otomatis setelah
+menghasilkan cluster sesi manusiawi; satu klaim tinggi tetap tidak mendapat angka publik.
 
 > **Jangan perketat lagi berdasarkan intuisi** — itu persis yang melahirkan bug di atas. Nilai
 > final harus diambil dari distribusi `net_wpm` install ini sendiri (p99.9). Caveat itu sudah ada
@@ -397,15 +398,19 @@ pemain jujur saat deploy.
 **c. Baseline longitudinal per-pemain** (`LongitudinalBaseline`)
 
 Keunggulan struktural UEType atas situs typing murni: **riwayat pemain** sudah tersimpan di
-`typing_results`. `reviewReasonFor()` membandingkan hasil baru dengan riwayat pemain di mode/config
-yang sama:
+`typing_results`. `decisionFor()` membandingkan hasil baru dengan riwayat tepercaya pemain:
 
-- `longitudinal_spike` — lonjakan > **40%** di atas rata-rata (jendela **20** sesi terakhir, minimal **5** riwayat)
+- `longitudinal_spike` — hasil melewati ambang terbesar dari median + 40%, median + 20 WPM,
+  atau median + 4 × scaled MAD (jendela **20** sesi terakhir, minimal **5** exact history)
 - `no_history_high` — pemain tanpa riwayat langsung mencetak ≥ **150 WPM**
 
-**Ini tidak menolak** — pemain memang bisa membaik, dan menghukum peningkatan asli jauh lebih
-merusak kepercayaan daripada meloloskan satu cheater. Ia hanya **menandai untuk review manusia**.
-Hanya riwayat `clear`/`approved` yang jadi pembanding (hasil pending/rejected tak mencemari baseline).
+Bahasa merupakan dimensi exact dan tidak dicampur. Minimal tiga hasil tepercaya dari konfigurasi
+lain pada mode dan bahasa yang sama boleh menjadi konteks pendukung, tetapi tidak dapat melegitimasi
+lonjakan besar kedua. Median + MAD mencegah satu warm-up buruk atau satu outlier menggeser baseline.
+
+**Ini tidak menolak** — pemain memang bisa membaik. Ia membuat probation yang diselesaikan
+`AutomaticResultResolver`, bukan tiket admin. Hanya riwayat `clear`/`approved` yang menjadi
+baseline publik; `pending` hanya dibaca resolver sebagai bukti provisional dengan syarat ketat.
 
 ### 7.7d Aturan durasi & plafon khusus Clan War
 
@@ -468,10 +473,10 @@ stamina awal dianggap habis terpakai, dan **cap** stamina diabaikan meski di per
 membuang refill di atas `sMax` sehingga kebutuhan sebenarnya lebih tinggi. Ditambah toleransi 10%
 lagi sebelum apa pun ditandai.
 
-**Ditahan, bukan ditolak** — sama seperti §7.7c. Barisnya tetap tersimpan dan terlihat di profil
-pemain sendiri, hanya tak ikut papan publik sampai ada manusia yang meloloskannya
-(`review_reason = 'survival_impossible'`). Lantai fisik yang salah tembak pada satu pemain jujur
-lebih mahal daripada poin yang ia jaga.
+**Ditolak otomatis, bukan dibuat pending.** Mengulang klaim yang berada di bawah invariant fisik
+tidak dapat menjadikannya mungkin, sehingga tidak ada bukti longitudinal yang dapat menyelesaikan
+status tersebut. Baris tidak disimpan dan pemain memperoleh pesan penolakan spesifik. Run Survival
+yang memenuhi lantai langsung `clear`; mode ini tidak membutuhkan keputusan admin.
 
 > **Preset stamina disalin ke PHP, dan salinan bisa hanyut.** Alternatifnya lebih buruk: klien
 > butuh angka itu tiap frame, server butuh untuk membatasi klaim, dan mengirimkannya dari klien
@@ -479,17 +484,17 @@ lebih mahal daripada poin yang ia jaga.
 > membaca berkas JS dan membandingkannya — berubah di sisi mana pun, suite yang merah, bukan
 > lantai yang diam-diam melonggar.
 
-### 7.8 Antrean review admin (`review_status`)
+### 7.8 Probation otomatis (`review_status`)
 
 Sinyal §7.7c yang menandai membuat hasil disimpan sebagai **`pending`**, bukan ditolak. Kolom
-`review_status` di `typing_results` punya empat nilai:
+`review_status` memiliki empat nilai, tetapi hanya `clear` dan `pending` yang ditulis alur baru:
 
 | Status | Arti | Boleh jadi angka publik? |
 |---|---|---|
 | `clear` | lolos otomatis (mayoritas hasil) | ✅ |
-| `pending` | ditahan untuk ditinjau manusia | ❌ (sampai di-approve) |
-| `approved` | admin menyetujui | ✅ |
-| `rejected` | admin menolak | ❌ selamanya |
+| `pending` | probation otomatis, menunggu bukti sesi lanjutan | ❌ (sampai auto-clear) |
+| `approved` | nilai legacy yang dahulu disetujui admin | ✅ |
+| `rejected` | nilai legacy yang dahulu ditolak admin | ❌ selamanya |
 
 **Kolomnya menjaga tiga angka, bukan cuma leaderboard.** Gerbangnya hidup di satu tempat —
 `TypingResult::scopeTrustworthy()` — dan dipakai papan, kedua helper rekor per-mode
@@ -508,13 +513,20 @@ disimulasikan di **klien** — jadi justru angka yang tak bisa dihitung ulang se
 dulu kembali sebagai rekor meski `SurvivalPlausibility` menahannya. Dikunci
 `RecordExcludesFlaggedTest`.
 
-Admin membuka **`/review-queue`** ([`ReviewQueue`](../../app/Livewire/ReviewQueue.php)) untuk
-menilai tiap hasil pending (pemain, WPM, akurasi, alasan flag) lalu **Approve** (hasil masuk
-leaderboard, PB pemain ikut naik bila mengalahkan rekor) atau **Reject** (tetap di luar). Ini
-satu-satunya lapisan yang **tak bisa di-*pace*** — tak ada angka tetap untuk dibidik di bawahnya,
-karena manusia yang memutuskan.
+Untuk Time/Words, minimal tiga sesi pada bucket user + mode + config + bahasa yang sama harus
+membawa fingerprint server unik, timing bersih dengan coverage memadai, total volume minimal,
+konsistensi di bawah invariant mekanis, dan WPM dalam rentang 12% atau 12 WPM dari median cluster.
+Cluster dibatasi 14 hari. Jika lolos, resolver mempromosikan seluruh hasil pending yang didukung
+secara atomik, menghitung ulang `highest_wpm`, dan melepas poin Clan War yang masih ongoing.
 
-Akses admin-saja: route memikul `EnsureUserIsAdmin` sebagai **satu-satunya** gerbang (guest &
+Resolver dipanggil sesudah setiap hasil dan oleh command `typing:reconcile` per jam sebagai safety
+net. Satu baris tanpa evidence atau satu outlier tidak memblokir cluster bersih berikutnya, tetapi
+baris tersebut juga tidak menjadi suara pembentuk cluster.
+
+`/review-queue` dipertahankan hanya untuk kompatibilitas/audit legacy pada iterasi ini. Workflow
+normal tidak menunggu klik Approve/Reject dan fungsi admin tetap monitoring.
+
+Akses panel legacy tetap admin-saja: route memikul `EnsureUserIsAdmin` sebagai **satu-satunya** gerbang (guest &
 non-admin sama-sama dapat **404**, tak membocorkan keberadaan panel), dan tiap aksi memeriksa
 ulang Gate `access-monitoring` di server. Filter leaderboard di
 [`leaderboard.blade.php`](../../resources/views/livewire/leaderboard.blade.php) hanya menerima
@@ -755,7 +767,8 @@ Keunggulannya unik: gerbang ini **tidak bisa di-*pace*** (tak ada angka untuk di
   hanya bergabung ke papan global begitu ambang tercapai (diuji eksplisit).
 - **Pesan yang jelas.** Pemain yang **sudah mengetik tapi belum cukup** melihat "ketik X menit
   lagi untuk masuk papan" (`leaderboard.eligibility_pending`), bukan "Unranked" telanjang yang
-  seolah rekornya lenyap. Yang **belum pernah main** tetap "Unranked" biasa.
+  seolah rekornya lenyap. Setelah mencapai 30 menit, pemain yang hasil relevannya masih probation
+  melihat `leaderboard.verification_pending`; yang **belum pernah main** tetap "Unranked" biasa.
 
 ### 11.4 Kalibrasi
 

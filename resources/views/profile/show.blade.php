@@ -101,6 +101,15 @@
                 </div>
             </div>
 
+            @if(! $isPublic && ($stats['pending_results'] ?? 0) > 0)
+                <div role="status" class="rounded-2xl border border-gold/40 bg-gold/10 px-5 py-4 font-mono text-gold">
+                    <p class="text-sm font-semibold">{{ __('profile.integrity_pending_title') }}</p>
+                    <p class="mt-1 text-xs text-gold/80">
+                        {{ __('profile.integrity_pending_body', ['count' => $stats['pending_results']]) }}
+                    </p>
+                </div>
+            @endif
+
             <!-- ===== STATISTICS ===== -->
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 @php
@@ -133,6 +142,10 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
                 </a>
+
+                {{-- Private audit trail: a player must be able to see which individual runs
+                     are public and which are still in automatic integrity probation. --}}
+                <livewire:profile.typing-history />
             @endif
 
         </div>

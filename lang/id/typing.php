@@ -42,6 +42,7 @@ return [
     'result_rejected' => 'Hasil sesi ini ditolak oleh validasi server (tidak masuk akal) dan tidak disimpan.',
     'result_rate_limited' => 'Terlalu banyak hasil dikirim dalam waktu singkat. Tunggu sebentar sebelum menyelesaikan tes berikutnya.',
     'result_session_expired' => 'Sesi tes ini kedaluwarsa atau dimulai di tab lain, sehingga hasilnya tidak dapat disimpan. Silakan jalankan tesnya lagi.',
+    'result_survival_unverified' => 'Hasil Survival tidak dapat diverifikasi dari durasi dan input sesi, sehingga tidak disimpan.',
 
     'aria' => [
         'pick_main_mode' => 'Pilih mode utama',

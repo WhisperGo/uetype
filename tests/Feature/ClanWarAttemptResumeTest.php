@@ -309,7 +309,7 @@ it('caps a survival war credit by the wall budget already spent', function () {
     app(SoloSessionGuard::class)->backdate(90);
     $claim->update(['attempt_started_at' => now()->subSeconds(200)]);
 
-    $component->call('saveResult', ['durationMs' => 90000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 300])
+    $component->call('saveResult', ['durationMs' => 90000, 'totalKeystrokes' => 600, 'correctKeystrokes' => 600])
         ->assertRedirect(route('typing.result'));
 
     $claim->refresh();
@@ -327,7 +327,7 @@ it('does not shrink the stored survival duration, only the war credit', function
     app(SoloSessionGuard::class)->backdate(90);
     $claim->update(['attempt_started_at' => now()->subSeconds(200)]);
 
-    $component->call('saveResult', ['durationMs' => 90000, 'totalKeystrokes' => 300, 'correctKeystrokes' => 300])
+    $component->call('saveResult', ['durationMs' => 90000, 'totalKeystrokes' => 600, 'correctKeystrokes' => 600])
         ->assertRedirect(route('typing.result'));
 
     // The solo record stays truthful: they really did survive 90 seconds. Capping the STORED

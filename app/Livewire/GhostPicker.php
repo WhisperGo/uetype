@@ -84,6 +84,7 @@ class GhostPicker extends Component
         $bests = TypingResult::whereIn('user_id', $friends->pluck('user_id'))
             ->where('mode', $this->mainMode)
             ->where('mode_config', $this->subMode)
+            ->trustworthy()
             ->groupBy('user_id')
             ->selectRaw('user_id, MAX(net_wpm) as best')
             ->pluck('best', 'user_id');

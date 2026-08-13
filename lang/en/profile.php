@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'integrity_pending_title' => 'Results are being verified automatically',
+    'integrity_pending_body' => ':count saved result(s) are not used for records or the leaderboard yet. The backend will resolve them without admin approval.',
     'header' => 'PROFILE',
     'header_public' => 'PLAYER PROFILE',
     'back' => 'Back',

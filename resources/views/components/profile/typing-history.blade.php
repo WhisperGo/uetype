@@ -89,6 +89,7 @@ new class extends Component
                         <th scope="col" class="px-3 sm:px-6 py-3 font-semibold">{{ __('history.th_raw') }}</th>
                         <th scope="col" class="px-3 sm:px-6 py-3 font-semibold">{{ __('history.th_accuracy') }}</th>
                         <th scope="col" class="px-3 sm:px-6 py-3 font-semibold">{{ __('history.th_duration') }}</th>
+                        <th scope="col" class="px-3 sm:px-6 py-3 font-semibold">{{ __('history.th_status') }}</th>
                     </tr>
                 </thead>
                 <tbody class="font-mono">
@@ -114,10 +115,29 @@ new class extends Component
                             <td class="px-3 sm:px-6 py-4 text-muted">
                                 {{ rtrim(rtrim(number_format($result->duration_seconds, 1), '0'), '.') }}s
                             </td>
+                            <td class="px-3 sm:px-6 py-4">
+                                @if ($result->review_status === \App\Models\TypingResult::REVIEW_PENDING)
+                                    <span class="inline-flex rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-xs text-gold">
+                                        {{ __('history.status.pending') }}
+                                    </span>
+                                @elseif ($result->review_status === \App\Models\TypingResult::REVIEW_REJECTED)
+                                    <span class="inline-flex rounded-full border border-danger/40 bg-danger/10 px-2 py-0.5 text-xs text-danger">
+                                        {{ __('history.status.rejected') }}
+                                    </span>
+                                @elseif ($result->review_resolved_at !== null)
+                                    <span class="inline-flex rounded-full border border-brand/30 bg-brand/10 px-2 py-0.5 text-xs text-brand-bright">
+                                        {{ __('history.status.verified') }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex rounded-full border border-brand/30 bg-brand/10 px-2 py-0.5 text-xs text-brand-bright">
+                                        {{ __('history.status.clear') }}
+                                    </span>
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-muted font-mono">
+                            <td colspan="7" class="px-6 py-8 text-center text-muted font-mono">
                                 {{ __('history.empty') }}
                             </td>
                         </tr>

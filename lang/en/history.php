@@ -16,6 +16,14 @@ return [
     'th_raw' => 'Raw',
     'th_accuracy' => 'Accuracy',
     'th_duration' => 'Duration',
+    'th_status' => 'Status',
+
+    'status' => [
+        'clear' => 'Accepted',
+        'pending' => 'Automatic verification',
+        'verified' => 'Automatically accepted',
+        'rejected' => 'Not accepted',
+    ],
 
     'empty' => 'No history for the selected mode yet.',
 ];
