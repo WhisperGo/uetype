@@ -88,4 +88,7 @@ jobs:
         run: php artisan migrate --force
 
       - name: Run tests (Pest)
-        run: php artisan test
+        # The full Blade-heavy suite exceeds PHP's 128M CLI default. Invoke Pest
+        # directly so the per-process limit is applied to the actual test runner;
+        # `php -d ... artisan test` would launch a child process without that flag.
+        run: php -d memory_limit=512M vendor/bin/pest
