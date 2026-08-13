@@ -5,9 +5,12 @@ namespace App\Services;
 /** Replays a bounded key-event stream against the server-issued challenge text. */
 class TypingVerificationReplay
 {
-    public const DURATION_SECONDS = 30.0;
+    public const DURATION_SECONDS = 10.0;
 
     private const MAX_EVENTS = 2000;
+
+    /** Client timestamps are clamped to the timer; 250 ms only absorbs scheduling jitter. */
+    private const EVENT_END_SLACK_MS = 250.0;
 
     /**
      * @param  array<int, mixed>  $events
@@ -33,7 +36,9 @@ class TypingVerificationReplay
             $key = (string) $event['key'];
             $at = (float) $event['at_ms'];
 
-            if ($at < 0 || $at < $previousAt || $at > 35_000) {
+            $latestAllowedAt = self::DURATION_SECONDS * 1000 + self::EVENT_END_SLACK_MS;
+
+            if ($at < 0 || $at < $previousAt || $at > $latestAllowedAt) {
                 return $this->failure('event_timing_invalid');
             }
 

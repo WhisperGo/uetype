@@ -2,8 +2,8 @@
 
 return [
     'integrity_pending_title' => 'Hasil sedang diverifikasi otomatis',
-    'integrity_pending_body' => ':count hasil tersimpan belum digunakan untuk rekor atau leaderboard. Kamu dapat menyelesaikan cek kecepatan 30 detik sekarang.',
-    'verify_speed' => 'Verifikasi kecepatan · 30 detik',
+    'integrity_pending_body' => ':count hasil tersimpan belum digunakan untuk rekor atau leaderboard. Kamu dapat menyelesaikan cek kecepatan 10 detik sekarang.',
+    'verify_speed' => 'Verifikasi kecepatan · 10 detik',
     'header' => 'PROFIL',
     'header_public' => 'PROFIL PEMAIN',
     'back' => 'Kembali',

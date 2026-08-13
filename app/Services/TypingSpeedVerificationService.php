@@ -11,15 +11,15 @@ use Illuminate\Support\Str;
 
 class TypingSpeedVerificationService
 {
-    public const DURATION_SECONDS = 30;
+    public const DURATION_SECONDS = 10;
 
     public const ATTEMPT_TTL_MINUTES = 10;
 
     private const MIN_ACCURACY = 75.0;
 
-    private const MIN_SERVER_ELAPSED_SECONDS = 28.0;
+    private const MIN_SERVER_ELAPSED_SECONDS = 8.0;
 
-    private const MAX_SERVER_ELAPSED_SECONDS = 45.0;
+    private const MAX_SERVER_ELAPSED_SECONDS = 20.0;
 
     public function eligibleResultFor(User $user): ?TypingResult
     {
@@ -57,7 +57,11 @@ class TypingSpeedVerificationService
                 ]);
 
             $token = Str::random(64);
-            $text = app(TextGeneratorService::class)->forSoloMode('time', '30', $source->language);
+            $text = app(TextGeneratorService::class)->forSoloMode(
+                'time',
+                (string) self::DURATION_SECONDS,
+                $source->language,
+            );
 
             $attempt = TypingVerificationAttempt::create([
                 'user_id' => $user->id,
@@ -186,6 +190,7 @@ class TypingSpeedVerificationService
                 $replay['accuracy'],
                 [
                     'attempt_id' => $attempt->id,
+                    'challenge_duration_seconds' => self::DURATION_SECONDS,
                     'timing' => $timing,
                     'sample_count' => count($replay['intervals']),
                     'event_count' => count($events),
@@ -200,6 +205,7 @@ class TypingSpeedVerificationService
                 'result_meta' => [
                     'verification_wpm' => $replay['net_wpm'],
                     'accuracy' => $replay['accuracy'],
+                    'challenge_duration_seconds' => self::DURATION_SECONDS,
                     'ceiling' => $result['ceiling'],
                     'promoted_count' => count($result['promoted_ids']),
                 ],
@@ -225,7 +231,7 @@ class TypingSpeedVerificationService
         }, 3);
     }
 
-    /** Start the authoritative 30-second window on the first real input, exactly once. */
+    /** Start the authoritative 10-second window on the first real input, exactly once. */
     public function begin(User $user, int $attemptId, string $token): bool
     {
         return DB::transaction(function () use ($user, $attemptId, $token) {

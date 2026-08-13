@@ -40,7 +40,7 @@ function speedVerificationPendingResult(
 }
 
 /** @return list<array{key:string,at_ms:int,type:string}> */
-function speedVerificationEvents(string $text, int $characters = 425, bool $uniform = false): array
+function speedVerificationEvents(string $text, int $characters = 142, bool $uniform = false): array
 {
     $characters = min($characters, mb_strlen($text));
     $chars = array_slice(mb_str_split($text), 0, $characters);
@@ -56,7 +56,7 @@ function speedVerificationEvents(string $text, int $characters = 425, bool $unif
     return $events;
 }
 
-it('verifies a 30-second pace and promotes supported pending results in the same language', function () {
+it('verifies a universal 10-second pace and promotes supported pending results in the same language', function () {
     $user = User::factory()->create(['highest_wpm' => 0]);
 
     $tooFast = speedVerificationPendingResult($user, 205, 'en');
@@ -69,12 +69,12 @@ it('verifies a 30-second pace and promotes supported pending results in the same
     $events = speedVerificationEvents($issued['attempt']->challenge_text);
 
     expect($verification->begin($user, $issued['attempt']->id, $issued['token']))->toBeTrue();
-    $this->travel(30)->seconds();
+    $this->travel(10)->seconds();
     $result = $verification->complete($user, $issued['attempt']->id, $issued['token'], $events);
 
     expect($result['passed'])->toBeTrue()
-        ->and($result['wpm'])->toBe(170.0)
-        ->and($result['ceiling'])->toBe(195.5)
+        ->and($result['wpm'])->toBe(170.4)
+        ->and($result['ceiling'])->toBe(195.96)
         ->and($result['promoted_count'])->toBe(2)
         ->and($supported->fresh()->review_status)->toBe(TypingResult::REVIEW_CLEAR)
         ->and($source->fresh()->review_status)->toBe(TypingResult::REVIEW_CLEAR)
@@ -92,6 +92,33 @@ it('verifies a 30-second pace and promotes supported pending results in the same
         ->toBe('no_history_high');
 });
 
+it('keeps the stronger legacy 30-second capability valid after the universal challenge upgrade', function () {
+    $user = User::factory()->create();
+    TypingSpeedCapability::create([
+        'user_id' => $user->id,
+        'language' => 'en',
+        'verified_wpm' => 160,
+        'verified_accuracy' => 98,
+        'verified_at' => now(),
+        'rule_version' => 1,
+        'evidence_meta' => ['challenge_duration_seconds' => 30],
+    ]);
+
+    $decision = app(LongitudinalBaseline::class)->decisionFor(
+        $user->id,
+        'words',
+        '10',
+        'en',
+        180,
+        ['has_data' => true, 'reasons' => []],
+    );
+
+    expect(TypingSpeedVerificationService::DURATION_SECONDS)->toBe(10)
+        ->and(TypingVerificationReplay::DURATION_SECONDS)->toBe(10.0)
+        ->and($decision->reason)->toBeNull()
+        ->and($decision->state)->toBe('verified_capability');
+});
+
 it('consumes a token once and never promotes a failed uniform event stream', function () {
     $user = User::factory()->create();
     $source = speedVerificationPendingResult($user, 170);
@@ -99,7 +126,7 @@ it('consumes a token once and never promotes a failed uniform event stream', fun
     $issued = $verification->issue($user);
 
     $verification->begin($user, $issued['attempt']->id, $issued['token']);
-    $this->travel(30)->seconds();
+    $this->travel(10)->seconds();
     $failed = $verification->complete(
         $user,
         $issued['attempt']->id,
@@ -142,7 +169,7 @@ it('keeps only one active attempt and binds submission to its owner', function (
     expect($verification->begin($user, $second['attempt']->id, $second['token']))->toBeTrue()
         ->and($second['attempt']->fresh()->input_started_at->equalTo($firstInputAt))->toBeTrue();
 
-    $this->travel(25)->seconds();
+    $this->travel(5)->seconds();
     $foreign = $verification->complete(
         $other,
         $second['attempt']->id,
@@ -176,6 +203,8 @@ it('replays corrections and rejects a backward timestamp or incomplete timing co
     $valid = $replay->replay($target, $events);
     $backward = $events;
     $backward[30]['at_ms'] = 1;
+    $pastTimer = $events;
+    $pastTimer[array_key_last($pastTimer)]['at_ms'] = 10_251;
     $sparse = $events;
     foreach ($sparse as $index => &$event) {
         $event['at_ms'] = intdiv($index, 5) * 100;
@@ -186,6 +215,7 @@ it('replays corrections and rejects a backward timestamp or incomplete timing co
         ->and($valid['correct_chars'])->toBe(80)
         ->and($valid['accuracy'])->toBe(98.77)
         ->and($replay->replay($target, $backward)['reason'])->toBe('event_timing_invalid')
+        ->and($replay->replay($target, $pastTimer)['reason'])->toBe('event_timing_invalid')
         ->and($replay->replay($target, $sparse)['reason'])->toBe('event_coverage_invalid');
 });
 

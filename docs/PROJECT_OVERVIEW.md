@@ -278,7 +278,7 @@ selamat melewati unload; `FriendController` melayani nav yang berupa partial sta
 | `KeystrokeAnalyzer` | Analisis distribusi timing antar-keystroke (deteksi bot) — §7.7b |
 | `LongitudinalBaseline` | Bandingkan hasil vs riwayat tepercaya pemain; tandai lonjakan untuk probation otomatis — §7.7c |
 | `AutomaticResultResolver` | Evaluasi cluster bukti pending dan promosikan hasil yang saling mendukung ke `clear` tanpa keputusan admin |
-| `TypingSpeedVerificationService` | Terbitkan dan konsumsi challenge Time 30 dengan token sekali pakai, replay event, expiry, serta lifecycle attempt |
+| `TypingSpeedVerificationService` | Terbitkan dan konsumsi challenge universal Time 10 untuk hasil Time/Words, dengan token sekali pakai, replay event, expiry, serta lifecycle attempt |
 | `TypingVerificationReplay` | Rekonstruksi teks dan metrik challenge dari urutan event tombol yang dibatasi |
 | `TypingSpeedCapabilityService` | Simpan capability per user + bahasa dan gunakan ceiling terverifikasi pada hasil berikutnya |
 | `TypingResultPromoter` | Satu jalur idempoten untuk clear hasil serta sinkronisasi PB, achievement, dan poin war |

@@ -3,9 +3,9 @@
 return [
     'eyebrow' => 'Verifikasi kecepatan',
     'title' => 'Verifikasi pace mengetikmu',
-    'intro' => 'Ketik teks yang tersedia selama 30 detik. Hasil bersih yang mendekati pace tersimpan dapat langsung meloloskan hasil yang memenuhi syarat.',
+    'intro' => 'Ketik teks yang tersedia selama 10 detik. Hasil bersih yang mendekati pace tersimpan dapat langsung meloloskan hasil Time dan Words yang memenuhi syarat.',
     'seconds' => 'detik',
-    'rule_time' => 'Timer dimulai saat ketikan pertama dan berhenti otomatis setelah 30 detik.',
+    'rule_time' => 'Timer dimulai saat ketikan pertama dan berhenti otomatis setelah 10 detik.',
     'rule_locked' => 'Paste, drop, dan input otomatis tidak diterima.',
     'rule_no_rewards' => 'Cek ini memverifikasi pace; ini bukan tes mengetik yang menghasilkan skor.',
     'start' => 'Mulai verifikasi',

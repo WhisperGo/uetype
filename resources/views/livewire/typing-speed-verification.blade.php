@@ -1,5 +1,7 @@
+@php($durationSeconds = \App\Services\TypingSpeedVerificationService::DURATION_SECONDS)
+
 <x-page-container width="max-w-4xl">
-    <div class="py-12 font-mono" x-data="speedVerification($wire, 30)" x-on:pagehide.window="destroy()">
+    <div class="py-12 font-mono" x-data="speedVerification($wire, {{ $durationSeconds }})" x-on:pagehide.window="destroy()">
         <div class="rounded-3xl border border-border bg-surface/70 p-6 sm:p-8">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -8,7 +10,7 @@
                     <p class="mt-3 max-w-2xl text-sm leading-relaxed text-muted">{{ __('verification.intro') }}</p>
                 </div>
                 <div class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-center text-gold">
-                    <p class="text-3xl font-bold tabular-nums" x-text="remaining">30</p>
+                    <p class="text-3xl font-bold tabular-nums" x-text="remaining">{{ $durationSeconds }}</p>
                     <p class="text-[0.65rem] uppercase tracking-widest">{{ __('verification.seconds') }}</p>
                 </div>
             </div>

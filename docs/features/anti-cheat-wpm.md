@@ -5,7 +5,7 @@
 **Analisis timing keystroke:** [`App\Services\KeystrokeAnalyzer`](../../app/Services/KeystrokeAnalyzer.php)
 **Baseline per-pemain:** [`App\Services\LongitudinalBaseline`](../../app/Services/LongitudinalBaseline.php)
 **Resolver probation otomatis:** [`App\Services\AutomaticResultResolver`](../../app/Services/AutomaticResultResolver.php)
-**Verifikasi kecepatan 30 detik:** [`App\Services\TypingSpeedVerificationService`](../../app/Services/TypingSpeedVerificationService.php)
+**Verifikasi kecepatan universal 10 detik:** [`App\Services\TypingSpeedVerificationService`](../../app/Services/TypingSpeedVerificationService.php)
 **Capability kecepatan:** [`App\Services\TypingSpeedCapabilityService`](../../app/Services/TypingSpeedCapabilityService.php)
 **Antrean review legacy:** [`App\Livewire\ReviewQueue`](../../app/Livewire/ReviewQueue.php) (`/review-queue`)
 **Dipakai oleh:** [`TypingEngine::saveResult()`](../../app/Livewire/TypingEngine.php) (solo),
@@ -530,7 +530,7 @@ Resolver dipanggil sesudah setiap hasil dan oleh command `typing:reconcile` per 
 net. Satu baris tanpa evidence atau satu outlier tidak memblokir cluster bersih berikutnya, tetapi
 baris tersebut juga tidak menjadi suara pembentuk cluster.
 
-Pemain juga dapat memilih challenge Time 30 detik dari halaman hasil atau profil sendiri. Server
+Pemain juga dapat memilih challenge universal Time 10 detik dari halaman hasil atau profil sendiri. Server
 menerbitkan teks dan token sekali pakai, lalu me-replay stream tombol lengkap untuk menghitung WPM,
 akurasi, dan bentuk timing. Challenge yang lolos membentuk capability per user + bahasa. Capability
 berlaku untuk hasil Time/Words bertiming bersih sampai `verified_wpm + max(15 WPM, 15%)`, termasuk
@@ -539,7 +539,7 @@ XP, PB, achievement, entri leaderboard, atau poin war. Kegagalan hanya menghabis
 asal tetap `pending` dan capability lama tidak diturunkan.
 
 Timer challenge mulai pada ketikan pertama, bukan saat request penerbitan selesai, sehingga waktu
-render dan pemulihan fokus tidak memotong jatah 30 detik. Retry gagal tidak memakai cooldown;
+render dan pemulihan fokus tidak memotong jatah 10 detik. Retry gagal tidak memakai cooldown;
 pembatas 30 start/menit hanya menjadi backstop terhadap request flood.
 
 `/review-queue` dipertahankan hanya untuk kompatibilitas/audit legacy pada iterasi ini. Workflow

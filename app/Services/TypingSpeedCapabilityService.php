@@ -8,7 +8,10 @@ use App\Models\User;
 
 class TypingSpeedCapabilityService
 {
-    public const RULE_VERSION = 1;
+    public const RULE_VERSION = 2;
+
+    /** Version 1 used the stronger 30-second challenge and remains valid. */
+    private const SUPPORTED_RULE_VERSIONS = [1, self::RULE_VERSION];
 
     private const ALLOWANCE_FRACTION = 0.15;
 
@@ -30,7 +33,7 @@ class TypingSpeedCapabilityService
         $capability = TypingSpeedCapability::query()
             ->where('user_id', $userId)
             ->where('language', $language)
-            ->where('rule_version', self::RULE_VERSION)
+            ->whereIn('rule_version', self::SUPPORTED_RULE_VERSIONS)
             ->first();
 
         return $capability !== null

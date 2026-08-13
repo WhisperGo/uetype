@@ -1,4 +1,4 @@
-export default function speedVerification(wire, durationSeconds = 30) {
+export default function speedVerification(wire, durationSeconds = 10) {
     return {
         wire,
         durationSeconds,

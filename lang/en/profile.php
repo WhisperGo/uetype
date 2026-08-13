@@ -2,8 +2,8 @@
 
 return [
     'integrity_pending_title' => 'Results are being verified automatically',
-    'integrity_pending_body' => ':count saved result(s) are not used for records or the leaderboard yet. You can complete a 30-second speed check now.',
-    'verify_speed' => 'Verify speed · 30 seconds',
+    'integrity_pending_body' => ':count saved result(s) are not used for records or the leaderboard yet. You can complete a 10-second speed check now.',
+    'verify_speed' => 'Verify speed · 10 seconds',
     'header' => 'PROFILE',
     'header_public' => 'PLAYER PROFILE',
     'back' => 'Back',

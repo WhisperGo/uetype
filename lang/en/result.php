@@ -22,8 +22,8 @@ return [
     'integrity' => [
         'clear' => 'Result accepted and eligible for records and the leaderboard.',
         'pending_title' => 'Result is being verified automatically',
-        'pending_body' => 'The result is saved, but is not used for records, Ghost, or the leaderboard yet. Complete a 30-second speed check to verify this pace now.',
-        'verify_speed' => 'Verify speed · 30 seconds',
+        'pending_body' => 'The result is saved, but is not used for records, Ghost, or the leaderboard yet. Complete a 10-second speed check to verify this pace now.',
+        'verify_speed' => 'Verify speed · 10 seconds',
         'auto_cleared' => ':count previously verified results were accepted automatically.',
     ],
 

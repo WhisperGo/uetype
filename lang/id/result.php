@@ -22,8 +22,8 @@ return [
     'integrity' => [
         'clear' => 'Hasil diterima dan dapat dihitung untuk rekor serta leaderboard.',
         'pending_title' => 'Hasil sedang diverifikasi otomatis',
-        'pending_body' => 'Hasil tetap tersimpan, tetapi belum digunakan untuk rekor, Ghost, atau leaderboard. Selesaikan cek kecepatan 30 detik untuk memverifikasi pace ini sekarang.',
-        'verify_speed' => 'Verifikasi kecepatan · 30 detik',
+        'pending_body' => 'Hasil tetap tersimpan, tetapi belum digunakan untuk rekor, Ghost, atau leaderboard. Selesaikan cek kecepatan 10 detik untuk memverifikasi pace ini sekarang.',
+        'verify_speed' => 'Verifikasi kecepatan · 10 detik',
         'auto_cleared' => ':count hasil yang sebelumnya diverifikasi kini diterima otomatis.',
     ],
 

@@ -3,9 +3,9 @@
 return [
     'eyebrow' => 'Speed verification',
     'title' => 'Verify your typing pace',
-    'intro' => 'Type the provided text for 30 seconds. A clean result close to your saved pace can release eligible results immediately.',
+    'intro' => 'Type the provided text for 10 seconds. A clean result close to your saved pace can release eligible Time and Words results immediately.',
     'seconds' => 'seconds',
-    'rule_time' => 'The timer starts on your first keystroke and stops automatically after 30 seconds.',
+    'rule_time' => 'The timer starts on your first keystroke and stops automatically after 10 seconds.',
     'rule_locked' => 'Paste, drop, and automated input are not accepted.',
     'rule_no_rewards' => 'This check verifies your pace; it is not a scored typing test.',
     'start' => 'Start verification',
